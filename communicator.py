@@ -8,9 +8,10 @@ class Communicator:
         self.device_idstr = device_idstr
         self.device_id = 0
         self.writer = queue_writer_json.QueueWriterJson()
+        self.gps = gps
         self.gps = "5.8833, -162.0833"
 
-    def register(self):
+    def register(self, latlng):
         if self.device_type is not constants.DEVICE_TYPE_CAM:
             return
         register_msg = {
