@@ -1,0 +1,7 @@
+REGISTER
+  Cam->CC
+  Data:
+    DEVICE_ID
+    GPS
+    NEIGHBOURHOOD
+
