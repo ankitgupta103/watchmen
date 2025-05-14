@@ -1,23 +1,19 @@
 import constants
+import device_info
 
 from vyomcloudbridge.services import queue_writer_json
 
 class Communicator:
-    def __init__(self, device_type, device_idstr):
-        self.device_type = constants.DEVICE_TYPE_CAM
-        self.device_idstr = device_idstr
-        self.device_id = 0
+    def __init__(self):
         self.writer = queue_writer_json.QueueWriterJson()
-        self.gps = gps
-        self.gps = "5.8833, -162.0833"
 
-    def register(self, latlng):
-        if self.device_type is not constants.DEVICE_TYPE_CAM:
+    def register(self, dinfo):
+        if dinfo.device_type is not constants.DEVICE_TYPE_CAM:
             return
         register_msg = {
-                "device_idstr" : self.device_idstr,
+                "device_idstr" : dinfo.device_id_str,
                 "distance_cc" : -1,
-                "lat" : self.gps,
+                "lat" : dinfo.gps,
                 }
 
         (succ, err) = self.writer.write_message(
@@ -36,8 +32,9 @@ class Communicator:
         return []
 
 def main():
-    comm = Communicator(constants.DEVICE_TYPE_CAM, "xyz")
-    comm.register()
+    dinfo = device_info.DeviceInfo("9eccfdf8c851a5ef")
+    comm = Communicator()
+    comm.register(dinfo)
     comm.send_heartbeat(5)
 
 if __name__=="__main__":
