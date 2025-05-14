@@ -1,0 +1,11 @@
+google-auth
+requests
+mqtt
+awscrt
+awsiot
+# rosidl_runtime_py
+pymavlink
+google-cloud-pubsub
+protobuf
+pika
+lockfile

@@ -1,0 +1,18 @@
+YOLOMODELNAME="yolov8n.pt"
+
+DEVICE_TYPE_CAM = "CAMUNIT"
+DEVICE_TYPE_COMMAND = "COMMAND"
+
+# Device IDs which act as CAM start with this
+DEVICE_ID_CAM_BASE = 1000000
+# Device IDs which act as Command Center start with this
+DEVICE_ID_CC_BASE = 1000
+
+MESSAGE_TYPE_REGISTER = "Register"
+MESSAGE_TYPE_HEARTBEAT = "Heartbeat"
+MESSAGE_TYPE_NEIGHBOUR = "Neighbour"
+MESSAGE_TYPE_PHOTO = "Photo"
+MESSAGE_TYPE_UPDATE = "Update"
+
+PRIORITY_LOW = 1
+PRIORITY_HIGH = 2
