@@ -1,5 +1,4 @@
 import time
-import messages_pb2
 import communicator
 
 LOCATION_HOME = "28.4241,77.0358"
