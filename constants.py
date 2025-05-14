@@ -17,4 +17,4 @@ MESSAGE_TYPE_UPDATE = "Update"
 PRIORITY_LOW = 1
 PRIORITY_HIGH = 2
 
-GITTEST=""
+RPI_SERIAL_FILENAME = "/sys/firmware/devicetree/base/serial-number"
