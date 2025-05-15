@@ -2,7 +2,7 @@ import time
 import os
 import communicator
 import detect
-
+import camera
 import constants
 import device_info
 
@@ -19,6 +19,7 @@ class CamUnit:
     def __init__(self, dinfo, comm, p_detector):
         self.dinfo = dinfo
         self.comm = comm
+        self.cam = camera.Camera(self.dinfo)
         self.p_detector = p_detector
         self.p_detector.set_debug_mode()
         # TODO Topology, or should this go in device info
@@ -34,15 +35,17 @@ class CamUnit:
         # TODO Handle callback to complete registration
 
 
-    def get_picture(self):
-        
-        p_detector.ImageHasPerson(fname)
-
+    def check_human(self):
+        fname = self.cam.take_picture()
+        p_found = self.p_detector.ImageHasPerson(fname)
+        if p_found:
+            print(f"####### Human found ######")
+            print(f"Check file {fname} ")
+            # Notify Network
 
     def send_heartbeat(self):
         ts = time.time()
         self.neighbourhood = self.comm.send_heartbeat(ts)
-        pass
 
 def main():
     device_id_str = get_device_id_str()
@@ -51,6 +54,11 @@ def main():
     comm = communicator.Communicator()
     unit = CamUnit(dinfo, comm, p_detector)
     unit.register_myself()
+    for i in range(10):
+        print(f"Checked at time --- {i}")
+        unit.check_human()
+        time.sleep(10)
+        
     # TODO wait for response asynchronously
     unit.send_heartbeat()
 
