@@ -1,3 +1,5 @@
+opencv-python
+ultralytics
 mqtt
 awscrt
 awsiot
@@ -7,3 +9,4 @@ pika
 lockfile
 requests
 geopy
+picamera2

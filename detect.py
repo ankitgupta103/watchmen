@@ -20,9 +20,9 @@ def is_image_file(file_path):
     return file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))
 
 class Detector:
-    def __init__(self, modelname):
-        self.modelname = modelname
-        self.model = YOLO(modelname)
+    def __init__(self):
+        self.modelname = YOLOMODELNAME
+        self.model = YOLO(self.modelname)
         self.model.info()
         self.debug_mode = False
 
@@ -62,10 +62,10 @@ def eval_dir(detector, dname):
     print ("Found people in %d out of %d images." % (len(people_images), len(image_files)))
 
 def main():
-    detector = Detector(YOLOMODELNAME)
+    detector = Detector()
     detector.set_debug_mode()
-    #eval_file(model, testfilename)
-    eval_dir(detector, "/Users/ankitgupta/yolo/testdata/images_cv/")
+    detector.ImageHasPerson("/tmp/test1.jpg")
+    # eval_dir(detector, "/Users/ankitgupta/yolo/testdata/images_cv/")
 
 if __name__=="__main__":
     main()

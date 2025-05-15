@@ -8,8 +8,9 @@ LOCATION_CLUB = (28.4264,77.0335)
 def hardcoded_gps(device_id_str):
     print("Here1")
     if device_id_str == "9eccfdf8c851a5ef":
-        print("Here2")
         return LOCATION_HOME
+    if device_id_str == "2b46c5c95aea7306":
+        return LOCATION_CLUB
 
 # Basically a struct
 class DeviceInfo:

@@ -1,6 +1,7 @@
 import time
 import os
 import communicator
+import detect
 
 import constants
 import device_info
@@ -15,9 +16,11 @@ def get_device_id_str():
     return serial_id_str
 
 class CamUnit:
-    def __init__(self, dinfo, comm):
+    def __init__(self, dinfo, comm, p_detector):
         self.dinfo = dinfo
         self.comm = comm
+        self.p_detector = p_detector
+        self.p_detector.set_debug_mode()
         # TODO Topology, or should this go in device info
         # self.neighbourhood = None
         # self.min_hops_from_command_central = -1
@@ -30,8 +33,11 @@ class CamUnit:
         self.comm.register(self.dinfo)
         # TODO Handle callback to complete registration
 
+
     def get_picture(self):
-        pass
+        
+        p_detector.ImageHasPerson(fname)
+
 
     def send_heartbeat(self):
         ts = time.time()
@@ -40,9 +46,10 @@ class CamUnit:
 
 def main():
     device_id_str = get_device_id_str()
+    p_detector = detect.Detector()
     dinfo = device_info.DeviceInfo(device_id_str)
     comm = communicator.Communicator()
-    unit = CamUnit(dinfo, comm)
+    unit = CamUnit(dinfo, comm, p_detector)
     unit.register_myself()
     # TODO wait for response asynchronously
     unit.send_heartbeat()
