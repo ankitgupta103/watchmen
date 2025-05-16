@@ -83,7 +83,7 @@ def main():
     #devnode.register_myself()
     thread_cam = threading.Thread(target=devnode.keep_checking_human)
     thread_heartbeat = threading.Thread(target=devnode.keep_sending_heartbeat)
-
+    
     thread_cam.start()
     time.sleep(3)
     thread_heartbeat.start()
