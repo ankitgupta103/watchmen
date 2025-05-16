@@ -18,7 +18,11 @@ class Camera:
         fname = f"{self.output_dir}/capture_{self.dinfo.device_id_str}_{ts_ns}.jpg"
         print(f"Will write image to file : {fname}")
         # TODO image is a little zoomed in
-        self.picam2.capture_file(fname)
+        try:
+            self.picam2.capture_file(fname)
+        except:
+            print("Couldn't take picture")
+            return ""
         print(f"... Write image to file : {fname}")
         return fname
 

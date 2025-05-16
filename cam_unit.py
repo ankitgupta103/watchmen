@@ -1,4 +1,5 @@
 import time
+import threading
 import os
 import communicator
 import detect
@@ -16,12 +17,20 @@ def get_device_id_str():
     return serial_id_str
 
 class CamUnit:
-    def __init__(self, dinfo, comm, p_detector):
+    def __init__(
+            self,
+            dinfo,
+            comm,
+            p_detector,
+            check_freq_sec=10,
+            hb_freq_sec=30):
         self.dinfo = dinfo
         self.comm = comm
         self.cam = camera.Camera(self.dinfo)
         self.p_detector = p_detector
         self.p_detector.set_debug_mode()
+        self.check_freq_sec = check_freq_sec
+        self.hb_freq_sec = hb_freq_sec
         # TODO Topology, or should this go in device info
         # self.neighbourhood = None
         # self.min_hops_from_command_central = -1
@@ -34,18 +43,35 @@ class CamUnit:
         self.comm.register(self.dinfo)
         # TODO Handle callback to complete registration
 
-
     def check_human(self):
         fname = self.cam.take_picture()
+        if fname == "":
+            print("No picture")
         p_found = self.p_detector.ImageHasPerson(fname)
         if p_found:
             print(f"####### Human found ######")
             print(f"Check file {fname} ")
             # Notify Network
+        else:
+            print("No human detection")
 
-    def send_heartbeat(self):
-        ts = time.time()
+    def keep_checking_human(self):
+        while True:
+            ts = time.time()
+            print(f"Checked at time --- {ts}")
+            self.check_human()
+            time.sleep(self.check_freq_sec)
+
+    def send_heartbeat(self, ts):
         self.neighbourhood = self.comm.send_heartbeat(ts)
+
+    def keep_sending_heartbeat(self):
+        while True:
+            ts = time.time()
+            print(f"Sending heartbeat at {ts}")
+            self.send_heartbeat(ts)
+            time.sleep(self.hb_freq_sec)
+
 
 def main():
     device_id_str = get_device_id_str()
@@ -53,14 +79,16 @@ def main():
     dinfo = device_info.DeviceInfo(device_id_str)
     comm = communicator.Communicator()
     unit = CamUnit(dinfo, comm, p_detector)
-    unit.register_myself()
-    for i in range(10):
-        print(f"Checked at time --- {i}")
-        unit.check_human()
-        time.sleep(10)
-        
-    # TODO wait for response asynchronously
-    unit.send_heartbeat()
+    #unit.register_myself()
+    thread_cam = threading.Thread(target=unit.keep_checking_human)
+    thread_heartbeat = threading.Thread(target=unit.keep_sending_heartbeat)
+
+    thread_cam.start()
+    time.sleep(3)
+    #thread_heartbeat.start()
+
+    thread_cam.join()
+    thread_heartbeat.join()
 
 if __name__=="__main__":
     main()
