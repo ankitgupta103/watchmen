@@ -7,28 +7,30 @@ class Camera:
     def __init__(self, dinfo, o_dir="/tmp/camera_captures"):
         self.dinfo = dinfo
         self.output_dir = o_dir
-        self.picam2 = Picamera2()
 
     def start(self):
         os.makedirs(self.output_dir, exist_ok=True)
-        self.picam2.start()
 
     def take_picture(self):
         ts_ns = time.time_ns()
         fname = f"{self.output_dir}/capture_{self.dinfo.device_id_str}_{ts_ns}.jpg"
         print(f"Will write image to file : {fname}")
-        # TODO image is a little zoomed in
-        try:
-            self.picam2.capture_file(fname)
-        except:
-            print("Couldn't take picture")
+        with Picamera2() as cam:
+            cam.configure(cam.create_still_configuration())
+            cam.start()
+            time.sleep(2)
+            try:
+                cam.capture_file(fname)
+            except Exception as e:
+                print("Couldn't take picture")
+                print(e)
             return ""
-        print(f"... Write image to file : {fname}")
+        print(f"... Written image to file : {fname}")
         return fname
 
 def main():
     dinfo = device_info.DeviceInfo("2b46c5c95aea7306")
-    cam = Camera(dinfo)
+    cam = Camera(dinfo, o_dir="/tmp/camera_captures_test")
     cam.start()
     cam.take_picture()
 
