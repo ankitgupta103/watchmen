@@ -16,7 +16,7 @@ def get_device_id_str():
         quit(-1)
     return serial_id_str
 
-class CamUnit:
+class DevNode:
     def __init__(
             self,
             dinfo,
@@ -27,6 +27,7 @@ class CamUnit:
         self.dinfo = dinfo
         self.comm = comm
         self.cam = camera.Camera(self.dinfo)
+        self.cam.start()
         self.p_detector = p_detector
         self.p_detector.set_debug_mode()
         self.check_freq_sec = check_freq_sec
@@ -46,14 +47,15 @@ class CamUnit:
     def check_human(self):
         fname = self.cam.take_picture()
         if fname == "":
-            print("No picture")
+            print("No picture available")
+            return
         p_found = self.p_detector.ImageHasPerson(fname)
         if p_found:
             print(f"####### Human found ######")
             print(f"Check file {fname} ")
             # Notify Network
         else:
-            print("No human detection")
+            print("No human detected.")
 
     def keep_checking_human(self):
         while True:
@@ -72,20 +74,19 @@ class CamUnit:
             self.send_heartbeat(ts)
             time.sleep(self.hb_freq_sec)
 
-
 def main():
     device_id_str = get_device_id_str()
     p_detector = detect.Detector()
     dinfo = device_info.DeviceInfo(device_id_str)
     comm = communicator.Communicator()
-    unit = CamUnit(dinfo, comm, p_detector)
-    #unit.register_myself()
-    thread_cam = threading.Thread(target=unit.keep_checking_human)
-    thread_heartbeat = threading.Thread(target=unit.keep_sending_heartbeat)
+    devnode = DevNode(dinfo, comm, p_detector)
+    #devnode.register_myself()
+    thread_cam = threading.Thread(target=devnode.keep_checking_human)
+    thread_heartbeat = threading.Thread(target=devnode.keep_sending_heartbeat)
 
     thread_cam.start()
     time.sleep(3)
-    #thread_heartbeat.start()
+    thread_heartbeat.start()
 
     thread_cam.join()
     thread_heartbeat.join()
