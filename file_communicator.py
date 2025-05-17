@@ -4,9 +4,9 @@ import threading
 import constants
 import device_info
 import json
+import layout
 
 class FileCommunicator:
-
     def __init__(self, dinfo, ndir):
         self.ndir = ndir 
         print(f" Network simulated by {self.ndir}")
@@ -15,6 +15,8 @@ class FileCommunicator:
         self.read_files = []
         self.messages_processed = []
         self.neighbours_seen = []
+        # This is a simulated network layout, it is only used to "receive" messages which a real network can see.
+        self.simulated_layout = layout.Layout()
     
     def _write_json_to_file(self, msg):
         fname = f"{self.ndir}/hb_{time.time_ns()}"
@@ -43,12 +45,16 @@ class FileCommunicator:
         message_type = data['message_type']
         message_id = data['message_id']
         last_sender = data['last_sender']
-        if last_sender != self.dinfo.device_id_str and last_sender not in self.neighbours_seen:
-            print("I saw a new neighbour")
-            self.neighbours_seen.append(last_sender)
         if message_id in self.messages_processed:
             #print("Skipping already processed message")
             return
+        if not self.simulated_layout.is_neighbour(last_sender, self.dinfo.device_id_str):
+            # print("I did not see this because it isnt in range in reality")
+            self.messages_processed.append(message_id)
+            return
+        if last_sender != self.dinfo.device_id_str and last_sender not in self.neighbours_seen:
+            print("I saw a new neighbour")
+            self.neighbours_seen.append(last_sender)
         if message_type != constants.MESSAGE_TYPE_HEARTBEAT:
             print("Skipping non HB message")
             self.messages_processed.append(message_id)
@@ -86,7 +92,6 @@ class FileCommunicator:
         self.messages_processed.append(message_id)
 
     def _listen_once(self):
-        self.print_state()
         filenames = os.listdir(self.ndir)
         all_files = []
         unread_files = []
@@ -126,8 +131,8 @@ def start_n_units(dirname, n):
     return comms
 
 def main():
-    dirname = "network_sim"
-    num_units = 5
+    dirname = f"/tmp/network_sim_{time.time_ns()}"
+    num_units = 25
 
     comms = start_n_units(dirname, num_units)
 
@@ -135,11 +140,13 @@ def main():
     for i in range(num_units):
         listen_threads.append(comms[i].keep_listening())
 
-    for i in range(num_units):
-        for j in range(4):
-            comms[i].send_heartbeat(time.time_ns())
+    for j in range(4):
+        for comm in comms:
+            comm.send_heartbeat(time.time_ns())
             time.sleep(1)
-        time.sleep(30)
+        time.sleep(10)
+    for comm in comms:
+        comm.print_state()
 
     for i in range(num_units):
         listen_threads[i].join()

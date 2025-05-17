@@ -18,7 +18,8 @@ class CommandCentral:
 
 def main():
     print(f" === Welcome to Central Command ====")
+    cc = CommandCentral()
+    cc.init
 
 if __name__=="__main__":
     main()
-
