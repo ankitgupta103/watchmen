@@ -18,3 +18,11 @@ PRIORITY_LOW = 1
 PRIORITY_HIGH = 2
 
 RPI_SERIAL_FILENAME = "/sys/firmware/devicetree/base/serial-number"
+
+node_layout = [
+        ["R", "Q", "P", "O", "N"],
+        ["S", "F", "E", "D", "M"],
+        ["T", "G", "A", "C", "L"],
+        ["U", "H", "I", "B", "K"],
+        ["V", "W", "X", "Y", "J", "Z"]
+        ]
