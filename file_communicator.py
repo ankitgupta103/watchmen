@@ -21,6 +21,9 @@ class FileCommunicator:
         with open(fname, 'w') as f:
             json.dump(msg, f)
 
+    def print_state(self):
+        print(f"Node: {self.dinfo.device_id_str}, Messages processed: {len(self.messages_processed)}, Neighbours = {self.neighbours_seen}")
+
     def send_heartbeat(self, ts):
         hb_msg = {
                 "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
@@ -37,7 +40,6 @@ class FileCommunicator:
         return True
 
     def process_msg(self, data):
-        print(data)
         message_type = data['message_type']
         message_id = data['message_id']
         last_sender = data['last_sender']
@@ -45,14 +47,14 @@ class FileCommunicator:
             print("I saw a new neighbour")
             self.neighbours_seen.append(last_sender)
         if message_id in self.messages_processed:
-            print("Skipping already processed message")
+            #print("Skipping already processed message")
             return
         if message_type != constants.MESSAGE_TYPE_HEARTBEAT:
             print("Skipping non HB message")
             self.messages_processed.append(message_id)
             return
         if last_sender == self.dinfo.device_id_str:
-            print("Self Message, Skipping")
+            #print("Self Message, Skipping")
             self.messages_processed.append(message_id)
             return
         path_so_far = data['path_so_far']
@@ -84,6 +86,7 @@ class FileCommunicator:
         self.messages_processed.append(message_id)
 
     def _listen_once(self):
+        self.print_state()
         filenames = os.listdir(self.ndir)
         all_files = []
         unread_files = []
@@ -93,9 +96,7 @@ class FileCommunicator:
                 print(f"{fpath} isnt a file....")
                 continue
             all_files.append(fpath)
-            if fpath in self.read_files:
-                print(f"already read {f}")
-            else:
+            if fpath not in self.read_files:
                 unread_files.append(fpath)
         print(f"Unread files : {len(unread_files)}, Total files : {len(all_files)}")
         for unread_fpath in unread_files:
@@ -114,28 +115,34 @@ class FileCommunicator:
         thread_listen.start()
         return thread_listen
 
-
+def start_n_units(dirname, n):
+    comms = []
+    for i in range(n):
+        c=chr(i+65)
+        name=f"{c}{c}{c}"
+        dinfo = device_info.DeviceInfo(name)
+        comm = FileCommunicator(dinfo, dirname)
+        comms.append(comm)
+    return comms
 
 def main():
     dirname = "network_sim"
-    
-    dinfo1 = device_info.DeviceInfo("AAAA")
-    comm1 = FileCommunicator(dinfo1, dirname)
+    num_units = 5
 
-    dinfo2 = device_info.DeviceInfo("BBBB")
-    comm2 = FileCommunicator(dinfo2, dirname)
+    comms = start_n_units(dirname, num_units)
 
-    thread_listen_1 = comm1.keep_listening()
-    thread_listen_2 = comm2.keep_listening()
+    listen_threads = []
+    for i in range(num_units):
+        listen_threads.append(comms[i].keep_listening())
 
-    for i in range(10):
-        comm1.send_heartbeat(time.time_ns())
-        time.sleep(1)
-        comm2.send_heartbeat(time.time_ns())
-        time.sleep(4)
+    for i in range(num_units):
+        for j in range(4):
+            comms[i].send_heartbeat(time.time_ns())
+            time.sleep(1)
+        time.sleep(30)
 
-    thread_listen_1.join()
-    thread_listen_2.join()
+    for i in range(num_units):
+        listen_threads[i].join()
 
 if __name__=="__main__":
     main()
