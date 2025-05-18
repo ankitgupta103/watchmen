@@ -31,6 +31,7 @@ class FileCommunicator:
                 "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
                 "hb_id" : self.dinfo.device_id_str,
                 "hb_ts" : ts,
+                "neighbours": self.neighbours_seen,
                 "desired_path1" : [],
                 "desired_path2" : [],
                 "path_so_far" : [self.dinfo.device_id_str],
