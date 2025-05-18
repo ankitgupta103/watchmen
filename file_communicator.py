@@ -31,7 +31,7 @@ class FileCommunicator:
                 "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
                 "hb_id" : self.dinfo.device_id_str,
                 "hb_ts" : ts,
-                "neighbours": self.neighbours_seen,
+                "neighbours" : self.neighbours_seen,
                 "desired_path1" : [],
                 "desired_path2" : [],
                 "path_so_far" : [self.dinfo.device_id_str],
@@ -72,6 +72,7 @@ class FileCommunicator:
         hb_id = data['hb_id']
         hb_ts = data['hb_ts']
         network_ts = data['network_ts']
+        neighbours = data["neighbours"]
 
         # If desired_path_1,2 not empty and I am not on desired path, skip
         # else (if desired_path is empty OR I am on desired_path)
@@ -81,6 +82,7 @@ class FileCommunicator:
                 "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
                 "hb_id" : hb_id,
                 "hb_ts" : hb_ts,
+                "neighbours" : neighbours,
                 "desired_path1" : [],
                 "desired_path2" : [],
                 "path_so_far" : path_so_far,
@@ -114,7 +116,7 @@ class FileCommunicator:
     def _keep_listening(self):
         while True:
             self._listen_once()
-            time.sleep(2)
+            time.sleep(1)
 
     def keep_listening(self):
         thread_listen = threading.Thread(target=self._keep_listening)
@@ -141,16 +143,16 @@ def main():
     for i in range(num_units):
         listen_threads.append(comms[i].keep_listening())
 
-    for j in range(4):
+    for j in range(10):
         for comm in comms:
             comm.send_heartbeat(time.time_ns())
             time.sleep(1)
-        time.sleep(10)
+        time.sleep(5)
     for comm in comms:
         comm.print_state()
 
-    for i in range(num_units):
-        listen_threads[i].join()
+    #for i in range(num_units):
+    #    listen_threads[i].join()
 
 if __name__=="__main__":
     main()

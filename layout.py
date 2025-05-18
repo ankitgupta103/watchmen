@@ -9,7 +9,6 @@ class Layout:
                 c = self.inp[i][j]
                 node_name = f"{c}{c}{c}"
                 self.node_pos[node_name] = (i,j)
-                print(node_name)
 
     def print_layout(self):
         print(self.node_pos)

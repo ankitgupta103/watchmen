@@ -1,6 +1,12 @@
+import json
 import time
 import os
+import threading
 import layout
+
+class NodeSummary:
+    def __init__(self, name):
+        self.name = ""
 
 class CommandCentral:
     def __init__(self, dname):
@@ -10,7 +16,8 @@ class CommandCentral:
         self.simulated_layout = layout.Layout()
     
     def print_node_info(self, node):
-        print(node)
+        #print(node)
+        pass
 
     def print_map(self):
         for n in self.node_list:
@@ -27,35 +34,39 @@ class CommandCentral:
         last_sender = data["last_sender"]
         hb_id = data["hb_id"]
         hb_ts = data["hb_ts"]
+        neighbours = data["neighbours"]
         network_ts = data["network_ts"]
         path_so_far = data["path_so_far"]
-        return (hb_id, hb_ts, path_so_far, [])
+        return (hb_id, hb_ts, path_so_far, neighbours)
 
     def process_msgs(self, all_msgs):
         unit_HBs = {} # DevID -> [HBInfo]
         for msg in all_msgs:
-            hbinfo = get_hb_from_msg(msg)
+            hbinfo = self.get_hb_from_msg(msg)
             if hbinfo == None:
                 continue
             (name, ts, path, neighbours) = hbinfo
+            print(hbinfo)
             unit_HBs[name].append(hbinfo)
-            if len(path_so_far
-        print(unit_HBs)
+        #print(unit_HBs)
 
     def _listen_once(self):
         filenames = os.listdir(self.dname)
         all_files = []
         for f in filenames:
-            fpath = os.path.join(self.ndir, f)
+            fpath = os.path.join(self.dname, f)
             if not os.path.isfile(fpath):
                 print(f"{fpath} isnt a file....")
                 continue
             all_files.append(fpath)
         all_msgs = []
+        
         for unread_fpath in all_files:
             with open(unread_fpath, 'r') as f:
                 data = json.load(f)
                 all_msgs.append(data)
+
+
         self.process_msgs(all_msgs)
 
     def _keep_listening(self):
@@ -69,8 +80,8 @@ class CommandCentral:
         return thread_listen
 
 def main():
-    cc = CommandCentral("/tmp/network_sim_1747578790681896761")
-    tl = comms[i].keep_listening()
+    cc = CommandCentral("/tmp/network_sim_1747584315184510000")
+    tl = cc.keep_listening()
 
     print("###### Central Command #######")
 
