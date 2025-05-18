@@ -1,14 +1,14 @@
 import time
 import os
+import layout
 
 class CommandCentral:
-    def __init__(self):
+    def __init__(self, dname):
+        # Node : List of neighbours, Shortest Path, Num HBs
         self.node_list = []
-
-    def init_listener(self):
-        read_from_file("network_sim.txt")
-        pass
-
+        self.dname = dname
+        self.simulated_layout = layout.Layout()
+    
     def print_node_info(self, node):
         print(node)
 
@@ -16,10 +16,65 @@ class CommandCentral:
         for n in self.node_list:
             self.print_node_info(n)
 
+    def send_to_node(self):
+        pass
+
+    def get_hb_from_msg(self, data):
+        # None
+        # (node name, TS, path so far, neighbours)
+        message_type = data["message_type"]
+        message_id = data["message_id"]
+        last_sender = data["last_sender"]
+        hb_id = data["hb_id"]
+        hb_ts = data["hb_ts"]
+        network_ts = data["network_ts"]
+        path_so_far = data["path_so_far"]
+        return (hb_id, hb_ts, path_so_far, [])
+
+    def process_msgs(self, all_msgs):
+        unit_HBs = {} # DevID -> [HBInfo]
+        for msg in all_msgs:
+            hbinfo = get_hb_from_msg(msg)
+            if hbinfo == None:
+                continue
+            (name, ts, path, neighbours) = hbinfo
+            unit_HBs[name].append(hbinfo)
+            if len(path_so_far
+        print(unit_HBs)
+
+    def _listen_once(self):
+        filenames = os.listdir(self.dname)
+        all_files = []
+        for f in filenames:
+            fpath = os.path.join(self.ndir, f)
+            if not os.path.isfile(fpath):
+                print(f"{fpath} isnt a file....")
+                continue
+            all_files.append(fpath)
+        all_msgs = []
+        for unread_fpath in all_files:
+            with open(unread_fpath, 'r') as f:
+                data = json.load(f)
+                all_msgs.append(data)
+        self.process_msgs(all_msgs)
+
+    def _keep_listening(self):
+        while True:
+            self._listen_once()
+            self.print_map()
+
+    def keep_listening(self):
+        thread_listen = threading.Thread(target=self._keep_listening)
+        thread_listen.start()
+        return thread_listen
+
 def main():
-    print(f" === Welcome to Central Command ====")
-    cc = CommandCentral()
-    cc.init
+    cc = CommandCentral("/tmp/network_sim_1747578790681896761")
+    tl = comms[i].keep_listening()
+
+    print("###### Central Command #######")
+
+    tl.join()
 
 if __name__=="__main__":
     main()
