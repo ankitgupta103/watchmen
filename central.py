@@ -40,7 +40,7 @@ class CommandCentral:
                     "dest" : neighbour,
                     "source_ts" : ts,
                     "shortest_path" : [self.nodename, neighbour],
-                    "last_sender" : self.dname,
+                    "last_sender" : self.nodename,
                     "network_ts" : ts,
                 }
             self._write_json_to_file(spath_msg)

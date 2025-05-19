@@ -25,7 +25,7 @@ class FileCommunicator:
             json.dump(msg, f)
 
     def print_state(self):
-        print(f"Node: {self.dinfo.device_id_str}, Neighbours = {self.neighbours_seen}")
+        print(f"Node: {self.dinfo.device_id_str}, Neighbours = {self.neighbours_seen}, spath = {self.spath}")
     def send_scan(self, ts):
         scan_msg = {
                 "message_type" : constants.MESSAGE_TYPE_SCAN,
@@ -57,11 +57,11 @@ class FileCommunicator:
             self.spath = spath
 
             for neighbour in self.neighbours_seen:
-                spath_new = spath
-                spath_new.append(neighbour)
+                if neighbour in spath:
+                    continue
                 new_msg = msg
                 new_msg["dest"] = neighbour
-                msg["shortest_path"] = spath_new
+                msg["shortest_path"] = spath + [neighbour]
                 new_msg["last_sender"] = self.dinfo.device_id_str
                 new_msg["network_ts"] = time.time_ns()
                 self._write_json_to_file(new_msg, "spath")
@@ -70,8 +70,9 @@ class FileCommunicator:
         scan_msgs = self.get_msgs_of_type("spath")
         for msg in scan_msgs:
             source = msg["source"]
+            last_sender = msg["last_sender"]
             dest = msg["dest"]
-            if not self.simulated_layout.is_neighbour(source, self.dinfo.device_id_str):
+            if not self.simulated_layout.is_neighbour(last_sender, self.dinfo.device_id_str):
                 continue
             if dest == self.dinfo.device_id_str:
                 self.propogate_spath(msg)
