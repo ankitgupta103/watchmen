@@ -3,128 +3,78 @@ import time
 import os
 import threading
 import layout
+import glob
+import constants
 
 class CommandCentral:
     def __init__(self, nodename, dname):
         # Node : List of neighbours, Shortest Path, Num HBs
         self.nodename = nodename
-        self.node_list = []
         self.dname = dname
         self.simulated_layout = layout.Layout()
-    
+        
+        self.node_list = []
+
+        self.neighbours_seen = []
+
     def print_node_info(self, node):
         #print(node)
         pass
+
+    def _write_json_to_file(self, msg):
+        fname = f"{self.dname}/spath_{self.nodename}_{time.time_ns()}"
+        with open(fname, 'w') as f:
+            json.dump(msg, f)
 
     def print_map(self):
         for n in self.node_list:
             self.print_node_info(n)
 
-    def send_to_node(self):
+    def send_spath(self):
+        print(f"Sending spath to {self.neighbours_seen}")
+        for neighbour in self.neighbours_seen:
+            ts = time.time_ns()
+            spath_msg = {
+                    "message_type" : constants.MESSAGE_TYPE_SPATH,
+                    "source" : self.nodename,
+                    "dest" : neighbour,
+                    "source_ts" : ts,
+                    "shortest_path" : [self.nodename, neighbour],
+                    "last_sender" : self.dname,
+                    "network_ts" : ts,
+                }
+            self._write_json_to_file(spath_msg)
+        return True
+
+    def get_msgs_of_type(self, scantype):
+        fnames = glob.glob(f"{self.dname}/{scantype}_*")
+        all_msgs = []
+        for fname in fnames:
+            fpath = os.path.join(self.dname, fname)
+            with open(fpath, 'r') as f:
+                data = json.load(f)
+                all_msgs.append(data)
+        return all_msgs
+
+    def get_scan_messages(self):
+        print("in CC SCAN")
+        scan_msgs = self.get_msgs_of_type("scan")
+        for msg in scan_msgs:
+            source = msg["source"]
+            if self.simulated_layout.is_neighbour(source, self.nodename):
+                if source not in self.neighbours_seen:
+                    self.neighbours_seen.append(source)
+
+    def get_hb_messages(self):
         pass
 
-    def sort_tuples(self, tuples, a, b, c):
-        key_func = lambda x: (x[a], x[b], x[c])
-        return sorted(tuples, key=key_func)
-
-    def get_hb_from_msg(self, data):
-        # None
-        # (node name, TS, path so far, neighbours)
-        message_type = data["message_type"]
-        message_id = data["message_id"]
-        last_sender = data["last_sender"]
-        hb_id = data["hb_id"]
-        hb_ts = data["hb_ts"]
-        neighbours = data["neighbours"]
-        network_ts = data["network_ts"]
-        path_so_far = data["path_so_far"]
-        return (hb_id, hb_ts, neighbours, network_ts, path_so_far)
-
-    def process_msgs(self, all_msgs):
-        unit_HBs = {} # DevID -> [HBInfo]
-        for msg in all_msgs:
-            hbinfo = self.get_hb_from_msg(msg)
-            if hbinfo == None:
-                continue
-            (name, ts, neighbours, network_ts, path_so_far) = hbinfo
-            if name not in unit_HBs:
-                unit_HBs[name] = [hbinfo]
-            else:
-                unit_HBs[name].append(hbinfo)
-        return unit_HBs
-
-    def get_all_msgs_for_hb(self, hbs, node):
-        tss = {}
-        for hb in hbs:
-            (name, ts, neighbours, network_ts, path_so_far) = hb
-            if name is not node:
-                continue
-            if ts not in tss:
-                tss[ts] = [hb]
-            else:
-                tss = tss[ts].append(hb)
-        return tss
-
-    def get_paths_for_hb(self, hbs, node):
-        msgs = self.get_all_msgs_for_hb(hbs, node)
-        for ts, hhh in msgs.items():
-            print(f"Node: {node} - TS={ts} has {len(hhh)} messages")
-
-    def count_paths(self, hbs):
-        curr_node = None
-        curr_ts = 0
-        num_paths = 0
-        shortest_path = []
-        for hb in hbs:
-            (name, ts, neighbours, network_ts, path_so_far) = hb
-            path_so_far.append(self.nodename)
-            if name != curr_node or curr_ts != ts:
-                if curr_node == None:
-                    pass
-                else:
-                    print(f"Node {curr_node} : HB@{curr_ts} had {num_paths} PATHS with shortest = {len(shortest_path)} - {shortest_path}")
-                curr_node = name
-                curr_ts = ts
-                num_paths = 1
-                shortest_path = path_so_far
-            else:
-                num_paths = num_paths + 1
-                if len(path_so_far) < len(shortest_path):
-                    shortest_path = path_so_far
-        print(f"Node {curr_node} : HB@{curr_ts} had {num_paths} PATHS with shortest = {len(shortest_path)} - {shortest_path}")
-
-    def summarize_node(self, name, hbs):
-        #sorted_hbs = self.sort_tuples(hbs, 0, 1, 3)
-        #self.count_paths(hbs)
-        self.get_paths_for_hb(hbs, name)
-        
-
     def listen_once(self):
-        filenames = os.listdir(self.dname)
-        all_files = []
-        for f in filenames:
-            fpath = os.path.join(self.dname, f)
-            if not os.path.isfile(fpath):
-                print(f"{fpath} isnt a file....")
-                continue
-            all_files.append(fpath)
-        all_msgs = []
-       
-        for unread_fpath in all_files:
-            with open(unread_fpath, 'r') as f:
-                data = json.load(f)
-                if self.simulated_layout.is_neighbour(data["last_sender"], self.nodename):
-                    all_msgs.append(data)
-
-        unit_HBs = self.process_msgs(all_msgs)
-        for k,v in unit_HBs.items():
-            print(f"{k} : {len(v)}")
-            self.summarize_node(k, v)
+        self.get_scan_messages()
         
     def _keep_listening(self):
         while True:
             self.listen_once()
-            self.print_map()
+            time.sleep(5)
 
     def keep_listening(self):
         thread_listen = threading.Thread(target=self._keep_listening)
@@ -132,7 +82,7 @@ class CommandCentral:
         return thread_listen
 
 def main():
-    cc = CommandCentral("ZZZ", "/tmp/network_sim_1747646303191149481")
+    cc = CommandCentral("ZZZ", "/tmp/network_sim_1747651680792971540/")
     # tl = cc.keep_listening()
     print("###### Central Command #######")
     #tl.join()

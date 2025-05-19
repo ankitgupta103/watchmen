@@ -6,112 +6,93 @@ import device_info
 import json
 import layout
 import central
+import glob
 
 class FileCommunicator:
-    def __init__(self, dinfo, ndir):
-        self.ndir = ndir 
-        print(f" Network simulated by {self.ndir}")
-        os.makedirs(self.ndir, exist_ok=True)
+    def __init__(self, dinfo, dname):
+        self.dname = dname
+        print(f" Network simulated by {self.dname}")
+        os.makedirs(self.dname, exist_ok=True)
         self.dinfo = dinfo
-        self.read_files = []
-        self.messages_processed = []
         self.neighbours_seen = []
+        self.spath = []
         # This is a simulated network layout, it is only used to "receive" messages which a real network can see.
         self.simulated_layout = layout.Layout()
     
-    def _write_json_to_file(self, msg):
-        fname = f"{self.ndir}/hb_{time.time_ns()}"
+    def _write_json_to_file(self, msg, prefix):
+        fname = f"{self.dname}/{prefix}_{self.dinfo.device_id_str}_{time.time_ns()}"
         with open(fname, 'w') as f:
             json.dump(msg, f)
 
     def print_state(self):
-        print(f"Node: {self.dinfo.device_id_str}, Messages processed: {len(self.messages_processed)}, Neighbours = {self.neighbours_seen}")
-
-    def send_heartbeat(self, ts):
-        hb_msg = {
-                "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
-                "hb_id" : self.dinfo.device_id_str,
-                "hb_ts" : ts,
-                "neighbours" : self.neighbours_seen,
-                "desired_path1" : [],
-                "desired_path2" : [],
-                "path_so_far" : [self.dinfo.device_id_str],
-                "last_sender" : self.dinfo.device_id_str,
-                "network_ts" : ts,
-                "message_id" : f"hb_{self.dinfo.device_id_str}_{ts}",
+        print(f"Node: {self.dinfo.device_id_str}, Neighbours = {self.neighbours_seen}")
+    def send_scan(self, ts):
+        scan_msg = {
+                "message_type" : constants.MESSAGE_TYPE_SCAN,
+                "source" : self.dinfo.device_id_str,
+                "ts" : ts,
                 }
-        self._write_json_to_file(hb_msg)
-        return True
+        self._write_json_to_file(scan_msg, "scan")
 
-    def process_msg(self, data):
-        message_type = data['message_type']
-        message_id = data['message_id']
-        last_sender = data['last_sender']
-        if not self.simulated_layout.is_neighbour(last_sender, self.dinfo.device_id_str):
-            # print("I did not see this because it isnt in range in reality")
-            return
-        if last_sender == self.dinfo.device_id_str:
-            # print("Self Message, Skipping")
-            return
-        if message_type != constants.MESSAGE_TYPE_HEARTBEAT:
-            print("Skipping non HB message")
-            return
-        #if message_id in self.messages_processed:
-            #print("Skipping already processed message")
-        #    return
-        self.messages_processed.append(message_id)
-        if last_sender != self.dinfo.device_id_str and last_sender not in self.neighbours_seen:
-            #print(f"I saw a new neighbour : {self.dinfo.device_id_str} : {last_sender}")
-            self.neighbours_seen.append(last_sender)
-        path_so_far = data['path_so_far']
-        if self.dinfo.device_id_str in path_so_far:
- #           print(f"{self.dinfo.device_id_str} : Cyclic Message, Skipping : {path_so_far}")
-            return
-        hb_id = data['hb_id']
-        hb_ts = data['hb_ts']
-        hb_network_ts = data['network_ts']
-        hb_neighbours = data["neighbours"]
-
-        # If desired_path_1,2 not empty and I am not on desired path, skip
-        # else (if desired_path is empty OR I am on desired_path)
-
-        path_so_far.append(self.dinfo.device_id_str)
-        hb_msg = {
-                "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
-                "hb_id" : hb_id,
-                "hb_ts" : hb_ts,
-                "neighbours" : hb_neighbours,
-                "desired_path1" : [],
-                "desired_path2" : [],
-                "path_so_far" : path_so_far,
-                "last_sender" : self.dinfo.device_id_str,
-                "network_ts" : time.time_ns(),
-                "message_id" : message_id,
-                }
-        self._write_json_to_file(hb_msg)
-
-    def _listen_once(self):
-        filenames = os.listdir(self.ndir)
-        all_files = []
-        unread_files = []
-        for f in filenames:
-            fpath = os.path.join(self.ndir, f)
-            if not os.path.isfile(fpath):
-                print(f"{fpath} isnt a file....")
-                continue
-            all_files.append(fpath)
-            if fpath not in self.read_files:
-                unread_files.append(fpath)
-        # print(f"Unread files : {len(unread_files)}, Total files : {len(all_files)}")
-        for unread_fpath in unread_files:
-            with open(unread_fpath, 'r') as f:
+    def get_msgs_of_type(self, scantype):
+        fnames = glob.glob(f"{self.dname}/{scantype}_*")
+        all_msgs = []
+        for fname in fnames:
+            fpath = os.path.join(self.dname, fname)
+            with open(fpath, 'r') as f:
                 data = json.load(f)
-                self.process_msg(data)
-            self.read_files.append(unread_fpath)
+                data["hack_fname"] = fpath
+                all_msgs.append(data)
+        return all_msgs
+
+    def propogate_spath(self, msg):
+        source = msg["source"]
+        dest = msg["dest"]
+        source_ts = msg["source_ts"]
+        spath = msg["shortest_path"]
+        print(f"{self.dinfo.device_id_str} : Current = {self.spath} ...... Should update to {spath}")
+
+        if len(self.spath) == 0 or len(spath) < len(self.spath):
+            print(f"{self.dinfo.device_id_str} : Updating spath from {self.spath} tp {spath}")
+            self.spath = spath
+
+            for neighbour in self.neighbours_seen:
+                spath_new = spath
+                spath_new.append(neighbour)
+                new_msg = msg
+                new_msg["dest"] = neighbour
+                msg["shortest_path"] = spath_new
+                new_msg["last_sender"] = self.dinfo.device_id_str
+                new_msg["network_ts"] = time.time_ns()
+                self._write_json_to_file(new_msg, "spath")
+
+    def process_spath(self):
+        scan_msgs = self.get_msgs_of_type("spath")
+        for msg in scan_msgs:
+            source = msg["source"]
+            dest = msg["dest"]
+            if not self.simulated_layout.is_neighbour(source, self.dinfo.device_id_str):
+                continue
+            if dest == self.dinfo.device_id_str:
+                self.propogate_spath(msg)
+                print(f"DELETING {msg['hack_fname']}")
+                os.remove(msg["hack_fname"])
+
+    def process_scans(self):
+        scan_msgs = self.get_msgs_of_type("scan")
+        for msg in scan_msgs:
+            source = msg["source"]
+            if self.simulated_layout.is_neighbour(source, self.dinfo.device_id_str):
+                if source not in self.neighbours_seen:
+                    self.neighbours_seen.append(source)
+
+    def listen_once(self):
+        self.process_scans()
+        self.process_spath()
 
     def _keep_listening(self):
         while True:
-            self._listen_once()
+            self.listen_once()
             time.sleep(1)
 
     def keep_listening(self):
@@ -141,15 +122,22 @@ def main():
 
     cc = central.CommandCentral("ZZZ", dirname)
 
-    for j in range(10):
+    for j in range(5):
         for comm in comms:
-            comm.send_heartbeat(time.time_ns())
+            comm.send_scan(time.time_ns())
             time.sleep(0.001)
         print(f"{j} rounds of HB done.")
-        cc.listen_once()
         time.sleep(5)
+        cc.listen_once()
+        cc.send_spath()
+
     for comm in comms:
         comm.print_state()
+
+    print("Waiting for 15 secs")
+    time.sleep(15)
+    print("Listening on command center now")
+    cc.listen_once()
 
     #for i in range(num_units):
     #    listen_threads[i].join()
