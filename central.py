@@ -8,13 +8,14 @@ class NodeSummary:
     def __init__(self, name):
         self.name = ""
 
-def sort_tuples(tuples, key_idx):
-    key_func = lambda x: x[key_idx]
+def sort_tuples(tuples, a, b, c):
+    key_func = lambda x: (x[a], x[b], x[c])
     return sorted(tuples, key=key_func)
 
 class CommandCentral:
-    def __init__(self, dname):
+    def __init__(self, nodename, dname):
         # Node : List of neighbours, Shortest Path, Num HBs
+        self.nodename = nodename
         self.node_list = []
         self.dname = dname
         self.simulated_layout = layout.Layout()
@@ -57,12 +58,11 @@ class CommandCentral:
         return unit_HBs
 
     def summarize_node(self, name, hbs):
-        if name == "AAA":
-            sorted_hbs = sort_tuples(hbs, 3)
-            for hb in sorted_hbs:
-                print(hb)
+        sorted_hbs = sort_tuples(hbs, 0, 1, 3)
+        for hb in sorted_hbs:
+            print(hb)
 
-    def _listen_once(self):
+    def listen_once(self):
         filenames = os.listdir(self.dname)
         all_files = []
         for f in filenames:
@@ -76,17 +76,17 @@ class CommandCentral:
         for unread_fpath in all_files:
             with open(unread_fpath, 'r') as f:
                 data = json.load(f)
-                all_msgs.append(data)
+                if self.simulated_layout.is_neighbour(data["last_sender"], self.nodename):
+                    all_msgs.append(data)
 
         unit_HBs = self.process_msgs(all_msgs)
         for k,v in unit_HBs.items():
             print(f"{k} : {len(v)}")
             self.summarize_node(k, v)
         
-
     def _keep_listening(self):
         while True:
-            self._listen_once()
+            self.listen_once()
             self.print_map()
 
     def keep_listening(self):
@@ -95,12 +95,11 @@ class CommandCentral:
         return thread_listen
 
 def main():
-    cc = CommandCentral("/tmp/network_sim_1747620327180310567")
-    tl = cc.keep_listening()
-
+    cc = CommandCentral("ZZZ", "/tmp/network_sim_1747620327180310567")
+    # tl = cc.keep_listening()
     print("###### Central Command #######")
-
-    tl.join()
+    #tl.join()
+    cc.listen_once()
 
 if __name__=="__main__":
     main()
