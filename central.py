@@ -53,10 +53,51 @@ class CommandCentral:
                 unit_HBs[name].append(hbinfo)
         return unit_HBs
 
+    def get_all_msgs_for_hb(self, hbs, node):
+        tss = {}
+        for hb in hbs:
+            (name, ts, neighbours, network_ts, path_so_far) = hb
+            if name is not node:
+                continue
+            if ts not in tss:
+                tss[ts] = [hb]
+            else:
+                tss = tss[ts].append(hb)
+        return tss
+
+    def get_paths_for_hb(self, hbs, node):
+        msgs = self.get_all_msgs_for_hb(hbs, node)
+        for ts, hhh in msgs.items():
+            print(f"Node: {node} - TS={ts} has {len(hhh)} messages")
+
+    def count_paths(self, hbs):
+        curr_node = None
+        curr_ts = 0
+        num_paths = 0
+        shortest_path = []
+        for hb in hbs:
+            (name, ts, neighbours, network_ts, path_so_far) = hb
+            path_so_far.append(self.nodename)
+            if name != curr_node or curr_ts != ts:
+                if curr_node == None:
+                    pass
+                else:
+                    print(f"Node {curr_node} : HB@{curr_ts} had {num_paths} PATHS with shortest = {len(shortest_path)} - {shortest_path}")
+                curr_node = name
+                curr_ts = ts
+                num_paths = 1
+                shortest_path = path_so_far
+            else:
+                num_paths = num_paths + 1
+                if len(path_so_far) < len(shortest_path):
+                    shortest_path = path_so_far
+        print(f"Node {curr_node} : HB@{curr_ts} had {num_paths} PATHS with shortest = {len(shortest_path)} - {shortest_path}")
+
     def summarize_node(self, name, hbs):
-        sorted_hbs = self.sort_tuples(hbs, 0, 1, 3)
-        for hb in sorted_hbs:
-            print(hb)
+        #sorted_hbs = self.sort_tuples(hbs, 0, 1, 3)
+        #self.count_paths(hbs)
+        self.get_paths_for_hb(hbs, name)
+        
 
     def listen_once(self):
         filenames = os.listdir(self.dname)
