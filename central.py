@@ -95,7 +95,7 @@ class CommandCentral:
         return thread_listen
 
 def main():
-    cc = CommandCentral("ZZZ", "/tmp/network_sim_1747620327180310567")
+    cc = CommandCentral("ZZZ", "/tmp/network_sim_1747643811251458546")
     # tl = cc.keep_listening()
     print("###### Central Command #######")
     #tl.join()
