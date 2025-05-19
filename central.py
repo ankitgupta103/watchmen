@@ -4,14 +4,6 @@ import os
 import threading
 import layout
 
-class NodeSummary:
-    def __init__(self, name):
-        self.name = ""
-
-def sort_tuples(tuples, a, b, c):
-    key_func = lambda x: (x[a], x[b], x[c])
-    return sorted(tuples, key=key_func)
-
 class CommandCentral:
     def __init__(self, nodename, dname):
         # Node : List of neighbours, Shortest Path, Num HBs
@@ -30,6 +22,10 @@ class CommandCentral:
 
     def send_to_node(self):
         pass
+
+    def sort_tuples(self, tuples, a, b, c):
+        key_func = lambda x: (x[a], x[b], x[c])
+        return sorted(tuples, key=key_func)
 
     def get_hb_from_msg(self, data):
         # None
@@ -58,7 +54,7 @@ class CommandCentral:
         return unit_HBs
 
     def summarize_node(self, name, hbs):
-        sorted_hbs = sort_tuples(hbs, 0, 1, 3)
+        sorted_hbs = self.sort_tuples(hbs, 0, 1, 3)
         for hb in sorted_hbs:
             print(hb)
 
@@ -95,7 +91,7 @@ class CommandCentral:
         return thread_listen
 
 def main():
-    cc = CommandCentral("ZZZ", "/tmp/network_sim_1747643811251458546")
+    cc = CommandCentral("ZZZ", "/tmp/network_sim_1747646303191149481")
     # tl = cc.keep_listening()
     print("###### Central Command #######")
     #tl.join()

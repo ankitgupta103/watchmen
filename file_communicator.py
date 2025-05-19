@@ -5,6 +5,7 @@ import constants
 import device_info
 import json
 import layout
+import central
 
 class FileCommunicator:
     def __init__(self, dinfo, ndir):
@@ -55,16 +56,16 @@ class FileCommunicator:
         if message_type != constants.MESSAGE_TYPE_HEARTBEAT:
             print("Skipping non HB message")
             return
-        if message_id in self.messages_processed:
+        #if message_id in self.messages_processed:
             #print("Skipping already processed message")
-            return
+        #    return
         self.messages_processed.append(message_id)
         if last_sender != self.dinfo.device_id_str and last_sender not in self.neighbours_seen:
             #print(f"I saw a new neighbour : {self.dinfo.device_id_str} : {last_sender}")
             self.neighbours_seen.append(last_sender)
         path_so_far = data['path_so_far']
         if self.dinfo.device_id_str in path_so_far:
-            print(f"{self.dinfo.device_id_str} : Cyclic Message, Skipping : {path_so_far}")
+ #           print(f"{self.dinfo.device_id_str} : Cyclic Message, Skipping : {path_so_far}")
             return
         hb_id = data['hb_id']
         hb_ts = data['hb_ts']
@@ -75,8 +76,6 @@ class FileCommunicator:
         # else (if desired_path is empty OR I am on desired_path)
 
         path_so_far.append(self.dinfo.device_id_str)
-        if hb_id == "SSS":
-            print(f"{self.dinfo.device_id_str} : {path_so_far}")
         hb_msg = {
                 "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
                 "hb_id" : hb_id,
@@ -140,11 +139,14 @@ def main():
     for i in range(num_units):
         listen_threads.append(comms[i].keep_listening())
 
+    cc = central.CommandCentral("ZZZ", dirname)
+
     for j in range(10):
         for comm in comms:
             comm.send_heartbeat(time.time_ns())
-            time.sleep(0.05)
+            time.sleep(0.001)
         print(f"{j} rounds of HB done.")
+        cc.listen_once()
         time.sleep(5)
     for comm in comms:
         comm.print_state()
