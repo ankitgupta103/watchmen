@@ -54,7 +54,7 @@ class FileCommunicator:
             self.messages_processed.append(message_id)
             return
         if last_sender != self.dinfo.device_id_str and last_sender not in self.neighbours_seen:
-            print("I saw a new neighbour")
+            print(f"I saw a new neighbour : {self.dinfo.device_id_str} : {last_sender}")
             self.neighbours_seen.append(last_sender)
         if message_type != constants.MESSAGE_TYPE_HEARTBEAT:
             print("Skipping non HB message")
@@ -66,7 +66,7 @@ class FileCommunicator:
             return
         path_so_far = data['path_so_far']
         if self.dinfo.device_id_str in path_so_far:
-            print("Cyclic Message, Skipping")
+            print(f"Cyclic Message, Skipping : {path_so_far}")
             self.messages_processed.append(message_id)
             return
         hb_id = data['hb_id']
@@ -106,7 +106,7 @@ class FileCommunicator:
             all_files.append(fpath)
             if fpath not in self.read_files:
                 unread_files.append(fpath)
-        print(f"Unread files : {len(unread_files)}, Total files : {len(all_files)}")
+        # print(f"Unread files : {len(unread_files)}, Total files : {len(all_files)}")
         for unread_fpath in unread_files:
             with open(unread_fpath, 'r') as f:
                 data = json.load(f)
@@ -147,6 +147,7 @@ def main():
         for comm in comms:
             comm.send_heartbeat(time.time_ns())
             time.sleep(1)
+        print(f"{j} rounds of HB done.")
         time.sleep(5)
     for comm in comms:
         comm.print_state()

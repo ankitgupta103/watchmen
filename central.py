@@ -8,6 +8,10 @@ class NodeSummary:
     def __init__(self, name):
         self.name = ""
 
+def sort_tuples(tuples, key_idx):
+    key_func = lambda x: x[key_idx]
+    return sorted(tuples, key=key_func)
+
 class CommandCentral:
     def __init__(self, dname):
         # Node : List of neighbours, Shortest Path, Num HBs
@@ -37,7 +41,7 @@ class CommandCentral:
         neighbours = data["neighbours"]
         network_ts = data["network_ts"]
         path_so_far = data["path_so_far"]
-        return (hb_id, hb_ts, path_so_far, neighbours)
+        return (hb_id, hb_ts, neighbours, network_ts, path_so_far)
 
     def process_msgs(self, all_msgs):
         unit_HBs = {} # DevID -> [HBInfo]
@@ -45,10 +49,18 @@ class CommandCentral:
             hbinfo = self.get_hb_from_msg(msg)
             if hbinfo == None:
                 continue
-            (name, ts, path, neighbours) = hbinfo
-            print(hbinfo)
-            unit_HBs[name].append(hbinfo)
-        #print(unit_HBs)
+            (name, ts, neighbours, network_ts, path_so_far) = hbinfo
+            if name not in unit_HBs:
+                unit_HBs[name] = [hbinfo]
+            else:
+                unit_HBs[name].append(hbinfo)
+        return unit_HBs
+
+    def summarize_node(self, name, hbs):
+        if name == "AAA":
+            sorted_hbs = sort_tuples(hbs, 3)
+            for hb in sorted_hbs:
+                print(hb)
 
     def _listen_once(self):
         filenames = os.listdir(self.dname)
@@ -60,14 +72,17 @@ class CommandCentral:
                 continue
             all_files.append(fpath)
         all_msgs = []
-        
+       
         for unread_fpath in all_files:
             with open(unread_fpath, 'r') as f:
                 data = json.load(f)
                 all_msgs.append(data)
 
-
-        self.process_msgs(all_msgs)
+        unit_HBs = self.process_msgs(all_msgs)
+        for k,v in unit_HBs.items():
+            print(f"{k} : {len(v)}")
+            self.summarize_node(k, v)
+        
 
     def _keep_listening(self):
         while True:
@@ -80,7 +95,7 @@ class CommandCentral:
         return thread_listen
 
 def main():
-    cc = CommandCentral("/tmp/network_sim_1747584315184510000")
+    cc = CommandCentral("/tmp/network_sim_1747620327180310567")
     tl = cc.keep_listening()
 
     print("###### Central Command #######")
