@@ -21,8 +21,8 @@ class CommandCentral:
         #print(node)
         pass
 
-    def _write_json_to_file(self, msg):
-        fname = f"{self.dname}/spath_{self.nodename}_{time.time_ns()}"
+    def _write_json_to_file(self, msg, dest):
+        fname = f"{self.dname}/spath_{self.nodename}_to_{dest}_{time.time_ns()}"
         with open(fname, 'w') as f:
             json.dump(msg, f)
 
@@ -43,7 +43,7 @@ class CommandCentral:
                     "last_sender" : self.nodename,
                     "network_ts" : ts,
                 }
-            self._write_json_to_file(spath_msg)
+            self._write_json_to_file(spath_msg, neighbour)
         return True
 
     def get_msgs_of_type(self, scantype):
