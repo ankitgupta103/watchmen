@@ -18,14 +18,16 @@ class NodeInfo:
         self.num_images_captured = 0
         self.num_events_reported = 0
 
-    def add_hb(self, ts, neighbours, shortest_path):
+    def add_hb(self, ts, neighbours, shortest_path, image_count, event_count):
         if ts not in self.all_hb_ts:
             self.hb_count = self.hb_count + 1
             self.all_hb_ts.append(ts)
             if self.latest_hb_ts < ts:
                 self.latest_hb_ts = ts
-            self.neighbours = neighbours
-            self.shortest_path = shortest_path
+                self.neighbours = neighbours
+                self.shortest_path = shortest_path
+                self.num_images_captured = image_count
+                self.num_events_reported = event_count
 
     def print_info(self):
         print(f"""AtCC Node {self.nodename}:
@@ -66,7 +68,7 @@ class CommandCentral:
                     "last_sender" : self.nodename,
                     "last_ts" : ts,
                 }
-            self.fcomm._write_json_to_file(spath_msg, "spath", neighbour)
+            self.fcomm.send_to_network(spath_msg, "spath", neighbour)
         return True
 
     def get_scan_messages(self):
@@ -85,15 +87,17 @@ class CommandCentral:
         path_so_far = msg["path_so_far"]
         msg_spath = msg["shortest_path"]
         neighbours = msg["neighbours"]
-        return (source, dest, source_ts, path_so_far, msg_spath, neighbours)
+        image_count = msg["image_count"]
+        event_count = msg["event_count"]
+        return (source, dest, source_ts, path_so_far, msg_spath, neighbours, image_count, event_count)
 
     def consume_hb(self, msg):
         hb_msg = self.parse_hb_msg(msg)
-        (source, dest, source_ts, path_so_far, msg_spath, neighbours) = hb_msg
+        (source, dest, source_ts, path_so_far, msg_spath, neighbours, image_count, event_count) = hb_msg
         if source not in self.node_list:
             self.node_list[source] = NodeInfo(source)
         info = self.node_list[source]
-        info.add_hb(source_ts, neighbours, msg_spath)
+        info.add_hb(source_ts, neighbours, msg_spath, image_count, event_count)
 
     def get_hb_messages(self):
         hb_msgs = self.fcomm.read_msgs_of_type("hb")
