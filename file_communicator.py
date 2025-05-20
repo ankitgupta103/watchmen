@@ -47,7 +47,7 @@ class FileCommunicator:
 
     def send_hb(self, ts):
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.dinfo.device_id_str:
-            print(f"{self.dinfo.device_id_str} : Not sending HB because spath not good : {self.spath}")
+            #print(f"{self.dinfo.device_id_str} : Not sending HB because spath not good : {self.spath}")
             return
         # Send to next on shortest path
         dest = self.spath[0]
@@ -84,7 +84,7 @@ class FileCommunicator:
         spath1 = msg["shortest_path"]
 
         if len(self.spath) == 0 or len(spath1) < len(self.spath):
-            print(f"{self.dinfo.device_id_str} : Updating spath from {self.spath} tp {spath1}")
+            #print(f"{self.dinfo.device_id_str} : Updating spath from {self.spath} to {spath1}")
             self.spath = spath1[::-1]
 
             for neighbour in self.neighbours_seen:
@@ -103,7 +103,7 @@ class FileCommunicator:
         msg_spath = msg["shortest_path"]
         path_so_far = msg["path_so_far"]
         if len(path_so_far) >= len(msg_spath):
-            print(f"Finished")
+            #print(f"Finished")
             return
         if dest != self.dinfo.device_id_str:
             print(f"Weird that {dest} is not {self.dinfo.device_id_str:}")
@@ -111,7 +111,7 @@ class FileCommunicator:
         new_dest = msg_spath[len(path_so_far)] # Get the next item
         new_path_so_far = path_so_far + [new_dest]
 
-        print(f"{self.dinfo.device_id_str} : Sending {source}'s HB to {new_dest}, spath = {msg_spath}, path_so_far = {path_so_far}")
+        #print(f"{self.dinfo.device_id_str} : Sending {source}'s HB to {new_dest}, spath = {msg_spath}, path_so_far = {path_so_far}")
         new_msg = msg
         new_msg["dest"] = new_dest
         msg["path_so_far"] = new_path_so_far
@@ -200,8 +200,8 @@ def main():
         time.sleep(15)
         cc.listen_once()
 
-    for comm in comms:
-        comm.print_state()
+    #for comm in comms:
+    #    comm.print_state()
 
     print("Waiting for 15 secs")
     time.sleep(15)
