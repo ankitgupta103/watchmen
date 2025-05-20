@@ -26,7 +26,7 @@ class FileCommunicator:
             json.dump(msg, f)
 
     def _write_json_to_spath_file(self, msg, dest, prefix):
-        fname = f"{self.dname}/{prefix}_{self.dinfo.device_id_str}_{dest}_{time.time_ns()}"
+        fname = f"{self.dname}/{prefix}_{self.dinfo.device_id_str}_to_{dest}_{time.time_ns()}"
         with open(fname, 'w') as f:
             json.dump(msg, f)
 
@@ -56,6 +56,8 @@ class FileCommunicator:
 
     def get_msgs_of_type(self, scantype):
         fnames = glob.glob(f"{self.dname}/{scantype}_*")
+        if scantype == "spath":
+            fnames = glob.glob(f"{self.dname}/{scantype}_*to_{self.dinfo.device_id_str}*")
         all_msgs = []
         for fname in fnames:
             fpath = os.path.join(self.dname, fname)
