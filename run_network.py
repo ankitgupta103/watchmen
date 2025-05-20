@@ -33,6 +33,7 @@ def main():
 
     for j in range(5):
         for device in devices:
+            device.check_event()
             device.send_scan(time.time_ns())
             device.send_hb(time.time_ns())
             time.sleep(0.001)

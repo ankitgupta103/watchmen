@@ -22,5 +22,3 @@ class DeviceInfo:
         time_at_start_secs = 0 # Time when it came up.
         print(f"Initializing device with id={self.device_id_str}, at location {self.gps}")
 
-
-

@@ -1,11 +1,10 @@
 import time
 import os
 from picamera2 import Picamera2, Preview
-import device_info
 
 class Camera:
-    def __init__(self, dinfo, o_dir="/tmp/camera_captures"):
-        self.dinfo = dinfo
+    def __init__(self, devid, o_dir="/tmp/camera_captures"):
+        self.devid = devid
         self.output_dir = o_dir
         self.cam = Picamera2()
         self.cam.start()
@@ -17,7 +16,7 @@ class Camera:
 
     def take_picture(self):
         ts_ns = time.time_ns()
-        fname = f"{self.output_dir}/capture_{self.dinfo.device_id_str}_{ts_ns}.jpg"
+        fname = f"{self.output_dir}/capture_{self.devid}_{ts_ns}.jpg"
         print(f" ==== Will write image to file : {fname}")
         try:
             self.cam.capture_file(fname)
@@ -29,8 +28,7 @@ class Camera:
         return fname
 
 def main():
-    dinfo = device_info.DeviceInfo("2b46c5c95aea7306")
-    cam = Camera(dinfo, o_dir="/tmp/camera_captures_test")
+    cam = Camera("dsdsdsrwrdews", o_dir="/tmp/camera_captures_test")
     cam.start()
     cam.take_picture()
 

@@ -8,15 +8,26 @@ import layout
 import central
 import glob
 from file_communicator import FileCommunicator
+from detect import Detector
+from camera import Camera
 
 class Device:
     def __init__(self, devid, dname):
         self.devid = devid
         self.neighbours_seen = []
         self.spath = []
-        self.fcomm = FileCommunicator(dname, devid)
         # This is a simulated network layout, it is only used to "receive" messages which a real network can see.
         self.simulated_layout = layout.Layout()
+        # This ia a communication running in a simulated directory
+        self.fcomm = FileCommunicator(dname, devid)
+        self.detector = Detector()
+        self.detector.set_debug_mode()
+        self.cam = None
+        if self.devid == "AAA":
+            self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
+            self.cam.start()
+        self.image_count = 0
+        self.event_count = 0
 
     def send_scan(self, ts):
         scan_msg = {
@@ -24,7 +35,7 @@ class Device:
                 "source" : self.devid,
                 "ts" : ts,
                 }
-        self.fcomm._write_json_to_file(scan_msg, "scan")
+        self.fcomm.send_to_network(scan_msg, "scan")
 
     def send_hb(self, ts):
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.devid:
@@ -41,9 +52,11 @@ class Device:
                 "path_so_far" : [self.devid],
                 "source_ts" : ts,
                 "last_sender" : self.devid,
+                "image_count" : self.image_count,
+                "event_count" : self.event_count,
                 "last_ts" : ts
                 }
-        self.fcomm._write_json_to_file(hb_msg, "hb", dest)
+        self.fcomm.send_to_network(hb_msg, "hb", dest)
 
     def propogate_spath(self, msg):
         source = msg["source"]
@@ -63,7 +76,7 @@ class Device:
                 msg["shortest_path"] = spath1 + [neighbour]
                 new_msg["last_sender"] = self.devid
                 new_msg["network_ts"] = time.time_ns()
-                self.fcomm._write_json_to_file(new_msg, "spath", neighbour)
+                self.fcomm.send_to_network(new_msg, "spath", neighbour)
 
     def propogate_hb(self, msg):
         dest = msg["dest"]
@@ -85,7 +98,7 @@ class Device:
         msg["path_so_far"] = new_path_so_far
         new_msg["last_sender"] = self.devid
         new_msg["last_ts"] = time.time_ns()
-        self.fcomm._write_json_to_file(new_msg, "hb", new_dest)
+        self.fcomm.send_to_network(new_msg, "hb", new_dest)
 
     def process_spath(self):
         spath_msgs = self.fcomm.read_msgs_of_type("spath")
@@ -133,3 +146,13 @@ class Device:
         thread_listen = threading.Thread(target=self._keep_listening)
         thread_listen.start()
         return thread_listen
+    
+    def check_event(self):
+        if self.cam is None:
+            return
+        photo = self.cam.take_picture()
+        self.image_count = self.image_count + 1
+        event_found = self.detector.ImageHasPerson(photo)
+        if event_found:
+            print(f"###### {self.devid} saw an event, photo at {photo} ######")
+            self.event_count = self.event_count + 1

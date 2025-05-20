@@ -15,17 +15,21 @@ class FileCommunicator:
         print(f" Network simulated by {self.dname}")
         os.makedirs(self.dname, exist_ok=True)
 
-    def _write_json_to_file(self, msg, prefix, dest=None):
-        fname = f"{self.dname}/{prefix}_{self.devid}_{time.time_ns()}"
+    # Send msg of mtype to dest, None=all neighbours (broadcast mode).
+    def send_to_network(self, msg, mtype, dest=None):
+        fname = f"{self.dname}/{mtype}_{self.devid}_{time.time_ns()}"
         if dest is not None:
-            fname = f"{self.dname}/{prefix}_{self.devid}_to_{dest}_{time.time_ns()}"
+            fname = f"{self.dname}/{mtype}_{self.devid}_to_{dest}_{time.time_ns()}"
         with open(fname, 'w') as f:
             json.dump(msg, f)
 
-    def read_msgs_of_type(self, scantype):
-        fnames = glob.glob(f"{self.dname}/{scantype}_*")
-        if scantype == "spath" or scantype == "hb":
-            fnames = glob.glob(f"{self.dname}/{scantype}_*to_{self.devid}*")
+    # Read messages of type.
+    # Assumes that spath and hb are unicasts and hence fileformat assumes destination.
+    # Also hacks in a fname into the message so they can be acked later.
+    def read_msgs_of_type(self, mtype):
+        fnames = glob.glob(f"{self.dname}/{mtype}_*")
+        if mtype == "spath" or mtype == "hb":
+            fnames = glob.glob(f"{self.dname}/{mtype}_*to_{self.devid}*")
         all_msgs = []
         for fname in fnames:
             fpath = os.path.join(self.dname, fname)
@@ -35,6 +39,7 @@ class FileCommunicator:
                 all_msgs.append(data)
         return all_msgs
 
+    # Def acks message by deleting the file
     def ack_message(self, msg):
         # print(f"DELETING {msg['hack_fname']}")
         os.remove(msg["hack_fname"])
