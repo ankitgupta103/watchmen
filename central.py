@@ -5,6 +5,7 @@ import threading
 import layout
 import glob
 import constants
+from file_communicator import FileCommunicator
 
 class NodeInfo:
     def __init__(self, nodename):
@@ -43,14 +44,10 @@ class CommandCentral:
         self.dname = dname
         self.neighbours_seen = []
         self.simulated_layout = layout.Layout()
+        self.fcomm = FileCommunicator(dname, nodename)
         
         # Node : NodeInfo
         self.node_list = {}
-
-    def _write_json_to_file(self, msg, dest):
-        fname = f"{self.dname}/spath_{self.nodename}_to_{dest}_{time.time_ns()}"
-        with open(fname, 'w') as f:
-            json.dump(msg, f)
 
     def print_map(self):
         for n, info in self.node_list.items():
@@ -69,23 +66,12 @@ class CommandCentral:
                     "last_sender" : self.nodename,
                     "last_ts" : ts,
                 }
-            self._write_json_to_file(spath_msg, neighbour)
+            self.fcomm._write_json_to_file(spath_msg, "spath", neighbour)
         return True
-
-    def get_msgs_of_type(self, scantype):
-        fnames = glob.glob(f"{self.dname}/{scantype}_*")
-        all_msgs = []
-        for fname in fnames:
-            fpath = os.path.join(self.dname, fname)
-            with open(fpath, 'r') as f:
-                data = json.load(f)
-                data["hack_fname"] = fpath
-                all_msgs.append(data)
-        return all_msgs
 
     def get_scan_messages(self):
         print("in CC SCAN")
-        scan_msgs = self.get_msgs_of_type("scan")
+        scan_msgs = self.fcomm.read_msgs_of_type("scan")
         for msg in scan_msgs:
             source = msg["source"]
             if self.simulated_layout.is_neighbour(source, self.nodename):
@@ -110,7 +96,7 @@ class CommandCentral:
         info.add_hb(source_ts, neighbours, msg_spath)
 
     def get_hb_messages(self):
-        hb_msgs = self.get_msgs_of_type("hb")
+        hb_msgs = self.fcomm.read_msgs_of_type("hb")
         for msg in hb_msgs:
             source = msg["source"]
             last_sender = msg["last_sender"]
@@ -118,7 +104,7 @@ class CommandCentral:
                 continue
             else:
                 self.consume_hb(msg)
-                os.remove(msg["hack_fname"])
+                self.fcomm.ack_message(msg)
 
     def listen_once(self):
         self.get_scan_messages()
