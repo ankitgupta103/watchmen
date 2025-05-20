@@ -8,8 +8,8 @@ import constants
 from file_communicator import FileCommunicator
 
 class NodeInfo:
-    def __init__(self, nodename):
-        self.nodename = nodename
+    def __init__(self, devid):
+        self.devid = devid
         self.hb_count = 0
         self.latest_hb_ts = 0
         self.all_hb_ts = []
@@ -30,7 +30,7 @@ class NodeInfo:
                 self.num_events_reported = event_count
 
     def print_info(self):
-        print(f"""AtCC Node {self.nodename}:
+        print(f"""AtCC Node {self.devid}:
                 ---- Num HBs = {self.hb_count}
                 ---- Latest HB = {self.latest_hb_ts}
                 ---- HB Timestamps = {self.all_hb_ts}
@@ -41,12 +41,12 @@ class NodeInfo:
                 """)
 
 class CommandCentral:
-    def __init__(self, nodename, dname):
-        self.nodename = nodename
+    def __init__(self, devid, dname):
+        self.devid = devid
         self.dname = dname
         self.neighbours_seen = []
         self.simulated_layout = layout.Layout()
-        self.fcomm = FileCommunicator(dname, nodename)
+        self.fcomm = FileCommunicator(dname, devid)
         
         # Node : NodeInfo
         self.node_list = {}
@@ -61,11 +61,11 @@ class CommandCentral:
             ts = time.time_ns()
             spath_msg = {
                     "message_type" : constants.MESSAGE_TYPE_SPATH,
-                    "source" : self.nodename,
+                    "source" : self.devid,
                     "dest" : neighbour,
                     "source_ts" : ts,
-                    "shortest_path" : [self.nodename, neighbour],
-                    "last_sender" : self.nodename,
+                    "shortest_path" : [self.devid, neighbour],
+                    "last_sender" : self.devid,
                     "last_ts" : ts,
                 }
             self.fcomm.send_to_network(spath_msg, "spath", neighbour)
@@ -76,7 +76,7 @@ class CommandCentral:
         scan_msgs = self.fcomm.read_msgs_of_type("scan")
         for msg in scan_msgs:
             source = msg["source"]
-            if self.simulated_layout.is_neighbour(source, self.nodename):
+            if self.simulated_layout.is_neighbour(source, self.devid):
                 if source not in self.neighbours_seen:
                     self.neighbours_seen.append(source)
 
@@ -104,7 +104,7 @@ class CommandCentral:
         for msg in hb_msgs:
             source = msg["source"]
             last_sender = msg["last_sender"]
-            if not self.simulated_layout.is_neighbour(last_sender, self.nodename):
+            if not self.simulated_layout.is_neighbour(last_sender, self.devid):
                 continue
             else:
                 self.consume_hb(msg)

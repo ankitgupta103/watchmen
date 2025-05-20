@@ -20,12 +20,12 @@ class Device:
         self.simulated_layout = layout.Layout()
         # This ia a communication running in a simulated directory
         self.fcomm = FileCommunicator(dname, devid)
-        self.detector = Detector()
-        self.detector.set_debug_mode()
         self.cam = None
         if self.devid == "AAA":
             self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
             self.cam.start()
+        self.detector = Detector()
+        self.detector.set_debug_mode()
         self.image_count = 0
         self.event_count = 0
 
