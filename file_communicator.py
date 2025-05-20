@@ -18,7 +18,6 @@ class FileCommunicator:
         self.spath = []
         # This is a simulated network layout, it is only used to "receive" messages which a real network can see.
         self.simulated_layout = layout.Layout()
-        self.spaths_seen = []
 
     def _write_json_to_file(self, msg, prefix):
         fname = f"{self.dname}/{prefix}_{self.dinfo.device_id_str}_{time.time_ns()}"
@@ -30,8 +29,13 @@ class FileCommunicator:
         with open(fname, 'w') as f:
             json.dump(msg, f)
 
+    def _write_json_to_hb_file(self, msg, dest, prefix):
+        fname = f"{self.dname}/{prefix}_{self.dinfo.device_id_str}_to_{dest}_{time.time_ns()}"
+        with open(fname, 'w') as f:
+            json.dump(msg, f)
+
     def print_state(self):
-        print(f"Node: {self.dinfo.device_id_str}, Neighbours = {self.neighbours_seen}, spath = {self.spath}, Spath Messages seen = {len(self.spaths_seen)}")
+        print(f"Node: {self.dinfo.device_id_str}, Neighbours = {self.neighbours_seen}, spath = {self.spath}")
 
     def send_scan(self, ts):
         scan_msg = {
@@ -42,21 +46,27 @@ class FileCommunicator:
         self._write_json_to_file(scan_msg, "scan")
 
     def send_hb(self, ts):
-        scan_msg = {
+        if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.dinfo.device_id_str:
+            print(f"{self.dinfo.device_id_str} : Not sending HB because spath not good : {self.spath}")
+            return
+        # Send to next on shortest path
+        dest = self.spath[0]
+        hb_msg = {
                 "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
                 "source" : self.dinfo.device_id_str,
                 "neighbours" : self.neighbours_seen,
-                "spath" : self.spath,
+                "shortest_path" : self.spath,
+                "dest" : dest,
                 "path_so_far" : [self.dinfo.device_id_str],
-                "ts" : ts,
+                "source_ts" : ts,
                 "last_sender" : self.dinfo.device_id_str,
-                "last_ts" : time.time_ns()
+                "last_ts" : ts
                 }
-        self._write_json_to_file(scan_msg, "hb")
+        self._write_json_to_hb_file(hb_msg, dest, "hb")
 
     def get_msgs_of_type(self, scantype):
         fnames = glob.glob(f"{self.dname}/{scantype}_*")
-        if scantype == "spath":
+        if scantype == "spath" or scantype == "hb":
             fnames = glob.glob(f"{self.dname}/{scantype}_*to_{self.dinfo.device_id_str}*")
         all_msgs = []
         for fname in fnames:
@@ -71,41 +81,66 @@ class FileCommunicator:
         source = msg["source"]
         dest = msg["dest"]
         source_ts = msg["source_ts"]
-        spath = msg["shortest_path"]
+        spath1 = msg["shortest_path"]
 
-        if len(self.spath) == 0 or len(spath) < len(self.spath):
-            print(f"{self.dinfo.device_id_str} : Updating spath from {self.spath} tp {spath}")
-            self.spath = spath
+        if len(self.spath) == 0 or len(spath1) < len(self.spath):
+            print(f"{self.dinfo.device_id_str} : Updating spath from {self.spath} tp {spath1}")
+            self.spath = spath1[::-1]
 
             for neighbour in self.neighbours_seen:
-                if neighbour in spath:
+                if neighbour in spath1:
                     continue
                 new_msg = msg
                 new_msg["dest"] = neighbour
-                msg["shortest_path"] = spath + [neighbour]
+                msg["shortest_path"] = spath1 + [neighbour]
                 new_msg["last_sender"] = self.dinfo.device_id_str
                 new_msg["network_ts"] = time.time_ns()
                 self._write_json_to_spath_file(new_msg, neighbour, "spath")
 
+    def propogate_hb(self, msg):
+        dest = msg["dest"]
+        source = msg["source"]
+        msg_spath = msg["shortest_path"]
+        path_so_far = msg["path_so_far"]
+        if len(path_so_far) >= len(msg_spath):
+            print(f"Finished")
+            return
+        if dest != self.dinfo.device_id_str:
+            print(f"Weird that {dest} is not {self.dinfo.device_id_str:}")
+            return
+        new_dest = msg_spath[len(path_so_far)] # Get the next item
+        new_path_so_far = path_so_far + [new_dest]
+
+        print(f"{self.dinfo.device_id_str} : Sending {source}'s HB to {new_dest}, spath = {msg_spath}, path_so_far = {path_so_far}")
+        new_msg = msg
+        new_msg["dest"] = new_dest
+        msg["path_so_far"] = new_path_so_far
+        new_msg["last_sender"] = self.dinfo.device_id_str
+        new_msg["last_ts"] = time.time_ns()
+        self._write_json_to_hb_file(new_msg, new_dest, "hb")
+
     def process_spath(self):
-        scan_msgs = self.get_msgs_of_type("spath")
-        for msg in scan_msgs:
+        spath_msgs = self.get_msgs_of_type("spath")
+        for msg in spath_msgs:
             source = msg["source"]
             last_sender = msg["last_sender"]
-            dest = msg["dest"]
-            #ts = msg["ts"]
-            #spath = msg["spath"]
             if not self.simulated_layout.is_neighbour(last_sender, self.dinfo.device_id_str):
                 continue
             else:
                 self.propogate_spath(msg)
-            #spath_id = f"{spath}_{ts}"
-            #if dest == self.dinfo.device_id_str:
-            #    if spath_id in self.spaths_seen:
-            #        print(f"Skipping already seen spath message")
-            #    else:
-            #        self.spaths_seen[
-                print(f"DELETING {msg['hack_fname']}")
+#                print(f"DELETING {msg['hack_fname']}")
+                os.remove(msg["hack_fname"])
+
+    def process_hb(self):
+        hb_msgs = self.get_msgs_of_type("hb")
+        for msg in hb_msgs:
+            source = msg["source"]
+            last_sender = msg["last_sender"]
+            if not self.simulated_layout.is_neighbour(last_sender, self.dinfo.device_id_str):
+                continue
+            else:
+                self.propogate_hb(msg)
+ #               print(f"DELETING {msg['hack_fname']}")
                 os.remove(msg["hack_fname"])
 
     def process_scans(self):
@@ -121,6 +156,7 @@ class FileCommunicator:
     def listen_once(self):
         self.process_scans()
         self.process_spath()
+        self.process_hb()
 
     def _keep_listening(self):
         while True:
@@ -157,6 +193,7 @@ def main():
     for j in range(5):
         for comm in comms:
             comm.send_scan(time.time_ns())
+            comm.send_hb(time.time_ns())
             time.sleep(0.001)
         cc.send_spath()
         print(f"{j} rounds of Scan done.")
