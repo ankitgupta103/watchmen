@@ -1,10 +1,6 @@
-import json
 import time
-import os
 import threading
-import glob
 import constants
-from file_communicator import FileCommunicator
 
 class NodeInfo:
     def __init__(self, devid):

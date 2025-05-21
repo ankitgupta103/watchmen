@@ -1,6 +1,5 @@
 import time
 import constants
-import device_info
 
 from vyomcloudbridge.services import queue_writer_json
 #from vyomcloudbridge.services import vyom_listener

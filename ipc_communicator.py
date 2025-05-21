@@ -7,7 +7,7 @@ import layout
 import glob
 import random
 
-class FileCommunicator:
+class IPCCommunicator:
     def __init__(self):
         # This is a simulated network layout, it is only used to "receive" messages which a real network can see.
         self.simulated_layout = layout.Layout()

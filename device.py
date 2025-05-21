@@ -1,11 +1,6 @@
 import time
-import os
-import threading
 import constants
-import json
-import glob
 
-from file_communicator import FileCommunicator
 from detect import Detector
 from camera import Camera
 
@@ -125,14 +120,14 @@ class Device:
         self.fcomm.send_to_network(new_msg, self.devid, new_dest)
 
     def propogate_image(self, msg):
-        new_dest = self.get_route(msg)
-        if new_dest is None:
+        new_route = self.get_route(msg)
+        if new_route is None:
             return
-        new_msg = msg
-        path_so_far = msg["path_so_far"]
-        new_path_so_far = path_so_far + [new_dest]
-        new_msg["dest"] = new_dest
+        
+        (new_dest, new_path_so_far) = new_route
         print(f" ==== SENDING IMAGE FROM {self.devid} to {new_dest}")
+        new_msg = msg
+        new_msg["dest"] = new_dest
         msg["path_so_far"] = new_path_so_far
         new_msg["last_sender"] = self.devid
         new_msg["last_ts"] = time.time_ns()
