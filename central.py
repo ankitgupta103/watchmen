@@ -20,10 +20,11 @@ class NodeInfo:
         self.all_hb_ts = []
         self.neighbours = []
         self.shortest_path = []
+        self.paths_seen = []
         self.num_images_captured = 0
         self.num_events_reported = 0
 
-    def add_hb(self, ts, neighbours, shortest_path, image_count, event_count):
+    def add_hb(self, ts, neighbours, shortest_path, path_so_far, image_count, event_count):
         if ts not in self.all_hb_ts:
             self.hb_count = self.hb_count + 1
             self.all_hb_ts.append(ts)
@@ -33,6 +34,7 @@ class NodeInfo:
                 self.shortest_path = shortest_path
                 self.num_images_captured = image_count
                 self.num_events_reported = event_count
+                self.paths_seen.append(path_so_far)
 
     def print_info(self):
         print(f"""AtCC Node {self.devid}:
@@ -40,7 +42,8 @@ class NodeInfo:
                 ---- Latest HB = {self.latest_hb_ts}
                 ---- HB Timestamps = {self.all_hb_ts}
                 ---- Neighbours = {self.neighbours}
-                ---- Shortest Pats to CC = {self.shortest_path}
+                ---- Shortest Path to CC = {self.shortest_path}
+                ---- Actual Path to CC = {self.paths_seen}
                 ---- Num images processed = {self.num_images_captured}
                 ---- Num events reported = {self.num_events_reported}
                 """)
@@ -90,7 +93,7 @@ class CommandCentral:
         if source not in self.node_list:
             self.node_list[source] = NodeInfo(source)
         info = self.node_list[source]
-        info.add_hb(source_ts, neighbours, msg_spath, image_count, event_count)
+        info.add_hb(source_ts, neighbours, msg_spath, path_so_far, image_count, event_count)
 
     def consume_image(self, msg):
         imf = f"/tmp/camera_captures_test/Image_CC_{msg['source']}_{msg['image_ts']}.jpg"
