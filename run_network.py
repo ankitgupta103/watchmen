@@ -9,27 +9,25 @@ import central
 import glob
 from device import Device
 from central import CommandCentral
+from file_communicator import FileCommunicator
 
-def start_n_units(dirname, n):
+def start_n_units(n, ncomm):
     devices = []
     for i in range(n):
         c=chr(i+65)
         devid=f"{c}{c}{c}"
-        device = Device(devid, dirname)
+        device = Device(devid, ncomm)
         devices.append(device)
     return devices
 
 def main():
-    dirname = f"/tmp/network_sim_{time.time_ns()}"
     num_units = 25
-
-    devices = start_n_units(dirname, num_units)
-
-    listen_threads = []
-    for i in range(num_units):
-        listen_threads.append(devices[i].keep_listening())
-
-    cc  = central.CommandCentral("ZZZ", dirname)
+    ncomm = FileCommunicator()
+    devices = start_n_units(num_units, ncomm)
+    cc  = central.CommandCentral("ZZZ", ncomm)
+    ncomm.add_dev(cc.devid, cc)
+    for d in devices:
+        ncomm.add_dev(d.devid, d)
 
     for j in range(5):
         for device in devices:
@@ -39,10 +37,8 @@ def main():
             time.sleep(0.001)
         cc.send_spath()
         print(f"{j} rounds of Scan done.")
-        time.sleep(15)
-        cc.listen_once()
+        time.sleep(3)
 
-    cc.listen_once()
     cc.console_output()
 
     #for i in range(num_units):

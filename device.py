@@ -10,12 +10,11 @@ from detect import Detector
 from camera import Camera
 
 class Device:
-    def __init__(self, devid, dname):
+    def __init__(self, devid, fcomm):
         self.devid = devid
         self.neighbours_seen = []
         self.spath = []
-        # This ia a communication running in a simulated directory
-        self.fcomm = FileCommunicator(dname, devid)
+        self.fcomm = fcomm
         self.cam = None
         if self.devid == "AAA":
             self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
@@ -32,7 +31,7 @@ class Device:
                 "last_sender" : self.devid,
                 "ts" : ts,
                 }
-        self.fcomm.send_to_network(scan_msg)
+        self.fcomm.send_to_network(scan_msg, self.devid)
 
     def send_hb(self, ts):
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.devid:
@@ -53,7 +52,7 @@ class Device:
                 "last_sender" : self.devid,
                 "last_ts" : ts
                 }
-        self.fcomm.send_to_network(hb_msg, dest)
+        self.fcomm.send_to_network(hb_msg, self.devid, dest)
 
     def send_image(self, ts, image_data, image_ts):
         # TODO this will need to be stored until we have spath
@@ -74,7 +73,7 @@ class Device:
                 "last_sender" : self.devid,
                 "last_ts" : ts
                 }
-        self.fcomm.send_to_network(hb_msg, dest)
+        self.fcomm.send_to_network(hb_msg, self.devid, dest)
 
     def propogate_spath(self, msg):
         source = msg["source"]
@@ -83,7 +82,7 @@ class Device:
         spath1 = msg["shortest_path"]
         if len(self.spath) == 0 or len(spath1) < len(self.spath):
             if self.devid == "AAA":
-                print(f"{self.devid} : Updating spath from {self.spath} to {spath1[::-1]} from file {msg['hack_fname']}")
+                print(f" ********* {self.devid} : Updating spath from {self.spath} to {spath1[::-1]}")
             self.spath = spath1[::-1]
 
             for neighbour in self.neighbours_seen:
@@ -94,7 +93,7 @@ class Device:
                 msg["shortest_path"] = spath1 + [neighbour]
                 new_msg["last_sender"] = self.devid
                 new_msg["network_ts"] = time.time_ns()
-                self.fcomm.send_to_network(new_msg, neighbour)
+                self.fcomm.send_to_network(new_msg, self.devid, neighbour)
 
     def get_route(self, msg):
         dest = msg["dest"]
@@ -120,7 +119,7 @@ class Device:
         msg["path_so_far"] = new_path_so_far
         new_msg["last_sender"] = self.devid
         new_msg["last_ts"] = time.time_ns()
-        self.fcomm.send_to_network(new_msg, new_dest)
+        self.fcomm.send_to_network(new_msg, self.devid, new_dest)
 
     def propogate_image(self, msg):
         new_dest = self.get_route(msg)
@@ -134,49 +133,21 @@ class Device:
         msg["path_so_far"] = new_path_so_far
         new_msg["last_sender"] = self.devid
         new_msg["last_ts"] = time.time_ns()
-        self.fcomm.send_to_network(new_msg, new_dest)
+        self.fcomm.send_to_network(new_msg, self.devid, new_dest)
 
-    def process_spath(self):
-        spath_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_SPATH)
-        for msg in spath_msgs:
-            self.propogate_spath(msg)
-            self.fcomm.ack_message(msg)
-
-    def process_hb(self):
-        hb_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_HEARTBEAT)
-        for msg in hb_msgs:
-            self.propogate_hb(msg)
-            self.fcomm.ack_message(msg)
-
-    def process_image_event(self):
-        image_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_PHOTO)
-        for msg in image_msgs:
-            self.propogate_image(msg)
-            self.fcomm.ack_message(msg)
-
-    def process_scans(self):
-        scan_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_SCAN)
-        for msg in scan_msgs:
+    def process_msg(self, msg):
+        mtype = msg["message_type"]
+        if mtype == constants.MESSAGE_TYPE_SCAN:
             source = msg["source"]
             if source not in self.neighbours_seen:
                 self.neighbours_seen.append(source)
+        if mtype == constants.MESSAGE_TYPE_HEARTBEAT:
+            self.propogate_hb(msg)
+        if mtype == constants.MESSAGE_TYPE_SPATH:
+            self.propogate_spath(msg)
+        if mtype == constants.MESSAGE_TYPE_PHOTO:
+            self.propogate_image(msg)
 
-    def listen_once(self):
-        self.process_scans()
-        self.process_spath()
-        self.process_image_event()
-        self.process_hb()
-
-    def _keep_listening(self):
-        while True:
-            self.listen_once()
-            time.sleep(1)
-
-    def keep_listening(self):
-        thread_listen = threading.Thread(target=self._keep_listening)
-        thread_listen.start()
-        return thread_listen
-    
     def check_event(self):
         if self.cam is None:
             return
@@ -185,6 +156,6 @@ class Device:
         self.image_count = self.image_count + 1
         event_found = self.detector.ImageHasPerson(photo)
         if event_found:
-            self.send_image(time.time_ns(), "Hello this is an image", image_ts)
             print(f"###### {self.devid} saw an event, photo at {photo} ######")
+            self.send_image(time.time_ns(), "Hello this is an image", image_ts)
             self.event_count = self.event_count + 1

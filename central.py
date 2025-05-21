@@ -40,11 +40,10 @@ class NodeInfo:
                 """)
 
 class CommandCentral:
-    def __init__(self, devid, dname):
+    def __init__(self, devid, fcomm):
         self.devid = devid
-        self.dname = dname
         self.neighbours_seen = []
-        self.fcomm = FileCommunicator(dname, devid)
+        self.fcomm = fcomm
         
         # Node : NodeInfo
         self.node_list = {}
@@ -54,7 +53,6 @@ class CommandCentral:
             info.print_info()
 
     def send_spath(self):
-        print(f"Sending spath to {self.neighbours_seen}")
         for neighbour in self.neighbours_seen:
             ts = time.time_ns()
             spath_msg = {
@@ -66,15 +64,8 @@ class CommandCentral:
                     "last_sender" : self.devid,
                     "last_ts" : ts,
                 }
-            self.fcomm.send_to_network(spath_msg, neighbour)
+            self.fcomm.send_to_network(spath_msg, self.devid, neighbour)
         return True
-
-    def get_scan_messages(self):
-        scan_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_SCAN)
-        for msg in scan_msgs:
-            source = msg["source"]
-            if source not in self.neighbours_seen:
-                self.neighbours_seen.append(source)
 
     def parse_hb_msg(self, msg):
         source = msg["source"]
@@ -96,36 +87,19 @@ class CommandCentral:
         info.add_hb(source_ts, neighbours, msg_spath, image_count, event_count)
 
     def consume_image(self, msg):
-        print(f"==== CC got an image from {msg['source']}")
-        print(f"==== ====================={msg['image_data']}")
+        print(f" %%%%%% ==== CC got an image from {msg['source']}")
+        print(f" ****** ==== ====================={msg['image_data']}")
 
-    def get_hb_messages(self):
-        hb_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_HEARTBEAT)
-        for msg in hb_msgs:
+    def process_msg(self, msg):
+        mtype = msg["message_type"]
+        if mtype == constants.MESSAGE_TYPE_SCAN:
+            source = msg["source"]
+            if source not in self.neighbours_seen:
+                self.neighbours_seen.append(source)
+        if mtype == constants.MESSAGE_TYPE_HEARTBEAT:
             self.consume_hb(msg)
-            self.fcomm.ack_message(msg)
-
-    def get_image_messages(self):
-        image_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_PHOTO)
-        for msg in image_msgs:
-            print(f"")
+        if mtype == constants.MESSAGE_TYPE_PHOTO:
             self.consume_image(msg)
-            self.fcomm.ack_message(msg)
-
-    def listen_once(self):
-        self.get_scan_messages()
-        self.get_hb_messages()
-        self.get_image_messages()
-        
-    def _keep_listening(self):
-        while True:
-            self.listen_once()
-            time.sleep(5)
-
-    def keep_listening(self):
-        thread_listen = threading.Thread(target=self._keep_listening)
-        thread_listen.start()
-        return thread_listen
 
 def main():
     cc = CommandCentral("ZZZ", "/tmp/network_sim_1747651680792971540/")

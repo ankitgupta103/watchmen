@@ -17,7 +17,6 @@ class Camera:
     def take_picture(self):
         ts_ns = time.time_ns()
         fname = f"{self.output_dir}/capture_{self.devid}_{ts_ns}.jpg"
-        print(f" ==== Will write image to file : {fname}")
         try:
             self.cam.capture_file(fname)
         except Exception as e:
