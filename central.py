@@ -2,7 +2,6 @@ import json
 import time
 import os
 import threading
-import layout
 import glob
 import constants
 from file_communicator import FileCommunicator
@@ -45,13 +44,12 @@ class CommandCentral:
         self.devid = devid
         self.dname = dname
         self.neighbours_seen = []
-        self.simulated_layout = layout.Layout()
         self.fcomm = FileCommunicator(dname, devid)
         
         # Node : NodeInfo
         self.node_list = {}
 
-    def print_map(self):
+    def console_output(self):
         for n, info in self.node_list.items():
             info.print_info()
 
@@ -68,17 +66,15 @@ class CommandCentral:
                     "last_sender" : self.devid,
                     "last_ts" : ts,
                 }
-            self.fcomm.send_to_network(spath_msg, "spath", neighbour)
+            self.fcomm.send_to_network(spath_msg, neighbour)
         return True
 
     def get_scan_messages(self):
-        print("in CC SCAN")
-        scan_msgs = self.fcomm.read_msgs_of_type("scan")
+        scan_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_SCAN)
         for msg in scan_msgs:
             source = msg["source"]
-            if self.simulated_layout.is_neighbour(source, self.devid):
-                if source not in self.neighbours_seen:
-                    self.neighbours_seen.append(source)
+            if source not in self.neighbours_seen:
+                self.neighbours_seen.append(source)
 
     def parse_hb_msg(self, msg):
         source = msg["source"]
@@ -99,21 +95,27 @@ class CommandCentral:
         info = self.node_list[source]
         info.add_hb(source_ts, neighbours, msg_spath, image_count, event_count)
 
+    def consume_image(self, msg):
+        print(f"==== CC got an image from {msg['source']}")
+        print(f"==== ====================={msg['image_data']}")
+
     def get_hb_messages(self):
-        hb_msgs = self.fcomm.read_msgs_of_type("hb")
+        hb_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_HEARTBEAT)
         for msg in hb_msgs:
-            source = msg["source"]
-            last_sender = msg["last_sender"]
-            if not self.simulated_layout.is_neighbour(last_sender, self.devid):
-                continue
-            else:
-                self.consume_hb(msg)
-                self.fcomm.ack_message(msg)
+            self.consume_hb(msg)
+            self.fcomm.ack_message(msg)
+
+    def get_image_messages(self):
+        image_msgs = self.fcomm.read_msgs_of_type(constants.MESSAGE_TYPE_PHOTO)
+        for msg in image_msgs:
+            print(f"")
+            self.consume_image(msg)
+            self.fcomm.ack_message(msg)
 
     def listen_once(self):
         self.get_scan_messages()
         self.get_hb_messages()
-        self.print_map()
+        self.get_image_messages()
         
     def _keep_listening(self):
         while True:
