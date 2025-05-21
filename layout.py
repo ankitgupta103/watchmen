@@ -24,6 +24,17 @@ class Layout:
         (bx,by) = self.node_pos[b]
         return abs(ax-bx)<=1 and abs(ay-by) <= 1
 
+    def list_nodes(self):
+        return self.node_pos.keys()
+
+    def get_neighbours(self, a):
+        neighbours = []
+        ns = self.list_nodes()
+        for n in ns:
+            if self.is_neighbour(a, n):
+                neighbours.append(n)
+        return neighbours
+
 def main():
     l = Layout()
     l.print_layout()
