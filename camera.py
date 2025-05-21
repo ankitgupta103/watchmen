@@ -1,6 +1,21 @@
 import time
 import os
+import io
+import base64
+from PIL import Image
 from picamera2 import Picamera2, Preview
+
+def image2string(imagefile):
+    r""" Convert Pillow image to string. """
+    image = Image.open(imagefile)
+    image = image.convert('RGB')
+    img_bytes_arr = io.BytesIO()
+    image.save(img_bytes_arr, format="JPEG")
+    img_bytes_arr.seek(0)
+    img_bytes_arr = img_bytes_arr.read()
+    img_bytes_arr_encoded = base64.b64encode(img_bytes_arr)
+    res = img_bytes_arr_encoded.decode('utf-8')
+    return res
 
 class Camera:
     def __init__(self, devid, o_dir="/tmp/camera_captures"):
@@ -24,12 +39,14 @@ class Camera:
             print(e)
             return ""
         print(f"... Written image to file : {fname}")
-        return fname
+        imstr = image2string(fname)
+        return (fname, imstr)
 
 def main():
     cam = Camera("dsdsdsrwrdews", o_dir="/tmp/camera_captures_test")
     cam.start()
-    cam.take_picture()
+    (imfile, imstr) = cam.take_picture()
+    print(imstr)
 
 if __name__=="__main__":
     main()
