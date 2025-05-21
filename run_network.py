@@ -42,10 +42,8 @@ def main():
         time.sleep(15)
         cc.listen_once()
 
-    print("Waiting for 15 secs")
-    time.sleep(15)
-    print("Listening on command center now")
     cc.listen_once()
+    cc.console_output()
 
     #for i in range(num_units):
     #    listen_threads[i].join()
