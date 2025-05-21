@@ -8,6 +8,7 @@ from picamera2 import Picamera2, Preview
 def image2string(imagefile):
     r""" Convert Pillow image to string. """
     image = Image.open(imagefile)
+    # image.show()
     image = image.convert('RGB')
     img_bytes_arr = io.BytesIO()
     image.save(img_bytes_arr, format="JPEG")
@@ -22,6 +23,13 @@ class Camera:
         self.devid = devid
         self.output_dir = o_dir
         self.cam = Picamera2()
+
+        preview_config = self.cam.create_preview_configuration(main={"size": (800, 600)})
+        self.cam.configure(preview_config)
+        self.cam.start_preview(Preview.QTGL)
+
+        self.capture_config = self.cam.create_still_configuration()
+
         self.cam.start()
         time.sleep(2)
 
@@ -33,6 +41,7 @@ class Camera:
         ts_ns = time.time_ns()
         fname = f"{self.output_dir}/capture_{self.devid}_{ts_ns}.jpg"
         try:
+            # self.cam.switch_mode_and_capture_file(self.capture_config, fname)
             self.cam.capture_file(fname)
         except Exception as e:
             print("Couldn't take picture")
@@ -44,9 +53,7 @@ class Camera:
 
 def main():
     cam = Camera("dsdsdsrwrdews", o_dir="/tmp/camera_captures_test")
-    cam.start()
     (imfile, imstr) = cam.take_picture()
-    print(imstr)
 
 if __name__=="__main__":
     main()
