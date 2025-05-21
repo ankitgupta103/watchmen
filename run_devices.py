@@ -1,15 +1,7 @@
 import time
-import os
-import threading
-import constants
-import device_info
-import json
-import layout
-import central
-import glob
 from device import Device
 from central import CommandCentral
-from file_communicator import FileCommunicator
+from ipc_communicator import IPCCommunicator
 
 def start_n_units(n, ncomm):
     devices = []
@@ -22,9 +14,9 @@ def start_n_units(n, ncomm):
 
 def main():
     num_units = 25
-    ncomm = FileCommunicator()
+    ncomm = IPCCommunicator()
     devices = start_n_units(num_units, ncomm)
-    cc  = central.CommandCentral("ZZZ", ncomm)
+    cc  = CommandCentral("ZZZ", ncomm)
     ncomm.add_dev(cc.devid, cc)
     for d in devices:
         ncomm.add_dev(d.devid, d)
