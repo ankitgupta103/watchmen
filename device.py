@@ -107,6 +107,12 @@ class Device:
         return (new_dest, new_path_so_far)
 
     def propogate_hb(self, msg):
+        #msg_spath = msg["shortest_path"]
+        #path_so_far = msg["path_so_far"]
+        #if len(msg_spath) == 0:
+        #    msg_spath = path_so_far + self.spath[1:]
+        #    print(f"{self.devid} : Likely reroute : updating msg_path to {msg_spath}")
+        
         new_route = self.get_route(msg)
         if new_route is None:
             return
@@ -117,7 +123,25 @@ class Device:
         msg["path_so_far"] = new_path_so_far
         new_msg["last_sender"] = self.devid
         new_msg["last_ts"] = time.time_ns()
-        self.fcomm.send_to_network(new_msg, self.devid, new_dest)
+        succ = self.fcomm.send_to_network(new_msg, self.devid, new_dest)
+        #if not succ:
+        #    print(f"{self.devid} Sending failed to {new_dest}, trying other neighbours : {self.neighbours_seen}")
+        #    avoidlist = new_path_so_far # Avoid everything the message has been on.
+        #    for n in self.neighbours_seen:
+        #        if n in avoidlist:
+        #            continue
+        #        print(f"{self.devid} sending HB to {new_dest} failed, trying to send to {n}, avoiding {avoidlist}")
+        #        new_msg["dest"] = n
+        #        msg["path_so_far"] = path_so_far + [n]
+        #        if n not in avoidlist:
+        #            avoidlist.append(n)
+        #        msg['msg_spath'] = []
+        #        new_msg["last_sender"] = self.devid
+        #        new_msg["last_ts"] = time.time_ns()
+        #        succ = self.fcomm.send_to_network(new_msg, self.devid, new_dest)
+        #        if succ:
+        #            print(f"{self.devid} : Successfully sent to {n}")
+        #            break
 
     def propogate_image(self, msg):
         new_route = self.get_route(msg)
