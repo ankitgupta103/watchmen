@@ -31,6 +31,7 @@ class Device:
                 "last_sender" : self.devid,
                 "ts" : ts,
                 }
+        # Failure Here is OK, since it is a discovery and alternative paths would be discovered.
         self.fcomm.send_to_network(scan_msg, self.devid)
 
     def send_hb(self, ts):
@@ -93,6 +94,7 @@ class Device:
                 msg["shortest_path"] = spath1 + [neighbour]
                 new_msg["last_sender"] = self.devid
                 new_msg["network_ts"] = time.time_ns()
+                # Failure Here is OK, since it is a discovery and alternative paths would be discovered.
                 self.fcomm.send_to_network(new_msg, self.devid, neighbour)
 
     def get_route(self, msg):
@@ -106,15 +108,16 @@ class Device:
             print(f"Weird that {dest} is not {self.devid:}")
             return None
         new_dest = msg_spath[len(path_so_far)] # Get the next item
-        return new_dest
+        new_path_so_far = path_so_far + [new_dest]
+        return (new_dest, new_path_so_far)
 
     def propogate_hb(self, msg):
-        new_dest = self.get_route(msg)
-        if new_dest is None:
+        new_route = self.get_route(msg)
+        if new_route is None:
             return
+        (new_dest, new_path_so_far) = new_route
+
         new_msg = msg
-        path_so_far = msg["path_so_far"]
-        new_path_so_far = path_so_far + [new_dest]
         new_msg["dest"] = new_dest
         msg["path_so_far"] = new_path_so_far
         new_msg["last_sender"] = self.devid
