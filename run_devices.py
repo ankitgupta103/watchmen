@@ -32,7 +32,6 @@ def main():
         time.sleep(3)
 
     cc.console_output()
-
     #for i in range(num_units):
     #    listen_threads[i].join()
 

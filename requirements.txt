@@ -10,3 +10,4 @@ lockfile
 requests
 geopy
 picamera2
+PIL

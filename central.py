@@ -1,6 +1,16 @@
 import time
 import threading
 import constants
+import io
+import base64
+from PIL import Image
+
+def imstrtoimage(string: str) -> Image.Image:
+    r""" Convert string to Pillow image. """
+    img_bytes_arr = string.encode('utf-8')
+    img_bytes_arr_encoded = base64.b64decode(img_bytes_arr)
+    image = Image.open(io.BytesIO(img_bytes_arr_encoded))
+    return image
 
 class NodeInfo:
     def __init__(self, devid):
@@ -83,8 +93,11 @@ class CommandCentral:
         info.add_hb(source_ts, neighbours, msg_spath, image_count, event_count)
 
     def consume_image(self, msg):
-        print(f" %%%%%% ==== CC got an image from {msg['source']}")
-        print(f" ****** ==== ====================={msg['image_data']}")
+        imf = f"/tmp/camera_captures_test/Image_CC_{msg['source']}_{msg['image_ts']}.jpg"
+        print(f" %%%%%% ==== CC got an image from {msg['source']}, will save to {imf}")
+        im = imstrtoimage(msg["image_data"])
+        im.save(imf)
+        im.show()
 
     def process_msg(self, msg):
         mtype = msg["message_type"]

@@ -15,7 +15,6 @@ class Device:
             self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
             self.cam.start()
             self.detector = Detector()
-            self.detector.set_debug_mode()
         self.image_count = 0
         self.event_count = 0
 
@@ -174,10 +173,10 @@ class Device:
         if self.cam is None:
             return
         image_ts = time.time_ns()
-        photo = self.cam.take_picture()
+        (imfile, imdatastr) = self.cam.take_picture()
         self.image_count = self.image_count + 1
-        event_found = self.detector.ImageHasPerson(photo)
+        event_found = self.detector.ImageHasPerson(imfile)
         if event_found:
-            print(f"###### {self.devid} saw an event, photo at {photo} ######")
-            self.send_image(time.time_ns(), "Hello this is an image", image_ts)
+            print(f"###### {self.devid} saw an event, photo at {imfile} ######")
+            self.send_image(time.time_ns(), imdatastr, image_ts)
             self.event_count = self.event_count + 1
