@@ -20,7 +20,7 @@ class FileCommunicator:
 
     # Send msg of mtype to dest, None=all neighbours (broadcast mode).
     def send_to_network(self, msg, devid, dest=None):
-        time.sleep(0.1)
+        time.sleep(0.01)
         if random.random() > self.robustness:
             return False
         if dest is not None:
