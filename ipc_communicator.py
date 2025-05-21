@@ -21,8 +21,8 @@ class IPCCommunicator:
     # Send msg of mtype to dest, None=all neighbours (broadcast mode).
     def send_to_network(self, msg, devid, dest=None):
         time.sleep(0.01)
-        if random.random() > self.robustness:
-            return False
+        # Flakiness in node. 2-3 Nodes should fail sending and receiving messages and see the network recover.
+        # r = random.random()
         if dest is not None:
             self.dev[dest].process_msg(msg)
         else:
