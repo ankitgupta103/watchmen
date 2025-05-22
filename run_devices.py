@@ -29,11 +29,10 @@ def main():
             time.sleep(0.001)
         cc.send_spath()
         print(f"{j} rounds of Scan done.")
-        time.sleep(3)
+        time.sleep(1)
 
+    time.sleep(1)
     cc.console_output()
-    #for i in range(num_units):
-    #    listen_threads[i].join()
 
 if __name__=="__main__":
     main()

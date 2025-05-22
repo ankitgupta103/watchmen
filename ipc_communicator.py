@@ -18,11 +18,23 @@ class IPCCommunicator:
         self.dev[devid] = devobj
         print(f"Added {len(self.dev)} devs")
 
+    def add_flakiness(self, msg, devid):
+        return False # Disable flakiness for now
+        # Flakiness in node. 2-3 Nodes should fail sending and receiving messages and see the network recover.
+        r = random.random()
+        if devid in ["VVV", "NNN", "CCC"]:
+            if r < 0.4:
+                print(f"Flaky network failing to send for {devid} msg type = {msg['message_type']}")
+                return True
+        if devid in ["QQQ"]:
+            if msg["message_type"] == constants.MESSAGE_TYPE_HEARTBEAT:
+                return True
+
     # Send msg of mtype to dest, None=all neighbours (broadcast mode).
     def send_to_network(self, msg, devid, dest=None):
         time.sleep(0.01)
-        # Flakiness in node. 2-3 Nodes should fail sending and receiving messages and see the network recover.
-        # r = random.random()
+        if self.add_flakiness(msg, devid):
+            return False
         if dest is not None:
             self.dev[dest].process_msg(msg)
         else:

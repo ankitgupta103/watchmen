@@ -11,7 +11,7 @@ class Device:
         self.spath = []
         self.fcomm = fcomm
         self.cam = None
-        if self.devid == "AAAaa":
+        if self.devid == "AAAggg":
             self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
             self.cam.start()
             self.detector = Detector()
@@ -34,10 +34,9 @@ class Device:
         # Failure Here is OK, since it is a discovery and alternative paths would be discovered.
         self.fcomm.send_to_network(scan_msg, self.devid)
 
-    def send_hb(self, ts):
+    def make_hb_msg(self, ts):
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.devid:
-            return
-        dest = self.spath[1]
+            return None
         hb_msg = {
                 "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
                 "source" : self.devid,
@@ -48,18 +47,17 @@ class Device:
                 "event_count" : self.event_count,
                 "shortest_path" : self.spath,
                 # Routing info
-                "dest" : dest,
-                "path_so_far" : [self.devid],
+                "dest" : None, # Will get rerouted
+                "path_so_far" : [],
                 "last_ts" : ts
                 }
-        self.fcomm.send_to_network(hb_msg, self.devid, dest)
+        return hb_msg
 
-    def send_image(self, ts, image_data, image_ts):
+    def make_image_msg(self, ts, image_data, image_ts):
         # TODO this will need to be stored until we have spath
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.devid:
-            return
-        dest = self.spath[1]
-        hb_msg = {
+            return None
+        image_msg = {
                 "message_type" : constants.MESSAGE_TYPE_PHOTO,
                 "source" : self.devid,
                 "source_ts" : ts,
@@ -67,11 +65,11 @@ class Device:
                 "image_data" : image_data,
                 "image_ts" : image_ts,
                 # Routing info
-                "dest" : dest,
-                "path_so_far" : [self.devid],
+                "dest" : None, # Will get rerouted
+                "path_so_far" : [],
                 "last_ts" : ts
                 }
-        self.fcomm.send_to_network(hb_msg, self.devid, dest)
+        return image_msg
 
     def spread_spath(self, msg):
         source = msg["source"]
@@ -94,12 +92,11 @@ class Device:
                 self.fcomm.send_to_network(new_msg, self.devid, neighbour)
 
     def get_next_dest(self, msg):
-        curr_dest = msg["dest"]
-        if curr_dest != self.devid:
-            print(f"Weird that {curr_dest} is not {self.devid:}")
-            return None
+        path_so_far = msg["path_so_far"]
         new_dest = self.get_next_on_spath()
-        # TODO If already on path_so_far then pick a random neighbour not on path_so_far
+        if new_dest in path_so_far:
+            print(f"{self.devid} : new_dest : {new_dest} is in {path_so_far}")
+            return None
         return new_dest
     
     def propogate_msg_to_next(self, msg, new_dest):
@@ -112,10 +109,30 @@ class Device:
 
     def propogate_message(self, msg):
         new_dest = self.get_next_dest(msg)
+        sent = False
         if new_dest is not None:
             sent = self.propogate_msg_to_next(msg, new_dest)
-            if not sent:
-                print(f"{self.devid} : Failed to deliver, find alternative route")
+        path_so_far = msg["path_so_far"]
+        if not sent:
+            print(f"{self.devid} : Failed to send to {new_dest} : Trying to find alternative route : path_so_far {path_so_far}")
+            for n in self.neighbours_seen:
+                if n in path_so_far or n == new_dest:
+                    continue
+                new_dest = n
+                sent = self.propogate_msg_to_next(msg, new_dest)
+                if sent:
+                    print(f"{self.devid} : Finally succeeded to deliver to {new_dest}, path_so_far : {path_so_far}")
+                    break
+
+    def send_hb(self, ts):
+        msg = self.make_hb_msg(ts)
+        if msg is not None:
+            self.propogate_message(msg)
+
+    def send_image(self, ts):
+        msg = self.make_image_msg(ts)
+        if msg is not None:
+            self.propogate_message(msg)
 
     def process_msg(self, msg):
         mtype = msg["message_type"]
