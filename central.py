@@ -23,11 +23,14 @@ class NodeInfo:
         self.paths_seen = []
         self.num_images_captured = 0
         self.num_events_reported = 0
+        self.num_follow_spath = 0
 
     def add_hb(self, ts, neighbours, shortest_path, path_so_far, image_count, event_count):
         if ts not in self.all_hb_ts:
             self.hb_count = self.hb_count + 1
             self.all_hb_ts.append(ts)
+            if shortest_path == path_so_far:
+                self.num_follow_spath = self.num_follow_spath + 1
             if self.latest_hb_ts < ts:
                 self.latest_hb_ts = ts
                 self.neighbours = neighbours
@@ -44,6 +47,7 @@ class NodeInfo:
                 ---- Neighbours = {self.neighbours}
                 ---- Shortest Path to CC = {self.shortest_path}
                 ---- Actual Path to CC = {self.paths_seen}
+                ---- Num HB Actually following Shortest Path to CC = {self.num_follow_spath}
                 ---- Num images processed = {self.num_images_captured}
                 ---- Num events reported = {self.num_events_reported}
                 """)
@@ -57,9 +61,13 @@ class CommandCentral:
         # Node : NodeInfo
         self.node_list = {}
 
+        self.num_hbs_received = 0
+        self.num_hbs_rerouted = 0
+
     def console_output(self):
         for n, info in self.node_list.items():
             info.print_info()
+        print(f"\n ---- Rerouted {self.num_hbs_rerouted} out of {self.num_hbs_received} HBs")
 
     def send_spath(self):
         for neighbour in self.neighbours_seen:
@@ -80,7 +88,7 @@ class CommandCentral:
         source = msg["source"]
         dest = msg["dest"]
         source_ts = msg["source_ts"]
-        path_so_far = msg["path_so_far"]
+        path_so_far = msg["path_so_far"] + [self.devid]
         msg_spath = msg["shortest_path"]
         neighbours = msg["neighbours"]
         image_count = msg["image_count"]
@@ -94,6 +102,10 @@ class CommandCentral:
             self.node_list[source] = NodeInfo(source)
         info = self.node_list[source]
         info.add_hb(source_ts, neighbours, msg_spath, path_so_far, image_count, event_count)
+        self.num_hbs_received = self.num_hbs_received + 1
+        if path_so_far != msg_spath:
+            self.num_hbs_rerouted = self.num_hbs_rerouted + 1
+            print(f" --- At CC Noticed rerouting from {msg_spath} to {path_so_far}")
 
     def consume_image(self, msg):
         imf = f"/tmp/camera_captures_test/Image_CC_{msg['source']}_{msg['image_ts']}.jpg"

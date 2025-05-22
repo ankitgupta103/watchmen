@@ -24,10 +24,9 @@ class Camera:
         self.output_dir = o_dir
         self.cam = Picamera2()
 
-        preview_config = self.cam.create_preview_configuration(main={"size": (800, 600)})
-        self.cam.configure(preview_config)
-        self.cam.start_preview(Preview.QTGL)
-
+        #preview_config = self.cam.create_preview_configuration(main={"size": (800, 600)})
+        #self.cam.configure(preview_config)
+        #self.cam.start_preview(Preview.QTGL)
         self.capture_config = self.cam.create_still_configuration()
 
         self.cam.start()
@@ -46,13 +45,14 @@ class Camera:
         except Exception as e:
             print("Couldn't take picture")
             print(e)
-            return ""
+            return ("", "")
         print(f"... Written image to file : {fname}")
         imstr = image2string(fname)
         return (fname, imstr)
 
 def main():
     cam = Camera("dsdsdsrwrdews", o_dir="/tmp/camera_captures_test")
+    cam.start()
     (imfile, imstr) = cam.take_picture()
 
 if __name__=="__main__":
