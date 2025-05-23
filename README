@@ -5,4 +5,14 @@ REGISTER
     GPS
     NEIGHBOURHOOD
 
-Checking git flow1
+GPS:
+https://sparklers-the-makers.github.io/blog/robotics/use-neo-6m-module-with-raspberry-pi/
+
+Camera:
+# Automatically load overlays for detected DSI displays
+display_auto_detect=0
+dtoverlay=imx219
+
+
+
+

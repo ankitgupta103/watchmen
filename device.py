@@ -11,7 +11,7 @@ class Device:
         self.spath = []
         self.fcomm = fcomm
         self.cam = None
-        if self.devid == "AAAggg":
+        if self.devid == "AAA":
             self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
             self.cam.start()
             self.detector = Detector()
@@ -129,8 +129,8 @@ class Device:
         if msg is not None:
             self.propogate_message(msg)
 
-    def send_image(self, ts):
-        msg = self.make_image_msg(ts)
+    def send_image(self, ts, imdatastr, image_ts):
+        msg = self.make_image_msg(ts, imdatastr, image_ts)
         if msg is not None:
             self.propogate_message(msg)
 
