@@ -19,7 +19,7 @@ class IPCCommunicator:
         print(f"Added {len(self.dev)} devs")
 
     def add_flakiness(self, msg, devid):
-        return False # Disable flakiness for now
+        # return False # Disable flakiness for now
         # Flakiness in node. 2-3 Nodes should fail sending and receiving messages and see the network recover.
         r = random.random()
         if devid in ["VVV", "NNN", "CCC"]:
