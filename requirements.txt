@@ -1,14 +1,7 @@
 opencv-python
 ultralytics
-mqtt
-awscrt
-awsiot
-awsiotsdk
-pymavlink
-pika
-lockfile
-requests
 geopy
 picamera2
-PIL
+pillow
 pyserial
+opencv-python
