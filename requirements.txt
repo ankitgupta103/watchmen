@@ -11,4 +11,4 @@ requests
 geopy
 picamera2
 PIL
-serial
+pyserial

@@ -12,7 +12,7 @@ class EspComm:
         while True:
             if self.ser.in_waiting > 0:
                 try:
-                    data = ser.readline().decode().strip()
+                    data = self.ser.readline().decode().strip()
                     if data:
                         print("\nFrom ESP32:", data)
                 except UnicodeDecodeError:
@@ -24,7 +24,7 @@ class EspComm:
         reader_thread = threading.Thread(target=self.read_from_esp, daemon=True)
         reader_thread.start()
 
-    def send(msg):
+    def send(self, msg):
         self.ser.write((msg + "\n").encode())
 
     # Blocking
@@ -36,7 +36,7 @@ class EspComm:
                     self.send(msg)
         except KeyboardInterrupt:
             print("\nExiting...")
-            ser.close()
+            self.ser.close()
 
 def main():
     esp = EspComm()
