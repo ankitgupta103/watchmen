@@ -10,7 +10,7 @@ class EspComm:
 
     def read_from_esp(self):
         while True:
-            if ser.in_waiting > 0:
+            if self.ser.in_waiting > 0:
                 try:
                     data = ser.readline().decode().strip()
                     if data:
