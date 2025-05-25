@@ -22,6 +22,7 @@ class EspComm:
     def keep_reading(self):
         # Start background thread to read incoming data
         reader_thread = threading.Thread(target=self.read_from_esp, daemon=True)
+        # TODO fix and make it a clean exit on self deletion
         reader_thread.start()
 
     def send(self, msg):

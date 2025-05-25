@@ -11,7 +11,7 @@ class Device:
         self.spath = []
         self.fcomm = fcomm
         self.cam = None
-        if self.devid == "AAA":
+        if self.devid == "AAAaaa":
             self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
             self.cam.start()
             self.detector = Detector()
