@@ -1,6 +1,5 @@
 import time
 import os
-import threading
 import constants
 import json
 import layout
