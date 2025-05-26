@@ -32,16 +32,17 @@ class EspComm:
             return
         msg = json.loads(msgstr)
         dest = msg["espdest"]
+        src = msg["espsrc"]
         msgid = msg["espmsgid"]
         if dest is None:
             print(f"{msgid} is a broadcast")
             #TODO process message
             return
         if dest != self.devid:
-            print(f"{msgid} is a unicast but not for me")
+            print(f"{self.devid} : {msgid} is a unicast but not for me vut for {dest}")
             return
         print(f"{msgid} is a unicast for me")
-        self.send(f"Ack {msgid}", dest)
+        self.send(f"Ack {msgid}", src)
 
     def read_from_esp(self):
         while True:
@@ -71,8 +72,9 @@ class EspComm:
     def send(self, msg, dest):
         msgid = self.get_msg_id(dest)
         msg["espmsgid"] = msgid
+        msg["espsrc"] = self.devid
         if dest is not None:
-            msg["espdest"] = msgid
+            msg["espdest"] = dest
         msgstr = json.dumps(msg)
         if dest is None:
             self.ser.write((msgstr + "\n").encode())
