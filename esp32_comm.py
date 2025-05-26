@@ -12,6 +12,27 @@ class EspComm:
         # Initialize UART
         self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=1)     # /dev/serial0 ,  /dev/ttyS0,  /dev/ttyAMA0
         time.sleep(2)  # Give ESP32 time to reset
+        msg_unacked = []
+        msg_unacked_lock = threading.lock()
+
+    # Four kinds of messages:
+    # 1. Has a dest, but not for me, ignore
+    # 2. Has a dest, and the dest is myself, ack and process.
+    # 3. Has no dest, is a broadcast, process, but dont ack.
+    # 4. Is an ack, try to unblock my send.
+    def process_read_message(self, msgstr):
+        # Handle ack
+        # Format expected = 'Ack <msgid>'
+        if msgstr[0:3] == "Ack":
+            msgid = msgstr[4:]
+            with msg_unacked_lock:
+                if msgid in msg_unacked:
+                    msg_unacked = [m for m in msg_unacked if m != msgid]
+            return
+        msg = json.loads(msgstr)
+        dest = msg["espmsgid"]
+        if dest is None:
+            print(f"{msgid} is a broadcast")
 
     def read_from_esp(self):
         while True:
@@ -20,6 +41,7 @@ class EspComm:
                     data = self.ser.readline().decode().strip()
                     if data:
                         print("\nFrom ESP32:", data)
+                        self.process_read_message(data)
                 except UnicodeDecodeError:
                     print("\n[Warning] Received non-UTF8 data")
 
