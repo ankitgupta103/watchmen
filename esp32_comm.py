@@ -5,6 +5,7 @@ import random
 import json
 import time
 import threading
+import constants
 
 class EspComm:
     msg_unacked = []
@@ -23,15 +24,16 @@ class EspComm:
     # 4. Is an ack, try to unblock my send.
     def process_read_message(self, msgstr):
         # Handle ack
-        # Format expected = 'Ack <msgid>'
         print(f" ******* {self.devid} : Received message {msgstr}")
-        if msgstr[0:3] == "Ack":
-            msgid = msgstr[4:]
+        msg = json.loads(msgstr)
+        if msg["msgtype"] == constants.MESSAGE_TYPE_ACK:
+            msgid = msg["espmsgid"]
+            dest = msg["espdest"]
+            print (f"{self.devid} weird that {dest} != {self.devid}")
             with self.msg_unacked_lock:
                 if msgid in self.msg_unacked:
                     self.msg_unacked = [m for m in self.msg_unacked if m != msgid]
             return
-        msg = json.loads(msgstr)
         dest = msg["espdest"]
         src = msg["espsrc"]
         msgid = msg["espmsgid"]
@@ -44,7 +46,10 @@ class EspComm:
             return
         print(f"{self.devid} : {msgid} is a unicast for me")
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
-        self.send(f"Ack {msgid}", src)
+        msg_to_send = {
+                "msgtype" : constants.MESSAGE_TYPE_ACK,
+                }
+        self.send(msg_to_send, src)
 
     def read_from_esp(self):
         while True:
@@ -71,16 +76,17 @@ class EspComm:
         print(f"Id = {id}")
         return id
 
-    def send(self, msg, dest):
+    def send(self, msg, dest, wait_for_ack = False):
         msgid = self.get_msg_id(dest)
         msg["espmsgid"] = msgid
         msg["espsrc"] = self.devid
         if dest is not None:
             msg["espdest"] = dest
         msgstr = json.dumps(msg)
-        if dest is None:
+        if dest is None or not wait_for_ack:
             self.ser.write((msgstr + "\n").encode())
             return True
+        # We have a dest and we have to wait for ack.
         with self.msg_unacked_lock:
              if msgid not in self.msg_unacked:
                  self.msg_unacked.append(msgid)
@@ -121,9 +127,9 @@ def main():
     esp.keep_reading()
     for i in range(5):
         time.sleep(random.randint(1000,3000)/1000)
-        msga = f"Sending msg #{devid}_{i}"
-        msg = {"Name" : msga}
-        sent = esp.send(msg, dest)
+        msga = f"HB#{devid}_{i}"
+        msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": msga}
+        sent = esp.send(msg, dest, True)
         print(f"Sending success = {sent}")
     time.sleep(10)
 
