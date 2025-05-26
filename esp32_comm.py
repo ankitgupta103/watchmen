@@ -26,13 +26,17 @@ class EspComm:
         # Handle ack
         print(f" ******* {self.devid} : Received message {msgstr}")
         msg = json.loads(msgstr)
-        if msg["msgtype"] == constants.MESSAGE_TYPE_ACK:
-            msgid = msg["espmsgid"]
-            dest = msg["espdest"]
-            print (f"{self.devid} weird that {dest} != {self.devid}")
+        msgid = msg["espmsgid"]
+        dest = msg["espdest"]
+        if msg["msgtype"] == constants.MESSAGE_TYPE_ACK and dest == self.devid:
+            print(f"Received Ack for {msgid}!!!!!")
+            ackid = msg["ackid"]
             with self.msg_unacked_lock:
-                if msgid in self.msg_unacked:
-                    self.msg_unacked = [m for m in self.msg_unacked if m != msgid]
+                print(f"Should clear {ackid} from unacked messages : {self.msg_unacked}")
+                if ackid in self.msg_unacked:
+                    print(f"Clearing {ackid} from unacked messages : {self.msg_unacked}")
+                    self.msg_unacked = [m for m in self.msg_unacked if m != ackid]
+                    print(f"Cleared {ackid} from unacked messages : {self.msg_unacked}")
             return
         dest = msg["espdest"]
         src = msg["espsrc"]
@@ -48,6 +52,7 @@ class EspComm:
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
         msg_to_send = {
                 "msgtype" : constants.MESSAGE_TYPE_ACK,
+                "ackid" : msgid,
                 }
         self.send(msg_to_send, src)
 
