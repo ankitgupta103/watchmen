@@ -1,9 +1,14 @@
 import serial
+import sys
+import threading
+import random
+import json
 import time
 import threading
 
 class EspComm:
-    def __init__(self):
+    def __init__(self, devid):
+        self.devid = devid
         # Initialize UART
         self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=1)     # /dev/serial0 ,  /dev/ttyS0,  /dev/ttyAMA0
         time.sleep(2)  # Give ESP32 time to reset
@@ -25,8 +30,22 @@ class EspComm:
         # TODO fix and make it a clean exit on self deletion
         reader_thread.start()
 
-    def send(self, msg):
-        self.ser.write((msg + "\n").encode())
+    def get_msg_id(self, dest):
+        r = random.randint(10000,20000)
+        t = time.time_ns()
+        id = f"msg_{self.devid}_{dest}_{t}_{r}"
+        print(f"Id = {id}")
+        return id
+
+    def send(self, msg, dest):
+        msgid = self.get_msg_id(dest)
+        msg["espmsgid"] = msgid
+        if dest is not None:
+            msg["espdest"] = msgid
+        msgstr = json.dumps(msg)
+        self.ser.write((msgstr + "\n").encode())
+        if dest is not None:
+            print(f"Waiting for ack for {msgid}")
 
     # Blocking
     def keep_sending(self):
@@ -40,10 +59,12 @@ class EspComm:
             self.ser.close()
 
 def main():
-    esp = EspComm()
+    devid = sys.argv[1]
+    esp = EspComm(devid)
+    msg = {"Name" : "Hello My name is " + devid}
     esp.keep_reading()
-    print("Two-way communication started. Type to send to ESP32.\nPress Ctrl+C to exit.")
-    esp.keep_sending()
+    esp.send(msg, "bb")
+    time.sleep(10)
 
 if __name__=="__main__":
     main()
