@@ -19,10 +19,11 @@ import { Badge } from '@/components/ui/badge';
 
 import 'leaflet/dist/leaflet.css';
 
+import { Button } from '@/components/ui/button';
+
 import { MAPS_API_KEY } from '@/lib/constants';
 import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
 interface MapProps {
   machines: Machine[];
@@ -111,12 +112,13 @@ const createEnhancedIcon = (machine: Machine) => {
 
       {/* Main marker */}
       <div
-        className={cn(`relative h-4 w-4 flex items-center justify-center rounded-full border-white shadow-lg bg-yellow-500 text-white`,
+        className={cn(
+          `relative flex h-4 w-4 items-center justify-center rounded-full border-white bg-yellow-500 text-white shadow-lg`,
           {
-            "bg-green-500": machine.data.status === 'online',
-            "bg-gray-500": machine.data.status === 'offline',
+            'bg-green-500': machine.data.status === 'online',
+            'bg-gray-500': machine.data.status === 'offline',
           },
-          pulseClass
+          pulseClass,
         )}
       >
         {unreviewed > 9 ? '9+' : unreviewed}
@@ -260,66 +262,65 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
         autoClose={false}
         closeOnClick={false}
         closeOnEscapeKey={false}
-
       >
-          <div className="mb-2 flex items-center gap-2 justify-between">
-            <h3 className="text-sm font-semibold">
-              {machine.name.toUpperCase()}
-            </h3>
-            <Badge
-              variant={
-                machine.data.status === 'online'
-                  ? 'default'
-                  : machine.data.status === 'offline'
-                    ? 'destructive'
-                    : 'secondary'
-              }
-              className="text-xs"
-            >
-              {machine.data.status}
-            </Badge>
-          </div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">
+            {machine.name.toUpperCase()}
+          </h3>
+          <Badge
+            variant={
+              machine.data.status === 'online'
+                ? 'default'
+                : machine.data.status === 'offline'
+                  ? 'destructive'
+                  : 'secondary'
+            }
+            className="text-xs"
+          >
+            {machine.data.status}
+          </Badge>
+        </div>
 
-          <div className="space-y-1 text-xs">
-            <div>
-              <strong>Type:</strong> {machine.type.replace('_', ' ')}
-            </div>
-            <div>
-              <strong>Activity:</strong> {getMachineActivityLevel(machine)}
-            </div>
-            {machine.data.suspiciousEvents &&
-              machine.data.suspiciousEvents.length > 0 && (
-                <div>
-                  <strong>Recent Events:</strong>{' '}
-                  {
-                    machine.data.suspiciousEvents.filter((e) => {
-                      const days =
-                        (Date.now() - new Date(e.timestamp).getTime()) /
-                        (1000 * 60 * 60 * 24);
-                      return days <= 7;
-                    }).length
-                  }{' '}
-                  (last 7 days)
-                </div>
-              )}
-            {getUnreviewedCount(machine) > 0 && (
-              <div className="font-medium text-red-600">
-                {getUnreviewedCount(machine)} unreviewed alert
-                {getUnreviewedCount(machine) > 1 ? 's' : ''}
+        <div className="space-y-1 text-xs">
+          <div>
+            <strong>Type:</strong> {machine.type.replace('_', ' ')}
+          </div>
+          <div>
+            <strong>Activity:</strong> {getMachineActivityLevel(machine)}
+          </div>
+          {machine.data.suspiciousEvents &&
+            machine.data.suspiciousEvents.length > 0 && (
+              <div>
+                <strong>Recent Events:</strong>{' '}
+                {
+                  machine.data.suspiciousEvents.filter((e) => {
+                    const days =
+                      (Date.now() - new Date(e.timestamp).getTime()) /
+                      (1000 * 60 * 60 * 24);
+                    return days <= 7;
+                  }).length
+                }{' '}
+                (last 7 days)
               </div>
             )}
-            <div className="text-xs text-gray-500">
-              <strong>Last seen:</strong>{' '}
-              {new Date(machine.data.lastSeen).toLocaleString()}
+          {getUnreviewedCount(machine) > 0 && (
+            <div className="font-medium text-red-600">
+              {getUnreviewedCount(machine)} unreviewed alert
+              {getUnreviewedCount(machine) > 1 ? 's' : ''}
             </div>
+          )}
+          <div className="text-xs text-gray-500">
+            <strong>Last seen:</strong>{' '}
+            {new Date(machine.data.lastSeen).toLocaleString()}
           </div>
+        </div>
 
-          <Button
-            onClick={handleClick}
-            className="mt-2 w-full rounded bg-blue-500 text-xs text-white transition-colors hover:bg-blue-600"
-          >
-            View Details
-          </Button>
+        <Button
+          onClick={handleClick}
+          className="mt-2 w-full rounded bg-blue-500 text-xs text-white transition-colors hover:bg-blue-600"
+        >
+          View Details
+        </Button>
       </Popup>
     </Marker>
   );
