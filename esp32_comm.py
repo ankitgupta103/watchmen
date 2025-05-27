@@ -11,6 +11,7 @@ class EspComm:
     msg_unacked = {} # id -> list of ts
     msg_acked = {} # id -> (tries, timetoack)
     msg_unacked_lock = threading.Lock()
+    msg_received = [] # Only for testing
     
     def __init__(self, devid):
         self.devid = devid
@@ -23,6 +24,7 @@ class EspComm:
             print(f"Acked messages = {len(self.msg_acked)}, unacked messages = {len(self.msg_unacked)}")
             print(self.msg_acked)
             print(self.msg_unacked)
+            print(self.msg_received)
 
     # Four kinds of messages:
     # 1. Has a dest, but not for me, ignore
@@ -56,9 +58,10 @@ class EspComm:
             #TODO process message
             return
         if dest != self.devid:
-            print(f"{self.devid} : {msgid} is a unicast but not for me vut for {dest}")
+            print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
             return
         print(f"{self.devid} : {msgid} is a unicast for me")
+        self.msg_received.append(msg)
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
         msg_to_send = {
                 "msgtype" : constants.MESSAGE_TYPE_ACK,
@@ -158,12 +161,14 @@ def send(esp, devid, dest):
         msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": msga}
         sent = esp.send(msg, dest, True)
         print(f"Sending success = {sent}")
+
     crazy_long_message = {
             "msgtype" : constants.MESSAGE_TYPE_HEARTBEAT
             }
     for i in range(10):
         crazy_long_message[f"k{i}"] = f"Hello 123456 This is a test to make a very long message {i}"
-    sent = esp.send(msg, dest, True)
+    sent = esp.send(crazy_long_message, dest, True)
+    print(f"Sending success = {sent}")
 
 def main():
     devid = sys.argv[1]
