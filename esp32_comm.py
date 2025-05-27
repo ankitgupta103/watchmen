@@ -9,6 +9,7 @@ import constants
 
 class EspComm:
     msg_unacked = {} # id -> list of ts
+    msg_acked = {} # id -> (tries, timetoack)
     msg_unacked_lock = threading.Lock()
     
     def __init__(self, devid):
@@ -16,6 +17,11 @@ class EspComm:
         # Initialize UART
         self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=1)     # /dev/serial0 ,  /dev/ttyS0,  /dev/ttyAMA0
         time.sleep(2)  # Give ESP32 time to reset
+
+    def print_status(self):
+        with self.msg_unacked_lock:
+            print(self.msg_acked)
+            print(self.msg_unacked)
 
     # Four kinds of messages:
     # 1. Has a dest, but not for me, ignore
@@ -35,9 +41,11 @@ class EspComm:
                 print(f"Should clear {ackid} from unacked messages : {self.msg_unacked}")
                 if ackid in self.msg_unacked:
                     print(f"Clearing {ackid} from unacked messages : {self.msg_unacked}")
-                    latset_ts = self.msg_unacked.pop(ackid, None)[-1]
+                    unack = self.msg_unacked.pop(ackid, None)
+                    time_to_ack = time.time() - unack[-1]
+                    self.msg_acked[ackid] = (len(unack), time_to_ack)
                     print(f"Cleared {ackid} from unacked messages : {self.msg_unacked}")
-                    print(f"{ackid} --- time for ack = {time.time() - latset_ts}")
+                    print(f"{ackid} --- time for ack = {time_to_ack}")
             return
         dest = msg["espdest"]
         src = msg["espsrc"]
@@ -93,6 +101,14 @@ class EspComm:
             self.ser.write((msgstr + "\n").encode())
             return True
         # We have a dest and we have to wait for ack.
+        sent_succ = False
+        for i in range(3):
+            if sent_succ:
+                break
+            print(f"Sending {msgid} for the {i}th time")
+            sent_succ = self.send_with_retries(msgstr, msgid) 
+
+    def send_with_retries(self, msgstr, msgid):
         with self.msg_unacked_lock:
              if msgid not in self.msg_unacked:
                  self.msg_unacked[msgid] = [time.time()]
@@ -110,7 +126,7 @@ class EspComm:
                     return True # Hopefully lock is received
             time.sleep(2)
             ts = time.time_ns()
-            if (ts - time_ack_start) > 10000000000:
+            if (ts - time_ack_start) > 5000000000:
                 print(f" Timed out received for {msgid}")
                 break
         return False
@@ -131,12 +147,15 @@ def main():
     dest  = sys.argv[2]
     esp = EspComm(devid)
     esp.keep_reading()
-    for i in range(2):
-        time.sleep(random.randint(1000,3000)/1000)
+    for i in range(10):
+        rt = random.randint(1000,2000)/1000
+        print(f"Sending message #{i} but first, sleeping for {rt} secs")
+        time.sleep(rt)
         msga = f"HB#{devid}_{i}"
         msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": msga}
         sent = esp.send(msg, dest, True)
         print(f"Sending success = {sent}")
+    esp.print_status()
     time.sleep(10)
 
 if __name__=="__main__":
