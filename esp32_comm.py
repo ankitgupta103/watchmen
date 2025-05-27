@@ -35,7 +35,7 @@ class EspComm:
                 print(f"Should clear {ackid} from unacked messages : {self.msg_unacked}")
                 if ackid in self.msg_unacked:
                     print(f"Clearing {ackid} from unacked messages : {self.msg_unacked}")
-                    latset_ts = self.msg_unacked.pop(ackid, None)[:-1]
+                    latset_ts = self.msg_unacked.pop(ackid, None)[-1]
                     print(f"Cleared {ackid} from unacked messages : {self.msg_unacked}")
                     print(f"{ackid} --- time for ack = {time.time() - latset_ts}")
             return
