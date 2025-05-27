@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
@@ -13,6 +14,7 @@ import {
   Wifi,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner'; 
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -218,13 +220,14 @@ export default function CriticalAlertSystem({
 }: AlertSystemProps) {
   const [alerts, setAlerts] = useState<CriticalAlert[]>([]);
   const [isAudioEnabled, setIsAudioEnabled] = useState(enableSound);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [volume, setVolume] = useState(0.7);
   const [unacknowledgedCount, setUnacknowledgedCount] = useState(0);
 
   const audioManagerRef = useRef(new AudioManager());
   const flashIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mockIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null); // Ref for modal for click outside
 
   // Initialize audio on first user interaction
   useEffect(() => {
@@ -297,9 +300,6 @@ export default function CriticalAlertSystem({
     async (alert: CriticalAlert) => {
       setAlerts((prev) => [alert, ...prev.slice(0, 49)]); // Keep last 50 alerts
       setUnacknowledgedCount((prev) => prev + 1);
-      setIsVisible(true);
-
-      // Play alarm sound for critical alerts
       if (isAudioEnabled && alert.severity === 'critical') {
         try {
           await audioManagerRef.current.playAlarm(volume);
@@ -317,14 +317,41 @@ export default function CriticalAlertSystem({
         startFlashing();
       }
 
-      // Show browser notification if permission granted
-      if (Notification.permission === 'granted') {
-        new Notification(`Critical Alert: ${alert.type.replace('_', ' ')}`, {
-          body: `${alert.machineName}: ${alert.message}`,
-          icon: '/alert-icon.png',
-          tag: alert.id,
-        });
-      }
+      toast.custom(
+        (t) => (
+          <div
+            className={cn(
+              'flex w-full max-w-md items-center justify-between rounded-lg border border-orange-400 bg-orange-50 p-3 shadow-lg',
+              { 'border-red-400 bg-red-50': alert.severity === 'critical' },
+            )}
+          >
+            <div className="flex items-center gap-3">
+              {getAlertIcon(alert.type)}
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {alert.type.replace('_', ' ').toUpperCase()}
+                </p>
+                <p className="text-sm text-gray-700">
+                  {alert.machineName}: {alert.message}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toast.dismiss(t)}
+              className="ml-2"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+        {
+          duration: alert.severity === 'critical' ? 7000 : 5000,
+          id: alert.id,
+          position: 'bottom-right',
+        },
+      );
 
       // Callback for parent component
       if (onAlertReceived) {
@@ -358,12 +385,26 @@ export default function CriticalAlertSystem({
     setUnacknowledgedCount(0);
   }, []);
 
-  // Request notification permission on mount
   useEffect(() => {
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
+        setIsModalOpen(false);
+      }
+    };
+
+    if (isModalOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, []);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isModalOpen]);
 
   // Get alert icon
   const getAlertIcon = (type: CriticalAlert['type']) => {
@@ -400,7 +441,7 @@ export default function CriticalAlertSystem({
       {/* Alert Trigger Button */}
       <div className="fixed top-4 right-4 z-50">
         <Button
-          onClick={() => setIsVisible(!isVisible)}
+          onClick={() => setIsModalOpen(!isModalOpen)} 
           className={cn(
             'relative',
             unacknowledgedCount > 0
@@ -419,10 +460,13 @@ export default function CriticalAlertSystem({
         </Button>
       </div>
 
-      {/* Alert Panel */}
-      {isVisible && (
-        <div className="absolute inset-0 z-[1000] flex items-start justify-end bg-black/50 p-4">
-          <Card className="max-h-[90vh] w-full max-w-md overflow-hidden">
+      {/* Alert Panel (Modal) */}
+      {isModalOpen && ( 
+        <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4">
+          <Card
+            className="max-h-[90vh] w-full max-w-md overflow-hidden"
+            ref={modalRef}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -449,7 +493,7 @@ export default function CriticalAlertSystem({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setIsVisible(false)}
+                    onClick={() => setIsModalOpen(false)} 
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -491,7 +535,6 @@ export default function CriticalAlertSystem({
                 </div>
               )}
             </CardHeader>
-
             <CardContent className="p-0">
               {/* Status */}
               <div className="px-4 pb-3">
