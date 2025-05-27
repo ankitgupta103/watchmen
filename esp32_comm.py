@@ -99,12 +99,14 @@ class EspComm:
         self.ser.write((msgstr + "\n").encode())
    
     # No ack, no retry
+    # TODO set limit on size
     def send_broadcast(self, msg):
         msgstr = json.dumps(msg)
         self.actual_send(msgstr)
 
     # dest = None = broadcast, no ack waited, assumed success.
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
+    # TODO set limit on size
     def send_unicast(self, msg, dest, wait_for_ack = True, retry_count = 3):
         msgid = self.get_msg_id(dest)
         msg["espmsgid"] = msgid
@@ -166,9 +168,9 @@ def send(esp, devid, dest):
     msg = {"msgtype" : constants.MESSAGE_TYPE_SCAN, "data": "Scantest"}
     esp.send_broadcast(msg)
     msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": "Someone else"}
-    esp.send_unicast(msg, "cc", True)
+    esp.send_unicast(msg, "cc", True, 2)
 
-    for i in range(5):
+    for i in range(3):
         rt = random.randint(1000,2000)/1000
         print(f"Sending message #{i} but first, sleeping for {rt} secs")
         time.sleep(rt)
