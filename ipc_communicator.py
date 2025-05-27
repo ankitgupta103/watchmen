@@ -23,14 +23,15 @@ class IPCCommunicator:
         r = random.random()
         if devid in ["VVV", "NNN", "CCC"]:
             if r < 0.4:
-                print(f"Flaky network failing to send for {devid} msg type = {msg['message_type']}")
+                print(f"Flaky network failing to send for {devid} msg type = {msg[constants.JK_MESSAGE_TYPE]}")
                 return True
         if devid in ["QQQ"]:
-            if msg["message_type"] == constants.MESSAGE_TYPE_HEARTBEAT:
+            if msg[constants.JK_MESSAGE_TYPE] == constants.MESSAGE_TYPE_HEARTBEAT:
                 return True
 
     # Send msg of mtype to dest, None=all neighbours (broadcast mode).
     def send_to_network(self, msg, devid, dest=None):
+        print(f"Sending a msg of json str len {len(json.dumps(msg))}")
         time.sleep(0.01)
         if self.add_flakiness(msg, devid):
             return False

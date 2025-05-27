@@ -26,10 +26,10 @@ class Device:
 
     def send_scan(self, ts):
         scan_msg = {
-                "message_type" : constants.MESSAGE_TYPE_SCAN,
-                "source" : self.devid,
-                "last_sender" : self.devid,
-                "ts" : ts,
+                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_SCAN,
+                constants.JK_SOURCE : self.devid,
+                constants.JK_LAST_SENDER : self.devid,
+                constants.JK_SOURCE_TIMESTAMP : ts,
                 }
         # Failure Here is OK, since it is a discovery and alternative paths would be discovered.
         self.fcomm.send_to_network(scan_msg, self.devid)
@@ -38,18 +38,18 @@ class Device:
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.devid:
             return None
         hb_msg = {
-                "message_type" : constants.MESSAGE_TYPE_HEARTBEAT,
-                "source" : self.devid,
-                "source_ts" : ts,
+                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT,
+                constants.JK_SOURCE : self.devid,
+                constants.JK_SOURCE_TIMESTAMP : ts,
                 # Payload
-                "neighbours" : self.neighbours_seen,
-                "image_count" : self.image_count,
-                "event_count" : self.event_count,
-                "shortest_path" : self.spath,
+                constants.JK_NEIGHBOURS : self.neighbours_seen,
+                constants.JK_IMAGE_COUNT : self.image_count,
+                constants.JK_EVENT_COUNT : self.event_count,
+                constants.JK_SHORTEST_PATH : self.spath,
                 # Routing info
-                "dest" : None, # Will get rerouted
-                "path_so_far" : [],
-                "last_ts" : ts
+                constants.JK_DEST : None, # Will get rerouted
+                constants.JK_PATH_SO_FAR : [],
+                constants.JK_LAST_TS : ts
                 }
         return hb_msg
 
@@ -58,24 +58,24 @@ class Device:
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.devid:
             return None
         image_msg = {
-                "message_type" : constants.MESSAGE_TYPE_PHOTO,
-                "source" : self.devid,
-                "source_ts" : ts,
+                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_PHOTO,
+                constants.JK_SOURCE : self.devid,
+                constants.JK_SOURCE_TIMESTAMP : ts,
                 # Payload
-                "image_data" : image_data,
-                "image_ts" : image_ts,
+                constants.JK_IMAGE_DATA : image_data,
+                constants.JK_IMAGE_TS : image_ts,
                 # Routing info
-                "dest" : None, # Will get rerouted
-                "path_so_far" : [],
-                "last_ts" : ts
+                constants.JK_DEST : None, # Will get rerouted
+                constants.JK_PATH_SO_FAR : [],
+                constants.JK_LAST_TS : ts
                 }
         return image_msg
 
     def spread_spath(self, msg):
-        source = msg["source"]
-        dest = msg["dest"]
-        source_ts = msg["source_ts"]
-        spath1 = msg["shortest_path"]
+        source = msg[constants.JK_SOURCE]
+        dest = msg[constants.JK_DEST]
+        source_ts = msg[constants.JK_SOURCE_TIMESTAMP]
+        spath1 = msg[constants.JK_SHORTEST_PATH]
         if len(self.spath) == 0 or len(spath1) < len(self.spath):
             if self.devid == "AAA":
                 print(f" ********* {self.devid} : Updating spath from {self.spath} to {spath1[::-1]}")
@@ -85,14 +85,14 @@ class Device:
                 if neighbour in spath1:
                     continue
                 new_msg = msg
-                new_msg["dest"] = neighbour
-                msg["shortest_path"] = spath1 + [neighbour]
-                new_msg["network_ts"] = time.time_ns()
+                new_msg[constants.JK_DEST] = neighbour
+                msg[constants.JK_SHORTEST_PATH] = spath1 + [neighbour]
+                new_msg[constants.JK_NETWORK_TS] = time.time_ns()
                 # Failure Here is OK, since it is a discovery and alternative paths would be discovered.
                 self.fcomm.send_to_network(new_msg, self.devid, neighbour)
 
     def get_next_dest(self, msg):
-        path_so_far = msg["path_so_far"]
+        path_so_far = msg[constants.JK_PATH_SO_FAR]
         new_dest = self.get_next_on_spath()
         if new_dest in path_so_far:
             print(f"{self.devid} : new_dest : {new_dest} is in {path_so_far}")
@@ -101,9 +101,9 @@ class Device:
     
     def propogate_msg_to_next(self, msg, new_dest):
         new_msg = msg
-        new_msg["dest"] = new_dest
-        msg["path_so_far"] = msg["path_so_far"] + [self.devid]
-        new_msg["last_ts"] = time.time_ns()
+        new_msg[constants.JK_DEST] = new_dest
+        msg[constants.JK_PATH_SO_FAR] = msg[constants.JK_PATH_SO_FAR] + [self.devid]
+        new_msg[constants.JK_LAST_TS] = time.time_ns()
         succ = self.fcomm.send_to_network(new_msg, self.devid, new_dest)
         return succ
 
@@ -112,7 +112,7 @@ class Device:
         sent = False
         if new_dest is not None:
             sent = self.propogate_msg_to_next(msg, new_dest)
-        path_so_far = msg["path_so_far"]
+        path_so_far = msg[constants.JK_PATH_SO_FAR]
         if not sent:
             print(f"{self.devid} : Failed to send to {new_dest} : Trying to find alternative route : path_so_far {path_so_far}")
             for n in self.neighbours_seen:
@@ -135,9 +135,9 @@ class Device:
             self.propogate_message(msg)
 
     def process_msg(self, msg):
-        mtype = msg["message_type"]
+        mtype = msg[constants.JK_MESSAGE_TYPE]
         if mtype == constants.MESSAGE_TYPE_SCAN:
-            source = msg["source"]
+            source = msg[constants.JK_SOURCE]
             if source not in self.neighbours_seen:
                 self.neighbours_seen.append(source)
         if mtype == constants.MESSAGE_TYPE_SPATH:
