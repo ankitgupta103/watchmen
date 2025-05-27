@@ -36,6 +36,7 @@ class Device:
 
     def make_hb_msg(self, ts):
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.devid:
+            print(f"{self.devid} : Spath is not adequate {self.spath}")
             return None
         hb_msg = {
                 constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT,
@@ -87,7 +88,6 @@ class Device:
                 new_msg = msg
                 new_msg[constants.JK_DEST] = neighbour
                 msg[constants.JK_SHORTEST_PATH] = spath1 + [neighbour]
-                new_msg[constants.JK_NETWORK_TS] = time.time_ns()
                 # Failure Here is OK, since it is a discovery and alternative paths would be discovered.
                 self.fcomm.send_to_network(new_msg, self.devid, neighbour)
 
