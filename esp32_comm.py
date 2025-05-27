@@ -149,7 +149,7 @@ class EspComm:
             print("\nExiting...")
             self.ser.close()
 
-def send(esp, dest):
+def send(esp, devid, dest):
     for i in range(10):
         rt = random.randint(1000,2000)/1000
         print(f"Sending message #{i} but first, sleeping for {rt} secs")
@@ -171,7 +171,7 @@ def main():
     esp = EspComm(devid)
     esp.keep_reading()
     if devid == "bb":
-        send(esp, dest)
+        send(esp, devid, dest)
     if devid == "aa":
         time.sleep(60)
     time.sleep(10)
