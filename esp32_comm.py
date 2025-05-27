@@ -96,13 +96,15 @@ class EspComm:
     def actual_send(self, msgstr):
         if len(msgstr) > 200:
             print(f"Message is exceeding length {len(msgstr)}")
+            return False
         self.ser.write((msgstr + "\n").encode())
+        return True
    
     # No ack, no retry
     # TODO set limit on size
     def send_broadcast(self, msg):
         msgstr = json.dumps(msg)
-        self.actual_send(msgstr)
+        return self.actual_send(msgstr)
 
     # dest = None = broadcast, no ack waited, assumed success.
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
@@ -114,8 +116,7 @@ class EspComm:
         msg["espdest"] = dest
         msgstr = json.dumps(msg)
         if not wait_for_ack:
-            self.actual_send(msgstr)
-            return True
+            return self.actual_send(msgstr)
         # We have to wait for ack.
         sent_succ = False
         for i in range(retry_count):
@@ -136,7 +137,7 @@ class EspComm:
                  self.msg_unacked[msgid] = [time.time()]
              else:
                  self.msg_unacked[msgid].append(time.time())
-        self.actual_send(msgstr)
+        sent_succ = self.actual_send(msgstr)
         ack_received = False
         time_ack_start = time.time_ns()
         while not ack_received:
