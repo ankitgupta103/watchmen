@@ -149,7 +149,7 @@ def main():
     dest  = sys.argv[2]
     esp = EspComm(devid)
     esp.keep_reading()
-    for i in range(0):
+    for i in range(10):
         rt = random.randint(1000,2000)/1000
         print(f"Sending message #{i} but first, sleeping for {rt} secs")
         time.sleep(rt)
@@ -158,7 +158,7 @@ def main():
         sent = esp.send(msg, dest, True)
         print(f"Sending success = {sent}")
     esp.print_status()
-    time.sleep(1000)
+    time.sleep(10)
 
 if __name__=="__main__":
     main()
