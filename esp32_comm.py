@@ -36,6 +36,10 @@ class EspComm:
         # Handle ack
         print(f" ******* {self.devid} : Received message {msgstr}")
         msg = json.loads(msgstr)
+        if "espdest" not in msg:
+            print(f"{msgstr} is a broadcast")
+            #TODO process message
+            return
         msgid = msg["espmsgid"]
         dest = msg["espdest"]
         if msg["msgtype"] == constants.MESSAGE_TYPE_ACK and dest == self.devid:
@@ -51,13 +55,7 @@ class EspComm:
                     print(f"Cleared {ackid} from unacked messages : {self.msg_unacked}")
                     print(f"{ackid} --- time for ack = {time_to_ack}")
             return
-        dest = msg["espdest"]
         src = msg["espsrc"]
-        msgid = msg["espmsgid"]
-        if dest is None:
-            print(f"{msgid} is a broadcast")
-            #TODO process message
-            return
         if dest != self.devid:
             print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
             return
@@ -68,7 +66,7 @@ class EspComm:
                 "msgtype" : constants.MESSAGE_TYPE_ACK,
                 "ackid" : msgid,
                 }
-        self.send(msg_to_send, src)
+        self.send_unicast(msg_to_send, src, False, 0)
 
     def read_from_esp(self):
         while True:
