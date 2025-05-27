@@ -72,26 +72,26 @@ class CommandCentral:
         for neighbour in self.neighbours_seen:
             ts = time.time_ns()
             spath_msg = {
-                    "message_type" : constants.MESSAGE_TYPE_SPATH,
-                    "source" : self.devid,
-                    "dest" : neighbour,
-                    "source_ts" : ts,
-                    "shortest_path" : [self.devid, neighbour],
-                    "last_sender" : self.devid,
-                    "last_ts" : ts,
+                    constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_SPATH,
+                    constants.JK_SOURCE : self.devid,
+                    constants.JK_DEST : neighbour,
+                    constants.JK_SOURCE_TIMESTAMP : ts,
+                    constants.JK_SHORTEST_PATH : [self.devid, neighbour],
+                    constants.JK_LAST_SENDER : self.devid,
+                    constants.JK_LAST_TS : ts,
                 }
             self.fcomm.send_to_network(spath_msg, self.devid, neighbour)
         return True
 
     def parse_hb_msg(self, msg):
-        source = msg["source"]
-        dest = msg["dest"]
-        source_ts = msg["source_ts"]
-        path_so_far = msg["path_so_far"] + [self.devid]
-        msg_spath = msg["shortest_path"]
-        neighbours = msg["neighbours"]
-        image_count = msg["image_count"]
-        event_count = msg["event_count"]
+        source = msg[constants.JK_SOURCE]
+        dest = msg[constants.JK_DEST]
+        source_ts = msg[constants.JK_SOURCE_TIMESTAMP]
+        path_so_far = msg[constants.JK_PATH_SO_FAR] + [self.devid]
+        msg_spath = msg[constants.JK_SHORTEST_PATH]
+        neighbours = msg[constants.JK_NEIGHBOURS]
+        image_count = msg[constants.JK_IMAGE_COUNT]
+        event_count = msg[constants.JK_EVENT_COUNT]
         return (source, dest, source_ts, path_so_far, msg_spath, neighbours, image_count, event_count)
 
     def consume_hb(self, msg):
@@ -107,16 +107,16 @@ class CommandCentral:
             print(f" --- At CC Noticed rerouting from {msg_spath} to {path_so_far}")
 
     def consume_image(self, msg):
-        imf = f"/tmp/camera_captures_test/Image_CC_{msg['source']}_{msg['image_ts']}.jpg"
-        print(f" %%%%%% ==== CC got an image from {msg['source']}, will save to {imf}")
-        im = imstrtoimage(msg["image_data"])
+        imf = f"/tmp/camera_captures_test/Image_CC_{msg['constants.JK_SOURCE']}_{msg['constants.JK_IMAGE_TS']}.jpg"
+        print(f" %%%%%% ==== CC got an image from {msg['constants.JK_SOURCE']}, will save to {imf}")
+        im = imstrtoimage(msg[constants.JK_IMAGE_DATA])
         im.save(imf)
         im.show()
 
     def process_msg(self, msg):
-        mtype = msg["message_type"]
+        mtype = msg[constants.JK_MESSAGE_TYPE]
         if mtype == constants.MESSAGE_TYPE_SCAN:
-            source = msg["source"]
+            source = msg[constants.JK_SOURCE]
             if source not in self.neighbours_seen:
                 self.neighbours_seen.append(source)
         if mtype == constants.MESSAGE_TYPE_HEARTBEAT:
