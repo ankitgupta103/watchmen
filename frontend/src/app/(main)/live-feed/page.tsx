@@ -1,5 +1,6 @@
 import { mockMachines } from '@/lib/mock-data';
 
+import CriticalAlertSystem from './components/live-alert';
 import LiveFeedWrapper from './components/live-feed-wrapper';
 import PageHeader from './components/page-header';
 
@@ -10,6 +11,10 @@ export default function LiveFeed() {
       <div className="h-full w-full overflow-hidden rounded-lg border">
         <LiveFeedWrapper machines={mockMachines} />
       </div>
+      <CriticalAlertSystem
+        enableSound={true}
+        mockAlerts={true} // Set to false when connecting real MQTT
+      />
     </section>
   );
 }
