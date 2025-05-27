@@ -20,6 +20,7 @@ class EspComm:
 
     def print_status(self):
         with self.msg_unacked_lock:
+            print(f"Acked messages = {len(self.msg_acked)}, unacked messages = {len(msg_unacked)}")
             print(self.msg_acked)
             print(self.msg_unacked)
 
@@ -107,6 +108,7 @@ class EspComm:
                 break
             print(f"Sending {msgid} for the {i}th time")
             sent_succ = self.send_with_retries(msgstr, msgid) 
+        return sent_succ
 
     def send_with_retries(self, msgstr, msgid):
         with self.msg_unacked_lock:
