@@ -8,7 +8,7 @@ import threading
 import constants
 
 class EspComm:
-    msg_unacked = []
+    msg_unacked = {} # id -> list of ts
     msg_unacked_lock = threading.Lock()
     
     def __init__(self, devid):
@@ -29,13 +29,13 @@ class EspComm:
         msgid = msg["espmsgid"]
         dest = msg["espdest"]
         if msg["msgtype"] == constants.MESSAGE_TYPE_ACK and dest == self.devid:
-            print(f"Received Ack for {msgid}!!!!!")
+            print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
             ackid = msg["ackid"]
             with self.msg_unacked_lock:
                 print(f"Should clear {ackid} from unacked messages : {self.msg_unacked}")
                 if ackid in self.msg_unacked:
                     print(f"Clearing {ackid} from unacked messages : {self.msg_unacked}")
-                    self.msg_unacked = [m for m in self.msg_unacked if m != ackid]
+                    self.msg_unacked.pop(ackid, None)
                     print(f"Cleared {ackid} from unacked messages : {self.msg_unacked}")
             return
         dest = msg["espdest"]
@@ -94,9 +94,9 @@ class EspComm:
         # We have a dest and we have to wait for ack.
         with self.msg_unacked_lock:
              if msgid not in self.msg_unacked:
-                 self.msg_unacked.append(msgid)
+                 self.msg_unacked[msgid] = [time.time()]
              else:
-                 print(f"Should never happen that message is already in queue")
+                 self.msg_unacked[msgid].append(time.time())
         self.ser.write((msgstr + "\n").encode())
         ack_received = False
         time_ack_start = time.time_ns()
@@ -130,7 +130,7 @@ def main():
     dest  = sys.argv[2]
     esp = EspComm(devid)
     esp.keep_reading()
-    for i in range(5):
+    for i in range(2):
         time.sleep(random.randint(1000,3000)/1000)
         msga = f"HB#{devid}_{i}"
         msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": msga}

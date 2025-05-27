@@ -19,19 +19,19 @@ class IPCCommunicator:
 
     def add_flakiness(self, msg, devid):
         # return False # Disable flakiness for now
-        # Flakiness in node. 2-3 Nodes should fail sending and receiving messages and see the network recover.
+        if msg[constants.JK_MESSAGE_TYPE] != constants.MESSAGE_TYPE_HEARTBEAT:
+            return False # Temp lets not block spath or scan.
         r = random.random()
         if devid in ["VVV", "NNN", "CCC"]:
             if r < 0.4:
                 print(f"Flaky network failing to send for {devid} msg type = {msg[constants.JK_MESSAGE_TYPE]}")
                 return True
         if devid in ["QQQ"]:
-            if msg[constants.JK_MESSAGE_TYPE] == constants.MESSAGE_TYPE_HEARTBEAT:
-                return True
+            return True
 
     # Send msg of mtype to dest, None=all neighbours (broadcast mode).
     def send_to_network(self, msg, devid, dest=None):
-        print(f"Sending a msg of json str len {len(json.dumps(msg))}")
+        # print(f"Sending a msg of json str len {len(json.dumps(msg))}")
         time.sleep(0.01)
         if self.add_flakiness(msg, devid):
             return False

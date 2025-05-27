@@ -27,7 +27,6 @@ JK_PATH_SO_FAR = "psf"
 JK_LAST_TS = "lts"
 JK_IMAGE_DATA = "imd"
 JK_IMAGE_TS = "its"
-JK_NETWORK_TS = "nts"
 
 PRIORITY_LOW = 1
 PRIORITY_HIGH = 2
