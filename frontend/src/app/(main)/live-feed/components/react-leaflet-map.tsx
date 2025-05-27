@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import L from 'leaflet';
-import { Activity, AlertTriangle, Eye, MapPin, Shield } from 'lucide-react';
+// import { Activity, AlertTriangle, Eye, MapPin, Shield } from 'lucide-react';
 import { renderToString } from 'react-dom/server';
 import {
   Circle,
@@ -21,6 +21,8 @@ import 'leaflet/dist/leaflet.css';
 
 import { MAPS_API_KEY } from '@/lib/constants';
 import { Machine } from '@/lib/types/machine';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface MapProps {
   machines: Machine[];
@@ -59,20 +61,20 @@ const getUnreviewedCount = (machine: Machine) => {
 };
 
 // Get machine type icon
-const getMachineTypeIcon = (type: string, size: number = 8) => {
-  switch (type) {
-    case 'perimeter_guard':
-      return <Shield size={size} className="text-white" />;
-    case 'mobile_patrol':
-      return <Activity size={size} className="text-white" />;
-    case 'fixed_surveillance':
-      return <Eye size={size} className="text-white" />;
-    case 'roving_sensor':
-      return <AlertTriangle size={size} className="text-white" />;
-    default:
-      return <MapPin size={size} className="text-white" />;
-  }
-};
+// const getMachineTypeIcon = (type: string, size: number = 8) => {
+//   switch (type) {
+//     case 'perimeter_guard':
+//       return <Shield size={size} className="text-white" />;
+//     case 'mobile_patrol':
+//       return <Activity size={size} className="text-white" />;
+//     case 'fixed_surveillance':
+//       return <Eye size={size} className="text-white" />;
+//     case 'roving_sensor':
+//       return <AlertTriangle size={size} className="text-white" />;
+//     default:
+//       return <MapPin size={size} className="text-white" />;
+//   }
+// };
 
 // Create enhanced custom icon with activity indicators
 const createEnhancedIcon = (machine: Machine) => {
@@ -103,47 +105,46 @@ const createEnhancedIcon = (machine: Machine) => {
       {/* Pulse animation for critical/active machines */}
       {machine.data.status === 'online' && activityLevel !== 'low' && (
         <div
-          className={`absolute inset-0 rounded-full ${bgColor} animate-ping opacity-30`}
+          className={`absolute inset-0 rounded-full ${bgColor} animate-ping opacity-90`}
         ></div>
       )}
 
       {/* Main marker */}
       <div
-        className={`relative h-10 w-10 ${bgColor} flex items-center justify-center rounded-full border-2 border-white shadow-lg ${pulseClass}`}
+        className={cn(`relative h-4 w-4 flex items-center justify-center rounded-full border-white shadow-lg bg-yellow-500 text-white`,
+          {
+            "bg-green-500": machine.data.status === 'online',
+            "bg-gray-500": machine.data.status === 'offline',
+          },
+          pulseClass
+        )}
       >
-        <MapPin size={20} className="text-white" />
+        {unreviewed > 9 ? '9+' : unreviewed}
       </div>
 
       {/* Activity indicator badge */}
-      {unreviewed > 0 && (
-        <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-red-500 text-xs font-bold text-white">
+      {/* {unreviewed > 0 && (
+        <div className={cn("absolute -top-2 -right-3 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-red-500 text-xs font-bold text-white",
+          bgColor
+        )}>
           {unreviewed > 9 ? '9+' : unreviewed}
         </div>
-      )}
-
-      {/* Status indicator */}
-      <div
-        className={`absolute -right-1 -bottom-1 h-3 w-3 rounded-full border border-white ${
-          machine.data.status === 'online'
-            ? 'bg-green-400'
-            : machine.data.status === 'offline'
-              ? 'bg-red-400'
-              : 'bg-yellow-400'
-        }`}
-      ></div>
+      )} */}
 
       {/* Type indicator */}
-      <div className="absolute -top-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-blue-500">
+      {/* <div className={cn("absolute -top-2 -left-3 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500",
+          bgColor
+        )}
+      >
         {getMachineTypeIcon(machine.type, 8)}
-      </div>
+      </div> */}
     </div>,
   );
 
   return L.divIcon({
     html: iconHtml,
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-    popupAnchor: [0, -40],
+    iconSize: [15, 15],
+    popupAnchor: [0, -10],
     className: 'custom-enhanced-marker',
   });
 };
@@ -259,9 +260,9 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
         autoClose={false}
         closeOnClick={false}
         closeOnEscapeKey={false}
+
       >
-        <div className="w-[280px] p-2">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center gap-2 justify-between">
             <h3 className="text-sm font-semibold">
               {machine.name.toUpperCase()}
             </h3>
@@ -313,13 +314,12 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
             </div>
           </div>
 
-          <button
+          <Button
             onClick={handleClick}
-            className="mt-2 w-full rounded bg-blue-500 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-600"
+            className="mt-2 w-full rounded bg-blue-500 text-xs text-white transition-colors hover:bg-blue-600"
           >
             View Details
-          </button>
-        </div>
+          </Button>
       </Popup>
     </Marker>
   );
