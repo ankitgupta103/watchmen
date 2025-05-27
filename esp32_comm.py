@@ -24,7 +24,8 @@ class EspComm:
             print(f"Acked messages = {len(self.msg_acked)}, unacked messages = {len(self.msg_unacked)}")
             print(self.msg_acked)
             print(self.msg_unacked)
-            print(self.msg_received)
+            for mi in self.msg_received:
+                print(mi)
 
     # Four kinds of messages:
     # 1. Has a dest, but not for me, ignore
@@ -98,27 +99,38 @@ class EspComm:
         if len(msgstr) > 200:
             print(f"Message is exceeding length {len(msgstr)}")
         self.ser.write((msgstr + "\n").encode())
-    
-    def send(self, msg, dest, wait_for_ack = False):
+   
+    # No ack, no retry
+    def send_broadcast(self, msg):
+        msgstr = json.dumps(msg)
+        self.actual_send(msgstr)
+
+    # dest = None = broadcast, no ack waited, assumed success.
+    # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
+    def send_unicast(self, msg, dest, wait_for_ack = True, retry_count = 3):
         msgid = self.get_msg_id(dest)
         msg["espmsgid"] = msgid
         msg["espsrc"] = self.devid
-        if dest is not None:
-            msg["espdest"] = dest
+        msg["espdest"] = dest
         msgstr = json.dumps(msg)
-        if dest is None or not wait_for_ack:
+        if not wait_for_ack:
             self.actual_send(msgstr)
             return True
-        # We have a dest and we have to wait for ack.
+        # We have to wait for ack.
         sent_succ = False
-        for i in range(3):
+        for i in range(retry_count):
             if sent_succ:
                 break
             print(f"Sending {msgid} for the {i}th time")
-            sent_succ = self.send_with_retries(msgstr, msgid) 
+            sent_succ = self._send_with_retries(msgstr, msgid)
         return sent_succ
 
-    def send_with_retries(self, msgstr, msgid):
+    # Note retry here is separate retry per chunk.
+    # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
+    def send_chunks(self, msg_chunks, dest, retry_count = 3):
+        print(f"Getting ready to push {len(msg_chunks)} chunks")
+
+    def _send_with_retries(self, msgstr, msgid):
         with self.msg_unacked_lock:
              if msgid not in self.msg_unacked:
                  self.msg_unacked[msgid] = [time.time()]
@@ -153,13 +165,18 @@ class EspComm:
             self.ser.close()
 
 def send(esp, devid, dest):
-    for i in range(10):
+    msg = {"msgtype" : constants.MESSAGE_TYPE_SCAN, "data": "Scantest"}
+    esp.send_broadcast(msg)
+    msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": "Someone else"}
+    esp.send_unicast(msg, "cc", True)
+
+    for i in range(5):
         rt = random.randint(1000,2000)/1000
         print(f"Sending message #{i} but first, sleeping for {rt} secs")
         time.sleep(rt)
         msga = f"HB#{devid}_{i}"
         msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": msga}
-        sent = esp.send(msg, dest, True)
+        sent = esp.send_unicast(msg, dest, True)
         print(f"Sending success = {sent}")
 
     crazy_long_message = {
@@ -167,8 +184,10 @@ def send(esp, devid, dest):
             }
     for i in range(10):
         crazy_long_message[f"k{i}"] = f"Hello 123456 This is a test to make a very long message {i}"
-    sent = esp.send(crazy_long_message, dest, True)
+    sent = esp.send_unicast(crazy_long_message, dest, True)
     print(f"Sending success = {sent}")
+
+    esp.send_chunks([msg], dest, 3)
 
 def main():
     devid = sys.argv[1]
