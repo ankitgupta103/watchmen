@@ -141,7 +141,7 @@ export default function LiveFeedWrapper({
             <SelectTrigger className="w-32">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[1000]">
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="online">Online</SelectItem>
               <SelectItem value="offline">Offline</SelectItem>
@@ -154,7 +154,7 @@ export default function LiveFeedWrapper({
             <SelectTrigger className="w-36">
               <SelectValue placeholder="All Activity" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[1000]">
               <SelectItem value="all">All Activity</SelectItem>
               <SelectItem value="high">High Activity</SelectItem>
               <SelectItem value="medium">Medium</SelectItem>
