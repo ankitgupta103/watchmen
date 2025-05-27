@@ -91,6 +91,11 @@ class EspComm:
         print(f"Id = {id}")
         return id
 
+    def actual_send(self, msgstr):
+        if len(msgstr) > 200:
+            print(f"Message is exceeding length {len(msgstr)}")
+        self.ser.write((msgstr + "\n").encode())
+    
     def send(self, msg, dest, wait_for_ack = False):
         msgid = self.get_msg_id(dest)
         msg["espmsgid"] = msgid
@@ -99,7 +104,7 @@ class EspComm:
             msg["espdest"] = dest
         msgstr = json.dumps(msg)
         if dest is None or not wait_for_ack:
-            self.ser.write((msgstr + "\n").encode())
+            self.actual_send(msgstr)
             return True
         # We have a dest and we have to wait for ack.
         sent_succ = False
@@ -116,7 +121,7 @@ class EspComm:
                  self.msg_unacked[msgid] = [time.time()]
              else:
                  self.msg_unacked[msgid].append(time.time())
-        self.ser.write((msgstr + "\n").encode())
+        self.actual_send(msgstr)
         ack_received = False
         time_ack_start = time.time_ns()
         while not ack_received:
@@ -144,11 +149,7 @@ class EspComm:
             print("\nExiting...")
             self.ser.close()
 
-def main():
-    devid = sys.argv[1]
-    dest  = sys.argv[2]
-    esp = EspComm(devid)
-    esp.keep_reading()
+def send(esp, dest):
     for i in range(10):
         rt = random.randint(1000,2000)/1000
         print(f"Sending message #{i} but first, sleeping for {rt} secs")
@@ -157,8 +158,24 @@ def main():
         msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": msga}
         sent = esp.send(msg, dest, True)
         print(f"Sending success = {sent}")
-    esp.print_status()
+    crazy_long_message = {
+            "msgtype" : constants.MESSAGE_TYPE_HEARTBEAT
+            }
+    for i in range(10):
+        crazy_long_message[f"k{i}"] = f"Hello 123456 This is a test to make a very long message {i}"
+    sent = esp.send(msg, dest, True)
+
+def main():
+    devid = sys.argv[1]
+    dest  = sys.argv[2]
+    esp = EspComm(devid)
+    esp.keep_reading()
+    if devid == "bb":
+        send(esp, dest)
+    if devid == "aa":
+        time.sleep(60)
     time.sleep(10)
+    esp.print_status()
 
 if __name__=="__main__":
     main()
