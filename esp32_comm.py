@@ -35,11 +35,11 @@ class EspComm:
     # 2. Has a dest, and the dest is myself, ack and process.
     # 3. Has no dest, is a broadcast, process, but dont ack.
     # 4. Is an ack, try to unblock my send.
-    def process_read_message(self, msgstr):
+    def _process_read_message(self, msgstr):
         # Handle ack
         msg = json.loads(msgstr)
         msgid = msg["nid"]
-        (msgtype, src, dest, ts) = self.parse_msg_id(msgid)
+        (msgtype, src, dest, ts) = self._parse_msg_id(msgid)
         if dest is None:
             print(f"{msgstr} is a broadcast")
             #TODO process message
@@ -108,7 +108,7 @@ class EspComm:
                 }
         self.send_unicast(msg_to_send, src, False, 0)
 
-    def read_from_esp(self):
+    def _read_from_esp(self):
         print(f"{self.devid} is reading messages now")
         while True:
             if self.ser.in_waiting > 0:
@@ -116,25 +116,25 @@ class EspComm:
                     data = self.ser.readline().decode().strip()
                     if data:
                         print("\nFrom ESP32:", data)
-                        self.process_read_message(data)
+                        self._process_read_message(data)
                 except UnicodeDecodeError:
                     print("\n[Warning] Received non-UTF8 data")
 
     # Non blocking, background thread
     def keep_reading(self):
         # Start background thread to read incoming data
-        reader_thread = threading.Thread(target=self.read_from_esp, daemon=True)
+        reader_thread = threading.Thread(target=self._read_from_esp, daemon=True)
         # TODO fix and make it a clean exit on self deletion
         reader_thread.start()
 
-    def get_msg_id(self, msgtype, dest):
+    def _get_msg_id(self, msgtype, dest):
         r = random.randint(100,200)
         t = int(time.time())
         id = f"{msgtype}_{self.devid}_{dest}_{t}_{r}"
         print(f"Id = {id}")
         return id
 
-    def parse_msg_id(self, msgid):
+    def _parse_msg_id(self, msgid):
         parts = msgid.split('_')
         if len(parts) != 5:
             print(f"Failed Parsing Key")
@@ -147,7 +147,7 @@ class EspComm:
         ts = parts[3]
         return (msgtype, src, dest, ts)
 
-    def actual_send(self, msgstr):
+    def _actual_send(self, msgstr):
         if len(msgstr) > 200:
             print(f"Message is exceeding length {len(msgstr)}")
             return False
@@ -158,17 +158,17 @@ class EspComm:
     # TODO set limit on size
     def send_broadcast(self, msg):
         msgstr = json.dumps(msg)
-        return self.actual_send(msgstr)
+        return self._actual_send(msgstr)
 
     # dest = None = broadcast, no ack waited, assumed success.
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
     # TODO set limit on size
     def send_unicast(self, msg, dest, wait_for_ack = True, retry_count = 3):
-        msgid = self.get_msg_id(msg[constants.JK_MESSAGE_TYPE], dest)
+        msgid = self._get_msg_id(msg[constants.JK_MESSAGE_TYPE], dest)
         msg["nid"] = msgid
         msgstr = json.dumps(msg)
         if not wait_for_ack:
-            return self.actual_send(msgstr)
+            return self._actual_send(msgstr)
         # We have to wait for ack.
         sent_succ = False
         for i in range(retry_count):
@@ -181,13 +181,13 @@ class EspComm:
     def _send_chunk_i(self, msg_chunks, chunk_identifier, i, dest):
         num_chunks = len(msg_chunks)
         print(f"Sending chunk {i} out of {num_chunks}")
-        msgid = self.get_msg_id(constants.MESSAGE_TYPE_CHUNK_ITEM, dest)
+        msgid = self._get_msg_id(constants.MESSAGE_TYPE_CHUNK_ITEM, dest)
         msg = msg_chunks[i]
         msg[constants.JK_MESSAGE_TYPE] = constants.MESSAGE_TYPE_CHUNK_ITEM
         msg["nid"] = msgid
         msg["cid"] = f"{chunk_identifier}_{i}"
         msgstr = json.dumps(msg)
-        self.actual_send(msgstr)
+        self._actual_send(msgstr)
         time.sleep(1) # TODO Needed for corruption free sending.
 
     def _send_chunk_end(self, chunk_identifier, dest):
@@ -243,7 +243,7 @@ class EspComm:
                  self.msg_unacked[msgid] = [time.time()]
              else:
                  self.msg_unacked[msgid].append(time.time())
-        sent_succ = self.actual_send(msgstr)
+        sent_succ = self._actual_send(msgstr)
         ack_received = False
         time_ack_start = time.time_ns()
         while not ack_received:
@@ -266,7 +266,7 @@ class EspComm:
             while True:
                 msg = input("To ESP32: ")
                 if msg:
-                    self.actual_send(msg)
+                    self._actual_send(msg)
         except KeyboardInterrupt:
             print("\nExiting...")
             self.ser.close()
