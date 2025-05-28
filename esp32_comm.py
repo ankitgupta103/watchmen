@@ -66,6 +66,11 @@ class EspComm:
         if msgtype == constants.MESSAGE_TYPE_CHUNK_BEGIN:
             self.msg_chunks_expected[msg["cid"]] = int(msg["num_chunks"])
             self.msg_chunks_received[msg["cid"]] = []
+            print(f"{self.devid} : Sending ack for {msgid} to {src}")
+            msg_to_send = {
+                    constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
+                    "ackid" : msgid,
+                    }
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
             # TODO aggregate by original message id of begin.
