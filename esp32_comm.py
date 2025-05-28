@@ -66,6 +66,8 @@ class EspComm:
         if msgtype == constants.MESSAGE_TYPE_CHUNK_BEGIN:
             self.msg_chunks_expected[msg["cid"]] = int(msg["num_chunks"])
             self.msg_chunks_received[msg["cid"]] = []
+            print(f"at cb : self.msg_chunks_received = {self.msg_chunks_received}")
+            print(f"at cb : self.msg_chunks_expected = {self.msg_chunks_expected}")
             print(f"{self.devid} : Sending ack for {msgid} to {src}")
             msg_to_send = {
                     constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
@@ -81,6 +83,9 @@ class EspComm:
                 return
             cid = int(parts[0])
             i = int(parts[1])
+            print(f"at ci : self.msg_chunks_expected = {self.msg_chunks_expected}")
+            print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
+            print(f"{self.devid} : Sending ack for {msgid} to {src}")
             self.msg_chunks_received[cid].append(i)
             print(f"Not acking individual chunks")
             return
@@ -195,7 +200,7 @@ class EspComm:
             return False
         for i in range(num_chunks):
             print(f"Sending chunk {i} out of {num_chunks}")
-            msgid = self.get_msg_id(constants.MESSAGE_TYPE_CHUNK_BEGIN, dest)
+            msgid = self.get_msg_id(constants.MESSAGE_TYPE_CHUNK_ITEM, dest)
             chunk_id_map[i] = msgid
             msg = msg_chunks[i]
             msg[constants.JK_MESSAGE_TYPE] = constants.MESSAGE_TYPE_CHUNK_ITEM
