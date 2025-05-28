@@ -37,7 +37,6 @@ class EspComm:
     # 4. Is an ack, try to unblock my send.
     def process_read_message(self, msgstr):
         # Handle ack
-        print(f" ******* {self.devid} : Received message {msgstr}")
         msg = json.loads(msgstr)
         msgid = msg["nid"]
         (msgtype, src, dest, ts) = self.parse_msg_id(msgid)
@@ -63,13 +62,11 @@ class EspComm:
         if dest != self.devid:
             print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
             return
-        print(f"{self.devid} : {msgid} is a unicast for me")
         self.msg_received.append(msg)
         if msgtype == constants.MESSAGE_TYPE_CHUNK_BEGIN:
             self.msg_chunks_expected[msg["cid"]] = int(msg["num_chunks"])
             self.msg_chunks_received[msg["cid"]] = []
             print(f"at cb : self.msg_chunks_received = {self.msg_chunks_received}")
-            print(f"at cb : self.msg_chunks_expected = {self.msg_chunks_expected}")
             print(f"{self.devid} : Sending ack for {msgid} to {src}")
             msg_to_send = {
                     constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
@@ -85,11 +82,8 @@ class EspComm:
                 return
             cid = parts[0]
             i = int(parts[1])
-            print(f"at ci : self.msg_chunks_expected = {self.msg_chunks_expected}")
             print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
-            print(f"{self.devid} : Sending ack for {msgid} to {src}")
             self.msg_chunks_received[cid].append(i)
-            print(f"Not acking individual chunks")
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_END:
             cid = msg["cid"]
@@ -184,6 +178,27 @@ class EspComm:
             sent_succ = self._send_with_retries(msgstr, msgid)
         return sent_succ
 
+    def _send_chunk_i(self, msg_chunks, chunk_identifier, i, dest):
+        num_chunks = len(msg_chunks)
+        print(f"Sending chunk {i} out of {num_chunks}")
+        msgid = self.get_msg_id(constants.MESSAGE_TYPE_CHUNK_ITEM, dest)
+        msg = msg_chunks[i]
+        msg[constants.JK_MESSAGE_TYPE] = constants.MESSAGE_TYPE_CHUNK_ITEM
+        msg["nid"] = msgid
+        msg["cid"] = f"{chunk_identifier}_{i}"
+        msgstr = json.dumps(msg)
+        self.actual_send(msgstr)
+        time.sleep(1) # TODO Needed for corruption free sending.
+
+    def _send_chunk_end(self, chunk_identifier, dest):
+        msg = {
+                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_CHUNK_END,
+                "cid" : f"{chunk_identifier}"
+                }
+        sent = self.send_unicast(msg, dest, True, 3)
+        time.sleep(1) # TODO Needed for corruption free sending.
+        return sent 
+
     # Note retry here is separate retry per chunk.
     # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
     def send_chunks(self, msg_chunks, dest, retry_count = 3):
@@ -197,33 +212,29 @@ class EspComm:
                 }
         sent = self.send_unicast(msg, dest, True, 3)
         time.sleep(1) # TODO Needed for corruption free sending.
-        chunk_id_map = {}  # chunkid->msgid
         if not sent:
             print(f"Failed to send chunk begin")
             return False
         for i in range(num_chunks):
-            print(f"Sending chunk {i} out of {num_chunks}")
-            msgid = self.get_msg_id(constants.MESSAGE_TYPE_CHUNK_ITEM, dest)
-            chunk_id_map[i] = msgid
-            msg = msg_chunks[i]
-            msg[constants.JK_MESSAGE_TYPE] = constants.MESSAGE_TYPE_CHUNK_ITEM
-            msg["nid"] = msgid
-            msg["cid"] = f"{chunk_identifier}_{i}"
-            msgstr = json.dumps(msg)
-            self.actual_send(msgstr)
-            time.sleep(1) # TODO Needed for corruption free sending.
-        print(f"Finished pushing {len(msg_chunks)} chunks")
-        msg = {
-                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_CHUNK_END,
-                "num_chunks" : f"{len(msg_chunks)}",
-                "cid" : f"{chunk_identifier}"
-                }
-        sent = self.send_unicast(msg, dest, True, 3)
+            self._send_chunk_i(msg_chunks, chunk_identifier, i, dest)
+        sent = self._send_chunk_end(chunk_identifier, dest)
         if not sent:
             return False
+        for i in range(retry_count):
+            chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
+            print(f"Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+            if len(chunks_undelivered) == 0:
+                break
+            for cid in chunks_undelivered:
+                self._send_chunk_i(msg_chunks, chunk_identifier, cid, dest)
+            sent = self._send_chunk_end(chunk_identifier, dest)
+            if not sent:
+                return False
         chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
-        print(f"Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
-        # TODO attempt redelivery of undelivered chunks.
+        if len(chunks_undelivered) == 0:
+            print(f" ==== Successfully delivered all chunks!!!")
+        else:
+            print(f" **** Finally after all attempts, Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
 
 
     def _send_with_retries(self, msgstr, msgid):
