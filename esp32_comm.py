@@ -81,7 +81,7 @@ class EspComm:
             if len(parts) != 2:
                 print(f"Error parsing cid in {msgstr}")
                 return
-            cid = int(parts[0])
+            cid = parts[0]
             i = int(parts[1])
             print(f"at ci : self.msg_chunks_expected = {self.msg_chunks_expected}")
             print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
