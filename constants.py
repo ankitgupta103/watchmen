@@ -32,6 +32,8 @@ JK_LAST_TS = "lts"
 JK_IMAGE_DATA = "imd"
 JK_IMAGE_TS = "its"
 
+JK_NETWORK_ID = "nid"
+
 PRIORITY_LOW = 1
 PRIORITY_HIGH = 2
 
