@@ -36,15 +36,17 @@ class EspComm:
         # Handle ack
         print(f" ******* {self.devid} : Received message {msgstr}")
         msg = json.loads(msgstr)
-        if "espdest" not in msg:
+        msgid = msg["nid"]
+        (msgtype, src, dest, ts) = self.parse_msg_id(msgid)
+        if dest is None:
             print(f"{msgstr} is a broadcast")
             #TODO process message
             return
-        msgid = msg["espmsgid"]
-        dest = msg["espdest"]
-        if msg["msgtype"] == constants.MESSAGE_TYPE_ACK and dest == self.devid:
+        if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
             print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
             ackid = msg["ackid"]
+            if "missing_chunks" in msg:
+                print(f"Receiver did not get chunks : {msg['missing_chunks']}")
             with self.msg_unacked_lock:
                 if ackid in self.msg_unacked:
                     unack = self.msg_unacked.pop(ackid, None)
@@ -54,15 +56,44 @@ class EspComm:
                 else:
                     print(f"Ack {ackid} isnt for me")
             return
-        src = msg["espsrc"]
         if dest != self.devid:
             print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
             return
         print(f"{self.devid} : {msgid} is a unicast for me")
         self.msg_received.append(msg)
+        if msgtype == constants.MESSAGE_TYPE_CHUNK_BEGIN:
+            self.msg_chunks_expected[msg["cid"]] = int(msg["num_chunks"])
+            self.msg_chunks_received[msg["cid"]] = []
+            return
+        if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
+            # TODO aggregate by original message id of begin.
+            parts = msg["cid"].split('_')
+            if len(parts) != 2:
+                print(f"Error parsing cid in {msgstr}")
+                return
+            cid = int(parts[0])
+            i = int(parts[1])
+            self.msg_chunks_received[cid].append(i)
+            print(f"Not acking individual chunks")
+            return
+        if msgtype == constants.MESSAGE_TYPE_CHUNK_END:
+            cid = msg["cid"]
+            expected_chunks = self.msg_chunks_expected[cid]
+            missing_chunks = []
+            for i in range(expected_chunks):
+                if i not in self.msg_chunks_received[cid]:
+                    missing_chunks.append(i)
+            print(f"At end I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
+            msg_to_send = {
+                    constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
+                    "ackid" : msgid,
+                    "missing_chunks" : f"{missing_chunks}"
+                    }
+            self.send_unicast(msg_to_send, src, False, 0)
+            return
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
         msg_to_send = {
-                "msgtype" : constants.MESSAGE_TYPE_ACK,
+                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
                 "ackid" : msgid,
                 }
         self.send_unicast(msg_to_send, src, False, 0)
@@ -86,12 +117,25 @@ class EspComm:
         # TODO fix and make it a clean exit on self deletion
         reader_thread.start()
 
-    def get_msg_id(self, dest):
-        r = random.randint(10000,20000)
-        t = time.time_ns()
-        id = f"msg_{self.devid}_{dest}_{t}_{r}"
+    def get_msg_id(self, msgtype, dest):
+        r = random.randint(100,200)
+        t = int(time.time())
+        id = f"{msgtype}_{self.devid}_{dest}_{t}_{r}"
         print(f"Id = {id}")
         return id
+
+    def parse_msg_id(self, msgid):
+        parts = msgid.split('_')
+        if len(parts) != 5:
+            print(f"Failed Parsing Key")
+            return None
+        msgtype = parts[0]
+        src = parts[1]
+        dest = None
+        if len(parts[2]) > 0:
+            dest = parts[2]
+        ts = parts[3]
+        return (msgtype, src, dest, ts)
 
     def actual_send(self, msgstr):
         if len(msgstr) > 200:
@@ -110,10 +154,8 @@ class EspComm:
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
     # TODO set limit on size
     def send_unicast(self, msg, dest, wait_for_ack = True, retry_count = 3):
-        msgid = self.get_msg_id(dest)
-        msg["espmsgid"] = msgid
-        msg["espsrc"] = self.devid
-        msg["espdest"] = dest
+        msgid = self.get_msg_id(msg[constants.JK_MESSAGE_TYPE], dest)
+        msg["nid"] = msgid
         msgstr = json.dumps(msg)
         if not wait_for_ack:
             return self.actual_send(msgstr)
@@ -122,7 +164,7 @@ class EspComm:
         for i in range(retry_count):
             if sent_succ:
                 break
-            print(f"Sending {msgid} of type {msg['msgtype']} for the {i}th time")
+            print(f"Sending {msgid} of type {msg[constants.JK_MESSAGE_TYPE]} for the {i}th time")
             sent_succ = self._send_with_retries(msgstr, msgid)
         return sent_succ
 
@@ -131,21 +173,26 @@ class EspComm:
     def send_chunks(self, msg_chunks, dest, retry_count = 3):
         num_chunks = len(msg_chunks)
         print(f"Getting ready to push {num_chunks} chunks")
-        msg = {"msgtype" : constants.MESSAGE_TYPE_CHUNK_BEGIN, "num_chunks" : f"{num_chunks}"}
+        chunk_identifier = random.randint(100,200) # TODO better.
+        msg = {
+                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_CHUNK_BEGIN,
+                "num_chunks" : f"{num_chunks}",
+                "cid" : f"{chunk_identifier}"
+                }
         sent = self.send_unicast(msg, dest, True, 3)
+        time.sleep(1) # TODO Needed for corruption free sending.
         chunk_id_map = {}  # chunkid->msgid
         if not sent:
             print(f"Failed to send chunk begin")
             return False
         for i in range(num_chunks):
             print(f"Sending chunk {i} out of {num_chunks}")
-            msgid = self.get_msg_id(dest)
+            msgid = self.get_msg_id(constants.MESSAGE_TYPE_CHUNK_BEGIN, dest)
             chunk_id_map[i] = msgid
             msg = msg_chunks[i]
-            msg["msgtype"] = constants.MESSAGE_TYPE_CHUNK_ITEM
-            msg["espmsgid"] = msgid
-            msg["espsrc"] = self.devid
-            msg["espdest"] = dest
+            msg[constants.JK_MESSAGE_TYPE] = constants.MESSAGE_TYPE_CHUNK_ITEM
+            msg["nid"] = msgid
+            msg["cid"] = f"{chunk_identifier}_{i}"
             msgstr = json.dumps(msg)
             with self.msg_unacked_lock:
                  if msgid not in self.msg_unacked:
@@ -153,9 +200,13 @@ class EspComm:
                  else:
                      self.msg_unacked[msgid].append(time.time())
             self.actual_send(msgstr)
-            time.sleep(1) # Needed for corruption free sending.
+            time.sleep(1) # TODO Needed for corruption free sending.
         print(f"Finished pushing {len(msg_chunks)} chunks")
-        msg = {"msgtype" : constants.MESSAGE_TYPE_CHUNK_END, "num_chunks" : f"{len(msg_chunks)}"}
+        msg = {
+                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_CHUNK_END,
+                "num_chunks" : f"{len(msg_chunks)}",
+                "cid" : f"{chunk_identifier}"
+                }
         sent = self.send_unicast(msg, dest, True, 3)
         if not sent:
             return False
@@ -214,9 +265,9 @@ def test_send(esp, devid, dest):
     esp.send_chunks(msg_chunks, dest, 3)
     return # TODO for now return here
 
-    msg = {"msgtype" : constants.MESSAGE_TYPE_SCAN, "data": "Scantest"}
+    msg = {constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_SCAN, "data": "Scantest"}
     esp.send_broadcast(msg)
-    msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": "Someone else"}
+    msg = {constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT, "data": "Someone else"}
     esp.send_unicast(msg, "cc", True, 2)
 
     for i in range(3):
@@ -224,12 +275,12 @@ def test_send(esp, devid, dest):
         print(f"Sending message #{i} but first, sleeping for {rt} secs")
         time.sleep(rt)
         msga = f"HB#{devid}_{i}"
-        msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": msga}
+        msg = {"mst" : constants.MESSAGE_TYPE_HEARTBEAT, "data": msga}
         sent = esp.send_unicast(msg, dest, True)
         print(f"Sending success = {sent}")
 
     crazy_long_message = {
-            "msgtype" : constants.MESSAGE_TYPE_HEARTBEAT
+            constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT
             }
     for i in range(10):
         crazy_long_message[f"k{i}"] = f"Hello 123456 This is a test to make a very long message {i}"
