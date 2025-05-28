@@ -50,7 +50,7 @@ class EspComm:
             ackid = msg["ackid"]
             if "missing_chunks" in msg:
                 print(f"Receiver did not get chunks : {msg['missing_chunks']}")
-                self.msg_cunks_missing[msg["cid"]] = msg["missing_chunks"] # Listify
+                self.msg_cunks_missing[msg["cid"]] = eval(msg["missing_chunks"])
             with self.msg_unacked_lock:
                 if ackid in self.msg_unacked:
                     unack = self.msg_unacked.pop(ackid, None)
@@ -221,7 +221,7 @@ class EspComm:
         sent = self.send_unicast(msg, dest, True, 3)
         if not sent:
             return False
-        chunks_undelivered = self.msg_cunks_missin[chunk_identifier]
+        chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
         print(f"Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
         # TODO attempt redelivery of undelivered chunks.
 
