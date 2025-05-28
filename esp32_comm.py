@@ -155,7 +155,7 @@ class EspComm:
             self.actual_send(msgstr)
         print(f"Finished pushing {len(msg_chunks)} chunks")
         msg = {"msgtype" : constants.MESSAGE_TYPE_CHUNK_END, "num_chunks" : f"{len(msg_chunks)}"}
-        sent = esp.send_unicast(msg, dest, True, 3)
+        sent = self.send_unicast(msg, dest, True, 3)
         if not sent:
             return False
         chunks_delivered = []
