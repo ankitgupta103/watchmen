@@ -153,6 +153,7 @@ class EspComm:
                  else:
                      self.msg_unacked[msgid].append(time.time())
             self.actual_send(msgstr)
+            time.sleep(1) # Needed for corruption free sending.
         print(f"Finished pushing {len(msg_chunks)} chunks")
         msg = {"msgtype" : constants.MESSAGE_TYPE_CHUNK_END, "num_chunks" : f"{len(msg_chunks)}"}
         sent = self.send_unicast(msg, dest, True, 3)
@@ -208,9 +209,10 @@ class EspComm:
 def test_send(esp, devid, dest):
     msg_chunks = []
     for i in range(12):
-        msg = {"data": f"Data for chunk {i} out of 12"}
+        msg = {"data": f"{i}"}
         msg_chunks.append(msg)
     esp.send_chunks(msg_chunks, dest, 3)
+    return # TODO for now return here
 
     msg = {"msgtype" : constants.MESSAGE_TYPE_SCAN, "data": "Scantest"}
     esp.send_broadcast(msg)
