@@ -18,8 +18,9 @@ class EspComm:
         # Initialize UART
         self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=1)     # /dev/serial0 ,  /dev/ttyS0,  /dev/ttyAMA0
         time.sleep(2)  # Give ESP32 time to reset
-        self.msg_chunks_expected = {}
-        self.msg_chunks_received = {}
+        self.msg_chunks_expected = {} # Receiver uses this.
+        self.msg_chunks_received = {} # Receiver uses this.
+        self.msg_cunks_missing = {} # Sender gets this from ack.
 
     def print_status(self):
         with self.msg_unacked_lock:
@@ -49,6 +50,7 @@ class EspComm:
             ackid = msg["ackid"]
             if "missing_chunks" in msg:
                 print(f"Receiver did not get chunks : {msg['missing_chunks']}")
+                self.msg_cunks_missing[msg["cid"]] = msg["missing_chunks"] # Listify
             with self.msg_unacked_lock:
                 if ackid in self.msg_unacked:
                     unack = self.msg_unacked.pop(ackid, None)
@@ -100,6 +102,7 @@ class EspComm:
             msg_to_send = {
                     constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
                     "ackid" : msgid,
+                    "cid" : cid,
                     "missing_chunks" : f"{missing_chunks}"
                     }
             self.send_unicast(msg_to_send, src, False, 0)
@@ -207,11 +210,6 @@ class EspComm:
             msg["nid"] = msgid
             msg["cid"] = f"{chunk_identifier}_{i}"
             msgstr = json.dumps(msg)
-            with self.msg_unacked_lock:
-                 if msgid not in self.msg_unacked:
-                     self.msg_unacked[msgid] = [time.time()]
-                 else:
-                     self.msg_unacked[msgid].append(time.time())
             self.actual_send(msgstr)
             time.sleep(1) # TODO Needed for corruption free sending.
         print(f"Finished pushing {len(msg_chunks)} chunks")
@@ -223,16 +221,8 @@ class EspComm:
         sent = self.send_unicast(msg, dest, True, 3)
         if not sent:
             return False
-        chunks_delivered = []
-        chunks_undelivered = []
-        with self.msg_unacked_lock:
-            for i in range(num_chunks):
-                if chunk_id_map[i] in self.msg_unacked:
-                    chunks_undelivered.append(i)
-                else:
-                    chunks_delivered.append(i)
-        print(f"Delivered {len(chunks_delivered)} chunks : {chunks_delivered}")
-        print(f"Could not Delivered {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+        chunks_undelivered = self.msg_cunks_missin[chunk_identifier]
+        print(f"Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
         # TODO attempt redelivery of undelivered chunks.
 
 
