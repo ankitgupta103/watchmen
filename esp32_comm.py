@@ -71,6 +71,7 @@ class EspComm:
                     constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
                     "ackid" : msgid,
                     }
+            self.send_unicast(msg_to_send, src, False, 0)
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
             # TODO aggregate by original message id of begin.
