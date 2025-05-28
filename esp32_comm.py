@@ -46,14 +46,13 @@ class EspComm:
             print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
             ackid = msg["ackid"]
             with self.msg_unacked_lock:
-                print(f"Should clear {ackid} from unacked messages : {self.msg_unacked}")
                 if ackid in self.msg_unacked:
-                    print(f"Clearing {ackid} from unacked messages : {self.msg_unacked}")
                     unack = self.msg_unacked.pop(ackid, None)
                     time_to_ack = time.time() - unack[-1]
                     self.msg_acked[ackid] = (len(unack), time_to_ack)
-                    print(f"Cleared {ackid} from unacked messages : {self.msg_unacked}")
-                    print(f"{ackid} --- time for ack = {time_to_ack}")
+                    print(f"{ackid} --- Cleared ack, time for ack = {time_to_ack}")
+                else:
+                    print(f"Ack {ackid} isnt for me")
             return
         src = msg["espsrc"]
         if dest != self.devid:
@@ -122,14 +121,53 @@ class EspComm:
         for i in range(retry_count):
             if sent_succ:
                 break
-            print(f"Sending {msgid} for the {i}th time")
+            print(f"Sending {msgid} of type {msg['msgtype']} for the {i}th time")
             sent_succ = self._send_with_retries(msgstr, msgid)
         return sent_succ
 
     # Note retry here is separate retry per chunk.
     # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
     def send_chunks(self, msg_chunks, dest, retry_count = 3):
-        print(f"Getting ready to push {len(msg_chunks)} chunks")
+        num_chunks = len(msg_chunks)
+        print(f"Getting ready to push {num_chunks} chunks")
+        msg = {"msgtype" : constants.MESSAGE_TYPE_CHUNK_BEGIN, "num_chunks" : f"{num_chunks}"}
+        sent = self.send_unicast(msg, dest, True, 3)
+        chunk_id_map = {}  # chunkid->msgid
+        if not sent:
+            print(f"Failed to send chunk begin")
+            return False
+        for i in range(num_chunks):
+            print(f"Sending chunk {i} out of {num_chunks}")
+            msgid = self.get_msg_id(dest)
+            chunk_id_map[i] = msgid
+            msg["msgtype"] = constants.MESSAGE_TYPE_CHUNK_ITEM
+            msg["espmsgid"] = msgid
+            msg["espsrc"] = self.devid
+            msg["espdest"] = dest
+            msgstr = json.dumps(msg)
+            with self.msg_unacked_lock:
+                 if msgid not in self.msg_unacked:
+                     self.msg_unacked[msgid] = [time.time()]
+                 else:
+                     self.msg_unacked[msgid].append(time.time())
+            self.actual_send(msgstr)
+        print(f"Finished pushing {len(msg_chunks)} chunks")
+        msg = {"msgtype" : constants.MESSAGE_TYPE_CHUNK_END, "num_chunks" : f"{len(msg_chunks)}"}
+        sent = esp.send_unicast(msg, dest, True, 3)
+        if not sent:
+            return False
+        chunks_delivered = []
+        chunks_undelivered = []
+        with self.msg_unacked_lock:
+            for i in range(num_chunks):
+                if chunk_id_map[i] in self.msg_unacked:
+                    chunks_undelivered.append(i)
+                else:
+                    chunks_delivered.append(i)
+        print(f"Delivered {len(chunks_delivered)} chunks : {chunks_delivered}")
+        print(f"Could not Delivered {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+        # TODO attempt redelivery of undelivered chunks.
+
 
     def _send_with_retries(self, msgstr, msgid):
         with self.msg_unacked_lock:
@@ -160,12 +198,18 @@ class EspComm:
             while True:
                 msg = input("To ESP32: ")
                 if msg:
-                    self.send(msg)
+                    self.actual_send(msg)
         except KeyboardInterrupt:
             print("\nExiting...")
             self.ser.close()
 
-def send(esp, devid, dest):
+def test_send(esp, devid, dest):
+    msg_chunks = []
+    for i in range(12):
+        msg = {"data": f"Data for chunk {i} out of 12"}
+        msg_chunks.append(msg)
+    esp.send_chunks(msg_chunks, dest, 3)
+
     msg = {"msgtype" : constants.MESSAGE_TYPE_SCAN, "data": "Scantest"}
     esp.send_broadcast(msg)
     msg = {"msgtype" : constants.MESSAGE_TYPE_HEARTBEAT, "data": "Someone else"}
@@ -188,15 +232,13 @@ def send(esp, devid, dest):
     sent = esp.send_unicast(crazy_long_message, dest, True)
     print(f"Sending success = {sent}")
 
-    esp.send_chunks([msg], dest, 3)
-
 def main():
     devid = sys.argv[1]
     dest  = sys.argv[2]
     esp = EspComm(devid)
     esp.keep_reading()
     if devid == "bb":
-        send(esp, devid, dest)
+        test_send(esp, devid, dest)
     if devid == "aa":
         time.sleep(60)
     time.sleep(10)
