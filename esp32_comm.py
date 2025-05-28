@@ -141,6 +141,7 @@ class EspComm:
             print(f"Sending chunk {i} out of {num_chunks}")
             msgid = self.get_msg_id(dest)
             chunk_id_map[i] = msgid
+            msg = msg_chunks[i]
             msg["msgtype"] = constants.MESSAGE_TYPE_CHUNK_ITEM
             msg["espmsgid"] = msgid
             msg["espsrc"] = self.devid
