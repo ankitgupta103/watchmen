@@ -68,6 +68,7 @@ class EspComm:
         self.send_unicast(msg_to_send, src, False, 0)
 
     def read_from_esp(self):
+        print(f"{self.devid} is reading messages now")
         while True:
             if self.ser.in_waiting > 0:
                 try:
