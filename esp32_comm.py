@@ -18,6 +18,8 @@ class EspComm:
         # Initialize UART
         self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=1)     # /dev/serial0 ,  /dev/ttyS0,  /dev/ttyAMA0
         time.sleep(2)  # Give ESP32 time to reset
+        self.msg_chunks_expected = {}
+        self.msg_chunks_received = {}
 
     def print_status(self):
         with self.msg_unacked_lock:
