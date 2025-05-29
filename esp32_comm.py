@@ -123,7 +123,7 @@ class EspComm:
         for (_, d) in p:
             parts.append(d)
         orig_payload = "".join(parts)
-        orig_msg = json.loads(orig_msg)
+        orig_msg = json.loads(orig_payload)
         if "i_d" in orig_msg:
             imstr = orig_msg["i_d"]
             im = image.imstrtoimage(imstr)
