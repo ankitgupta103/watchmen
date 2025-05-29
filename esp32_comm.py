@@ -351,6 +351,8 @@ def main():
     if devid == "bb":
         test_send_time_to_ack(esp, devid, dest, 10)
         test_send_img(esp, devid, dest, "pencil.jpg")
+        test_send_chunks(esp, devid, dest)
+        test_send_types(esp, devid, dest)
     if devid == "aa":
         time.sleep(60)
     time.sleep(10)
