@@ -1,15 +1,10 @@
 import time
-import constants
 import io
 import base64
 from PIL import Image
 
-def imstrtoimage(string: str) -> Image.Image:
-    r""" Convert string to Pillow image. """
-    img_bytes_arr = string.encode('utf-8')
-    img_bytes_arr_encoded = base64.b64decode(img_bytes_arr)
-    image = Image.open(io.BytesIO(img_bytes_arr_encoded))
-    return image
+import image
+import constants
 
 class NodeInfo:
     def __init__(self, devid):
@@ -109,7 +104,7 @@ class CommandCentral:
     def consume_image(self, msg):
         imf = f"/tmp/camera_captures_test/Image_CC_{msg['constants.JK_SOURCE']}_{msg['constants.JK_IMAGE_TS']}.jpg"
         print(f" %%%%%% ==== CC got an image from {msg['constants.JK_SOURCE']}, will save to {imf}")
-        im = imstrtoimage(msg[constants.JK_IMAGE_DATA])
+        im = image.imstrtoimage(msg[constants.JK_IMAGE_DATA])
         im.save(imf)
         im.show()
 

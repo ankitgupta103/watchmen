@@ -2,21 +2,9 @@ import time
 import os
 import io
 import base64
-from PIL import Image
+import image
+from PIL import Image # Should remove
 from picamera2 import Picamera2, Preview
-
-def image2string(imagefile):
-    r""" Convert Pillow image to string. """
-    image = Image.open(imagefile)
-    # image.show()
-    image = image.convert('RGB')
-    img_bytes_arr = io.BytesIO()
-    image.save(img_bytes_arr, format="JPEG")
-    img_bytes_arr.seek(0)
-    img_bytes_arr = img_bytes_arr.read()
-    img_bytes_arr_encoded = base64.b64encode(img_bytes_arr)
-    res = img_bytes_arr_encoded.decode('utf-8')
-    return res
 
 class Camera:
     def __init__(self, devid, o_dir="/tmp/camera_captures"):
@@ -51,9 +39,27 @@ class Camera:
         return (fname, imstr)
 
 def main():
-    cam = Camera("dsdsdsrwrdews", o_dir="/tmp/camera_captures_test")
-    cam.start()
-    (imfile, imstr) = cam.take_picture()
+    fpath = "/home/ankit/test.jpg"
+    image_file = Image.open(fpath)
+    fp = f"/home/ankit/test_20.jpg"
+    image_file.save(fp, quality=20)
+    im = image.image2string(fp)
+    print(len(im))
+    chunks = []
+    while len(im) > 0:
+        chunks.append(im[0:200])
+        im = im[200:]
+    print(len(chunks))
+    new_img = ""
+    for chunk in chunks:
+        new_img = new_img + chunk
+    print(len(new_img))
+    im2 = image.imstrtoimage(new_img)
+    im2.save("/home/ankit/test_new.jpg")
+    
+    #cam = Camera("dsdsdsrwrdews", o_dir="/tmp/camera_captures_test")
+    #cam.start()
+    #(imfile, imstr) = cam.take_picture()
 
 if __name__=="__main__":
     main()
