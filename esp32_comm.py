@@ -89,7 +89,7 @@ class EspComm:
             i = int(parts[1])
             print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
             self.msg_chunks_received[cid].append(i)
-            self.msg_parts[cid].append((i, msg))
+            self.msg_parts[cid].append((i, msg["imc"]))
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_END:
             cid = msg["cid"]
@@ -117,7 +117,11 @@ class EspComm:
         self.send_unicast(msg_to_send, src, False, 0)
 
     def _recompile_msg(self, cid):
-        parts = sorted(self.msg_parts[cid], key=lambda x: x[0])
+        print(self.msg_parts[cid])
+        p = sorted(self.msg_parts[cid], key=lambda x: x[0])
+        parts = []
+        for (_, d) in p:
+            parts.append(d)
         imstr = "".join(parts)
         im = image.imstrtoimage(imstr)
         im.save("/tmp/recompiled.jpg")
@@ -287,20 +291,24 @@ class EspComm:
             print("\nExiting...")
             self.ser.close()
 
-def test_send(esp, devid, dest):
-    im = image.image2string("pencil.jpg")
+def test_send_img(esp, devid, dest, imgfile):
+    im = image.image2string(imgfile)
     msg_chunks = []
     while len(im) > 0:
         msg = {"imc": im[0:120]}
         msg_chunks.append(msg)
         im = im[120:]
     print(len(msg_chunks))
-    #for i in range(12):
-    #    msg = {"data": f"{i}"}
-    #    msg_chunks.append(msg)
     esp.send_chunks(msg_chunks, dest, 3)
-    return # TODO for now return here
 
+def test_send_chunks(esp, devid, dest):
+    msg_chunks = []
+    for i in range(12):
+        msg = {"data": f"{i}"}
+        msg_chunks.append(msg)
+    esp.send_chunks(msg_chunks, dest, 3)
+
+def test_send_types(esp, devid, dest):
     msg = {constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_SCAN, "data": "Scantest"}
     esp.send_broadcast(msg)
     msg = {constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT, "data": "Someone else"}
@@ -323,6 +331,12 @@ def test_send(esp, devid, dest):
     sent = esp.send_unicast(crazy_long_message, dest, True)
     print(f"Sending success = {sent}")
 
+def test_send_time_to_ack(esp, devid, dest, msgsize):
+    msg = {
+            constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT, 
+            "data": "timecheck"}
+    esp.send_unicast(msg, dest, True, 3)
+
 def main():
     if sys.argv[1] == "r":
         devid = "aa"
@@ -335,7 +349,8 @@ def main():
     esp = EspComm(devid)
     esp.keep_reading()
     if devid == "bb":
-        test_send(esp, devid, dest)
+        test_send_time_to_ack(esp, devid, dest, 10)
+        test_send_img(esp, devid, dest, "pencil.jpg")
     if devid == "aa":
         time.sleep(60)
     time.sleep(10)
