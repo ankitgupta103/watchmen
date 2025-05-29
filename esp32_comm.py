@@ -25,6 +25,18 @@ class EspComm:
         self.msg_chunks_received = {} # Receiver uses this. cid->list of ids got
         self.msg_parts = {} # Receiver uses this. cid->data
         self.msg_cunks_missing = {} # Sender gets this from ack.
+        self.node = None
+
+    def add_node(self, node):
+        self.node = node
+
+    def process_message(self, msgstr):
+        print(f"Processing incoming message : {msgstr}")
+        self.msg_received.append(msgstr)
+        if self.node is not None:
+            # If in a real device, all messages are json
+            msg = json.loads(msgstr)
+            self.node.process_msg(msg)
 
     def print_status(self):
         with self.msg_unacked_lock:
@@ -44,9 +56,9 @@ class EspComm:
         msg = json.loads(msgstr)
         msgid = msg["nid"]
         (msgtype, src, dest, ts) = self._parse_msg_id(msgid)
-        if dest is None:
+        if dest is None or dest == "None":
             print(f"{msgstr} is a broadcast")
-            #TODO process message
+            self.process_message(msg["pyl"])
             return
         if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
             print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
@@ -100,7 +112,7 @@ class EspComm:
                     missing_chunks.append(i)
             print(f"At end I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             if len(missing_chunks) == 0:
-                self.msg_received.append(self._recompile_msg(cid))
+                self.process_message(self._recompile_msg(cid))
             msg_to_send = {
                     constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
                     "ackid" : msgid,
@@ -110,7 +122,7 @@ class EspComm:
             self._send_unicast(msg_to_send, src, False, 0)
             return
         
-        self.msg_received.append(msg["pyl"])
+        self.process_message(msg["pyl"])
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
         msg_to_send = {
                 constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,

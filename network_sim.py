@@ -16,7 +16,7 @@ def main():
     num_units = 25
     fcomm = IPCCommunicator()
     devices = start_n_units(num_units, fcomm)
-    cc  = CommandCentral("ZZZ", fcomm)
+    cc  = CommandCentral("ZZZ", fcomm, None)
     fcomm.add_dev(cc.devid, cc)
     for d in devices:
         fcomm.add_dev(d.devid, d)
