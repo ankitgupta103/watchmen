@@ -324,8 +324,14 @@ def test_send(esp, devid, dest):
     print(f"Sending success = {sent}")
 
 def main():
-    devid = sys.argv[1]
-    dest  = sys.argv[2]
+    if sys.argv[1] == "r":
+        devid = "aa"
+        dest = "bb"
+    else if sys.argv[1] == "s":
+        devid = "bb"
+        dest = "aa"
+    else:
+        print(f"arg1 has to be r or s only")
     esp = EspComm(devid)
     esp.keep_reading()
     if devid == "bb":
