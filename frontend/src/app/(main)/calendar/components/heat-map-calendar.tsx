@@ -185,11 +185,11 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
   };
 
   return (
-    <div className="flex h-full gap-8 p-6">
+    <div className="flex h-full gap-8 p-6 relative overflow-y-auto">
       {/* Calendar */}
-      <div className="max-w-4xl flex-1">
-        <Card className="h-full">
-          <CardHeader className="pb-4">
+      <div className="max-w-4xl flex-1 sticky top-0">
+        <Card className="h-fit">
+          <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-2xl font-bold">
                 {MONTHS[currentMonth.getMonth()]} {currentMonth.getFullYear()}
@@ -234,11 +234,11 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                 );
 
                 return (
-                  <button
+                  <Button
                     key={index}
                     onClick={() => setSelectedDate(date)}
                     className={cn(
-                      'group relative flex h-16 w-full flex-col items-center justify-center rounded-lg border-2 transition-all duration-200',
+                      'group relative flex h-16 w-full flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 text-primary',
                       intensityClasses,
                       isSelected(date) && 'ring-2 ring-blue-500 ring-offset-2',
                       !isCurrentMonth(date) && 'opacity-40',
@@ -280,53 +280,56 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                         {activity.healthIssues} health issues
                       </div>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
-            </div>
-
-            {/* Legend */}
-            <div className="mt-8 rounded-lg bg-gray-50 p-4">
-              <h3 className="mb-3 text-lg font-semibold">Activity Legend</h3>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded border-2 border-gray-200 bg-white"></div>
-                  <span className="text-sm">No Activity</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded border-2 border-yellow-200 bg-yellow-100"></div>
-                  <span className="text-sm">Low Activity</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded border-2 border-orange-300 bg-orange-200"></div>
-                  <span className="text-sm">Medium Activity</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded border-2 border-red-300 bg-red-200"></div>
-                  <span className="text-sm">High Activity</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded border-2 border-red-600 bg-red-500"></div>
-                  <span className="text-sm text-white">Critical</span>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center gap-6 border-t border-gray-200 pt-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-red-600"></div>
-                  <span className="text-sm">Suspicious Events</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-orange-500"></div>
-                  <span className="text-sm">Health Issues</span>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Details Panel */}
-      <div className="w-96">
+      <div className="w-96 space-y-4 mb-4">
+        <div className="h-fit">
+          <Card className='m-0 p-0 overflow-hidden'>
+              <div className="rounded-lg p-4">
+                <h3 className="mb-3 text-lg font-semibold">Activity Legend</h3>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded border-2 border-gray-200 bg-white"></div>
+                    <span className="text-sm">No Activity</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded border-2 border-yellow-200 bg-yellow-100"></div>
+                    <span className="text-sm">Low Activity</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded border-2 border-orange-300 bg-orange-200"></div>
+                    <span className="text-sm">Medium Activity</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded border-2 border-red-300 bg-red-200"></div>
+                    <span className="text-sm">High Activity</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded border-2 border-red-600 bg-red-500"></div>
+                    <span className="text-sm">Critical</span>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-6 border-t border-gray-200 pt-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-red-600"></div>
+                    <span className="text-sm">Suspicious Events</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-orange-500"></div>
+                    <span className="text-sm">Health Issues</span>
+                  </div>
+                </div>
+              </div>
+          </Card>
+        </div>
+
         <Card className="h-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">

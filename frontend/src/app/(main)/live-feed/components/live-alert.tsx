@@ -14,7 +14,7 @@ import {
   Wifi,
   X,
 } from 'lucide-react';
-import { toast } from 'sonner'; 
+import { toast } from 'sonner';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -441,7 +441,7 @@ export default function CriticalAlertSystem({
       {/* Alert Trigger Button */}
       <div className="fixed top-4 right-4 z-50">
         <Button
-          onClick={() => setIsModalOpen(!isModalOpen)} 
+          onClick={() => setIsModalOpen(!isModalOpen)}
           className={cn(
             'relative',
             unacknowledgedCount > 0
@@ -461,7 +461,7 @@ export default function CriticalAlertSystem({
       </div>
 
       {/* Alert Panel (Modal) */}
-      {isModalOpen && ( 
+      {isModalOpen && (
         <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4">
           <Card
             className="max-h-[90vh] w-full max-w-md overflow-hidden"
@@ -493,7 +493,7 @@ export default function CriticalAlertSystem({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setIsModalOpen(false)} 
+                    onClick={() => setIsModalOpen(false)}
                   >
                     <X className="h-4 w-4" />
                   </Button>
