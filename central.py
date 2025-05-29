@@ -47,16 +47,30 @@ class NodeInfo:
                 """)
 
 class CommandCentral:
-    def __init__(self, devid, fcomm):
+    def __init__(self, devid, fcomm, ncomm):
         self.devid = devid
         self.neighbours_seen = []
         self.fcomm = fcomm
+        self.ncomm = ncomm
+        if fcomm is None and ncomm is None:
+            print("At least one communicator")
+            return None
+        if fcomm is not None and ncomm is not None:
+            print("At most one communicator")
+            return None
         
         # Node : NodeInfo
         self.node_list = {}
 
         self.num_hbs_received = 0
         self.num_hbs_rerouted = 0
+
+    def send_message(self, msg, dest=None):
+        if self.fcomm is not None:
+            return self.fcomm.send_to_network(msg, self.devid, dest)
+        if self.ncomm is not None:
+            msgstr = json.dumps(msg)
+            return self.ncomm.send_message(msgstr, dest)
 
     def console_output(self):
         for n, info in self.node_list.items():
@@ -75,7 +89,7 @@ class CommandCentral:
                     constants.JK_LAST_SENDER : self.devid,
                     constants.JK_LAST_TS : ts,
                 }
-            self.fcomm.send_to_network(spath_msg, self.devid, neighbour)
+            self.send_message(spath_msg, neighbour)
         return True
 
     def parse_hb_msg(self, msg):
