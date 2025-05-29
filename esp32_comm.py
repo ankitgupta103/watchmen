@@ -116,7 +116,7 @@ class EspComm:
                 }
         self.send_unicast(msg_to_send, src, False, 0)
 
-    def _recompile_msg(cid):
+    def _recompile_msg(self, cid):
         parts = sorted(self.msg_parts[cid], key=lambda x: x[0])
         imstr = "".join(parts)
         im = image.imstrtoimage(imstr)
@@ -145,6 +145,7 @@ class EspComm:
     def _get_msg_id(self, msgtype, dest):
         r = random.randint(100,200)
         t = int(time.time())
+        t = 0
         id = f"{msgtype}_{self.devid}_{dest}_{t}_{r}"
         print(f"Id = {id}")
         return id
@@ -203,7 +204,7 @@ class EspComm:
         msg["cid"] = f"{chunk_identifier}_{i}"
         msgstr = json.dumps(msg)
         self._actual_send(msgstr)
-        # time.sleep(1) # TODO Needed for corruption free sending.
+        time.sleep(1) # TODO Needed for corruption free sending.
 
     def _send_chunk_end(self, chunk_identifier, dest):
         msg = {
@@ -287,12 +288,12 @@ class EspComm:
             self.ser.close()
 
 def test_send(esp, devid, dest):
-    im = image.image2string("/home/ankit/pencil.jpg")
+    im = image.image2string("pencil.jpg")
     msg_chunks = []
     while len(im) > 0:
-        msg = {"imc": im[0:200]}
+        msg = {"imc": im[0:120]}
         msg_chunks.append(msg)
-        im = im[200:]
+        im = im[120:]
     print(len(msg_chunks))
     #for i in range(12):
     #    msg = {"data": f"{i}"}

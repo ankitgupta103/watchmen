@@ -1,6 +1,7 @@
 import time
 import os
 import io
+import json
 import base64
 import image
 from PIL import Image # Should remove
@@ -47,14 +48,18 @@ def main():
     print(len(im))
     chunks = []
     while len(im) > 0:
-        chunks.append(im[0:200])
-        im = im[200:]
+        msg = {"d" : im[0:100]}
+        chunks.append(json.dumps(msg).encode())
+        im = im[100:]
     print(len(chunks))
     new_img = ""
     for chunk in chunks:
-        new_img = new_img + chunk
+        m = json.loads(chunk.decode().strip())
+        cd = m["d"]
+        new_img = new_img + cd
     print(len(new_img))
     im2 = image.imstrtoimage(new_img)
+    im2.show()
     im2.save("/home/ankit/test_new.jpg")
     
     #cam = Camera("dsdsdsrwrdews", o_dir="/tmp/camera_captures_test")
