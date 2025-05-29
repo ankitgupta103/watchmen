@@ -89,7 +89,7 @@ class EspComm:
             i = int(parts[1])
             print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
             self.msg_chunks_received[cid].append(i)
-            self.msg_parts[cid].append((i, msg["imc"]))
+            self.msg_parts[cid].append((i, msg["c_d"]))
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_END:
             cid = msg["cid"]
@@ -122,10 +122,16 @@ class EspComm:
         parts = []
         for (_, d) in p:
             parts.append(d)
-        imstr = "".join(parts)
-        im = image.imstrtoimage(imstr)
-        im.save("/tmp/recompiled.jpg")
-        im.show()
+        orig_payload = "".join(parts)
+        orig_msg = json.loads(orig_msg)
+        if "i_d" in orig_msg:
+            imstr = orig_msg["i_d"]
+            im = image.imstrtoimage(imstr)
+            im.save("/tmp/recompiled.jpg")
+            im.show()
+        else:
+            print(f"Recompiled message =\n{orig_msg}")
+        return orig_msg
 
     def _read_from_esp(self):
         print(f"{self.devid} is reading messages now")
@@ -177,6 +183,8 @@ class EspComm:
     # No ack, no retry
     # TODO set limit on size
     def send_broadcast(self, msg):
+        msgid = self._get_msg_id(msg[constants.JK_MESSAGE_TYPE], None)
+        msg["nid"] = msgid
         msgstr = json.dumps(msg)
         return self._actual_send(msgstr)
 
@@ -292,28 +300,34 @@ class EspComm:
             print("\nExiting...")
             self.ser.close()
 
-def test_send_img(esp, devid, dest, imgfile):
-    im = image.image2string(imgfile)
-    msg_chunks = []
-    while len(im) > 0:
-        msg = {"imc": im[0:120]}
-        msg_chunks.append(msg)
-        im = im[120:]
-    print(len(msg_chunks))
-    esp.send_chunks(msg_chunks, dest, 3)
+    # Note long message cant be a boradcast
+    def send_long_msg(self, long_msg, dest):
+        msgstr = json.dumps(long_msg)
+        msg_chunks = []
+        while len(msgstr) > 0:
+            msg = {"c_d": msgstr[0:120]}
+            msg_chunks.append(msg)
+            msgstr = msgstr[120:]
+        print(len(msg_chunks))
+        self.send_chunks(msg_chunks, dest, 3)
 
-def test_send_chunks(esp, devid, dest):
-    msg_chunks = []
-    for i in range(12):
-        msg = {"imc": f"{i}"}
-        msg_chunks.append(msg)
-    esp.send_chunks(msg_chunks, dest, 3)
+def test_send_img(esp, imgfile, dest):
+    im = {"i_m" : "Image metadata",
+          "i_d" : image.image2string(imgfile)}
+    esp.send_long_msg(im, dest)
+
+def test_send_long_msg(esp, dest):
+    long_string = ""
+    for i in range(500):
+        long_string = long_string + str(i) + "_"
+    lm = {"data" : long_string}
+    esp.send_long_msg(lm, dest)
 
 def test_send_types(esp, devid, dest):
     msg = {constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_SCAN, "data": "Scantest"}
     esp.send_broadcast(msg)
     msg = {constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT, "data": "Someone else"}
-    esp.send_unicast(msg, "cc", True, 2)
+    esp.send_unicast(msg, "cc", True, 2) # This will be unacked because it is to someone else
 
     for i in range(3):
         rt = random.randint(1000,2000)/1000
@@ -324,16 +338,8 @@ def test_send_types(esp, devid, dest):
         sent = esp.send_unicast(msg, dest, True)
         print(f"Sending success = {sent}")
 
-    crazy_long_message = {
-            constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT
-            }
-    for i in range(10):
-        crazy_long_message[f"k{i}"] = f"Hello 123456 This is a test to make a very long message {i}"
-    sent = esp.send_unicast(crazy_long_message, dest, True)
-    print(f"Sending success = {sent}")
-
 # 50 is overhead + size of string of msgsize
-def test_send_time_to_ack(esp, devid, dest, msgsize):
+def test_send_time_to_ack(esp, dest, msgsize):
     x = "x"*msgsize
     msg = {
             constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT, 
@@ -352,10 +358,10 @@ def main():
     esp = EspComm(devid)
     esp.keep_reading()
     if devid == "bb":
-        test_send_time_to_ack(esp, devid, dest, int(sys.argv[2]))
-        # test_send_img(esp, devid, dest, "pencil.jpg")
-        # test_send_chunks(esp, devid, dest) # Assumes its an image
-        # test_send_types(esp, devid, dest) # Some bug remains
+        # test_send_time_to_ack(esp, devid, dest, int(sys.argv[2]))
+        test_send_types(esp, devid, dest)
+        test_send_long_msg(esp, dest) # Assumes its an image
+        test_send_img(esp, "pencil.jpg", dest)
     if devid == "aa":
         time.sleep(100)
     time.sleep(10)
