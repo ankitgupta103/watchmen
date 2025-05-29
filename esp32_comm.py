@@ -332,10 +332,12 @@ def test_send_types(esp, devid, dest):
     sent = esp.send_unicast(crazy_long_message, dest, True)
     print(f"Sending success = {sent}")
 
+# 50 is overhead + size of string of msgsize
 def test_send_time_to_ack(esp, devid, dest, msgsize):
+    x = "x"*msgsize
     msg = {
             constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT, 
-            "data": "timecheck"}
+            "data": x}
     esp.send_unicast(msg, dest, True, 3)
 
 def main():
@@ -350,12 +352,12 @@ def main():
     esp = EspComm(devid)
     esp.keep_reading()
     if devid == "bb":
-        test_send_time_to_ack(esp, devid, dest, 10)
-        test_send_img(esp, devid, dest, "pencil.jpg")
-        test_send_chunks(esp, devid, dest) # Some bug remains
-        test_send_types(esp, devid, dest) # Some bug remains
+        test_send_time_to_ack(esp, devid, dest, int(sys.argv[2]))
+        # test_send_img(esp, devid, dest, "pencil.jpg")
+        # test_send_chunks(esp, devid, dest) # Assumes its an image
+        # test_send_types(esp, devid, dest) # Some bug remains
     if devid == "aa":
-        time.sleep(60)
+        time.sleep(100)
     time.sleep(10)
     esp.print_status()
 
