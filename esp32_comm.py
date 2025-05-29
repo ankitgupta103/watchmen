@@ -67,7 +67,6 @@ class EspComm:
             print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
             return
 
-        self.msg_received.append(msg["pyl"])
         if msgtype == constants.MESSAGE_TYPE_CHUNK_BEGIN:
             self.msg_chunks_expected[msg["cid"]] = int(msg["num_chunks"])
             self.msg_chunks_received[msg["cid"]] = []
@@ -110,6 +109,8 @@ class EspComm:
                     }
             self._send_unicast(msg_to_send, src, False, 0)
             return
+        
+        self.msg_received.append(msg["pyl"])
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
         msg_to_send = {
                 constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
