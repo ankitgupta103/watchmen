@@ -11,7 +11,7 @@ export default function CalendarPage() {
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader />
-      <div className="bg-background h-full w-full overflow-hidden rounded-lg border">
+      <div className="h-full w-full">
         <HeatMapCalendar machines={machines} />
       </div>
     </section>
