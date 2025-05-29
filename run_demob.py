@@ -18,10 +18,9 @@ def get_serial_id():
 
 def get_device_id():
     did=get_serial_id()
-    shortmap = {
-            "2b46c5c95aea7306" : "CC"
-            "9eccfdf8c851a5ef" : "D01"
-            }
+    shortmap = {}
+    shortmap["2b46c5c95aea7306"] = "CC"
+    shortmap["9eccfdf8c851a5ef"] = "D01"
     if did not in shortmap:
         return None
     return shortmap[did]
