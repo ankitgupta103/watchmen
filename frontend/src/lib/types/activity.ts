@@ -1,6 +1,6 @@
 export type ActivityIntensity = 'none' | 'low' | 'medium' | 'high' | 'critical';
 
-export type ActivityType = 'suspicious' | 'health' | 'offline';
+export type ActivityType = 'suspicious' | 'health' | 'offline' | 'unknown';
 
 export type ActivityEvent = {
   machineId: number;
@@ -15,6 +15,7 @@ export interface DayActivity {
   suspiciousCount: number;
   healthIssues: number;
   offlineCount: number;
+  unknownCount: number;
   intensity: ActivityIntensity;
   events: Array<ActivityEvent>;
 }

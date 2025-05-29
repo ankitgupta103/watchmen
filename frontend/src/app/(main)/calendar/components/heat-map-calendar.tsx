@@ -6,7 +6,6 @@ import { Activity, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 
 import { DayActivity } from '@/lib/types/activity';
 import { Machine } from '@/lib/types/machine';
@@ -55,6 +54,7 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
             suspiciousCount: 0,
             healthIssues: 0,
             offlineCount: 0,
+            unknownCount: 0,
             intensity: 'none',
             events: [],
           });
@@ -81,6 +81,7 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
             suspiciousCount: 0,
             healthIssues: 0,
             offlineCount: 0,
+            unknownCount: 0,
             intensity: 'none',
             events: [],
           });
@@ -127,7 +128,6 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
     const month = currentMonth.getMonth();
 
     const firstDay = new Date(year, month, 1);
-    // const lastDay = new Date(year, month + 1, 0);
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
 
@@ -156,21 +156,6 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
     });
   };
 
-  const getIntensityClasses = (intensity: string) => {
-    switch (intensity) {
-      case 'low':
-        return 'bg-yellow-100 hover:bg-yellow-200 border-yellow-200';
-      case 'medium':
-        return 'bg-orange-200 hover:bg-orange-300 border-orange-300';
-      case 'high':
-        return 'bg-red-200 hover:bg-red-300 border-red-300';
-      case 'critical':
-        return 'bg-red-500 hover:bg-red-600 text-white border-red-600';
-      default:
-        return 'bg-white hover:bg-gray-50 border-gray-200';
-    }
-  };
-
   const isCurrentMonth = (date: Date) => {
     return date.getMonth() === currentMonth.getMonth();
   };
@@ -185,9 +170,9 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
   };
 
   return (
-    <div className="flex h-full gap-8 p-6 relative overflow-y-auto">
+    <div className="relative flex gap-4 overflow-y-auto">
       {/* Calendar */}
-      <div className="max-w-4xl flex-1 sticky top-0">
+      <div className="mb-4 flex-1">
         <Card className="h-fit">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -229,17 +214,13 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
             <div className="grid grid-cols-7 gap-2">
               {calendarDays.map((date, index) => {
                 const activity = heatMapData.get(date.toDateString());
-                const intensityClasses = getIntensityClasses(
-                  activity?.intensity || 'none',
-                );
 
                 return (
                   <Button
                     key={index}
                     onClick={() => setSelectedDate(date)}
                     className={cn(
-                      'group relative flex h-16 w-full flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 text-primary',
-                      intensityClasses,
+                      'group text-primary relative flex h-24 w-full flex-col items-start justify-start rounded-lg border-2 border-gray-200 bg-white p-1 text-left transition-all duration-200 hover:bg-gray-50',
                       isSelected(date) && 'ring-2 ring-blue-500 ring-offset-2',
                       !isCurrentMonth(date) && 'opacity-40',
                       isToday(date) && 'ring-1 ring-blue-400',
@@ -247,7 +228,7 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                   >
                     <span
                       className={cn(
-                        'text-lg font-semibold',
+                        'font-semibold',
                         !isCurrentMonth(date) && 'text-gray-400',
                         isToday(date) && 'text-blue-600',
                       )}
@@ -255,29 +236,25 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                       {date.getDate()}
                     </span>
 
-                    {/* Activity Indicators */}
+                    {/* Activity Badges */}
                     {activity && (
-                      <div className="absolute top-1 right-1 flex gap-1">
+                      <div className="mt-1 flex flex-col items-start gap-1 text-xs w-full">
                         {activity.suspiciousCount > 0 && (
-                          <div className="flex h-2.5 w-2.5 items-center justify-center rounded-full bg-red-600">
-                            <span className="text-[8px] font-bold text-white">
-                              {activity.suspiciousCount > 9
-                                ? '9+'
-                                : activity.suspiciousCount}
-                            </span>
-                          </div>
+                          <Badge
+                            variant="destructive"
+                            className="h-auto px-1 py-0.5 w-full"
+                          >
+                            Suspicious: {activity.suspiciousCount}
+                          </Badge>
                         )}
                         {activity.healthIssues > 0 && (
-                          <div className="h-2.5 w-2.5 rounded-full bg-orange-500"></div>
+                          <Badge
+                            variant="secondary"
+                            className="h-auto px-1 py-0.5"
+                          >
+                            Health: {activity.healthIssues}
+                          </Badge>
                         )}
-                      </div>
-                    )}
-
-                    {/* Tooltip on hover */}
-                    {activity && (
-                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 transform rounded bg-black px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 transition-opacity group-hover:opacity-100">
-                        {activity.suspiciousCount} suspicious,{' '}
-                        {activity.healthIssues} health issues
                       </div>
                     )}
                   </Button>
@@ -289,47 +266,7 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
       </div>
 
       {/* Details Panel */}
-      <div className="w-96 space-y-4 mb-4">
-        <div className="h-fit">
-          <Card className='m-0 p-0 overflow-hidden'>
-              <div className="rounded-lg p-4">
-                <h3 className="mb-3 text-lg font-semibold">Activity Legend</h3>
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded border-2 border-gray-200 bg-white"></div>
-                    <span className="text-sm">No Activity</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded border-2 border-yellow-200 bg-yellow-100"></div>
-                    <span className="text-sm">Low Activity</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded border-2 border-orange-300 bg-orange-200"></div>
-                    <span className="text-sm">Medium Activity</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded border-2 border-red-300 bg-red-200"></div>
-                    <span className="text-sm">High Activity</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded border-2 border-red-600 bg-red-500"></div>
-                    <span className="text-sm">Critical</span>
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center gap-6 border-t border-gray-200 pt-3">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2.5 w-2.5 rounded-full bg-red-600"></div>
-                    <span className="text-sm">Suspicious Events</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-2.5 w-2.5 rounded-full bg-orange-500"></div>
-                    <span className="text-sm">Health Issues</span>
-                  </div>
-                </div>
-              </div>
-          </Card>
-        </div>
-
+      <div className="sticky top-0 mb-4 h-fit w-96 space-y-4">
         <Card className="h-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -366,8 +303,6 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                     </div>
                   </div>
                 </div>
-
-                <Separator />
 
                 {/* Event Details */}
                 <div className="max-h-80 space-y-3 overflow-y-auto">
@@ -407,7 +342,7 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                             <div>
                               Type:{' '}
                               <span className="font-medium">
-                                {event.details.type.replace('_', ' ')}
+                                {event.details.type.replace(/_/g, ' ')}
                               </span>
                             </div>
                             <div>
@@ -437,7 +372,7 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                             <div>
                               Issue:{' '}
                               <span className="font-medium">
-                                {event.details.type.replace('_', ' ')}
+                                {event.details.type.replace(/_/g, ' ')}
                               </span>
                             </div>
                             <div>
