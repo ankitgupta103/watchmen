@@ -5,7 +5,10 @@ import random
 import json
 import time
 import threading
+
+# Local
 import constants
+import image
 
 class EspComm:
     msg_unacked = {} # id -> list of ts
@@ -18,8 +21,9 @@ class EspComm:
         # Initialize UART
         self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=1)     # /dev/serial0 ,  /dev/ttyS0,  /dev/ttyAMA0
         time.sleep(2)  # Give ESP32 time to reset
-        self.msg_chunks_expected = {} # Receiver uses this.
-        self.msg_chunks_received = {} # Receiver uses this.
+        self.msg_chunks_expected = {} # Receiver uses this. cid->num_chunks
+        self.msg_chunks_received = {} # Receiver uses this. cid->list of ids got
+        self.msg_parts = {} # Receiver uses this. cid->data
         self.msg_cunks_missing = {} # Sender gets this from ack.
 
     def print_status(self):
@@ -66,6 +70,7 @@ class EspComm:
         if msgtype == constants.MESSAGE_TYPE_CHUNK_BEGIN:
             self.msg_chunks_expected[msg["cid"]] = int(msg["num_chunks"])
             self.msg_chunks_received[msg["cid"]] = []
+            self.msg_parts[msg["cid"]] = []
             print(f"at cb : self.msg_chunks_received = {self.msg_chunks_received}")
             print(f"{self.devid} : Sending ack for {msgid} to {src}")
             msg_to_send = {
@@ -84,6 +89,7 @@ class EspComm:
             i = int(parts[1])
             print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
             self.msg_chunks_received[cid].append(i)
+            self.msg_parts[cid].append((i, msg))
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_END:
             cid = msg["cid"]
@@ -93,6 +99,8 @@ class EspComm:
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
             print(f"At end I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
+            if len(missing_chunks) == 0:
+                self._recompile_msg(cid)
             msg_to_send = {
                     constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
                     "ackid" : msgid,
@@ -107,6 +115,13 @@ class EspComm:
                 "ackid" : msgid,
                 }
         self.send_unicast(msg_to_send, src, False, 0)
+
+    def _recompile_msg(cid):
+        parts = sorted(self.msg_parts[cid], key=lambda x: x[0])
+        imstr = "".join(parts)
+        im = image.imstrtoimage(imstr)
+        im.save("/tmp/recompiled.jpg")
+        im.show()
 
     def _read_from_esp(self):
         print(f"{self.devid} is reading messages now")
@@ -188,7 +203,7 @@ class EspComm:
         msg["cid"] = f"{chunk_identifier}_{i}"
         msgstr = json.dumps(msg)
         self._actual_send(msgstr)
-        time.sleep(1) # TODO Needed for corruption free sending.
+        # time.sleep(1) # TODO Needed for corruption free sending.
 
     def _send_chunk_end(self, chunk_identifier, dest):
         msg = {
@@ -272,10 +287,16 @@ class EspComm:
             self.ser.close()
 
 def test_send(esp, devid, dest):
+    im = image.image2string("/home/ankit/pencil.jpg")
     msg_chunks = []
-    for i in range(12):
-        msg = {"data": f"{i}"}
+    while len(im) > 0:
+        msg = {"imc": im[0:200]}
         msg_chunks.append(msg)
+        im = im[200:]
+    print(len(msg_chunks))
+    #for i in range(12):
+    #    msg = {"data": f"{i}"}
+    #    msg_chunks.append(msg)
     esp.send_chunks(msg_chunks, dest, 3)
     return # TODO for now return here
 
