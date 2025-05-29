@@ -304,7 +304,7 @@ def test_send_img(esp, devid, dest, imgfile):
 def test_send_chunks(esp, devid, dest):
     msg_chunks = []
     for i in range(12):
-        msg = {"data": f"{i}"}
+        msg = {"imc": f"{i}"}
         msg_chunks.append(msg)
     esp.send_chunks(msg_chunks, dest, 3)
 
