@@ -238,6 +238,7 @@ class EspComm:
         for i in range(num_chunks):
             self._send_chunk_i(msg_chunks, chunk_identifier, i, dest)
         sent = self._send_chunk_end(chunk_identifier, dest)
+        time.sleep(1)
         if not sent:
             return False
         for i in range(retry_count):
@@ -351,8 +352,8 @@ def main():
     if devid == "bb":
         test_send_time_to_ack(esp, devid, dest, 10)
         test_send_img(esp, devid, dest, "pencil.jpg")
-        test_send_chunks(esp, devid, dest)
-        test_send_types(esp, devid, dest)
+        test_send_chunks(esp, devid, dest) # Some bug remains
+        test_send_types(esp, devid, dest) # Some bug remains
     if devid == "aa":
         time.sleep(60)
     time.sleep(10)
