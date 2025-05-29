@@ -93,8 +93,7 @@ class Device:
         source_ts = msg[constants.JK_SOURCE_TIMESTAMP]
         spath1 = msg[constants.JK_SHORTEST_PATH]
         if len(self.spath) == 0 or len(spath1) < len(self.spath):
-            if self.devid == "AAA":
-                print(f" ********* {self.devid} : Updating spath from {self.spath} to {spath1[::-1]}")
+            print(f" ********* {self.devid} : Updating spath from {self.spath} to {spath1[::-1]}")
             self.spath = spath1[::-1]
 
             for neighbour in self.neighbours_seen:
