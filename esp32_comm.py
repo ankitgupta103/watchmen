@@ -272,8 +272,10 @@ class EspComm:
         chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
         if len(chunks_undelivered) == 0:
             print(f" ==== Successfully delivered all chunks!!!")
+            return True
         else:
             print(f" **** Finally after all attempts, Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+            return False
 
     def _send_with_retries(self, msgstr, msgid):
         with self.msg_unacked_lock:

@@ -5,11 +5,18 @@ from detect import Detector
 from camera import Camera
 
 class Device:
-    def __init__(self, devid, fcomm):
+    def __init__(self, devid, fcomm, ncomm):
         self.devid = devid
         self.neighbours_seen = []
         self.spath = []
         self.fcomm = fcomm
+        self.ncomm = ncomm
+        if fcomm is None and ncomm is None:
+            print("At least one communicator")
+            return None
+        if fcomm is not None and ncomm is not None:
+            print("At most one communicator")
+            return None
         self.cam = None
         if self.devid == "AAAaaa":
             self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
@@ -17,6 +24,13 @@ class Device:
             self.detector = Detector()
         self.image_count = 0
         self.event_count = 0
+
+    def send_message(self, msg, dest=None):
+        if self.fcomm is not None:
+            return self.fcomm.send_to_network(msg, self.devid, dest)
+        if self.ncomm is not None:
+            msgstr = json.dumps(msg)
+            return self.ncomm.send_message(msgstr, dest)
 
     def get_next_on_spath(self):
         if len(self.spath) <= 1 or self.spath[0] != self.devid:
@@ -32,7 +46,7 @@ class Device:
                 constants.JK_SOURCE_TIMESTAMP : ts,
                 }
         # Failure Here is OK, since it is a discovery and alternative paths would be discovered.
-        self.fcomm.send_to_network(scan_msg, self.devid)
+        self.send_message(scan_msg)
 
     def make_hb_msg(self, ts):
         if self.spath == None or len(self.spath) < 2 or self.spath[0] != self.devid:
@@ -89,7 +103,7 @@ class Device:
                 new_msg[constants.JK_DEST] = neighbour
                 msg[constants.JK_SHORTEST_PATH] = spath1 + [neighbour]
                 # Failure Here is OK, since it is a discovery and alternative paths would be discovered.
-                self.fcomm.send_to_network(new_msg, self.devid, neighbour)
+                self.send_message(new_msg, neighbour)
 
     def get_next_dest(self, msg):
         path_so_far = msg[constants.JK_PATH_SO_FAR]
@@ -104,7 +118,7 @@ class Device:
         new_msg[constants.JK_DEST] = new_dest
         msg[constants.JK_PATH_SO_FAR] = msg[constants.JK_PATH_SO_FAR] + [self.devid]
         new_msg[constants.JK_LAST_TS] = time.time_ns()
-        succ = self.fcomm.send_to_network(new_msg, self.devid, new_dest)
+        succ = self.send_message(new_msg, new_dest)
         return succ
 
     def propogate_message(self, msg):

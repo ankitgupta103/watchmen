@@ -3,23 +3,23 @@ from device import Device
 from central import CommandCentral
 from ipc_communicator import IPCCommunicator
 
-def start_n_units(n, ncomm):
+def start_n_units(n, fcomm):
     devices = []
     for i in range(n):
         c=chr(i+65)
         devid=f"{c}{c}{c}"
-        device = Device(devid, ncomm)
+        device = Device(devid, fcomm, None)
         devices.append(device)
     return devices
 
 def main():
     num_units = 25
-    ncomm = IPCCommunicator()
-    devices = start_n_units(num_units, ncomm)
-    cc  = CommandCentral("ZZZ", ncomm)
-    ncomm.add_dev(cc.devid, cc)
+    fcomm = IPCCommunicator()
+    devices = start_n_units(num_units, fcomm)
+    cc  = CommandCentral("ZZZ", fcomm)
+    fcomm.add_dev(cc.devid, cc)
     for d in devices:
-        ncomm.add_dev(d.devid, d)
+        fcomm.add_dev(d.devid, d)
 
     for j in range(5):
         for device in devices:
