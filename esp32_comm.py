@@ -327,7 +327,7 @@ def main():
     if sys.argv[1] == "r":
         devid = "aa"
         dest = "bb"
-    else if sys.argv[1] == "s":
+    elif sys.argv[1] == "s":
         devid = "bb"
         dest = "aa"
     else:
