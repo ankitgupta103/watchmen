@@ -271,25 +271,8 @@ Reduced solar input extends to battery backup mode
 | Cables & Accessories | $30 - $50 |
 | **Total System Cost** | **$465 - $780** |
 
-## 13. Maintenance Schedule
 
-### Monthly
-- Check battery voltage and SOC
-- Clean solar panel surface
-- Verify all connections are tight
-
-### Quarterly  
-- Inspect enclosure seals
-- Check for corrosion on terminals
-- Review system logs for anomalies
-
-### Annually
-- Deep clean all components
-- Replace any degraded seals
-- Update Raspberry Pi software
-- Battery capacity test
-
-## 14. Final Implementation Notes
+## 13. Final Implementation Notes
 
 ### Critical Success Factors
 1. **Size components conservatively** - better to oversize than undersize
@@ -311,4 +294,3 @@ This system design provides reliable, autonomous operation for outdoor Raspberry
 
 **Power Requirement**
 * 40Ah for 14 hr system boot.
-* 
