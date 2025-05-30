@@ -306,3 +306,9 @@ Reduced solar input extends to battery backup mode
 - Insufficient ventilation (overheating issues)
 
 This system design provides reliable, autonomous operation for outdoor Raspberry Pi camera applications with minimal maintenance requirements and excellent long-term durability.
+
+
+
+**Power Requirement**
+* 40Ah for 14 hr system boot.
+* 
