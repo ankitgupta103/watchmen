@@ -1,29 +1,18 @@
 import time
+import socket
 from device import Device
 from central import CommandCentral
 from esp32_comm import EspComm
 
-def get_serial_id():
-    f=open("/proc/cpuinfo", "r")
-    lines = f.readlines()
-    for line in lines:
-        l = line.strip()
-        if l.find("Serial") >= 0:
-            parts = l.split(":")
-            if len(parts) != 2:
-                return None
-            d = parts[1].strip()
-            return d
-    return None
+get_hostname():
+    return socket.gethostname()
 
+# Expect : central, rpi2, rpi3, rpi4, rpi5
 def get_device_id():
-    did=get_serial_id()
-    shortmap = {}
-    shortmap["2b46c5c95aea7306"] = "CC"
-    shortmap["9eccfdf8c851a5ef"] = "D01"
-    if did not in shortmap:
-        return None
-    return shortmap[did]
+    hn = get_hostname()
+    if hn == "central":
+        return "CC"
+    return hn
 
 def run_unit():
     devid = get_device_id()
