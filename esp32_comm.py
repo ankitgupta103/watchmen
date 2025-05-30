@@ -191,6 +191,7 @@ class EspComm:
         if len(msgstr) > 200:
             print(f"Message is exceeding length {len(msgstr)}")
             return False
+        print(f"Sending message : {msgstr}")
         self.ser.write((msgstr + "\n").encode())
         return True
   
@@ -348,6 +349,7 @@ class EspComm:
             sent = self._send_unicast(msg, dest)
             return sent
         else:
+            print("Too big, will chunk msg {len(payload)}")
             sent = self._send_long_msg(payload, dest)
             return sent
 

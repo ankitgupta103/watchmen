@@ -32,7 +32,7 @@ def run_unit():
         cc  = CommandCentral("CC", None, ncomm)
         ncomm.add_node(cc)
         ncomm.keep_reading()
-        for j in range(5):
+        for j in range(2):
             time.sleep(5)
             cc.send_spath()
             time.sleep(10)
@@ -43,7 +43,7 @@ def run_unit():
         device = Device(devid, None, ncomm)
         ncomm.add_node(device)
         ncomm.keep_reading()
-        for j in range(5):
+        for j in range(1):
             device.check_event()
             device.send_scan(time.time_ns())
             device.send_hb(time.time_ns())
