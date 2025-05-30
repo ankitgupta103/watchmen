@@ -238,11 +238,11 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
 
                     {/* Activity Badges */}
                     {activity && (
-                      <div className="mt-1 flex flex-col items-start gap-1 text-xs w-full">
+                      <div className="mt-1 flex flex-col items-start gap-1  w-full">
                         {activity.suspiciousCount > 0 && (
                           <Badge
                             variant="destructive"
-                            className="h-auto px-1 py-0.5 w-full"
+                            className="h-auto px-1 py-0.5 w-full text-[10px]"
                           >
                             Suspicious: {activity.suspiciousCount}
                           </Badge>
@@ -250,7 +250,7 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                         {activity.healthIssues > 0 && (
                           <Badge
                             variant="secondary"
-                            className="h-auto px-1 py-0.5"
+                            className="h-auto px-1 py-0.5 w-full text-[10px]"
                           >
                             Health: {activity.healthIssues}
                           </Badge>
