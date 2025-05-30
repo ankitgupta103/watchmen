@@ -47,7 +47,7 @@ def run_unit():
             device.check_event()
             device.send_scan(time.time_ns())
             device.send_hb(time.time_ns())
-            time.sleep(1)
+            time.sleep(8)
             print(f"{j} rounds of Scan done.")
 
 def main():
