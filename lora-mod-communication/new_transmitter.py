@@ -4,7 +4,7 @@ import time
 import sys # To cleanly exit the script
 
 # Define GPIO BCM numbers for your LoRa module
-NSS_PIN = 7     # Changed to BCM 7 (SPI CE1)
+NSS_PIN = 8     # Changed back to BCM 8 (SPI CE0)
 RESET_PIN = 22
 DIO0_PIN = 25   # DIO0 is used for TxDone interrupt
 
@@ -13,10 +13,10 @@ GPIO_CHIP_NUMBER = 0
 
 # --- SPI Setup ---
 spi = spidev.SpiDev()
-# Open SPI bus 0, device 1 (CE1, which is BCM 7).
-# We are manually controlling NSS_PIN, so spidev won't automatically toggle it.
+# Open SPI bus 0, device 0 (CE0, which is BCM 8).
+# spidev will automatically control this pin for transactions.
 try:
-    spi.open(0, 1) # Note the '1' here for CE1, which corresponds to BCM 7
+    spi.open(0, 0) # Note the '0' here for CE0
     spi.max_speed_hz = 5000000
 except FileNotFoundError:
     print("Error: SPI device not found. Ensure SPI is enabled in raspi-config.")
@@ -48,23 +48,19 @@ def reset_lora():
 
 def write_register(reg, val):
     """Writes a value to a LoRa register."""
-    set_gpio_output(NSS_PIN, lgpio.LOW)
+    # NSS control removed, spidev handles it
     spi.xfer2([reg | 0x80, val])
-    set_gpio_output(NSS_PIN, lgpio.HIGH)
 
 def read_register(reg):
     """Reads a value from a LoRa register."""
-    set_gpio_output(NSS_PIN, lgpio.LOW)
+    # NSS control removed, spidev handles it
     val = spi.xfer2([reg & 0x7F, 0x00])[1]
-    set_gpio_output(NSS_PIN, lgpio.HIGH)
     return val
 
 def write_fifo(data_bytes):
     """Writes data to the LoRa FIFO buffer."""
-    set_gpio_output(NSS_PIN, lgpio.LOW)
-    # 0x80 is the FIFO write address (RegFifo)
+    # NSS control removed, spidev handles it
     spi.xfer2([0x80] + list(data_bytes))
-    set_gpio_output(NSS_PIN, lgpio.HIGH)
 
 def set_lora_mode(mode):
     """Sets the LoRa module operating mode."""
@@ -120,12 +116,9 @@ try:
     print(f"GPIO chip {GPIO_CHIP_NUMBER} opened successfully.")
 
     # Claim GPIO pins for control
-    lgpio.gpio_claim_output(h, NSS_PIN)
+    # No longer claiming NSS_PIN
     lgpio.gpio_claim_output(h, RESET_PIN)
     lgpio.gpio_claim_input(h, DIO0_PIN)
-
-    # Ensure NSS is initially high (inactive)
-    set_gpio_output(NSS_PIN, lgpio.HIGH)
 
     # Initialize LoRa module
     reset_lora()
