@@ -16,7 +16,7 @@ spi = spidev.SpiDev()
 # spidev will automatically control this pin for transactions.
 try:
     spi.open(0, 0) # Using CE0, spidev handles CS automatically
-    spi.max_speed_hz = 5000000
+    spi.max_speed_hz = 1000000
 except FileNotFoundError:
     print("Error: SPI device not found. Ensure SPI is enabled in raspi-config.")
     sys.exit(1) # Exit if SPI device is not available
