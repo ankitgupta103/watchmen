@@ -6,7 +6,7 @@ import sys # To cleanly exit the script
 # Define GPIO BCM numbers for your LoRa module
 NSS_PIN = 8     # Changed back to BCM 8 (SPI CE0)
 RESET_PIN = 22
-DIO0_PIN = 25   # DIO0 is used for TxDone interrupt
+DIO0_PIN = 27   # DIO0 is used for TxDone interrupt
 
 # On Raspberry Pi 5, the main GPIO chip is typically 0
 GPIO_CHIP_NUMBER = 0
