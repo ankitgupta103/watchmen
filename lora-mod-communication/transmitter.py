@@ -2,8 +2,8 @@ import spidev
 import RPi.GPIO as GPIO
 import time
 
-NSS = 8   
-RESET = 22
+NSS = 24
+RESET = 15
 DIO0 = 25
 
 spi = spidev.SpiDev()
