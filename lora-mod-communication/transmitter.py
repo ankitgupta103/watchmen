@@ -2,7 +2,8 @@ import spidev
 import RPi.GPIO as GPIO
 import time
 
-NSS = 8
+
+NSS = 24
 RESET = 22
 DIO0 = 25
 
@@ -12,8 +13,8 @@ spi.max_speed_hz = 5000000
 
 
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(NSS, GPIO.OUT)
 GPIO.setup(RESET, GPIO.OUT)
+GPIO.setup(NSS, GPIO.OUT)
 GPIO.setup(DIO0, GPIO.IN)
 
 def reset():
