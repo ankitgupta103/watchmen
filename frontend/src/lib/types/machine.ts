@@ -27,14 +27,6 @@ export interface SuspiciousEvent {
   marked?: SuspiciousEventMarked;
 }
 
-export interface Image {
-  id: number;
-  url: string;
-  timestamp: string;
-  confidence: number;
-  marked: string;
-}
-
 export interface Machine {
   id: number;
   name: string;
@@ -43,7 +35,6 @@ export interface Machine {
   data: {
     status: string;
     lastSeen: string;
-    images: Array<Image>;
     suspiciousEvents?: Array<SuspiciousEvent>;
     healthEvents?: Array<HealthEvent>;
   };

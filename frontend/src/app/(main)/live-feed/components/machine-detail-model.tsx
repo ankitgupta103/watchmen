@@ -314,25 +314,28 @@ export default function MachineDetailModal({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {selectedMachine.data.images.map(
-                    (image: {
-                      id: number;
-                      url: string;
-                      timestamp: string;
-                      confidence: number;
-                      marked: string;
-                    }) => (
-                      <div key={image.id}>
-                        <Image
-                          src={image.url}
-                          alt={`Image captured at ${image.timestamp}`}
-                          width={100}
-                          height={100}
-                          className="h-full w-full"
-                        />
-                      </div>
-                    ),
-                  )}
+                  {(() => {
+                    const images = (selectedMachine.data.suspiciousEvents || []).filter(e => !!e.url);
+                    if (images.length > 0) {
+                      return images.map(event => (
+                        <div key={event.timestamp}>
+                          <Image
+                            src={event.url!}
+                            alt={`Image captured at ${event.timestamp}`}
+                            width={100}
+                            height={100}
+                            className="h-full w-full"
+                          />
+                        </div>
+                      ));
+                    } else {
+                      return (
+                        <div className="text-center text-gray-500">
+                          No images captured
+                        </div>
+                      );
+                    }
+                  })()}
                 </CardContent>
               </Card>
             </div>
