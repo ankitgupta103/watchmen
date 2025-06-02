@@ -1,9 +1,9 @@
 import spidev
-import lgpio  # Import lgpio instead of RPi.GPIO
+import lgpio  # Import lgpio
 import time
 
 # Define GPIO BCM numbers for your LoRa module
-NSS_PIN = 8     # Corresponds to SPI CE0 (Chip Select)
+# NSS_PIN is removed as spidev will manage it
 RESET_PIN = 22
 DIO0_PIN = 25
 
@@ -11,26 +11,20 @@ DIO0_PIN = 25
 GPIO_CHIP_NUMBER = 0
 
 # --- SPI Setup ---
-# spidev often works directly as it uses the Linux SPI driver,
-# but we need to ensure the NSS (CS) pin is handled by lgpio if
-# spidev's automatic CE handling conflicts or is not desired.
-# For manual NSS control as in your original code, spidev.open(0, 0) is fine.
 spi = spidev.SpiDev()
-# Open SPI bus 0, device 0 (CE0).
-# Since you're manually controlling NSS_PIN=8, this means spidev won't toggle it automatically.
-# This is usually the desired behavior when you want full control of CS.
+# Open SPI bus 0, device 0 (CE0, which is BCM 8).
+# spidev will automatically control this pin for transactions.
 spi.open(0, 0)
 spi.max_speed_hz = 5000000
 
 # --- lgpio Setup ---
-# Open the GPIO chip
-h = None # Initialize handle to None
+h = None # Initialize handle
 try:
     h = lgpio.gpiochip_open(GPIO_CHIP_NUMBER)
+    print(f"Successfully opened gpiochip{GPIO_CHIP_NUMBER}")
 
     # Claim GPIO pins as output or input
-    # Note: lgpio.gpio_claim_output and lgpio.gpio_claim_input handle the "setup"
-    lgpio.gpio_claim_output(h, NSS_PIN)
+    # NSS_PIN is NOT claimed by lgpio anymore
     lgpio.gpio_claim_output(h, RESET_PIN)
     lgpio.gpio_claim_input(h, DIO0_PIN)
 
@@ -45,30 +39,27 @@ try:
 
     def reset_lora():
         """Resets the LoRa module."""
-        set_gpio_output(RESET_PIN, lgpio.LOW) # Use lgpio.LOW/HIGH for clarity
+        set_gpio_output(RESET_PIN, lgpio.LOW)
         time.sleep(0.1)
         set_gpio_output(RESET_PIN, lgpio.HIGH)
         time.sleep(0.1)
 
     def write_register(reg, val):
         """Writes a value to a LoRa register."""
-        set_gpio_output(NSS_PIN, lgpio.LOW)
+        # NSS control removed, spidev handles it
         spi.xfer2([reg | 0x80, val])
-        set_gpio_output(NSS_PIN, lgpio.HIGH)
 
     def read_register(reg):
         """Reads a value from a LoRa register."""
-        set_gpio_output(NSS_PIN, lgpio.LOW)
+        # NSS control removed, spidev handles it
         val = spi.xfer2([reg & 0x7F, 0x00])[1]
-        set_gpio_output(NSS_PIN, lgpio.HIGH)
         return val
 
     def read_fifo(length):
         """Reads data from the LoRa FIFO buffer."""
-        set_gpio_output(NSS_PIN, lgpio.LOW)
+        # NSS control removed, spidev handles it
         # 0x00 is the FIFO read address (RegFifo)
         data = spi.xfer2([0x00] + [0x00] * length)[1:]
-        set_gpio_output(NSS_PIN, lgpio.HIGH)
         return data
 
     def set_lora_mode(mode):
@@ -107,28 +98,25 @@ try:
 
                 payload = read_fifo(bytes_recv)
                 try:
-                    # Attempt to decode, handle errors gracefully
                     decoded_payload = bytes(payload).decode('utf-8')
-                    print(f"Received: {decoded_payload} (RSSI: {read_register(0x1A) - 157})") # Example RSSI calculation
+                    print(f"Received: {decoded_payload} (RSSI: {read_register(0x1A) - 157})")
                 except UnicodeDecodeError:
                     print(f"Received (undecodable): {payload.hex()} (RSSI: {read_register(0x1A) - 157})")
             else:
-                # Handle other IRQ flags if necessary (e.g., RxTimeout, CrcError)
                 if irq_flags & 0x20: # RxTimeout
                     print("RX Timeout")
                 if irq_flags & 0x02: # CRC Error
                     print("CRC Error")
-        time.sleep(0.01) # Small delay to prevent busy-waiting
+        time.sleep(0.01)
 
-except KeyboardInterrupt:
-    print("\nExiting program...")
+except OSError as e: # Catch OSError for lgpio errors
+    print(f"An lgpio error occurred: {e}")
 except Exception as e:
     print(f"An unexpected error occurred: {e}")
 finally:
-    # --- Cleanup ---
     if spi:
         spi.close()
         print("SPI closed.")
     if h:
-        lgpio.gpiochip_close(h) # Release all claimed GPIO pins
+        lgpio.gpiochip_close(h)
         print("GPIO chip closed and pins released.")
