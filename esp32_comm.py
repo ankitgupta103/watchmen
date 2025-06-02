@@ -378,12 +378,10 @@ def test_send_types(esp, devid, dest):
 # 50 is overhead + size of string of msgsize
 def test_send_time_to_ack(esp, dest, msgsize):
     x = "x"*msgsize
-    msg = {
-            constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_HEARTBEAT, 
-            "data": x}
-    esp.send_unicast(msg, dest, True, 3)
+    esp.send_message(x, dest)
 
 def main():
+    devid = ""
     if sys.argv[1] == "r":
         devid = "aa"
         dest = "bb"
@@ -392,10 +390,11 @@ def main():
         dest = "aa"
     else:
         print(f"arg1 has to be r or s only")
+        return
     esp = EspComm(devid)
     esp.keep_reading()
     if devid == "bb":
-        # test_send_time_to_ack(esp, devid, dest, int(sys.argv[2]))
+        # test_send_time_to_ack(esp, dest, int(sys.argv[2]))
         test_send_types(esp, devid, dest)
         test_send_long_msg(esp, dest) # Assumes its an image
         test_send_img(esp, "pencil.jpg", dest)
