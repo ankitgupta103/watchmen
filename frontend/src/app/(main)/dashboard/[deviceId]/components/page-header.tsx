@@ -7,7 +7,13 @@ import {
 } from '@/components/ui/breadcrumb';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
-export default function PageHeader({ deviceId }: { deviceId: string }) {
+export default function PageHeader({
+  deviceId,
+  deviceName,
+}: {
+  deviceId: string;
+  deviceName: string;
+}) {
   return (
     <div className="flex items-center justify-between">
       <div>
@@ -26,7 +32,7 @@ export default function PageHeader({ deviceId }: { deviceId: string }) {
               <BreadcrumbSeparator />
               <BreadcrumbItem>
                 <BreadcrumbLink href={`/dashboard/${deviceId}`}>
-                  Device Details
+                  {deviceName}
                 </BreadcrumbLink>
               </BreadcrumbItem>
             </BreadcrumbList>

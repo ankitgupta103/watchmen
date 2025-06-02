@@ -31,7 +31,7 @@ export default function DeviceDetailsClient({ device }: { device: Machine }) {
 
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
-      <PageHeader deviceId={device.id.toString()} />
+      <PageHeader deviceId={device.id.toString()} deviceName={device.name} />
       {/* Device Info */}
       <div className="bg-background flex flex-col gap-4 rounded-lg border p-6 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
