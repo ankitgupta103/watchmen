@@ -1,18 +1,38 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Activity, ChevronLeft, ChevronRight, MapPin, Map as MapIcon, X, Filter, Shield, Eye, AlertTriangle } from 'lucide-react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Rectangle, useMapEvents, Circle, Tooltip } from 'react-leaflet';
+import {
+  Activity,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Filter,
+  Map as MapIcon,
+  MapPin,
+  Shield,
+  X,
+} from 'lucide-react';
 import { renderToString } from 'react-dom/server';
+import {
+  Circle,
+  MapContainer,
+  Marker,
+  Rectangle,
+  TileLayer,
+  Tooltip,
+  useMapEvents,
+} from 'react-leaflet';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import 'leaflet/dist/leaflet.css';
-import { Machine } from '@/lib/types/machine';
+
 import { DayActivity } from '@/lib/types/activity';
+import { Machine } from '@/lib/types/machine';
 
 interface HeatMapCalendarProps {
   machines: Machine[];
@@ -64,9 +84,13 @@ const getMachineTypeIcon = (type: string, size: number = 16) => {
 
 // Create custom marker icon
 const createMachineIcon = (machine: Machine, isSelected: boolean = false) => {
-  const bgColor = isSelected ? 'bg-blue-500' : 
-    machine.data.status === 'offline' ? 'bg-gray-500' :
-    machine.data.status === 'maintenance' ? 'bg-yellow-500' : 'bg-green-500';
+  const bgColor = isSelected
+    ? 'bg-blue-500'
+    : machine.data.status === 'offline'
+      ? 'bg-gray-500'
+      : machine.data.status === 'maintenance'
+        ? 'bg-yellow-500'
+        : 'bg-green-500';
 
   const iconHtml = renderToString(
     <div className="relative">
@@ -78,7 +102,7 @@ const createMachineIcon = (machine: Machine, isSelected: boolean = false) => {
       <div className="absolute -top-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-blue-500">
         {getMachineTypeIcon(machine.type, 8)}
       </div>
-    </div>
+    </div>,
   );
 
   return L.divIcon({
@@ -90,20 +114,22 @@ const createMachineIcon = (machine: Machine, isSelected: boolean = false) => {
 };
 
 // Rectangle Drawing Component
-const RectangleDrawer = ({ 
+const RectangleDrawer = ({
   onBoundsSelected,
-  existingBounds 
-}: { 
-  onBoundsSelected: (bounds: MapBounds | null) => void,
-  existingBounds: MapBounds | null 
+  existingBounds,
+}: {
+  onBoundsSelected: (bounds: MapBounds | null) => void;
+  existingBounds: MapBounds | null;
 }) => {
   const [drawing, setDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<L.LatLng | null>(null);
   const [currentBounds, setCurrentBounds] = useState<L.LatLngBounds | null>(
-    existingBounds ? L.latLngBounds(
-      [existingBounds.south, existingBounds.west],
-      [existingBounds.north, existingBounds.east]
-    ) : null
+    existingBounds
+      ? L.latLngBounds(
+          [existingBounds.south, existingBounds.west],
+          [existingBounds.north, existingBounds.east],
+        )
+      : null,
   );
 
   const map = useMapEvents({
@@ -127,7 +153,7 @@ const RectangleDrawer = ({
         setCurrentBounds(bounds);
         setDrawing(false);
         map.dragging.enable();
-        
+
         // Convert to our bounds format
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
@@ -135,10 +161,10 @@ const RectangleDrawer = ({
           north: ne.lat,
           south: sw.lat,
           east: ne.lng,
-          west: sw.lng
+          west: sw.lng,
         });
       }
-    }
+    },
   });
 
   if (!currentBounds) return null;
@@ -151,25 +177,27 @@ const RectangleDrawer = ({
         weight: 2,
         opacity: 0.8,
         fillOpacity: 0.2,
-        fillColor: '#3b82f6'
+        fillColor: '#3b82f6',
       }}
     />
   );
 };
 
 // Map Filter Component
-const MapFilter = ({ 
-  machines, 
-  onAreaSelect, 
+const MapFilter = ({
+  machines,
+  onAreaSelect,
   onClose,
-  selectedBounds 
-}: { 
-  machines: Machine[], 
-  onAreaSelect: (bounds: MapBounds | null) => void,
-  onClose: () => void,
-  selectedBounds: MapBounds | null
+  selectedBounds,
+}: {
+  machines: Machine[];
+  onAreaSelect: (bounds: MapBounds | null) => void;
+  onClose: () => void;
+  selectedBounds: MapBounds | null;
 }) => {
-  const [tempBounds, setTempBounds] = useState<MapBounds | null>(selectedBounds);
+  const [tempBounds, setTempBounds] = useState<MapBounds | null>(
+    selectedBounds,
+  );
 
   // Calculate map center and zoom
   const getMapCenter = (): [number, number] => {
@@ -187,7 +215,7 @@ const MapFilter = ({
         maxLat: machines[0].location.lat,
         minLng: machines[0].location.lng,
         maxLng: machines[0].location.lng,
-      }
+      },
     );
 
     return [
@@ -211,7 +239,7 @@ const MapFilter = ({
         maxLat: machines[0].location.lat,
         minLng: machines[0].location.lng,
         maxLng: machines[0].location.lng,
-      }
+      },
     );
 
     const latDiff = bounds.maxLat - bounds.minLat;
@@ -236,18 +264,21 @@ const MapFilter = ({
 
   const isMachineInBounds = (machine: Machine) => {
     if (!tempBounds) return false;
-    return machine.location.lat >= tempBounds.south &&
-           machine.location.lat <= tempBounds.north &&
-           machine.location.lng >= tempBounds.west &&
-           machine.location.lng <= tempBounds.east;
+    return (
+      machine.location.lat >= tempBounds.south &&
+      machine.location.lat <= tempBounds.north &&
+      machine.location.lng >= tempBounds.west &&
+      machine.location.lng <= tempBounds.east
+    );
   };
 
-  const selectedMachinesCount = tempBounds ? 
-    machines.filter(m => isMachineInBounds(m)).length : 0;
+  const selectedMachinesCount = tempBounds
+    ? machines.filter((m) => isMachineInBounds(m)).length
+    : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <Card className="w-[900px] max-h-[90vh] overflow-hidden">
+      <Card className="max-h-[90vh] w-[900px] overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <MapIcon className="h-5 w-5" />
@@ -260,10 +291,11 @@ const MapFilter = ({
         <CardContent className="overflow-auto">
           <div className="space-y-4">
             <div className="text-sm text-gray-600">
-              Click and drag to select an area on the map. Only events from machines within the selected area will be shown.
+              Click and drag to select an area on the map. Only events from
+              machines within the selected area will be shown.
             </div>
-            
-            <div className="border rounded-lg bg-gray-50 h-[400px]">
+
+            <div className="h-[400px] rounded-lg border bg-gray-50">
               <MapContainer
                 center={getMapCenter()}
                 zoom={getOptimalZoom()}
@@ -274,8 +306,8 @@ const MapFilter = ({
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
-                
-                <RectangleDrawer 
+
+                <RectangleDrawer
                   onBoundsSelected={setTempBounds}
                   existingBounds={tempBounds}
                 />
@@ -285,17 +317,22 @@ const MapFilter = ({
                   <Marker
                     key={machine.id}
                     position={[machine.location.lat, machine.location.lng]}
-                    icon={createMachineIcon(machine, isMachineInBounds(machine))}
+                    icon={createMachineIcon(
+                      machine,
+                      isMachineInBounds(machine),
+                    )}
                   >
                     <Tooltip>
-                      <div className="text-xs text-center font-medium">{machine.name}</div>
+                      <div className="text-center text-xs font-medium">
+                        {machine.name}
+                      </div>
                     </Tooltip>
                   </Marker>
                 ))}
 
                 {/* Coverage circles for visualization */}
                 {machines
-                  .filter(m => isMachineInBounds(m))
+                  .filter((m) => isMachineInBounds(m))
                   .map((machine) => (
                     <Circle
                       key={`coverage-${machine.id}`}
@@ -306,26 +343,24 @@ const MapFilter = ({
                         weight: 1,
                         opacity: 0.3,
                         fillOpacity: 0.1,
-                        fillColor: '#3b82f6'
+                        fillColor: '#3b82f6',
                       }}
                     />
                   ))}
               </MapContainer>
             </div>
 
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                {tempBounds ? 
-                  `${selectedMachinesCount} machine${selectedMachinesCount !== 1 ? 's' : ''} selected` : 
-                  'No area selected'}
+                {tempBounds
+                  ? `${selectedMachinesCount} machine${selectedMachinesCount !== 1 ? 's' : ''} selected`
+                  : 'No area selected'}
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={handleClear}>
                   Clear Selection
                 </Button>
-                <Button onClick={handleApply}>
-                  Apply Filter
-                </Button>
+                <Button onClick={handleApply}>Apply Filter</Button>
               </div>
             </div>
           </div>
@@ -336,7 +371,9 @@ const MapFilter = ({
 };
 
 export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    new Date(),
+  );
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showMapFilter, setShowMapFilter] = useState(false);
   const [areaFilter, setAreaFilter] = useState<MapBounds | null>(null);
@@ -345,17 +382,18 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
   const filteredMachines = useMemo(() => {
     if (!areaFilter) return machines;
 
-    const filtered = machines.filter(machine => 
-      machine.location.lat >= areaFilter.south &&
-      machine.location.lat <= areaFilter.north &&
-      machine.location.lng >= areaFilter.west &&
-      machine.location.lng <= areaFilter.east
+    const filtered = machines.filter(
+      (machine) =>
+        machine.location.lat >= areaFilter.south &&
+        machine.location.lat <= areaFilter.north &&
+        machine.location.lng >= areaFilter.west &&
+        machine.location.lng <= areaFilter.east,
     );
 
     console.log('Area filter applied:', {
       totalMachines: machines.length,
       filteredMachines: filtered.length,
-      bounds: areaFilter
+      bounds: areaFilter,
     });
 
     return filtered;
@@ -506,16 +544,19 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <CardTitle className="text-2xl font-bold">
-                    {MONTHS[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                    {MONTHS[currentMonth.getMonth()]}{' '}
+                    {currentMonth.getFullYear()}
                   </CardTitle>
                   <Button
-                    variant={areaFilter ? "default" : "outline"}
+                    variant={areaFilter ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setShowMapFilter(true)}
                     className="flex items-center gap-2"
                   >
                     <Filter className="h-4 w-4" />
-                    {areaFilter ? `Filtered (${filteredMachines.length} machines)` : 'Map Filter'}
+                    {areaFilter
+                      ? `Filtered (${filteredMachines.length} machines)`
+                      : 'Map Filter'}
                   </Button>
                 </div>
                 <div className="flex gap-2">
@@ -539,11 +580,12 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
             <CardContent>
               {/* Filter Status Banner */}
               {areaFilter && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-3">
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-blue-600" />
                     <span className="text-sm text-blue-800">
-                      Showing events from {filteredMachines.length} of {machines.length} machines in selected area
+                      Showing events from {filteredMachines.length} of{' '}
+                      {machines.length} machines in selected area
                     </span>
                   </div>
                   <Button
@@ -580,7 +622,8 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                       onClick={() => setSelectedDate(date)}
                       className={cn(
                         'group text-primary relative flex h-24 w-full flex-col items-start justify-start rounded-lg border-2 border-gray-200 bg-white p-1 text-left transition-all duration-200 hover:bg-gray-50',
-                        isSelected(date) && 'ring-2 ring-blue-500 ring-offset-2',
+                        isSelected(date) &&
+                          'ring-2 ring-blue-500 ring-offset-2',
                         !isCurrentMonth(date) && 'opacity-40',
                         isToday(date) && 'ring-1 ring-blue-400',
                       )}
@@ -597,11 +640,11 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
 
                       {/* Activity Badges */}
                       {activity && (
-                        <div className="mt-1 flex flex-col items-start gap-1  w-full">
+                        <div className="mt-1 flex w-full flex-col items-start gap-1">
                           {activity.suspiciousCount > 0 && (
                             <Badge
                               variant="destructive"
-                              className="h-auto px-1 py-0.5 w-full text-[10px]"
+                              className="h-auto w-full px-1 py-0.5 text-[10px]"
                             >
                               Suspicious: {activity.suspiciousCount}
                             </Badge>
@@ -609,18 +652,21 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                           {activity.healthIssues > 0 && (
                             <Badge
                               variant="secondary"
-                              className="h-auto px-1 py-0.5 w-full text-[10px]"
+                              className="h-auto w-full px-1 py-0.5 text-[10px]"
                             >
                               Health: {activity.healthIssues}
                             </Badge>
                           )}
                         </div>
                       )}
-                      
+
                       {/* Filter indicator */}
                       {areaFilter && !activity && isCurrentMonth(date) && (
-                        <div className="absolute bottom-1 right-1">
-                          <div className="h-1.5 w-1.5 rounded-full bg-blue-400" title="Area filter active" />
+                        <div className="absolute right-1 bottom-1">
+                          <div
+                            className="h-1.5 w-1.5 rounded-full bg-blue-400"
+                            title="Area filter active"
+                          />
                         </div>
                       )}
                     </Button>
@@ -652,9 +698,11 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                 <div className="space-y-6">
                   {/* Filter Status in Details */}
                   {areaFilter && (
-                    <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800 flex items-center gap-1">
+                    <div className="flex items-center gap-1 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-800">
                       <Filter className="h-3 w-3" />
-                      <span>Filtered view - showing events from selected area only</span>
+                      <span>
+                        Filtered view - showing events from selected area only
+                      </span>
                     </div>
                   )}
 
@@ -785,8 +833,8 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
                   <Activity className="mx-auto mb-4 h-16 w-16 opacity-30" />
                   <p className="text-lg font-medium">No activity recorded</p>
                   <p className="text-sm">
-                    {areaFilter 
-                      ? 'No events found in the selected area for this date' 
+                    {areaFilter
+                      ? 'No events found in the selected area for this date'
                       : 'Select a date to view events'}
                   </p>
                   {areaFilter && machines.length > filteredMachines.length && (
@@ -808,7 +856,7 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
 
       {/* Map Filter Modal */}
       {showMapFilter && (
-        <MapFilter 
+        <MapFilter
           machines={machines}
           onAreaSelect={handleAreaSelect}
           onClose={() => setShowMapFilter(false)}

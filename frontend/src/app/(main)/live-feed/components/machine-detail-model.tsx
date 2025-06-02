@@ -3,6 +3,7 @@ import {
   Activity,
   AlertCircle,
   AlertTriangle,
+  Camera,
   CheckCircle,
   Clock,
   Eye,
@@ -14,6 +15,7 @@ import {
   Video,
   XCircle,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -249,20 +251,6 @@ export default function MachineDetailModal({
                       {selectedMachine.type.replace('_', ' ')}
                     </div>
                   </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">
-                      Coverage Radius:
-                    </span>
-                    <div className="text-sm">
-                      {selectedMachine.type === 'perimeter_guard'
-                        ? '500m'
-                        : selectedMachine.type === 'mobile_patrol'
-                          ? '2km'
-                          : selectedMachine.type === 'fixed_surveillance'
-                            ? '800m'
-                            : '1.2km'}
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
 
@@ -317,6 +305,36 @@ export default function MachineDetailModal({
                   </div>
                 </CardContent>
               </Card>
+
+              <Card className="col-span-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Camera className="h-5 w-5" />
+                    Images Captured
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {selectedMachine.data.images.map(
+                    (image: {
+                      id: number;
+                      url: string;
+                      timestamp: string;
+                      confidence: number;
+                      marked: string;
+                    }) => (
+                      <div key={image.id}>
+                        <Image
+                          src={image.url}
+                          alt={`Image captured at ${image.timestamp}`}
+                          width={100}
+                          height={100}
+                          className="h-full w-full"
+                        />
+                      </div>
+                    ),
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
@@ -342,8 +360,8 @@ export default function MachineDetailModal({
                             : 'border-l-red-500 bg-red-50/30',
                       )}
                     >
-                      <CardContent className="p-4">
-                        <div className="mb-3 flex items-start justify-between">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
                             <Badge
                               variant={
@@ -417,6 +435,15 @@ export default function MachineDetailModal({
                                   : 'Low'}
                           </div>
                         </div>
+                        {event.url && (
+                          <Image
+                            src={event.url}
+                            alt={`Image captured at ${event.timestamp}`}
+                            width={100}
+                            height={100}
+                            className="h-full w-full"
+                          />
+                        )}
                       </CardContent>
                     </Card>
                   ))}

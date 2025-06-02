@@ -19,8 +19,6 @@ import { Badge } from '@/components/ui/badge';
 
 import 'leaflet/dist/leaflet.css';
 
-import { Button } from '@/components/ui/button';
-
 import { MAPS_API_KEY } from '@/lib/constants';
 import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
@@ -315,12 +313,6 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
           </div>
         </div>
 
-        <Button
-          onClick={handleClick}
-          className="mt-2 w-full rounded bg-blue-500 text-xs text-white transition-colors hover:bg-blue-600"
-        >
-          View Details
-        </Button>
       </Popup>
     </Marker>
   );

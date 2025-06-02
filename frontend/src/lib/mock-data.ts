@@ -24,6 +24,7 @@ export const mockMachines: Machine[] = [
     data: {
       status: 'online',
       lastSeen: new Date().toISOString(),
+      images: [],
       suspiciousEvents: [
         {
           timestamp: randomDateWithinDays(3),
@@ -64,14 +65,32 @@ export const mockMachines: Machine[] = [
     data: {
       status: 'offline',
       lastSeen: randomDateWithinDays(1),
+      images: [
+        {
+          id: 1,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+        {
+          id: 2,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+      ],
       suspiciousEvents: [
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(1),
           confidence: 0.67,
           type: 'human_detection',
           marked: 'ignored',
         },
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(5),
           confidence: 0.82,
           type: 'unusual_activity',
@@ -101,16 +120,19 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.6699, 0.1),
     },
     data: {
+      images: [],
       status: 'online',
       lastSeen: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
       suspiciousEvents: [
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(2),
           confidence: 0.91,
           type: 'weapon_detection',
           marked: 'noted',
         },
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(4),
           confidence: 0.73,
           type: 'human_detection',
@@ -123,6 +145,7 @@ export const mockMachines: Machine[] = [
           marked: 'unreviewed',
         },
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(10),
           confidence: 0.95,
           type: 'weapon_detection',
@@ -141,6 +164,22 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.6245, 0.1),
     },
     data: {
+      images: [
+        {
+          id: 1,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+        {
+          id: 2,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+      ],
       status: 'maintenance',
       lastSeen: randomDateWithinDays(2),
       suspiciousEvents: [
@@ -174,6 +213,7 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.599, 0.1),
     },
     data: {
+      images: [],
       status: 'online',
       lastSeen: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 minutes ago
       suspiciousEvents: [
@@ -190,12 +230,14 @@ export const mockMachines: Machine[] = [
           marked: 'noted',
         },
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(5),
           confidence: 0.78,
           type: 'unusual_activity',
           marked: 'unreviewed',
         },
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(9),
           confidence: 0.96,
           type: 'weapon_detection',
@@ -226,16 +268,19 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.5391, 0.1),
     },
     data: {
+      images: [],
       status: 'offline',
       lastSeen: randomDateWithinDays(3),
       suspiciousEvents: [
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(4),
           confidence: 0.87,
           type: 'weapon_detection',
           marked: 'unreviewed',
         },
         {
+          url: 'https://picsum.photos/600/400',
           timestamp: randomDateWithinDays(11),
           confidence: 0.74,
           type: 'human_detection',
@@ -249,6 +294,7 @@ export const mockMachines: Machine[] = [
           severity: 'critical',
         },
         {
+          
           timestamp: randomDateWithinDays(5),
           type: 'hardware_failure',
           severity: 'high',
@@ -270,6 +316,22 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.5587, 0.1),
     },
     data: {
+      images: [
+        {
+          id: 1,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+        {
+          id: 2,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+      ],
       status: 'online',
       lastSeen: new Date(Date.now() - 2 * 60 * 1000).toISOString(), // 2 minutes ago
       suspiciousEvents: [
@@ -304,6 +366,7 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.6413, 0.1),
     },
     data: {
+      images: [],
       status: 'online',
       lastSeen: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
       suspiciousEvents: [
@@ -343,6 +406,7 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.6146, 0.1),
     },
     data: {
+      images: [],
       status: 'maintenance',
       lastSeen: randomDateWithinDays(1),
       suspiciousEvents: [
@@ -388,6 +452,22 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.5963, 0.1),
     },
     data: {
+      images: [
+        {
+          id: 1,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+        {
+          id: 2,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+      ],
       status: 'online',
       lastSeen: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 minutes ago
       suspiciousEvents: [
@@ -434,6 +514,7 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.6593, 0.1),
     },
     data: {
+      images: [],
       status: 'offline',
       lastSeen: randomDateWithinDays(5),
       suspiciousEvents: [
@@ -478,6 +559,36 @@ export const mockMachines: Machine[] = [
       lng: randomCoordinate(77.5737, 0.1),
     },
     data: {
+      images: [
+        {
+          id: 1,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+        {
+          id: 2,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+        {
+          id: 3,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+        {
+          id: 4,
+          url: 'https://picsum.photos/600/400',
+          timestamp: randomDateWithinDays(1),
+          confidence: 0.88,
+          marked: 'unreviewed',
+        },
+      ],
       status: 'online',
       lastSeen: new Date(Date.now() - 45 * 60 * 1000).toISOString(), // 45 minutes ago
       suspiciousEvents: [
