@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
 import {
@@ -27,7 +28,11 @@ export default function DeviceListing({ machines }: { machines: Machine[] }) {
       <TableBody>
         {machines.map((machine) => (
           <TableRow key={machine.id}>
-            <TableCell className="font-medium">{machine.name}</TableCell>
+            <TableCell className="font-medium">
+              <Link href={`/dashboard/${machine.id}`} key={machine.id}>
+                {machine.name}
+              </Link>
+            </TableCell>
             <TableCell>{machine.type.replace(/_/g, ' ')}</TableCell>
             <TableCell>
               <Badge

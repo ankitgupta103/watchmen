@@ -258,7 +258,6 @@ export const mockMachines: Machine[] = [
           severity: 'critical',
         },
         {
-          
           timestamp: randomDateWithinDays(5),
           type: 'hardware_failure',
           severity: 'high',

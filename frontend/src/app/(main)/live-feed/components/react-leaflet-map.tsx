@@ -312,7 +312,6 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
             {new Date(machine.data.lastSeen).toLocaleString()}
           </div>
         </div>
-
       </Popup>
     </Marker>
   );
