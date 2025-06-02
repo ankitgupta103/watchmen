@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, ChevronLeft, ChevronRight, MapPin, Map as MapIcon, X, Filter, Shield, Eye, AlertTriangle } from 'lucide-react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Rectangle, useMapEvents, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Rectangle, useMapEvents, Circle, Tooltip } from 'react-leaflet';
 import { renderToString } from 'react-dom/server';
 
 import { Badge } from '@/components/ui/badge';
@@ -263,7 +263,7 @@ const MapFilter = ({
               Click and drag to select an area on the map. Only events from machines within the selected area will be shown.
             </div>
             
-            <div className="border rounded-lg bg-gray-50" style={{ height: '600px' }}>
+            <div className="border rounded-lg bg-gray-50 h-[400px]">
               <MapContainer
                 center={getMapCenter()}
                 zoom={getOptimalZoom()}
@@ -287,24 +287,10 @@ const MapFilter = ({
                     position={[machine.location.lat, machine.location.lng]}
                     icon={createMachineIcon(machine, isMachineInBounds(machine))}
                   >
+                    <Tooltip>
+                      <div className="text-xs text-center font-medium">{machine.name}</div>
+                    </Tooltip>
                   </Marker>
-                ))}
-
-                {/* Machine labels */}
-                {machines.map((machine) => (
-                  <Marker
-                    key={`label-${machine.id}`}
-                    position={[machine.location.lat, machine.location.lng]}
-                    icon={L.divIcon({
-                      className: 'machine-label',
-                      html: `<div class="text-xs font-medium ${
-                        isMachineInBounds(machine) ? 'text-blue-600' : 'text-gray-600'
-                      } bg-white px-1 rounded shadow-sm" style="white-space: nowrap; transform: translateY(-50px) translateX(-50%);">
-                        ${machine.name}
-                      </div>`,
-                      iconSize: [0, 0],
-                    })}
-                  />
                 ))}
 
                 {/* Coverage circles for visualization */}
