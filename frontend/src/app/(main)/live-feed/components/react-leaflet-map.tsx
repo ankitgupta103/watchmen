@@ -325,23 +325,6 @@ export default function EnhancedReactLeafletMap({
   const center = getMapCenter(machines);
   const zoom = getOptimalZoom(machines);
 
-  // Create activity heat zones for high-activity areas
-  const getActivityHeatZones = () => {
-    const highActivityMachines = machines.filter((m) => {
-      const level = getMachineActivityLevel(m);
-      return level === 'critical' || level === 'high';
-    });
-
-    return highActivityMachines.map((machine) => ({
-      center: [machine.location.lat, machine.location.lng] as [number, number],
-      radius: getMachineActivityLevel(machine) === 'critical' ? 1000 : 500,
-      color:
-        getMachineActivityLevel(machine) === 'critical' ? '#ef4444' : '#f97316',
-    }));
-  };
-
-  const heatZones = getActivityHeatZones();
-
   return (
     <MapContainer
       style={{ height: '100%', width: '100%' }}
@@ -370,26 +353,6 @@ export default function EnhancedReactLeafletMap({
         <LayersControl.BaseLayer name="Google Maps (Terrain)">
           <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'terrain'} />
         </LayersControl.BaseLayer>
-
-        {/* Activity Heat Zones Overlay */}
-        <LayersControl.Overlay name="Activity Heat Zones">
-          <>
-            {heatZones.map((zone, index) => (
-              <Circle
-                key={index}
-                center={zone.center}
-                radius={zone.radius}
-                pathOptions={{
-                  fillColor: zone.color,
-                  fillOpacity: 0.1,
-                  color: zone.color,
-                  weight: 2,
-                  opacity: 0.4,
-                }}
-              />
-            ))}
-          </>
-        </LayersControl.Overlay>
       </LayersControl>
 
       {/* Enhanced Machine Markers with hover popups */}
