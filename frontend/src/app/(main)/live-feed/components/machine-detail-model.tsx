@@ -315,9 +315,11 @@ export default function MachineDetailModal({
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {(() => {
-                    const images = (selectedMachine.data.suspiciousEvents || []).filter(e => !!e.url);
+                    const images = (
+                      selectedMachine.data.suspiciousEvents || []
+                    ).filter((e) => !!e.url);
                     if (images.length > 0) {
-                      return images.map(event => (
+                      return images.map((event) => (
                         <div key={event.timestamp}>
                           <Image
                             src={event.url!}
@@ -363,7 +365,7 @@ export default function MachineDetailModal({
                             : 'border-l-red-500 bg-red-50/30',
                       )}
                     >
-                      <CardContent className="p-4 space-y-3">
+                      <CardContent className="space-y-3 p-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
                             <Badge
