@@ -271,6 +271,7 @@ export default function CriticalAlertSystem({
         clearInterval(mockIntervalRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mockAlerts]);
 
   // Flash effect for critical alerts

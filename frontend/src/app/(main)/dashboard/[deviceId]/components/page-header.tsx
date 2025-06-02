@@ -8,7 +8,6 @@ import {
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export default function PageHeader({ deviceId }: { deviceId: string }) {
-
   return (
     <div className="flex items-center justify-between">
       <div>
@@ -24,9 +23,11 @@ export default function PageHeader({ deviceId }: { deviceId: string }) {
               <BreadcrumbItem>
                 <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
               </BreadcrumbItem>
-                <BreadcrumbSeparator />
+              <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink href={`/dashboard/${deviceId}`}>Device Details</BreadcrumbLink>
+                <BreadcrumbLink href={`/dashboard/${deviceId}`}>
+                  Device Details
+                </BreadcrumbLink>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
