@@ -20,10 +20,19 @@ export interface HealthEvent {
   severity: HealthEventSeverity;
 }
 export interface SuspiciousEvent {
+  url?: string;
   timestamp: string;
   confidence: number;
   type: SuspiciousEventType;
   marked?: SuspiciousEventMarked;
+}
+
+export interface Image {
+  id: number;
+  url: string;
+  timestamp: string;
+  confidence: number;
+  marked: string;
 }
 
 export interface Machine {
@@ -34,6 +43,7 @@ export interface Machine {
   data: {
     status: string;
     lastSeen: string;
+    images: Array<Image>;
     suspiciousEvents?: Array<SuspiciousEvent>;
     healthEvents?: Array<HealthEvent>;
   };
