@@ -17,7 +17,7 @@ spi = spidev.SpiDev()
 # spidev will automatically control this pin for transactions.
 try:
     spi.open(0, 0) # Note the '0' here for CE0
-    spi.max_speed_hz = 5000000
+    spi.max_speed_hz = 1000000
 except FileNotFoundError:
     print("Error: SPI device not found. Ensure SPI is enabled in raspi-config.")
     sys.exit(1)
@@ -134,6 +134,22 @@ try:
     write_register(0x1D, 0x72)  # RegModemConfig1: BW=125kHz, CR=4/5, Implicit Header OFF
     write_register(0x1E, 0x74)  # RegModemConfig2: SF=7, RxPayloadCrcOn (0x04)
     write_register(0x40, 0x00)  # DIO Mapping 1 (DIO0=TxDone)
+
+
+    print("\n--- LoRa Register Readback (Transmitter) ---")
+    print(f"REG_OP_MODE (0x01): {hex(read_register(0x01))}")
+    print(f"REG_FRF_MSB (0x06): {hex(read_register(0x06))}")
+    print(f"REG_FRF_MID (0x07): {hex(read_register(0x07))}")
+    print(f"REG_FRF_LSB (0x08): {hex(read_register(0x08))}")
+    print(f"REG_PA_CONFIG (0x09): {hex(read_register(0x09))}")
+    print(f"REG_OCP (0x0B): {hex(read_register(0x0B))}")
+    print(f"REG_MODEM_CONFIG1 (0x1D): {hex(read_register(0x1D))}")
+    print(f"REG_MODEM_CONFIG2 (0x1E): {hex(read_register(0x1E))}")
+    print(f"REG_DIO_MAPPING1 (0x40): {hex(read_register(0x40))}")
+    print("---------------------------------------------")
+    time.sleep(1) # Give it a moment
+
+    print(f"REG_VERSION (0x42): {hex(read_register(0x42))}")
 
     print("LoRa transmitter configured. Starting message loop...")
 
