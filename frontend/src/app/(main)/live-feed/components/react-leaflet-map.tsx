@@ -59,22 +59,6 @@ const getUnreviewedCount = (machine: Machine) => {
   );
 };
 
-// Get machine type icon
-// const getMachineTypeIcon = (type: string, size: number = 8) => {
-//   switch (type) {
-//     case 'perimeter_guard':
-//       return <Shield size={size} className="text-white" />;
-//     case 'mobile_patrol':
-//       return <Activity size={size} className="text-white" />;
-//     case 'fixed_surveillance':
-//       return <Eye size={size} className="text-white" />;
-//     case 'roving_sensor':
-//       return <AlertTriangle size={size} className="text-white" />;
-//     default:
-//       return <MapPin size={size} className="text-white" />;
-//   }
-// };
-
 // Create enhanced custom icon with activity indicators
 const createEnhancedIcon = (machine: Machine) => {
   const activityLevel = getMachineActivityLevel(machine);
@@ -84,25 +68,31 @@ const createEnhancedIcon = (machine: Machine) => {
 
   // Determine colors based on status and activity
   let bgColor = 'bg-green-500';
+  // let textColor = 'text-white';
   let pulseClass = '';
 
   if (isOffline) {
     bgColor = 'bg-gray-500';
+    // textColor = 'text-gray-500';
   } else if (isMaintenance) {
     bgColor = 'bg-yellow-500';
+    // textColor = 'text-yellow-500';
   } else if (activityLevel === 'critical') {
     bgColor = 'bg-red-500';
+    // textColor = 'text-red-500';
     pulseClass = 'animate-pulse';
   } else if (activityLevel === 'high') {
     bgColor = 'bg-orange-500';
+    // textColor = 'text-orange-500';
   } else if (activityLevel === 'medium') {
     bgColor = 'bg-yellow-500';
+    // textColor = 'text-yellow-500';
   }
 
   const iconHtml = renderToString(
     <div className="relative">
       {/* Pulse animation for critical/active machines */}
-      {machine.data.status === 'online' && activityLevel !== 'low' && (
+      {machine.data.status !== 'offline' && activityLevel !== 'low' && (
         <div
           className={`absolute inset-0 rounded-full ${bgColor} animate-ping opacity-90`}
         ></div>
@@ -111,39 +101,23 @@ const createEnhancedIcon = (machine: Machine) => {
       {/* Main marker */}
       <div
         className={cn(
-          `relative flex h-4 w-4 items-center justify-center rounded-full border-white bg-yellow-500 text-white shadow-lg`,
+          `relative flex h-5 w-5 items-center justify-center rounded-full border-white bg-yellow-500 text-white shadow-lg font-extrabold`,
           {
             'bg-green-500': machine.data.status === 'online',
             'bg-gray-500': machine.data.status === 'offline',
           },
           pulseClass,
+          // textColor,
         )}
       >
         {unreviewed > 9 ? '9+' : unreviewed}
       </div>
-
-      {/* Activity indicator badge */}
-      {/* {unreviewed > 0 && (
-        <div className={cn("absolute -top-2 -right-3 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-red-500 text-xs font-bold text-white",
-          bgColor
-        )}>
-          {unreviewed > 9 ? '9+' : unreviewed}
-        </div>
-      )} */}
-
-      {/* Type indicator */}
-      {/* <div className={cn("absolute -top-2 -left-3 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500",
-          bgColor
-        )}
-      >
-        {getMachineTypeIcon(machine.type, 8)}
-      </div> */}
     </div>,
   );
 
   return L.divIcon({
     html: iconHtml,
-    iconSize: [15, 15],
+    iconSize: [20, 20],
     popupAnchor: [0, -10],
     className: 'custom-enhanced-marker',
   });
