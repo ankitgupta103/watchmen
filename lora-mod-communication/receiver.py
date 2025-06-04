@@ -2,7 +2,7 @@ import spidev
 import RPi.GPIO as GPIO
 import time
 
-NSS = 8
+NSS = 24
 RESET = 22
 DIO0 = 25
 
