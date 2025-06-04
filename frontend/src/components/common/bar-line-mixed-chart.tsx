@@ -61,10 +61,10 @@ export default function MixedChart({
     const option: EChartsOption = {
       toolbox: {
         show: true,
-        name: `VyomOS Fleet Manager - ${data_x.name} vs ${data_y.name}`,
+        name: `VyomOS Netrajaal - ${data_x.name} vs ${data_y.name}`,
         feature: {
           saveAsImage: {
-            name: `VyomOS Fleet Manager - ${data_x.name} vs ${data_y.name}`,
+            name: `VyomOS Netrajaal - ${data_x.name} vs ${data_y.name}`,
           },
         },
       },

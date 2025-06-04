@@ -170,16 +170,16 @@ const MapFilter = ({
 
     const bounds = machines.reduce(
       (acc, m) => ({
-        minLat: Math.min(acc.minLat, m.location.lat),
-        maxLat: Math.max(acc.maxLat, m.location.lat),
-        minLng: Math.min(acc.minLng, m.location.lng),
-        maxLng: Math.max(acc.maxLng, m.location.lng),
+        minLat: Math.min(acc.minLat, m.last_location.lat),
+        maxLat: Math.max(acc.maxLat, m.last_location.lat),
+        minLng: Math.min(acc.minLng, m.last_location.lng),
+        maxLng: Math.max(acc.maxLng, m.last_location.lng),
       }),
       {
-        minLat: machines[0].location.lat,
-        maxLat: machines[0].location.lat,
-        minLng: machines[0].location.lng,
-        maxLng: machines[0].location.lng,
+        minLat: machines[0].last_location.lat,
+        maxLat: machines[0].last_location.lat,
+        minLng: machines[0].last_location.lng,
+        maxLng: machines[0].last_location.lng,
       },
     );
 
@@ -194,16 +194,16 @@ const MapFilter = ({
 
     const bounds = machines.reduce(
       (acc, m) => ({
-        minLat: Math.min(acc.minLat, m.location.lat),
-        maxLat: Math.max(acc.maxLat, m.location.lat),
-        minLng: Math.min(acc.minLng, m.location.lng),
-        maxLng: Math.max(acc.maxLng, m.location.lng),
+        minLat: Math.min(acc.minLat, m.last_location.lat),
+        maxLat: Math.max(acc.maxLat, m.last_location.lat),
+        minLng: Math.min(acc.minLng, m.last_location.lng),
+        maxLng: Math.max(acc.maxLng, m.last_location.lng),
       }),
       {
-        minLat: machines[0].location.lat,
-        maxLat: machines[0].location.lat,
-        minLng: machines[0].location.lng,
-        maxLng: machines[0].location.lng,
+        minLat: machines[0].last_location.lat,
+        maxLat: machines[0].last_location.lat,
+        minLng: machines[0].last_location.lng,
+        maxLng: machines[0].last_location.lng,
       },
     );
 
@@ -230,10 +230,10 @@ const MapFilter = ({
   const isMachineInBounds = (machine: Machine) => {
     if (!tempBounds) return false;
     return (
-      machine.location.lat >= tempBounds.south &&
-      machine.location.lat <= tempBounds.north &&
-      machine.location.lng >= tempBounds.west &&
-      machine.location.lng <= tempBounds.east
+      machine.last_location.lat >= tempBounds.south &&
+      machine.last_location.lat <= tempBounds.north &&
+      machine.last_location.lng >= tempBounds.west &&
+      machine.last_location.lng <= tempBounds.east
     );
   };
 
@@ -281,7 +281,7 @@ const MapFilter = ({
                 {machines.map((machine) => (
                   <Marker
                     key={machine.id}
-                    position={[machine.location.lat, machine.location.lng]}
+                    position={[machine.last_location.lat, machine.last_location.lng]}
                     icon={createMachineIcon(
                       machine,
                       isMachineInBounds(machine),
@@ -301,7 +301,7 @@ const MapFilter = ({
                   .map((machine) => (
                     <Circle
                       key={`coverage-${machine.id}`}
-                      center={[machine.location.lat, machine.location.lng]}
+                      center={[machine.last_location.lat, machine.last_location.lng]}
                       radius={300}
                       pathOptions={{
                         color: '#3b82f6',

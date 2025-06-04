@@ -19,7 +19,7 @@ export function Logo({ className, showText = true }: LogoProps) {
       {showText && (
         <div className="flex flex-col">
           <span className={'text-xl font-bold'}>Vyom OS</span>
-          <span className="text-muted-foreground text-xs">Fleet Manager</span>
+          <span className="text-muted-foreground text-xs">Netrajaal</span>
         </div>
       )}
     </div>

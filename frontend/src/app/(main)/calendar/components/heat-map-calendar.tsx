@@ -67,10 +67,10 @@ export default function HeatMapCalendar({ machines }: HeatMapCalendarProps) {
 
     const filtered = machines.filter(
       (machine) =>
-        machine.location.lat >= areaFilter.south &&
-        machine.location.lat <= areaFilter.north &&
-        machine.location.lng >= areaFilter.west &&
-        machine.location.lng <= areaFilter.east,
+        machine.last_location.lat >= areaFilter.south &&
+        machine.last_location.lat <= areaFilter.north &&
+        machine.last_location.lng >= areaFilter.west &&
+        machine.last_location.lng <= areaFilter.east,
     );
 
     console.log('Area filter applied:', {

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'VyomOS Fleet Manager',
+  title: 'VyomOS Netrajaal',
   icons: {
     icon: '/assets/png/vyomos-logo-filled.png',
   },

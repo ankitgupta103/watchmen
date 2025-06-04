@@ -67,8 +67,8 @@ export default function DeviceDetailsClient({ device }: { device: Machine }) {
               })}
             </div>
             <div className="text-muted-foreground text-sm">
-              Location: {device.location.lat.toFixed(4)},{' '}
-              {device.location.lng.toFixed(4)}
+              Location: {device.last_location.lat.toFixed(4)},{' '}
+              {device.last_location.lng.toFixed(4)}
             </div>
           </div>
         </div>

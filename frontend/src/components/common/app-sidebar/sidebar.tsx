@@ -71,7 +71,7 @@ export default function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              tooltip="Vyom OS Fleet Manager"
+              tooltip="Vyom OS Netrajaal"
               className="h-12"
             >
               <Logo showText={open} />

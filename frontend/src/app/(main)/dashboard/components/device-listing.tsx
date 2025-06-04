@@ -58,8 +58,8 @@ export default function DeviceListing({ machines }: { machines: Machine[] }) {
               })}
             </TableCell>
             <TableCell>
-              {machine.location.lat.toFixed(4)},{' '}
-              {machine.location.lng.toFixed(4)}
+              {machine.last_location.lat.toFixed(4)},{' '}
+              {machine.last_location.lng.toFixed(4)}
             </TableCell>
           </TableRow>
         ))}
