@@ -2,23 +2,6 @@
 
 A systemd service for automated USB power cycling and image transfer operations on Raspberry Pi systems.
 
-## Table of Contents
-
-- [USB Power Cycle and Image Transfer Service](#usb-power-cycle-and-image-transfer-service)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-    - [1. Create the Service File](#1-create-the-service-file)
-    - [2. Service Configuration](#2-service-configuration)
-    - [3. Enable and Start the Service](#3-enable-and-start-the-service)
-  - [Service Management](#service-management)
-    - [Basic Commands](#basic-commands)
-    - [Check Service Status](#check-service-status)
-  - [Monitoring and Logs](#monitoring-and-logs)
-    - [View Live Logs](#view-live-logs)
-    - [Historical Logs](#historical-logs)
-
 ## Overview
 
 This service automatically manages USB power cycling and image transfer operations. It runs as a systemd service with automatic restart capabilities and comprehensive logging.
