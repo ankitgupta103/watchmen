@@ -239,8 +239,8 @@ export default function MachineDetailModal({
                       Coordinates:
                     </span>
                     <div className="text-sm">
-                      {selectedMachine.location.lat.toFixed(6)},{' '}
-                      {selectedMachine.location.lng.toFixed(6)}
+                      {selectedMachine.last_location.lat.toFixed(6)},{' '}
+                      {selectedMachine.last_location.lng.toFixed(6)}
                     </div>
                   </div>
                   <div>

@@ -17,7 +17,7 @@ export const mockMachines: Machine[] = [
     id: 1,
     name: 'sentinel-alpha-01',
     type: 'perimeter_guard',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.9716, 0.1),
       lng: randomCoordinate(77.5946, 0.1),
     },
@@ -52,12 +52,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 2,
     name: 'watchman-beta-02',
     type: 'mobile_patrol',
-    location: {
+    last_location: {
       lat: randomCoordinate(13.0827, 0.1), // North Bangalore
       lng: randomCoordinate(77.5946, 0.1),
     },
@@ -93,12 +108,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 3,
     name: 'guardian-gamma-03',
     type: 'fixed_surveillance',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.8698, 0.1), // South Bangalore
       lng: randomCoordinate(77.6699, 0.1),
     },
@@ -136,12 +166,27 @@ export const mockMachines: Machine[] = [
       ],
       healthEvents: [],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 4,
     name: 'scout-delta-04',
     type: 'roving_sensor',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.9352, 0.1), // Central Bangalore
       lng: randomCoordinate(77.6245, 0.1),
     },
@@ -169,12 +214,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 5,
     name: 'watcher-epsilon-05',
     type: 'perimeter_guard',
-    location: {
+    last_location: {
       lat: randomCoordinate(13.0358, 0.1), // Yelahanka area
       lng: randomCoordinate(77.599, 0.1),
     },
@@ -223,12 +283,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 6,
     name: 'sentinel-zeta-06',
     type: 'mobile_patrol',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.8456, 0.1), // Banashankari area
       lng: randomCoordinate(77.5391, 0.1),
     },
@@ -269,12 +344,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 7,
     name: 'guardian-eta-07',
     type: 'fixed_surveillance',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.9698, 0.1), // Rajajinagar area
       lng: randomCoordinate(77.5587, 0.1),
     },
@@ -303,12 +393,27 @@ export const mockMachines: Machine[] = [
       ],
       healthEvents: [],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 8,
     name: 'patrol-theta-08',
     type: 'roving_sensor',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.9279, 0.1), // Indiranagar area
       lng: randomCoordinate(77.6413, 0.1),
     },
@@ -343,12 +448,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 9,
     name: 'lookout-iota-09',
     type: 'perimeter_guard',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.9034, 0.1), // Koramangala area
       lng: randomCoordinate(77.6146, 0.1),
     },
@@ -391,12 +511,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 10,
     name: 'sentry-kappa-10',
     type: 'mobile_patrol',
-    location: {
+    last_location: {
       lat: randomCoordinate(13.0097, 0.1), // Hebbal area
       lng: randomCoordinate(77.5963, 0.1),
     },
@@ -438,12 +573,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 11,
     name: 'observer-lambda-11',
     type: 'fixed_surveillance',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.8031, 0.1), // Electronic City area
       lng: randomCoordinate(77.6593, 0.1),
     },
@@ -483,12 +633,27 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
   {
     id: 12,
     name: 'vigilant-mu-12',
     type: 'roving_sensor',
-    location: {
+    last_location: {
       lat: randomCoordinate(12.9719, 0.1), // Malleshwaram area
       lng: randomCoordinate(77.5737, 0.1),
     },
@@ -542,6 +707,21 @@ export const mockMachines: Machine[] = [
         },
       ],
     },
+    machine_uid: '',
+    specifications: {},
+    mfg_date: '',
+    activation_date: '',
+    end_of_service_date: null,
+    current_owner: 0,
+    current_owner_name: '',
+    machine_status: '',
+    connection_status: '',
+    created_at: '',
+    updated_at: '',
+    model_id: 0,
+    model_uid: '',
+    manufacturer_id: 0,
+    model_specifications: {}
   },
 ];
 

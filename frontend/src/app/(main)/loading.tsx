@@ -14,7 +14,7 @@ export default function Loading() {
             width={240}
             height={240}
           />
-          <span className="text-muted-foreground text-4xl">Fleet Manager</span>
+          <span className="text-muted-foreground text-4xl">Netrajaal</span>
         </div>
         <Spinner size="lg" />
         <p className="text-lg font-medium text-gray-700">Loading...</p>

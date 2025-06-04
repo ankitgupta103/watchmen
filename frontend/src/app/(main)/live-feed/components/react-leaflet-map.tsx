@@ -101,7 +101,7 @@ const createEnhancedIcon = (machine: Machine) => {
       {/* Main marker */}
       <div
         className={cn(
-          `relative flex h-5 w-5 items-center justify-center rounded-full border-white bg-yellow-500 text-white shadow-lg font-extrabold`,
+          `relative flex h-5 w-5 items-center justify-center rounded-full border-white bg-yellow-500 font-extrabold text-white shadow-lg`,
           {
             'bg-green-500': machine.data.status === 'online',
             'bg-gray-500': machine.data.status === 'offline',
@@ -129,16 +129,16 @@ function getMapCenter(machines: Machine[]): [number, number] {
 
   const bounds = machines.reduce(
     (acc, m) => ({
-      minLat: Math.min(acc.minLat, m.location.lat),
-      maxLat: Math.max(acc.maxLat, m.location.lat),
-      minLng: Math.min(acc.minLng, m.location.lng),
-      maxLng: Math.max(acc.maxLng, m.location.lng),
+      minLat: Math.min(acc.minLat, m.last_location.lat),
+      maxLat: Math.max(acc.maxLat, m.last_location.lat),
+      minLng: Math.min(acc.minLng, m.last_location.lng),
+      maxLng: Math.max(acc.maxLng, m.last_location.lng),
     }),
     {
-      minLat: machines[0].location.lat,
-      maxLat: machines[0].location.lat,
-      minLng: machines[0].location.lng,
-      maxLng: machines[0].location.lng,
+      minLat: machines[0].last_location.lat,
+      maxLat: machines[0].last_location.lat,
+      minLng: machines[0].last_location.lng,
+      maxLng: machines[0].last_location.lng,
     },
   );
 
@@ -154,16 +154,16 @@ function getOptimalZoom(machines: Machine[]): number {
 
   const bounds = machines.reduce(
     (acc, m) => ({
-      minLat: Math.min(acc.minLat, m.location.lat),
-      maxLat: Math.max(acc.maxLat, m.location.lat),
-      minLng: Math.min(acc.minLng, m.location.lng),
-      maxLng: Math.max(acc.maxLng, m.location.lng),
+      minLat: Math.min(acc.minLat, m.last_location.lat),
+      maxLat: Math.max(acc.maxLat, m.last_location.lat),
+      minLng: Math.min(acc.minLng, m.last_location.lng),
+      maxLng: Math.max(acc.maxLng, m.last_location.lng),
     }),
     {
-      minLat: machines[0].location.lat,
-      maxLat: machines[0].location.lat,
-      minLng: machines[0].location.lng,
-      maxLng: machines[0].location.lng,
+      minLat: machines[0].last_location.lat,
+      maxLat: machines[0].last_location.lat,
+      minLng: machines[0].last_location.lng,
+      maxLng: machines[0].last_location.lng,
     },
   );
 
@@ -220,7 +220,7 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
     <Marker
       ref={markerRef}
       icon={createEnhancedIcon(machine)}
-      position={[machine.location.lat, machine.location.lng]}
+      position={[machine.last_location.lat, machine.last_location.lng]}
       eventHandlers={{
         click: handleClick,
         mouseover: handleMouseOver,
@@ -343,7 +343,7 @@ export default function EnhancedReactLeafletMap({
         .map((machine) => (
           <Circle
             key={`dark-${machine.id}`}
-            center={[machine.location.lat, machine.location.lng]}
+            center={[machine.last_location.lat, machine.last_location.lng]}
             radius={800}
             pathOptions={{
               fillColor: '#1f2937',
