@@ -1,5 +1,6 @@
 import socket
 import sys
+import threading
 import time
 
 from pyrf24 import RF24, RF24_PA_LOW, RF24_1MBPS
@@ -25,15 +26,22 @@ def setup():
     radio.payloadSize = MAX_CHUNK_SIZE
     radio.setAutoAck(True)
 
-def keep_receiving():
+def keep_receiving_bg():
+    num_messages = 0
     print("Starting to receive")
     while True:
         has_payload, pipe = radio.available_pipe()
         if has_payload:
             data = radio.read(MAX_CHUNK_SIZE)
             datastr = data.decode()
-            print(f"Received data : {datastr}")
-            send_message(f"Ack for msg:{datastr}")
+            print(f"{num_messages} Received data : {datastr}")
+            send_message(f"Ack:{datastr}")
+            num_messages += 1
+
+def keep_reading():
+    reader_thread = threading.Thread(target=keep_receiving_bg, daemon=True)
+    # TODO fix and make it a clean exit on self deletion
+    reader_thread.start()
 
 def send_message(msg):
     data_bytes = msg.encode('utf-8')
@@ -54,13 +62,15 @@ def send_messages():
     num_successfully_sent = 0
     for i in range(num_to_send):
         succ = send_message(f"Message#{i}")
-        num_successfully_sent += 1
+        if succ:
+            num_successfully_sent += 1
     print(f"Num messages sent = {num_to_send}, success = {num_successfully_sent}")
 
 def main():
     setup()
+    keep_reading()
     if sys.argv[1] == "r":
-        keep_receiving()
+        time.sleep(1000)
     elif sys.argv[1] == "s":
         radio.stopListening(b"test")
         send_messages()
