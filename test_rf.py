@@ -29,7 +29,7 @@ def setup():
     radio.stop_listening(myname)
     radio.open_rx_pipe(1, othername)
     radio.payloadSize = MAX_CHUNK_SIZE
-    radio.setAutoAck(True)
+    #radio.setAutoAck(True)
     radio.set_retries(10, 5)
 
 def keep_receiving_bg():
