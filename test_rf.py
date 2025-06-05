@@ -15,7 +15,7 @@ othername = b""
 if hname == "central":
     myname = b"n1"
     othername = b"n2"
-if hname == "rp2":
+if hname == "rpi2":
     myname = b"n2"
     othername = b"n1"
 print(f"{myname} : {othername}")
