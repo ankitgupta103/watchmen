@@ -10,7 +10,6 @@ tx_address = b"1Node"
 rx_address = b"2Node"
 MAX_CHUNK_SIZE = 32
 END_FLAG = b"<END>"
-count = 0
 
 def setup():
     if not radio.begin():
@@ -44,11 +43,7 @@ def transmit_loop():
         "using the nRF24L01+ module with PA and LNA enabled for long-range communication."
     )
     
-    while True:
-        send_large_message(long_text)
-        count +=1
-        if count == 6400:   # For 1 mb
-        break
+    send_large_message(long_text)
 
 if __name__ == "__main__":
     setup()
