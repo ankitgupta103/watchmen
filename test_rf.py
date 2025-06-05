@@ -33,6 +33,7 @@ def keep_receiving():
             data = radio.read(MAX_CHUNK_SIZE)
             datastr = data.decode()
             print(f"Received data : {datastr}")
+            send_message(f"Ack for msg:{datastr}")
 
 def send_message(msg):
     data_bytes = msg.encode('utf-8')
@@ -40,7 +41,9 @@ def send_message(msg):
     buffer = data_bytes.ljust(MAX_CHUNK_SIZE, b'\x00')
     print(f"Sending {total_len} bytes...{msg}")
     t1 = time.time()
+    radio.listen = False
     succ = radio.write(buffer)
+    radio.listen = True
     t2 = time.time()
     print(f"Sending {succ} in time {(t2-t1)*1000} msec")
     time.sleep(0.01)  # slight delay
@@ -60,7 +63,6 @@ def main():
         keep_receiving()
     elif sys.argv[1] == "s":
         radio.stopListening(b"test")
-        radio.listen = False
         send_messages()
     else:
         print("argv1 needs to be r OR s")
