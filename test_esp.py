@@ -31,5 +31,3 @@ except KeyboardInterrupt:
     print("\nExiting...")
     ser.close()
 
-
-

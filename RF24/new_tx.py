@@ -23,25 +23,6 @@ def setup():
     radio.setAddressWidth(5)
     radio.enableDynamicPayloads()
 
-# def send_integer(value: float):
-#     buffer = struct.pack("<f", value)
-#     radio.flush_tx()
-#     success = radio.write(buffer)
-#     if success:
-#         print(f"[TX] Sent float: {value}")
-#     else:
-#         print("[TX] Float transmission failed")
-
-# def send_string(message: str):
-#     truncated = message[:31]  # Ensure string fits within 32 bytes
-#     buffer = struct.pack("32s", truncated.encode('utf-8'))
-#     radio.flush_tx()
-#     success = radio.write(buffer)
-#     if success:
-#         print(f"[TX] Sent string: {truncated}")
-#     else:
-#         print("[TX] String transmission failed")
-
 def send_integer(value: float):
     header = struct.pack("B", 1)         # 1 = float
     buffer = struct.pack("<f", value)
