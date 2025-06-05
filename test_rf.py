@@ -7,12 +7,17 @@ from pyrf24 import RF24, RF24_PA_LOW, RF24_1MBPS
 
 radio = RF24(22, 0)
 
-tx_address = b"1Node"
-rx_address = b"2Node"
 MAX_CHUNK_SIZE = 32
 
-def get_hostname():
-    return socket.gethostname()
+hname = socket.gethostname()
+myname = b""
+othername = b""
+if hname == "central":
+    myname = b"central"
+    othername = b"rp1"
+if hname == "rp1":
+    myname = b"rp1"
+    othername = b"central"
 
 def setup():
     if not radio.begin():
@@ -20,8 +25,8 @@ def setup():
     radio.setPALevel(RF24_PA_LOW)
     radio.setDataRate(RF24_1MBPS)
     radio.setChannel(76)
-    hname = get_hostname()
-    radio.open_rx_pipe(1, b"test")
+    radio.stop_listening(myname)
+    radio.open_rx_pipe(1, othername)
     radio.listen = True
     radio.payloadSize = MAX_CHUNK_SIZE
     radio.setAutoAck(True)
@@ -36,7 +41,7 @@ def keep_receiving_bg():
             data = radio.read(MAX_CHUNK_SIZE)
             num_messages += 1
             datastr = data.decode()
-            print(f"{num_messages} Received data : {datastr}")
+            print(f"========{num_messages} Received data : {datastr}")
             if datastr.find("Ack") < 0:
                 send_message(f"Ack:{datastr}")
 
@@ -53,6 +58,7 @@ def send_message(msg):
     t1 = time.time()
     radio.listen = False
     succ = radio.write(buffer)
+    time.sleep(0.05)  # slight delay
     radio.listen = True
     t2 = time.time()
     print(f"Sending {succ} in time {(t2-t1)*1000} msec")
@@ -60,10 +66,11 @@ def send_message(msg):
     return succ
 
 def send_messages():
-    num_to_send = 100
+    num_to_send = 10
     num_successfully_sent = 0
     for i in range(num_to_send):
-        succ = send_message(f"M#{i}")
+        ms = "0123456789"*i
+        succ = send_message(ms)
         if succ:
             num_successfully_sent += 1
     print(f"Num messages sent = {num_to_send}, success = {num_successfully_sent}")
