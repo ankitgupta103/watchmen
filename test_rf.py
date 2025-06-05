@@ -13,11 +13,12 @@ hname = socket.gethostname()
 myname = b""
 othername = b""
 if hname == "central":
-    myname = b"central"
-    othername = b"rp1"
+    myname = b"n1"
+    othername = b"n2"
 if hname == "rp1":
-    myname = b"rp1"
-    othername = b"central"
+    myname = b"n2"
+    othername = b"n1"
+print(f"{myname} : {othername}")
 
 def setup():
     if not radio.begin():
@@ -27,12 +28,12 @@ def setup():
     radio.setChannel(76)
     radio.stop_listening(myname)
     radio.open_rx_pipe(1, othername)
-    radio.listen = True
     radio.payloadSize = MAX_CHUNK_SIZE
     radio.setAutoAck(True)
     radio.set_retries(10, 5)
 
 def keep_receiving_bg():
+    radio.listen = True
     num_messages = 0
     print("Starting to receive")
     while True:
