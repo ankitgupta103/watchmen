@@ -46,11 +46,6 @@ def keep_receiving_bg():
             if datastr.find("Ack") < 0:
                 send_message(f"Ack:{datastr}")
 
-def keep_reading():
-    reader_thread = threading.Thread(target=keep_receiving_bg, daemon=True)
-    # TODO fix and make it a clean exit on self deletion
-    reader_thread.start()
-
 def send_message(msg):
     data_bytes = msg.encode('utf-8')
     total_len = len(data_bytes)
@@ -59,18 +54,16 @@ def send_message(msg):
     t1 = time.time()
     radio.listen = False
     succ = radio.write(buffer)
-    time.sleep(0.05)  # slight delay
     radio.listen = True
     t2 = time.time()
     print(f"Sending {succ} in time {(t2-t1)*1000} msec")
-    time.sleep(1)  # slight delay
     return succ
 
 def send_messages():
     num_to_send = 10
     num_successfully_sent = 0
     for i in range(num_to_send):
-        ms = "0123456789"*i
+        ms = f"M#{i}"
         succ = send_message(ms)
         if succ:
             num_successfully_sent += 1
@@ -78,13 +71,16 @@ def send_messages():
 
 def main():
     setup()
-    keep_reading()
+    reader_thread = threading.Thread(target=keep_receiving_bg, daemon=True)
+    reader_thread.start()
     if sys.argv[1] == "r":
         time.sleep(1000)
     elif sys.argv[1] == "s":
         send_messages()
+        time.sleep(1000)
     else:
         print("argv1 needs to be r OR s")
+    reader_thread.join()
 
 if __name__ == "__main__":
     main()
