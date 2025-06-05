@@ -23,6 +23,7 @@ def setup():
     radio.open_rx_pipe(1, b"test")
     radio.listen = True
     radio.payloadSize = MAX_CHUNK_SIZE
+    radio.setAutoAck(True)
 
 def keep_receiving():
     print("Starting to receive")
@@ -43,10 +44,15 @@ def send_message(msg):
     t2 = time.time()
     print(f"Sending {succ} in time {(t2-t1)*1000} msec")
     time.sleep(0.01)  # slight delay
+    return succ
 
 def send_messages():
-    for i in range(10):
-        send_message(f"Message#{i}")
+    num_to_send = 100
+    num_successfully_sent = 0
+    for i in range(num_to_send):
+        succ = send_message(f"Message#{i}")
+        num_successfully_sent += 1
+    print(f"Num messages sent = {num_to_send}, success = {num_successfully_sent}")
 
 def main():
     setup()
