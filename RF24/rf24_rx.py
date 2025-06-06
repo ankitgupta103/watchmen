@@ -15,7 +15,8 @@ def setup():
     radio.setPALevel(RF24_PA_LOW)
     radio.setDataRate(RF24_1MBPS)
     radio.setChannel(76)
-    radio.open_rx_pipe(1, tx_address)
+#    radio.open_rx_pipe(1, tx_address)
+    radio.open_rx_pipe(1, b"test")
     radio.listen = True
     radio.payloadSize = MAX_CHUNK_SIZE
 
