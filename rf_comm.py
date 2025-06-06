@@ -266,7 +266,7 @@ class RFComm:
         payload = f"{chunk_identifier};{i};{msg_chunks[i]}"
         msgstr = f"{msgid};{payload}"
         self._actual_send(msgstr)
-        time.sleep(0.1) # TODO Needed for corruption free sending.
+        # time.sleep(0.1) # TODO Needed for corruption free sending.
 
     def _send_chunk_end(self, chunk_identifier, dest):
         payload = f"{chunk_identifier}"
@@ -280,6 +280,7 @@ class RFComm:
         num_chunks = len(msg_chunks)
         print(f"Getting ready to push {num_chunks} chunks")
         chunk_identifier = random.randint(100,200) # TODO better.
+        self.msg_cunks_missing[str(chunk_identifier)] = []
         payload = f"{mst}{chunk_identifier};{num_chunks}"
         sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 3)
         time.sleep(1) # TODO Needed for corruption free sending.
@@ -343,7 +344,7 @@ class RFComm:
             msgstr = msgstr[MAX_CHUNK_SIZE:]
         print(f"chunking {len(long_msg)} long message into {len(msg_chunks)} chunks")
         t1 = time.time()
-        sent = self._send_chunks(msg_chunks, mst, dest, 0) # TODO disabling retrying for now
+        sent = self._send_chunks(msg_chunks, mst, dest, 3)
         t2 = time.time()
         print(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
         return sent
