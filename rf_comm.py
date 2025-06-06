@@ -76,8 +76,8 @@ class RFComm:
             return
         if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
             print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
-            ackid = msg["ackid"]
-            if "missing_chunks" in msg:
+            ackid = msgpyl
+            if False and "missing_chunks" in msg:  # Disabling for now
                 print(f"Receiver did not get chunks : {msg['missing_chunks']}")
                 self.msg_cunks_missing[msg["cid"]] = eval(msg["missing_chunks"])
             with self.msg_unacked_lock:
