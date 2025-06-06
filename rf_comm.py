@@ -343,7 +343,7 @@ class RFComm:
             msgstr = msgstr[MAX_CHUNK_SIZE:]
         print(f"chunking {len(long_msg)} long message into {len(msg_chunks)} chunks")
         t1 = time.time()
-        sent = self._send_chunks(msg_chunks, mst, dest, 3)
+        sent = self._send_chunks(msg_chunks, mst, dest, 0) # TODO disabling retrying for now
         t2 = time.time()
         print(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
         return sent
