@@ -58,7 +58,7 @@ def keep_receiving_bg():
         if has_payload:
             data = radio.read(MAX_CHUNK_SIZE)
             num_messages += 1
-            datastr = date.rstrip(b'\x00').decode()
+            datastr = data.rstrip(b'\x00').decode()
             msgs_recd.append(datastr)
             print(f"==============={num_messages} Received data : {datastr}")
             #if datastr.find("Ack") < 0:
