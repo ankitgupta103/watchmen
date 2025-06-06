@@ -392,7 +392,7 @@ def main():
     devid = str(constants.HN_ID[hname])
     rf = RFComm(devid)
     rf.keep_reading()
-    if len(sys.argv) > 0:
+    if len(sys.argv) > 1:
         dest = sys.argv[1]
         # test_send_time_to_ack(rf, dest, int(sys.argv[2]))
         test_send_types(rf, devid, dest)
