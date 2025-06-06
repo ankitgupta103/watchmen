@@ -57,9 +57,9 @@ def keep_receiving_bg():
             data = radio.read(MAX_CHUNK_SIZE)
             num_messages += 1
             datastr = data.decode()
-            print(f"========{num_messages} Received data : {datastr}")
-            if datastr.find("Ack") < 0:
-                send_message(f"Ack:{datastr}")
+            print(f"==============={num_messages} Received data : {datastr}")
+            #if datastr.find("Ack") < 0:
+            #    send_message(f"Ack:{datastr}")
 
 def send_message(msg):
     data_bytes = msg.encode('utf-8')
