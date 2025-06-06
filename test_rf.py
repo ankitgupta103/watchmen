@@ -34,6 +34,8 @@ for i in range(len(nodenames)):
         othernames.append(nodenames[i])
 print(f"{myname} : {othernames}")
 
+msgs_recd = []
+
 def setup():
     if not radio.begin():
         raise RuntimeError("nRF24L01+ not responding")
@@ -57,6 +59,7 @@ def keep_receiving_bg():
             data = radio.read(MAX_CHUNK_SIZE)
             num_messages += 1
             datastr = data.decode()
+            msgs_recd.append(datastr)
             print(f"==============={num_messages} Received data : {datastr}")
             #if datastr.find("Ack") < 0:
             #    send_message(f"Ack:{datastr}")
@@ -94,6 +97,8 @@ def main():
         time.sleep(1000)
     elif sys.argv[1] == "s":
         send_messages()
+        time.sleep(10)
+        print(sorted(msgs_recd))
         time.sleep(1000)
     else:
         print("argv1 needs to be r OR s")
