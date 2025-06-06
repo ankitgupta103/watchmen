@@ -163,15 +163,16 @@ class RFComm:
         for (_, d) in p:
             parts.append(d)
         orig_payload = "".join(parts)
-        orig_msg = json.loads(orig_payload)
-        if "i_d" in orig_msg:
-            imstr = orig_msg["i_d"]
-            im = image.imstrtoimage(imstr)
-            im.save("/tmp/recompiled.jpg")
-            im.show()
-        else:
+        try:
+            orig_msg = json.loads(orig_payload)
+            if "i_d" in orig_msg:
+                imstr = orig_msg["i_d"]
+                im = image.imstrtoimage(imstr)
+                im.save("/tmp/recompiled.jpg")
+                im.show()
+        except:
             print(f"Recompiled message =\n{orig_payload}")
-        return orig_msg
+        return orig_payload
 
     def _read_from_rf(self):
         radio.listen = True
@@ -275,6 +276,7 @@ class RFComm:
     # Note retry here is separate retry per chunk.
     # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
     def _send_chunks(self, msg_chunks, mst, dest, retry_count = 3):
+        t1 = time.time()
         num_chunks = len(msg_chunks)
         print(f"Getting ready to push {num_chunks} chunks")
         chunk_identifier = random.randint(100,200) # TODO better.
@@ -301,6 +303,8 @@ class RFComm:
             if not sent:
                 return False
         chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
+        t2 = time.time()
+        print(f"Time taken to deliver chunks = {t2-t1}")
         if len(chunks_undelivered) == 0:
             print(f" ==== Successfully delivered all chunks!!!")
             return True
@@ -401,7 +405,7 @@ def main():
         dest = sys.argv[1]
         # test_send_time_to_ack(rf, dest, 10)
         # test_send_types(rf, devid, dest)
-        # test_send_long_msg(rf, dest) # Assumes its an image
+        test_send_long_msg(rf, dest) # Assumes its an image
         test_send_img(rf, "pencil.jpg", dest)
         time.sleep(10)
     else:
