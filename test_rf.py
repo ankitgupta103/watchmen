@@ -9,16 +9,29 @@ radio = RF24(22, 0)
 
 MAX_CHUNK_SIZE = 32
 
+nodenames = [b"nc", b"n2", b"n3"]
 hname = socket.gethostname()
+
 myname = b""
-othername = b""
-if hname == "rpi2":
-    myname = b"n1"
-    othername = b"n2"
-if hname == "rpi3":
-    myname = b"n2"
-    othername = b"n1"
-print(f"{myname} : {othername}")
+othernames = []
+ind = -1
+
+if hname == "central":
+    ind = 0
+elif hname == "rpi2":
+    ind = 1
+elif hname == "rpi3":
+    ind = 2
+else:
+    print(f"Unknown host")
+    sys.exit(1)
+
+for i in range(len(nodenames)):
+    if i == ind:
+        myname = nodenames[i]
+    else:
+        othernames.append(nodenames[i])
+print(f"{myname} : {othernames}")
 
 def setup():
     if not radio.begin():
@@ -27,7 +40,8 @@ def setup():
     radio.setDataRate(RF24_1MBPS)
     radio.setChannel(76)
     radio.stop_listening(myname)
-    radio.open_rx_pipe(1, othername)
+    for i in range(len(othernames)):
+        radio.open_rx_pipe(i+1, othernames[i])
     radio.payloadSize = MAX_CHUNK_SIZE
     #radio.setAutoAck(True)
     radio.set_retries(10, 5)
