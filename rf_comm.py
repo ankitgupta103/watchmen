@@ -166,8 +166,7 @@ class RFComm:
             if has_payload:
                 data = radio.read(MAX_CHUNK_SIZE)
                 datastr = data.rstrip(b'\x00').decode()
-                msgs_recd.append((datastr, time.time()))
-                print(f"==============={num_messages} Received data : {datastr}")
+                print(f"=============== Received data : {datastr}")
                 self._process_read_message(datastr)
 
     # Non blocking, background thread
@@ -185,7 +184,7 @@ class RFComm:
         return id
 
     def sep_part(self, msgstr, sepchar):
-        firstloc = msg.find(sepchar)
+        firstloc = msgstr.find(sepchar)
         if firstloc < 0:
             return (None, None)
         if firstloc == len(msgstr) - 1:
