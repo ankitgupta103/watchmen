@@ -132,7 +132,8 @@ class RFComm:
             cid, remaining = self.sep_part(msgpyl, ';')
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
-            print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
+            if len(self.msg_chunks_received) % 10 == 0:
+                print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
             self.msg_chunks_received[cid].append(i)
             self.msg_parts[cid].append((i, chunkdata))
             return
@@ -194,9 +195,12 @@ class RFComm:
         reader_thread.start()
 
     def _get_msg_id(self, msgtype, dest):
-        r = random.randint(900,999)
-        id = f"{msgtype}{self.devid}{dest}{r}"
-        print(f"Id = {id}")
+        if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
+            # No ack needed so no need of ID
+            id = f"{msgtype}{self.devid}{dest}"
+        else:
+            r = random.randint(900,999)
+            id = f"{msgtype}{self.devid}{dest}{r}"
         return id
 
     def sep_part(self, msgstr, sepchar):
@@ -209,7 +213,7 @@ class RFComm:
             return (msgstr[0:firstloc], msgstr[firstloc+1:])
 
     def _parse_msg_id(self, msgid):
-        if len(msgid) != 6:
+        if len(msgid) < 3:
             print(f"Failed Parsing Key : {msgid}")
             return None
         msgtype = msgid[0]
@@ -217,7 +221,9 @@ class RFComm:
         dest = None
         if msgid[2] != constants.NO_DEST:
             dest = msgid[2]
-        rid = msgid[3:]
+        rid = None
+        if len(msgid) > 3:
+            rid = msgid[3:]
         return (msgtype, src, dest, rid)
 
     def _actual_send(self, msgstr):
@@ -261,7 +267,7 @@ class RFComm:
 
     def _send_chunk_i(self, msg_chunks, chunk_identifier, i, dest):
         num_chunks = len(msg_chunks)
-        print(f"Sending chunk {i} out of {num_chunks}")
+        # print(f"Sending chunk {i} out of {num_chunks}")
         msgid = self._get_msg_id(constants.MESSAGE_TYPE_CHUNK_ITEM, dest)
         payload = f"{chunk_identifier};{i};{msg_chunks[i]}"
         msgstr = f"{msgid};{payload}"
@@ -271,7 +277,7 @@ class RFComm:
     def _send_chunk_end(self, chunk_identifier, dest):
         payload = f"{chunk_identifier}"
         sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 3)
-        time.sleep(1) # TODO Needed for corruption free sending.
+        # time.sleep(1) # TODO Needed for corruption free sending.
         return sent 
 
     # Note retry here is separate retry per chunk.
@@ -279,18 +285,18 @@ class RFComm:
     def _send_chunks(self, msg_chunks, mst, dest, retry_count = 3):
         num_chunks = len(msg_chunks)
         print(f"Getting ready to push {num_chunks} chunks")
-        chunk_identifier = random.randint(100,200) # TODO better.
+        chunk_identifier = random.randint(10,20) # TODO better.
         self.msg_cunks_missing[str(chunk_identifier)] = []
         payload = f"{mst}{chunk_identifier};{num_chunks}"
         sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 3)
-        time.sleep(1) # TODO Needed for corruption free sending.
+        # time.sleep(1) # TODO Needed for corruption free sending.
         if not sent:
             print(f"Failed to send chunk begin")
             return False
         for i in range(num_chunks):
             self._send_chunk_i(msg_chunks, chunk_identifier, i, dest)
         sent = self._send_chunk_end(chunk_identifier, dest)
-        time.sleep(1)
+        # time.sleep(1)
         if not sent:
             return False
         for i in range(retry_count):
