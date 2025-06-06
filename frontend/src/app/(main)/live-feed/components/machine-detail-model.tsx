@@ -30,27 +30,31 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import { Machine } from '@/lib/types/machine';
+import { Machine, MachineData } from '@/lib/types/machine';
 import { cn, toTitleCase } from '@/lib/utils';
 
 interface MachineDetailModalProps {
   selectedMachine: Machine | null;
   setSelectedMachine: React.Dispatch<React.SetStateAction<Machine | null>>;
+  getMachineData: (machineId: number) => MachineData;
 }
 
 export default function MachineDetailModal({
   selectedMachine,
   setSelectedMachine,
+  getMachineData,
 }: MachineDetailModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isExecutingCommand, setIsExecutingCommand] = useState(false);
 
   if (!selectedMachine) return null;
 
+  const machineData = getMachineData(selectedMachine.id);
+
   // Calculate machine activity level
-  const getMachineActivityLevel = (machine: Machine) => {
+  const getMachineActivityLevel = (data: MachineData) => {
     const recentEvents =
-      machine.data.suspiciousEvents?.filter((event) => {
+      data.suspiciousEvents?.filter((event) => {
         const eventDate = new Date(event.timestamp);
         const daysDiff =
           (Date.now() - eventDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -58,7 +62,7 @@ export default function MachineDetailModal({
       }) || [];
 
     const healthIssues =
-      machine.data.healthEvents?.filter(
+      data.healthEvents?.filter(
         (event) => event.severity === 'high' || event.severity === 'critical',
       ) || [];
 
@@ -69,9 +73,9 @@ export default function MachineDetailModal({
   };
 
   // Get unreviewed events count
-  const getUnreviewedCount = (machine: Machine) => {
+  const getUnreviewedCount = (data: MachineData) => {
     return (
-      machine.data.suspiciousEvents?.filter(
+      data.suspiciousEvents?.filter(
         (event) => event.marked === 'unreviewed' || !event.marked,
       ).length || 0
     );
@@ -95,8 +99,8 @@ export default function MachineDetailModal({
     console.log(`Marking event ${eventIndex} as ${status}`);
   };
 
-  const activityLevel = getMachineActivityLevel(selectedMachine);
-  const unreviewed = getUnreviewedCount(selectedMachine);
+  const activityLevel = getMachineActivityLevel(machineData);
+  const unreviewed = getUnreviewedCount(machineData);
 
   // Calculate time since last seen
   const getLastSeenText = (lastSeen: string) => {
@@ -129,9 +133,9 @@ export default function MachineDetailModal({
             <div
               className={cn(
                 'h-4 w-4 rounded-full',
-                selectedMachine.data.status === 'online'
+                machineData.status === 'online'
                   ? 'bg-green-500'
-                  : selectedMachine.data.status === 'offline'
+                  : machineData.status === 'offline'
                     ? 'bg-red-500'
                     : 'bg-yellow-500',
               )}
@@ -175,15 +179,15 @@ export default function MachineDetailModal({
                   </div>
                   <Badge
                     variant={
-                      selectedMachine.data.status === 'online'
+                      machineData.status === 'online'
                         ? 'default'
-                        : selectedMachine.data.status === 'offline'
+                        : machineData.status === 'offline'
                           ? 'destructive'
                           : 'secondary'
                     }
                     className="capitalize"
                   >
-                    {selectedMachine.data.status}
+                    {machineData.status}
                   </Badge>
                 </CardContent>
               </Card>
@@ -195,7 +199,7 @@ export default function MachineDetailModal({
                     <span className="text-sm font-medium">Last Seen</span>
                   </div>
                   <div className="text-sm">
-                    {getLastSeenText(selectedMachine.data.lastSeen)}
+                    {getLastSeenText(machineData.lastSeen)}
                   </div>
                 </CardContent>
               </Card>
@@ -239,8 +243,8 @@ export default function MachineDetailModal({
                       Coordinates:
                     </span>
                     <div className="text-sm">
-                      {selectedMachine.last_location.lat.toFixed(6)},{' '}
-                      {selectedMachine.last_location.lng.toFixed(6)}
+                      {selectedMachine.last_location?.lat?.toFixed(6) ?? '-'},{' '}
+                      {selectedMachine.last_location?.lng?.toFixed(6) ?? '-'}
                     </div>
                   </div>
                   <div>
@@ -267,7 +271,7 @@ export default function MachineDetailModal({
                       Total Suspicious Events:
                     </span>
                     <div className="text-sm">
-                      {selectedMachine.data.suspiciousEvents?.length || 0}
+                      {machineData.suspiciousEvents?.length || 0}
                     </div>
                   </div>
                   <div>
@@ -275,7 +279,7 @@ export default function MachineDetailModal({
                       Recent Events (7 days):
                     </span>
                     <div className="text-sm">
-                      {selectedMachine.data.suspiciousEvents?.filter((e) => {
+                      {machineData.suspiciousEvents?.filter((e) => {
                         const days =
                           (Date.now() - new Date(e.timestamp).getTime()) /
                           (1000 * 60 * 60 * 24);
@@ -289,7 +293,7 @@ export default function MachineDetailModal({
                       Health Issues:
                     </span>
                     <div className="text-sm">
-                      {selectedMachine.data.healthEvents?.filter(
+                      {machineData.healthEvents?.filter(
                         (e) => e.severity !== 'low',
                       ).length || 0}{' '}
                       active issues
@@ -315,9 +319,9 @@ export default function MachineDetailModal({
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {(() => {
-                    const images = (
-                      selectedMachine.data.suspiciousEvents || []
-                    ).filter((e) => !!e.url);
+                    const images = (machineData.suspiciousEvents || []).filter(
+                      (e) => !!e.url,
+                    );
                     if (images.length > 0) {
                       return images.map((event) => (
                         <div key={event.timestamp}>
@@ -345,9 +349,9 @@ export default function MachineDetailModal({
 
           {/* Suspicious Events Tab */}
           <TabsContent value="suspicious" className="space-y-4">
-            {selectedMachine.data.suspiciousEvents?.length ? (
+            {machineData.suspiciousEvents?.length ? (
               <div className="space-y-3">
-                {selectedMachine.data.suspiciousEvents
+                {machineData.suspiciousEvents
                   .sort(
                     (a, b) =>
                       new Date(b.timestamp).getTime() -
@@ -468,9 +472,9 @@ export default function MachineDetailModal({
 
           {/* Health & Status Tab */}
           <TabsContent value="health" className="space-y-4">
-            {selectedMachine.data.healthEvents?.length ? (
+            {machineData.healthEvents?.length ? (
               <div className="space-y-3">
-                {selectedMachine.data.healthEvents
+                {machineData.healthEvents
                   .sort(
                     (a, b) =>
                       new Date(b.timestamp).getTime() -

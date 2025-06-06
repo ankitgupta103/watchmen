@@ -10,7 +10,7 @@ import {
   LogOut,
   User,
 } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -39,6 +39,8 @@ import {
 import { cn } from '@/lib/utils';
 
 import { Logo } from '../logo';
+import { Organization } from '@/lib/types/organization';
+import { setCookie } from '@/lib/cookies';
 
 const items = [
   {
@@ -59,10 +61,16 @@ const items = [
 ];
 
 export default function AppSidebar() {
+  const router = useRouter();
   const { open } = useSidebar();
   const pathname = usePathname();
   const { user, organizations } = useUser();
   const { organization: currentOrg } = useOrganization();
+
+  const handleOrganizationChange = (org: Organization) => {
+    setCookie('organization', JSON.stringify(org));
+    router.refresh();
+  };
 
   return (
     <Sidebar collapsible="icon" className="group relative">
@@ -118,7 +126,10 @@ export default function AppSidebar() {
                 <DropdownMenuLabel>Organizations</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {organizations?.map((org) => (
-                  <DropdownMenuItem key={org.organization_id}>
+                  <DropdownMenuItem key={org.organization_id} onClick={() => {
+                    console.log('clicked');
+                    handleOrganizationChange(org);
+                  }}>
                     <Avatar className="mr-2 h-6 w-6">
                       <AvatarImage
                         src={org?.organization_logo || '/placeholder.svg'}

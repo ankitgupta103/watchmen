@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import L from 'leaflet';
 import {
   Activity,
@@ -23,7 +23,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-import { Machine } from '@/lib/types/machine';
+import { Machine, MachineData } from '@/lib/types/machine';
+import { useLiveMachineData } from '@/hooks/use-live-machine-data';
 
 interface MapBounds {
   north: number;
@@ -49,12 +50,14 @@ const getMachineTypeIcon = (type: string, size: number = 16) => {
 };
 
 // Create custom marker icon
-const createMachineIcon = (machine: Machine, isSelected: boolean = false) => {
+const createMachineIcon = (machine: Machine, machineData: MachineData, isSelected: boolean = false) => {
+  if (!machineData) return undefined;
+
   const bgColor = isSelected
     ? 'bg-blue-500'
-    : machine.data.status === 'offline'
+    : machineData?.status === 'offline'
       ? 'bg-gray-500'
-      : machine.data.status === 'maintenance'
+      : machineData?.status === 'maintenance'
         ? 'bg-yellow-500'
         : 'bg-green-500';
 
@@ -87,6 +90,7 @@ const RectangleDrawer = ({
   onBoundsSelected: (bounds: MapBounds | null) => void;
   existingBounds: MapBounds | null;
 }) => {
+  
   const [drawing, setDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<L.LatLng | null>(null);
   const [currentBounds, setCurrentBounds] = useState<L.LatLngBounds | null>(
@@ -164,6 +168,13 @@ const MapFilter = ({
     selectedBounds,
   );
 
+  // Get machine IDs for the hook
+  const machineIds = useMemo(() => machines.map((m) => m.id), [machines]);
+
+  // Use the live data hook
+  const { getMachineData } =
+    useLiveMachineData(machineIds, true);
+
   // Calculate map center and zoom
   const getMapCenter = (): [number, number] => {
     if (!machines.length) return [12.9716, 77.5946]; // Default to Bangalore
@@ -176,10 +187,10 @@ const MapFilter = ({
         maxLng: Math.max(acc.maxLng, m.last_location.lng),
       }),
       {
-        minLat: machines[0].last_location.lat,
-        maxLat: machines[0].last_location.lat,
-        minLng: machines[0].last_location.lng,
-        maxLng: machines[0].last_location.lng,
+        minLat: machines[0]?.last_location?.lat ?? 0,
+        maxLat: machines[0]?.last_location?.lat ?? 0,
+        minLng: machines[0]?.last_location?.lng ?? 0,
+        maxLng: machines[0]?.last_location?.lng ?? 0,
       },
     );
 
@@ -200,10 +211,10 @@ const MapFilter = ({
         maxLng: Math.max(acc.maxLng, m.last_location.lng),
       }),
       {
-        minLat: machines[0].last_location.lat,
-        maxLat: machines[0].last_location.lat,
-        minLng: machines[0].last_location.lng,
-        maxLng: machines[0].last_location.lng,
+        minLat: machines[0]?.last_location?.lat ?? 0,
+        maxLat: machines[0]?.last_location?.lat ?? 0,
+        minLng: machines[0]?.last_location?.lng ?? 0,
+        maxLng: machines[0]?.last_location?.lng ?? 0,
       },
     );
 
@@ -278,12 +289,17 @@ const MapFilter = ({
                 />
 
                 {/* Machine markers */}
-                {machines.map((machine) => (
-                  <Marker
-                    key={machine.id}
-                    position={[machine.last_location.lat, machine.last_location.lng]}
+                {machines.length > 0 &&
+                  machines.map((machine) => (
+                    <Marker
+                      key={machine.id}
+                    position={[
+                      machine.last_location.lat,
+                      machine.last_location.lng,
+                    ]}
                     icon={createMachineIcon(
                       machine,
+                       getMachineData(machine.id),
                       isMachineInBounds(machine),
                     )}
                   >
@@ -301,7 +317,10 @@ const MapFilter = ({
                   .map((machine) => (
                     <Circle
                       key={`coverage-${machine.id}`}
-                      center={[machine.last_location.lat, machine.last_location.lng]}
+                      center={[
+                        machine.last_location.lat,
+                        machine.last_location.lng,
+                      ]}
                       radius={300}
                       pathOptions={{
                         color: '#3b82f6',

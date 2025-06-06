@@ -3,6 +3,7 @@
 import 'leaflet/dist/leaflet.css';
 
 import React, { useMemo, useState } from 'react';
+import { useLiveMachineData } from '@/hooks/use-live-machine-data';
 import { Calendar, RefreshCw, Shield } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -16,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { Machine } from '@/lib/types/machine';
+import { Machine, SuspiciousEvent } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
 
 import MachineDetailModal from './machine-detail-model';
@@ -39,16 +40,25 @@ export default function LiveFeedWrapper({
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Get machine IDs for the hook
+  const machineIds = useMemo(() => machines.map((m) => m.id), [machines]);
+
+  // Use the live data hook
+  const { getMachineData, refreshMachineData, lastUpdateTime, isConnected } =
+    useLiveMachineData(machineIds, true);
+
   // Filter machines based on selected filters
   const filteredMachines = useMemo(() => {
     return machines.filter((machine) => {
-      if (statusFilter !== 'all' && machine.data.status !== statusFilter) {
+      const machineData = getMachineData(machine.id);
+
+      if (statusFilter !== 'all' && machineData.status !== statusFilter) {
         return false;
       }
 
       if (activityFilter !== 'all') {
         const recentEvents =
-          machine.data.suspiciousEvents?.filter((event) => {
+          machineData.suspiciousEvents?.filter((event: SuspiciousEvent) => {
             const eventDate = new Date(event.timestamp);
             const daysDiff =
               (Date.now() - eventDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -66,13 +76,15 @@ export default function LiveFeedWrapper({
 
       return true;
     });
-  }, [machines, statusFilter, activityFilter]);
+  }, [machines, statusFilter, activityFilter, getMachineData]);
 
-  // Get unreviewed events count
-  const getUnreviewedCount = (machine: Machine) => {
+  // Get unreviewed events count for a machine
+  const getUnreviewedCount = (machineId: number) => {
+    const machineData = getMachineData(machineId);
     return (
-      machine.data.suspiciousEvents?.filter(
-        (event) => event.marked === 'unreviewed' || !event.marked,
+      machineData.suspiciousEvents?.filter(
+        (event: SuspiciousEvent) =>
+          event.marked === 'unreviewed' || !event.marked,
       ).length || 0
     );
   };
@@ -80,18 +92,23 @@ export default function LiveFeedWrapper({
   // Mock refresh function
   const handleRefresh = () => {
     setIsRefreshing(true);
+    // Refresh data for all machines
+    machineIds.forEach((id) => refreshMachineData(id));
     setTimeout(() => setIsRefreshing(false), 1500);
   };
 
-  const onlineCount = machines.filter((m) => m.data.status === 'online').length;
+  // Calculate counts using live data
+  const onlineCount = machines.filter(
+    (machine) => getMachineData(machine.id).status === 'online',
+  ).length;
   const offlineCount = machines.filter(
-    (m) => m.data.status === 'offline',
+    (machine) => getMachineData(machine.id).status === 'offline',
   ).length;
   const maintenanceCount = machines.filter(
-    (m) => m.data.status === 'maintenance',
+    (machine) => getMachineData(machine.id).status === 'maintenance',
   ).length;
   const totalAlerts = machines.reduce(
-    (sum, m) => sum + getUnreviewedCount(m),
+    (sum, machine) => sum + getUnreviewedCount(machine.id),
     0,
   );
 
@@ -103,6 +120,12 @@ export default function LiveFeedWrapper({
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-blue-600" />
             <span className="font-semibold">Network Overview</span>
+            {isConnected && (
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
+                <span className="text-xs text-green-600">Live</span>
+              </div>
+            )}
           </div>
 
           {/* Quick Stats */}
@@ -128,6 +151,11 @@ export default function LiveFeedWrapper({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Last Update Time */}
+          <div className="text-xs text-gray-500">
+            Last update: {lastUpdateTime.toLocaleTimeString()}
+          </div>
+
           {/* Date Filter */}
           {selectedDate && (
             <div className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-1 text-sm">
@@ -183,6 +211,7 @@ export default function LiveFeedWrapper({
           machines={filteredMachines}
           onMarkerClick={setSelectedMachine}
           selectedDate={selectedDate}
+          getMachineData={getMachineData}
         />
 
         {/* Filtered Results Indicator */}
@@ -210,6 +239,7 @@ export default function LiveFeedWrapper({
       <MachineDetailModal
         selectedMachine={selectedMachine}
         setSelectedMachine={setSelectedMachine}
+        getMachineData={getMachineData}
       />
     </div>
   );
