@@ -42,7 +42,6 @@ def send_message(msg):
     data_bytes = msg.encode('utf-8')
     total_len = len(data_bytes)
     buffer = data_bytes.ljust(MAX_CHUNK_SIZE, b'\x00')
-    print(f"Sending {total_len} bytes...{msg}")
     t1 = time.time()
     radio.listen = False
     succ = radio.write(buffer)
@@ -52,11 +51,12 @@ def send_message(msg):
     return succ
 
 def send_messages():
-    num_to_send = 5
+    num_to_send = 100
     num_successfully_sent = 0
+    time.sleep(10)
     for i in range(num_to_send):
-        r = random.randint(3,6)
-        time.sleep(r)
+        r = random.randint(1,2)
+        time.sleep(r/10.0)
         ms = f"{hname}#{i}"
         succ = send_message(ms)
         if succ:
@@ -72,7 +72,7 @@ def main():
     elif sys.argv[1] == "s":
         send_messages()
         time.sleep(10)
-        print(f"{hname} : {sorted(msgs_recd)}")
+        print(f"{hname} : {len(msgs_recd)} {sorted(msgs_recd)}")
         time.sleep(1000)
     else:
         print("argv1 needs to be r OR s")
