@@ -10,18 +10,18 @@ radio = RF24(22, 0)
 
 MAX_CHUNK_SIZE = 32
 
-nodenames = [b"nc", b"n2", b"n3"]
+nodenames = [b"n2", b"n3"]#, b"nc"]
 hname = socket.gethostname()
 
 myname = b""
 othernames = []
 ind = -1
 
-if hname == "central":
+if hname == "rpi2":
     ind = 0
-elif hname == "rpi2":
-    ind = 1
 elif hname == "rpi3":
+    ind = 1
+elif hname == "central":
     ind = 2
 else:
     print(f"Unknown host")
@@ -58,7 +58,7 @@ def keep_receiving_bg():
         if has_payload:
             data = radio.read(MAX_CHUNK_SIZE)
             num_messages += 1
-            datastr = data.decode()
+            datastr = date.rstrip(b'\x00').decode()
             msgs_recd.append(datastr)
             print(f"==============={num_messages} Received data : {datastr}")
             #if datastr.find("Ack") < 0:
