@@ -9,6 +9,7 @@ from pyrf24 import RF24, RF24_PA_LOW, RF24_1MBPS
 radio = RF24(22, 0)
 MAX_CHUNK_SIZE = 32
 hname = socket.gethostname()
+msgs_sent = []
 msgs_recd = []
 
 def setup():
@@ -33,10 +34,10 @@ def keep_receiving_bg():
             data = radio.read(MAX_CHUNK_SIZE)
             num_messages += 1
             datastr = data.rstrip(b'\x00').decode()
-            msgs_recd.append(datastr)
+            msgs_recd.append((datastr, time.time()))
             print(f"==============={num_messages} Received data : {datastr}")
-            #if datastr.find("Ack") < 0:
-            #    send_message(f"Ack:{datastr}")
+            if datastr.find("Ack") < 0:
+                send_message(f"Ack:{datastr}")
 
 def send_message(msg):
     data_bytes = msg.encode('utf-8')
@@ -44,6 +45,7 @@ def send_message(msg):
     buffer = data_bytes.ljust(MAX_CHUNK_SIZE, b'\x00')
     t1 = time.time()
     radio.listen = False
+    msgs_sent.append((msg, time.time()))
     succ = radio.write(buffer)
     radio.listen = True
     t2 = time.time()
@@ -60,7 +62,21 @@ def send_messages(num_to_send):
         succ = send_message(ms)
         if succ:
             num_successfully_sent += 1
-    print(f"Num messages sent = {num_to_send}, success = {num_successfully_sent}")
+
+def ack_time(msg):
+    for (m, t) in msgs_recd:
+        if m == f"Ack:{msg}":
+            return t
+    return -1
+
+def print_status():
+    print(f"{hname} : {len(msgs_recd)} {sorted(msgs_recd)}")
+    print(f"Num messages sent = {len(msgs_sent)}")
+    for s,t in msgs_sent:
+        ackt = ack_time(s)
+        if ackt > 0:
+            print(f"Acktime for {s} = {ackt-t}")
+
 
 def main():
     setup()
@@ -68,7 +84,7 @@ def main():
     reader_thread.start()
     send_messages(int(sys.argv[1]))
     time.sleep(10)
-    print(f"{hname} : {len(msgs_recd)} {sorted(msgs_recd)}")
+    print_status()
     time.sleep(1000)
     reader_thread.join()
 
