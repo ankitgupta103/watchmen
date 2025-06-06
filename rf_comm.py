@@ -13,7 +13,8 @@ import image
 from pyrf24 import RF24, RF24_PA_LOW, RF24_1MBPS
 
 radio = RF24(22, 0)
-MAX_CHUNK_SIZE = 32
+MAX_DATA_SIZE = 32
+MAX_CHUNK_SIZE = 16
 hname = socket.gethostname()
 
 
@@ -44,7 +45,7 @@ class RFComm:
     
     def __init__(self, devid):
         self.devid = devid
-        time.sleep(2)  # Give ESP32 time to reset
+        time.sleep(2)
         self.msg_chunks_expected = {} # Receiver uses this. cid->num_chunks
         self.msg_chunks_received = {} # Receiver uses this. cid->list of ids got
         self.msg_parts = {} # Receiver uses this. cid->data
@@ -60,7 +61,7 @@ class RFComm:
         radio.setChannel(76)
         radio.stop_listening(b"n1")
         radio.open_rx_pipe(1, b"n1")
-        radio.payloadSize = MAX_CHUNK_SIZE
+        radio.payloadSize = MAX_DATA_SIZE
 
     def add_node(self, node):
         self.node = node
@@ -162,8 +163,9 @@ class RFComm:
         for (_, d) in p:
             parts.append(d)
         orig_payload = "".join(parts)
-        orig_msg = json.loads(orig_payload)
-        if "i_d" in orig_msg:
+        # TODO get image metadata from chunk begin.
+        # orig_msg = json.loads(orig_payload)
+        if False and "i_d" in orig_msg:  # Disable for now
             imstr = orig_msg["i_d"]
             im = image.imstrtoimage(imstr)
             im.save("/tmp/recompiled.jpg")
@@ -178,7 +180,7 @@ class RFComm:
         while True:
             has_payload, pipe = radio.available_pipe()
             if has_payload:
-                data = radio.read(MAX_CHUNK_SIZE)
+                data = radio.read(MAX_DATA_SIZE)
                 datastr = data.rstrip(b'\x00').decode()
                 print(f"=============== Received data : {datastr}")
                 self._process_read_message(datastr)
@@ -218,13 +220,13 @@ class RFComm:
         return (msgtype, src, dest, rid)
 
     def _actual_send(self, msgstr):
-        if len(msgstr) > 32:
+        if len(msgstr) > MAX_DATA_SIZE:
             print(f"Message is exceeding length {len(msgstr)} : {msgstr}")
             return False
         print(f"Sending message : {msgstr}")
         data_bytes = msgstr.encode('utf-8')
         total_len = len(data_bytes)
-        buffer = data_bytes.ljust(MAX_CHUNK_SIZE, b'\x00')
+        buffer = data_bytes.ljust(MAX_DATA_SIZE, b'\x00')
         radio.listen = False
         succ = radio.write(buffer)
         radio.listen = True
@@ -335,9 +337,9 @@ class RFComm:
         msgstr = long_msg
         msg_chunks = []
         while len(msgstr) > 0:
-            msg = msgstr[0:20]
+            msg = msgstr[0:MAX_CHUNK_SIZE]
             msg_chunks.append(msg)
-            msgstr = msgstr[20:]
+            msgstr = msgstr[MAX_CHUNK_SIZE:]
         print(f"chunking {len(long_msg)} long message into {len(msg_chunks)} chunks")
         return self._send_chunks(msg_chunks, mst, dest, 3)
 
