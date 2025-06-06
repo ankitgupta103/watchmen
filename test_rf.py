@@ -10,32 +10,7 @@ radio = RF24(22, 0)
 
 MAX_CHUNK_SIZE = 32
 
-nodenames = [b"n2", b"n3", b"nc"]
-hname = socket.gethostname()
-
-myname = b""
-othernames = []
-ind = -1
-
-if hname == "rpi2":
-    ind = 0
-elif hname == "rpi3":
-    ind = 1
-elif hname == "central":
-    ind = 2
-else:
-    print(f"Unknown host")
-    sys.exit(1)
-
-for i in range(len(nodenames)):
-    if i == ind:
-        myname = nodenames[i]
-    else:
-        othernames.append(nodenames[i])
-print(f"{myname} : {othernames}")
-
 msgs_recd = []
-
 def setup():
     if not radio.begin():
         raise RuntimeError("nRF24L01+ not responding")
@@ -44,12 +19,9 @@ def setup():
     radio.setChannel(76)
     radio.stop_listening(b"n1")
     radio.open_rx_pipe(1, b"n1")
-    #radio.stop_listening(myname)
-    #for i in range(len(othernames)):
-    #    radio.open_rx_pipe(i+1, othernames[i])
     radio.payloadSize = MAX_CHUNK_SIZE
     #radio.setAutoAck(True)
-    radio.set_retries(10, 5)
+    #radio.set_retries(10, 5)
 
 def keep_receiving_bg():
     radio.listen = True
