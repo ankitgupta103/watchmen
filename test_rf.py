@@ -10,7 +10,7 @@ radio = RF24(22, 0)
 
 MAX_CHUNK_SIZE = 32
 
-nodenames = [b"n2", b"n3"]#, b"nc"]
+nodenames = [b"n2", b"n3", b"nc"]
 hname = socket.gethostname()
 
 myname = b""
@@ -20,9 +20,9 @@ ind = -1
 if hname == "rpi2":
     ind = 0
 elif hname == "rpi3":
-    ind = 2
-elif hname == "central":
     ind = 1
+elif hname == "central":
+    ind = 2
 else:
     print(f"Unknown host")
     sys.exit(1)
