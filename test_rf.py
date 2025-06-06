@@ -44,7 +44,7 @@ def setup():
     radio.setChannel(76)
     radio.stop_listening(myname)
     for i in range(len(othernames)):
-        radio.open_rx_pipe(1, othernames[i]) # should this be i+1
+        radio.open_rx_pipe(i+1, othernames[i])
     radio.payloadSize = MAX_CHUNK_SIZE
     #radio.setAutoAck(True)
     radio.set_retries(10, 5)
@@ -98,7 +98,7 @@ def main():
     elif sys.argv[1] == "s":
         send_messages()
         time.sleep(10)
-        print(f"{hname} : sorted(msgs_recd)")
+        print(f"{hname} : {sorted(msgs_recd)}")
         time.sleep(1000)
     else:
         print("argv1 needs to be r OR s")
