@@ -108,7 +108,7 @@ class RFComm:
                     self.msg_acked[ackid] = (len(unack), time_to_ack)
                     print(f"{ackid} --- Cleared ack, time for ack = {time_to_ack}")
                 else:
-                    print(f"Ack {ackid} isnt for me")
+                    print(f"Ack {ackid} no matching unacked message")
             return
         if dest != self.devid:
             print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
@@ -146,8 +146,9 @@ class RFComm:
             print(f"At end I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             if len(missing_chunks) == 0:
                 self.process_message(self._recompile_msg(cid))
-            # TODO no parsing yet for this
-            msg_to_send = f"{cid} : {len(missing_chunks)} / {expected_chunks}"
+            msg_to_send = f"{msgid}"
+            # TODO should send missing chunks here and parse it above.
+            # msg_to_send = f"{cid} : {len(missing_chunks)} / {expected_chunks}"
             self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
             return
         
@@ -276,7 +277,6 @@ class RFComm:
     # Note retry here is separate retry per chunk.
     # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
     def _send_chunks(self, msg_chunks, mst, dest, retry_count = 3):
-        t1 = time.time()
         num_chunks = len(msg_chunks)
         print(f"Getting ready to push {num_chunks} chunks")
         chunk_identifier = random.randint(100,200) # TODO better.
@@ -303,8 +303,6 @@ class RFComm:
             if not sent:
                 return False
         chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
-        t2 = time.time()
-        print(f"Time taken to deliver chunks = {t2-t1}")
         if len(chunks_undelivered) == 0:
             print(f" ==== Successfully delivered all chunks!!!")
             return True
@@ -344,7 +342,11 @@ class RFComm:
             msg_chunks.append(msg)
             msgstr = msgstr[MAX_CHUNK_SIZE:]
         print(f"chunking {len(long_msg)} long message into {len(msg_chunks)} chunks")
-        return self._send_chunks(msg_chunks, mst, dest, 3)
+        t1 = time.time()
+        sent = self._send_chunks(msg_chunks, mst, dest, 3)
+        t2 = time.time()
+        print(f"Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
+        return sent
 
     def send_message(self, payload, mst, dest):
         if dest is None:
