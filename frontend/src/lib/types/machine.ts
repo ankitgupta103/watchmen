@@ -47,12 +47,6 @@ export interface Machine {
   model_uid: string;
   manufacturer_id: number;
   model_specifications: Record<string, unknown>;
-  // data: {
-  //   status: string;
-  //   lastSeen: string;
-  //   suspiciousEvents?: Array<SuspiciousEvent>;
-  //   healthEvents?: Array<HealthEvent>;
-  // };
 }
 
 export interface MachineData {
@@ -61,27 +55,3 @@ export interface MachineData {
   suspiciousEvents?: Array<SuspiciousEvent>;
   healthEvents?: Array<HealthEvent>;
 }
-
-// {
-//   id: 191,
-//   name: 'Watchmen-001',
-//   type: 'watchmen',
-//   machine_uid: 'm-zr5coiogf6',
-//   machine_model_details: [Object],
-//   specifications: {},
-//   mfg_date: '2025-06-04',
-//   activation_date: '2025-06-04',
-//   end_of_service_date: null,
-//   current_owner: 1,
-//   current_owner_name: 'Vyom OS',
-//   machine_status: 'active',
-//   connection_status: 'live',
-//   last_location: [Object],
-//   camera_feed: 'camera',
-//   created_at: '2025-06-04T06:48:21.709629Z',
-//   updated_at: '2025-06-04T06:48:21.736124Z',
-//   model_id: 53,
-//   model_uid: 'netrajaal-watchmen',
-//   manufacturer_id: 1,
-//   modal_specifications: {}
-// }
