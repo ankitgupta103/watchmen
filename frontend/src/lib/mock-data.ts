@@ -66,7 +66,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 2,
@@ -122,7 +122,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 3,
@@ -180,7 +180,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 4,
@@ -228,7 +228,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 5,
@@ -297,7 +297,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 6,
@@ -358,7 +358,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 7,
@@ -407,7 +407,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 8,
@@ -462,7 +462,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 9,
@@ -525,7 +525,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 10,
@@ -587,7 +587,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 11,
@@ -647,7 +647,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
   {
     id: 12,
@@ -721,7 +721,7 @@ export const mockMachines: Machine[] = [
     model_id: 0,
     model_uid: '',
     manufacturer_id: 0,
-    model_specifications: {}
+    model_specifications: {},
   },
 ];
 

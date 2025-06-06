@@ -20,19 +20,20 @@ import { Badge } from '@/components/ui/badge';
 import 'leaflet/dist/leaflet.css';
 
 import { MAPS_API_KEY } from '@/lib/constants';
-import { Machine } from '@/lib/types/machine';
+import { Machine, MachineData } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
 
 interface MapProps {
   machines: Machine[];
   onMarkerClick: (machine: Machine) => void;
   selectedDate?: Date;
+  getMachineData: (machineId: number) => MachineData;
 }
 
 // Calculate machine activity level
-const getMachineActivityLevel = (machine: Machine) => {
+const getMachineActivityLevel = (data: MachineData) => {
   const recentEvents =
-    machine.data.suspiciousEvents?.filter((event) => {
+    data.suspiciousEvents?.filter((event) => {
       const eventDate = new Date(event.timestamp);
       const daysDiff =
         (Date.now() - eventDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -40,7 +41,7 @@ const getMachineActivityLevel = (machine: Machine) => {
     }) || [];
 
   const healthIssues =
-    machine.data.healthEvents?.filter(
+    data.healthEvents?.filter(
       (event) => event.severity === 'high' || event.severity === 'critical',
     ) || [];
 
@@ -51,48 +52,40 @@ const getMachineActivityLevel = (machine: Machine) => {
 };
 
 // Get unreviewed events count
-const getUnreviewedCount = (machine: Machine) => {
+const getUnreviewedCount = (data: MachineData) => {
   return (
-    machine.data.suspiciousEvents?.filter(
+    data.suspiciousEvents?.filter(
       (event) => event.marked === 'unreviewed' || !event.marked,
     ).length || 0
   );
 };
 
 // Create enhanced custom icon with activity indicators
-const createEnhancedIcon = (machine: Machine) => {
-  const activityLevel = getMachineActivityLevel(machine);
-  const unreviewed = getUnreviewedCount(machine);
-  const isOffline = machine.data.status === 'offline';
-  const isMaintenance = machine.data.status === 'maintenance';
+const createEnhancedIcon = (machine: Machine, machineData: MachineData) => {
+  const activityLevel = getMachineActivityLevel(machineData);
+  const unreviewed = getUnreviewedCount(machineData);
+  const isOffline = machineData.status === 'offline';
+  const isMaintenance = machineData.status === 'maintenance';
 
   // Determine colors based on status and activity
   let bgColor = 'bg-green-500';
-  // let textColor = 'text-white';
-  let pulseClass = '';
 
   if (isOffline) {
     bgColor = 'bg-gray-500';
-    // textColor = 'text-gray-500';
   } else if (isMaintenance) {
     bgColor = 'bg-yellow-500';
-    // textColor = 'text-yellow-500';
   } else if (activityLevel === 'critical') {
     bgColor = 'bg-red-500';
-    // textColor = 'text-red-500';
-    pulseClass = 'animate-pulse';
   } else if (activityLevel === 'high') {
     bgColor = 'bg-orange-500';
-    // textColor = 'text-orange-500';
   } else if (activityLevel === 'medium') {
     bgColor = 'bg-yellow-500';
-    // textColor = 'text-yellow-500';
   }
 
   const iconHtml = renderToString(
     <div className="relative">
       {/* Pulse animation for critical/active machines */}
-      {machine.data.status !== 'offline' && activityLevel !== 'low' && (
+      {machineData.status !== 'offline' && activityLevel !== 'low' && (
         <div
           className={`absolute inset-0 rounded-full ${bgColor} animate-ping opacity-90`}
         ></div>
@@ -103,11 +96,9 @@ const createEnhancedIcon = (machine: Machine) => {
         className={cn(
           `relative flex h-5 w-5 items-center justify-center rounded-full border-white bg-yellow-500 font-extrabold text-white shadow-lg`,
           {
-            'bg-green-500': machine.data.status === 'online',
-            'bg-gray-500': machine.data.status === 'offline',
+            'bg-green-500': machineData.status === 'online',
+            'bg-gray-500': machineData.status === 'offline',
           },
-          pulseClass,
-          // textColor,
         )}
       >
         {unreviewed > 9 ? '9+' : unreviewed}
@@ -125,20 +116,20 @@ const createEnhancedIcon = (machine: Machine) => {
 
 // Calculate map center with better positioning
 function getMapCenter(machines: Machine[]): [number, number] {
-  if (!machines.length) return [12.9716, 77.5946]; // Default to Bangalore
+  if (machines.length! > 0) return [12.9716, 77.5946]; // Default to Bangalore
 
   const bounds = machines.reduce(
     (acc, m) => ({
-      minLat: Math.min(acc.minLat, m.last_location.lat),
-      maxLat: Math.max(acc.maxLat, m.last_location.lat),
-      minLng: Math.min(acc.minLng, m.last_location.lng),
-      maxLng: Math.max(acc.maxLng, m.last_location.lng),
+      minLat: Math.min(acc.minLat, m.last_location?.lat ?? 0),
+      maxLat: Math.max(acc.maxLat, m.last_location?.lat ?? 0),
+      minLng: Math.min(acc.minLng, m.last_location?.lng ?? 0),
+      maxLng: Math.max(acc.maxLng, m.last_location?.lng ?? 0),
     }),
     {
-      minLat: machines[0].last_location.lat,
-      maxLat: machines[0].last_location.lat,
-      minLng: machines[0].last_location.lng,
-      maxLng: machines[0].last_location.lng,
+      minLat: machines[0]?.last_location?.lat ?? 0,
+      maxLat: machines[0]?.last_location?.lat ?? 0,
+      minLng: machines[0]?.last_location?.lng ?? 0,
+      maxLng: machines[0]?.last_location?.lng ?? 0,
     },
   );
 
@@ -154,16 +145,16 @@ function getOptimalZoom(machines: Machine[]): number {
 
   const bounds = machines.reduce(
     (acc, m) => ({
-      minLat: Math.min(acc.minLat, m.last_location.lat),
-      maxLat: Math.max(acc.maxLat, m.last_location.lat),
-      minLng: Math.min(acc.minLng, m.last_location.lng),
-      maxLng: Math.max(acc.maxLng, m.last_location.lng),
+      minLat: Math.min(acc.minLat, m.last_location?.lat ?? 0),
+      maxLat: Math.max(acc.maxLat, m.last_location?.lat ?? 0),
+      minLng: Math.min(acc.minLng, m.last_location?.lng ?? 0),
+      maxLng: Math.max(acc.maxLng, m.last_location?.lng ?? 0),
     }),
     {
-      minLat: machines[0].last_location.lat,
-      maxLat: machines[0].last_location.lat,
-      minLng: machines[0].last_location.lng,
-      maxLng: machines[0].last_location.lng,
+      minLat: machines[0]?.last_location?.lat ?? 0,
+      maxLat: machines[0]?.last_location?.lat ?? 0,
+      minLng: machines[0]?.last_location?.lng ?? 0,
+      maxLng: machines[0]?.last_location?.lng ?? 0,
     },
   );
 
@@ -180,10 +171,15 @@ function getOptimalZoom(machines: Machine[]): number {
 // Enhanced Marker Component with hover popup functionality
 interface EnhancedMarkerProps {
   machine: Machine;
+  machineData: MachineData;
   onMarkerClick: (machine: Machine) => void;
 }
 
-function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
+function EnhancedMarker({
+  machine,
+  machineData,
+  onMarkerClick,
+}: EnhancedMarkerProps) {
   const markerRef = useRef<L.Marker>(null);
   let hoverTimeout: NodeJS.Timeout;
 
@@ -219,8 +215,11 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
   return (
     <Marker
       ref={markerRef}
-      icon={createEnhancedIcon(machine)}
-      position={[machine.last_location.lat, machine.last_location.lng]}
+      icon={createEnhancedIcon(machine, machineData)}
+      position={[
+        machine.last_location?.lat ?? 0,
+        machine.last_location?.lng ?? 0,
+      ]}
       eventHandlers={{
         click: handleClick,
         mouseover: handleMouseOver,
@@ -241,15 +240,15 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
           </h3>
           <Badge
             variant={
-              machine.data.status === 'online'
+              machineData.status === 'online'
                 ? 'default'
-                : machine.data.status === 'offline'
+                : machineData.status === 'offline'
                   ? 'destructive'
                   : 'secondary'
             }
             className="text-xs"
           >
-            {machine.data.status}
+            {machineData.status}
           </Badge>
         </div>
 
@@ -258,14 +257,14 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
             <strong>Type:</strong> {machine.type.replace('_', ' ')}
           </div>
           <div>
-            <strong>Activity:</strong> {getMachineActivityLevel(machine)}
+            <strong>Activity:</strong> {getMachineActivityLevel(machineData)}
           </div>
-          {machine.data.suspiciousEvents &&
-            machine.data.suspiciousEvents.length > 0 && (
+          {machineData.suspiciousEvents &&
+            machineData.suspiciousEvents.length > 0 && (
               <div>
                 <strong>Recent Events:</strong>{' '}
                 {
-                  machine.data.suspiciousEvents.filter((e) => {
+                  machineData.suspiciousEvents.filter((e) => {
                     const days =
                       (Date.now() - new Date(e.timestamp).getTime()) /
                       (1000 * 60 * 60 * 24);
@@ -275,15 +274,15 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
                 (last 7 days)
               </div>
             )}
-          {getUnreviewedCount(machine) > 0 && (
+          {getUnreviewedCount(machineData) > 0 && (
             <div className="font-medium text-red-600">
-              {getUnreviewedCount(machine)} unreviewed alert
-              {getUnreviewedCount(machine) > 1 ? 's' : ''}
+              {getUnreviewedCount(machineData)} unreviewed alert
+              {getUnreviewedCount(machineData) > 1 ? 's' : ''}
             </div>
           )}
           <div className="text-xs text-gray-500">
             <strong>Last seen:</strong>{' '}
-            {new Date(machine.data.lastSeen).toLocaleString()}
+            {new Date(machineData.lastSeen).toLocaleString()}
           </div>
         </div>
       </Popup>
@@ -294,6 +293,7 @@ function EnhancedMarker({ machine, onMarkerClick }: EnhancedMarkerProps) {
 export default function EnhancedReactLeafletMap({
   machines,
   onMarkerClick,
+  getMachineData,
 }: MapProps) {
   const center = getMapCenter(machines);
   const zoom = getOptimalZoom(machines);
@@ -333,17 +333,21 @@ export default function EnhancedReactLeafletMap({
         <EnhancedMarker
           key={machine.id}
           machine={machine}
+          machineData={getMachineData(machine.id)}
           onMarkerClick={onMarkerClick}
         />
       ))}
 
       {/* Coverage Areas for Offline Machines (Dark Spots) */}
       {machines
-        .filter((m) => m.data.status === 'offline')
+        .filter((m) => getMachineData(m.id).status === 'offline')
         .map((machine) => (
           <Circle
             key={`dark-${machine.id}`}
-            center={[machine.last_location.lat, machine.last_location.lng]}
+            center={[
+              machine.last_location?.lat ?? 0,
+              machine.last_location?.lng ?? 0,
+            ]}
             radius={800}
             pathOptions={{
               fillColor: '#1f2937',

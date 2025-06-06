@@ -47,12 +47,19 @@ export interface Machine {
   model_uid: string;
   manufacturer_id: number;
   model_specifications: Record<string, unknown>;
-  data: {
-    status: string;
-    lastSeen: string;
-    suspiciousEvents?: Array<SuspiciousEvent>;
-    healthEvents?: Array<HealthEvent>;
-  };
+  // data: {
+  //   status: string;
+  //   lastSeen: string;
+  //   suspiciousEvents?: Array<SuspiciousEvent>;
+  //   healthEvents?: Array<HealthEvent>;
+  // };
+}
+
+export interface MachineData {
+  status: string;
+  lastSeen: string;
+  suspiciousEvents?: Array<SuspiciousEvent>;
+  healthEvents?: Array<HealthEvent>;
 }
 
 // {
