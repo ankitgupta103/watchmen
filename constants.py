@@ -8,15 +8,15 @@ DEVICE_ID_CAM_BASE = 1000000
 # Device IDs which act as Command Center start with this
 DEVICE_ID_CC_BASE = 1000
 
-MESSAGE_TYPE_SPATH = "sp"
-MESSAGE_TYPE_SCAN = "sc"
-MESSAGE_TYPE_HEARTBEAT = "hb"
-MESSAGE_TYPE_PHOTO = "ph"
-MESSAGE_TYPE_ACK = "ak"
-
-MESSAGE_TYPE_CHUNK_BEGIN = "cb"
-MESSAGE_TYPE_CHUNK_ITEM = "ci"
-MESSAGE_TYPE_CHUNK_END = "ce"
+# No conflict please
+MESSAGE_TYPE_SPATH = "S"
+MESSAGE_TYPE_SCAN = "C"
+MESSAGE_TYPE_HEARTBEAT = "H"
+MESSAGE_TYPE_PHOTO = "P"
+MESSAGE_TYPE_ACK = "A"
+MESSAGE_TYPE_CHUNK_BEGIN = "B"
+MESSAGE_TYPE_CHUNK_ITEM = "I"
+MESSAGE_TYPE_CHUNK_END = "E"
 
 JK_MESSAGE_TYPE = "mst"
 JK_SOURCE = "src"
@@ -46,3 +46,12 @@ node_layout = [
         ["U", "H", "I", "B", "K"],
         ["V", "W", "X", "Y", "J", "Z"]
         ]
+
+NO_DEST = "0"
+
+# 0 is an error here
+HN_ID = {
+        "central" : 1,
+        "rpi2" : 2,
+        "rpi3" : 3
+        }

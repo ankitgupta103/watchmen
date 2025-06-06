@@ -68,11 +68,11 @@ class RFComm:
     # 4. Is an ack, try to unblock my send.
     def _process_read_message(self, msgstr):
         # Handle ack
-        msgid = msg["nid"]
+        msgid, msgpyl = self.sep_part(msgstr, ';')
         (msgtype, src, dest, rid) = self._parse_msg_id(msgid)
         if dest is None or dest == "None":
             print(f"{msgstr} is a broadcast")
-            self.process_message(msg["pyl"])
+            self.process_message(msgpyl)
             return
         if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
             print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
@@ -136,13 +136,10 @@ class RFComm:
             self._send_unicast(msg_to_send, src, False, 0)
             return
         
-        self.process_message(msg["pyl"])
+        self.process_message(msgpyl)
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
-        msg_to_send = {
-                constants.JK_MESSAGE_TYPE : constants.MESSAGE_TYPE_ACK,
-                "ackid" : msgid,
-                }
-        self._send_unicast(msg_to_send, src, False, 0)
+        msg_to_send = msgid
+        self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
 
     def _recompile_msg(self, cid):
         print(self.msg_parts[cid])
@@ -182,8 +179,9 @@ class RFComm:
         reader_thread.start()
 
     def _get_msg_id(self, msgtype, dest):
-        r = random.randint(1000,2000)
-        id = f"{msgtype}_{self.devid}_{dest}_{r}"
+        r = random.randint(900,999)
+        print(r)
+        id = f"{msgtype}{self.devid}{dest}{r}"
         print(f"Id = {id}")
         return id
 
@@ -197,21 +195,20 @@ class RFComm:
             return (msgstr[0:firstloc], msgstr[firstloc+1:])
 
     def _parse_msg_id(self, msgid):
-        parts = msgid.split('_')
-        if len(parts) != 4:
-            print(f"Failed Parsing Key")
+        if len(msgid) != 6:
+            print(f"Failed Parsing Key : {msgid}")
             return None
-        msgtype = parts[0]
-        src = parts[1]
+        msgtype = msgid[0]
+        src = msgid[1]
         dest = None
-        if len(parts[2]) > 0:
-            dest = parts[2]
-        rid = parts[3]
+        if msgid[2] != constants.NO_DEST:
+            dest = msgid[2]
+        rid = msgid[3:]
         return (msgtype, src, dest, rid)
 
     def _actual_send(self, msgstr):
-        if len(msgstr) > 20:
-            print(f"Message is exceeding length {len(msgstr)}")
+        if len(msgstr) > 32:
+            print(f"Message is exceeding length {len(msgstr)} : {msgstr}")
             return False
         print(f"Sending message : {msgstr}")
         data_bytes = msgstr.encode('utf-8')
@@ -226,25 +223,17 @@ class RFComm:
     # It is in msg just so we can take it out and stuff it into id.
     # Fixit.
     # No ack, no retry
-    def _send_broadcast(self, msg, mst=None):
-        mst = "br"
-        if constants.JK_MESSAGE_TYPE in msg:
-            mst = msg[constants.JK_MESSAGE_TYPE]
-        msgid = self._get_msg_id(mst, None) # Message type has to improve
-        msg["nid"] = msgid
-        msgstr = json.dumps(msg)
+    def _send_broadcast(self, payload, mst):
+        msgid = self._get_msg_id(mst, constants.NO_DEST) # Message type has to improve
+        msgstr = f"{msgid};{payload}"
         return self._actual_send(msgstr)
 
     # dest = None = broadcast, no ack waited, assumed success.
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
     # TODO set limit on size
-    def _send_unicast(self, msg, dest, wait_for_ack = True, retry_count = 3):
-        mst = "un"
-        if constants.JK_MESSAGE_TYPE in msg:
-            mst = msg[constants.JK_MESSAGE_TYPE]
+    def _send_unicast(self, payload, mst, dest, wait_for_ack = True, retry_count = 3):
         msgid = self._get_msg_id(mst, dest) # Message type has to improve
-        msg["nid"] = msgid
-        msgstr = json.dumps(msg)
+        msgstr = f"{msgid};{payload}"
         if not wait_for_ack:
             return self._actual_send(msgstr)
         # We have to wait for ack.
@@ -351,18 +340,18 @@ class RFComm:
         print(len(msg_chunks))
         return self._send_chunks(msg_chunks, dest, 3)
 
-    def send_message(self, payload, dest):
+    def send_message(self, payload, mst, dest):
         if dest is None:
-            if len(payload) < 200:
-                msg = {"pyl" : payload}
-                self._send_broadcast(msg)
+            if len(payload) < 30:
+                msg = payload
+                self._send_broadcast(msg, mst)
                 return True
             else:
                 print(f"Please dont broadcast big messages, this one is of size {len(payload)}")
                 return False
-        if len(payload) < 200:
-            msg = {"pyl" : payload}
-            sent = self._send_unicast(msg, dest)
+        if len(payload) < 30:
+            msg = payload
+            sent = self._send_unicast(msg, mst, dest)
             return sent
         else:
             print("Too big, will chunk msg {len(payload)}")
@@ -370,46 +359,41 @@ class RFComm:
             return sent
 
 def test_send_img(rf, imgfile, dest):
+    mst = constants.MESSAGE_TYPE_PHOTO
+    # Allowing json here, since the overhead is worth the metadata.
     im = {"i_m" : "Image metadata",
           "i_d" : image.image2string(imgfile)}
     msgstr = json.dumps(im)
-    rf.send_message(msgstr, dest)
+    rf.send_message(msgstr, mst, dest)
 
 def test_send_long_msg(rf, dest):
+    mst = constants.MESSAGE_TYPE_SPATH
     long_string = ""
     for i in range(500):
         long_string = long_string + str(i) + "_"
-    lm = {"data" : long_string}
-    msgstr = json.dumps(lm)
-    rf.send_message(msgstr, dest)
+    rf.send_message(long_string, mst, dest)
 
 def test_send_types(rf, devid, dest):
-    msg = "Sending broadcast"
-    rf.send_message(msg, None)
-    #msg = "Send unicast to cc"
-    #rf.send_message(msg, "cc")
-    msg = f"Send unicast to {dest}"
-    rf.send_message(msg, dest)
+    mst = constants.MESSAGE_TYPE_SPATH
+    msg = "Sending a message"
+    rf.send_message(msg, mst, None)
+    msg = f"Sending a message to {dest}"
+    rf.send_message(msg, mst, dest)
 
 # 50 is overhead + size of string of msgsize
-def test_send_time_to_ack(rf, dest, msgsize):
+def test_send_time_to_ack(rf, dest, mst, msgsize):
     x = "x"*msgsize
-    rf.send_message(x, dest)
+    rf.send_message(x, mst, dest)
 
 def main():
-    devid = ""
-    if sys.argv[1] == "r":
-        devid = "aa"
-        dest = "bb"
-    elif sys.argv[1] == "s":
-        devid = "bb"
-        dest = "aa"
-    else:
-        print(f"arg1 has to be r or s only")
+    if hname not in constants.HN_ID:
+        print(f"Unknown hostname ({hname}) not in {constants.HN_ID}")
         return
+    devid = str(constants.HN_ID[hname])
     rf = RFComm(devid)
     rf.keep_reading()
-    if devid == "bb":
+    if len(sys.argv) > 0:
+        dest = sys.argv[1]
         # test_send_time_to_ack(rf, dest, int(sys.argv[2]))
         test_send_types(rf, devid, dest)
         # test_send_long_msg(rf, dest) # Assumes its an image
