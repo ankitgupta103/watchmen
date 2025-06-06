@@ -163,15 +163,14 @@ class RFComm:
         for (_, d) in p:
             parts.append(d)
         orig_payload = "".join(parts)
-        # TODO get image metadata from chunk begin.
-        # orig_msg = json.loads(orig_payload)
-        if False and "i_d" in orig_msg:  # Disable for now
+        orig_msg = json.loads(orig_payload)
+        if "i_d" in orig_msg:
             imstr = orig_msg["i_d"]
             im = image.imstrtoimage(imstr)
             im.save("/tmp/recompiled.jpg")
             im.show()
         else:
-            print(f"Recompiled message =\n{orig_msg}")
+            print(f"Recompiled message =\n{orig_payload}")
         return orig_msg
 
     def _read_from_rf(self):
@@ -402,8 +401,8 @@ def main():
         dest = sys.argv[1]
         # test_send_time_to_ack(rf, dest, 10)
         # test_send_types(rf, devid, dest)
-        test_send_long_msg(rf, dest) # Assumes its an image
-        # test_send_img(rf, "pencil.jpg", dest)
+        # test_send_long_msg(rf, dest) # Assumes its an image
+        test_send_img(rf, "pencil.jpg", dest)
         time.sleep(10)
     else:
         # Keep receiving
