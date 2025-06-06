@@ -20,9 +20,9 @@ ind = -1
 if hname == "rpi2":
     ind = 0
 elif hname == "rpi3":
-    ind = 1
-elif hname == "central":
     ind = 2
+elif hname == "central":
+    ind = 1
 else:
     print(f"Unknown host")
     sys.exit(1)
