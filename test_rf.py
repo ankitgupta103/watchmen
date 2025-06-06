@@ -42,9 +42,11 @@ def setup():
     radio.setPALevel(RF24_PA_LOW)
     radio.setDataRate(RF24_1MBPS)
     radio.setChannel(76)
-    radio.stop_listening(myname)
-    for i in range(len(othernames)):
-        radio.open_rx_pipe(i+1, othernames[i])
+    radio.stop_listening(b"n1")
+    radio.open_rx_pipe(1, b"n1")
+    #radio.stop_listening(myname)
+    #for i in range(len(othernames)):
+    #    radio.open_rx_pipe(i+1, othernames[i])
     radio.payloadSize = MAX_CHUNK_SIZE
     #radio.setAutoAck(True)
     radio.set_retries(10, 5)
