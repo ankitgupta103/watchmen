@@ -50,8 +50,7 @@ def send_message(msg):
     print(f"Sending {succ} in time {(t2-t1)*1000} msec")
     return succ
 
-def send_messages():
-    num_to_send = 100
+def send_messages(num_to_send):
     num_successfully_sent = 0
     time.sleep(10)
     for i in range(num_to_send):
@@ -67,15 +66,10 @@ def main():
     setup()
     reader_thread = threading.Thread(target=keep_receiving_bg, daemon=True)
     reader_thread.start()
-    if sys.argv[1] == "r":
-        time.sleep(1000)
-    elif sys.argv[1] == "s":
-        send_messages()
-        time.sleep(10)
-        print(f"{hname} : {len(msgs_recd)} {sorted(msgs_recd)}")
-        time.sleep(1000)
-    else:
-        print("argv1 needs to be r OR s")
+    send_messages(int(sys.argv[1]))
+    time.sleep(10)
+    print(f"{hname} : {len(msgs_recd)} {sorted(msgs_recd)}")
+    time.sleep(1000)
     reader_thread.join()
 
 if __name__ == "__main__":
