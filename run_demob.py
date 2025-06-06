@@ -4,11 +4,12 @@ from device import Device
 from central import CommandCentral
 from esp32_comm import EspComm
 
-get_hostname():
+def get_hostname():
     return socket.gethostname()
 
 # Expect : central, rpi2, rpi3, rpi4, rpi5
 def get_device_id():
+    return "CC"
     hn = get_hostname()
     if hn == "central":
         return "CC"
