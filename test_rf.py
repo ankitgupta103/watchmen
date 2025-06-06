@@ -1,3 +1,4 @@
+import random
 import socket
 import sys
 import threading
@@ -74,10 +75,12 @@ def send_message(msg):
     return succ
 
 def send_messages():
-    num_to_send = 10
+    num_to_send = 5
     num_successfully_sent = 0
     for i in range(num_to_send):
-        ms = f"M#{i}"
+        r = random.randint(3,6)
+        time.sleep(r)
+        ms = f"{hname}#{i}"
         succ = send_message(ms)
         if succ:
             num_successfully_sent += 1
