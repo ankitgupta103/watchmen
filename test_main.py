@@ -33,7 +33,7 @@ def check_root_permissions():
     """Check if running with required permissions"""
     if os.geteuid() != 0:
         print("ERROR: This system requires root permissions for GPIO access")
-        print("Please run with: sudo python3 run_usb_camera_demo.py")
+        print("Please run with: sudo python3 test_main.py")
         return False
     return True
 
@@ -283,7 +283,7 @@ def run_continuous_monitoring():
 def print_usage():
     """Print usage information"""
     print("USB Camera System Demo")
-    print("Usage: sudo python3 run_usb_camera_demo.py [mode]")
+    print("Usage: sudo python3 test_main.py [mode]")
     print()
     print("Modes:")
     print("  test          - Test USB camera standalone")
@@ -297,9 +297,9 @@ def print_usage():
     print("      Only central device publishes to MQTT")
     print()
     print("Examples:")
-    print("  sudo python3 run_usb_camera_demo.py test")
-    print("  sudo python3 run_usb_camera_demo.py device")
-    print("  sudo python3 run_usb_camera_demo.py integrated")
+    print("  sudo python3 test_main.py test")
+    print("  sudo python3 test_main.py device")
+    print("  sudo python3 test_main.py integrated")
 
 def main():
     """Main entry point"""
