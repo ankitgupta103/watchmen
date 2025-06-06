@@ -17,7 +17,7 @@ GPIO_PIN_PATH = $(GPIO_PATH)/gpio$(GPIO_PIN)
 GPIO_DIRECTION = $(GPIO_PIN_PATH)/direction
 GPIO_VALUE = $(GPIO_PIN_PATH)/value
 
-.PHONY: all shutdown startup cycle-power status setup-gpio cleanup-gpio test-gpio config
+.PHONY: all shutdown startup cycle-power status setup-gpio setup-gpio-alt cleanup-gpio test-gpio config diagnose
 
 # Default target - provides instructions
 all:
@@ -28,7 +28,9 @@ all:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make config       - Show current configuration"
+	@echo "  make diagnose     - Run GPIO diagnostics"
 	@echo "  make setup-gpio   - Initialize GPIO pin for control"
+	@echo "  make setup-gpio-alt - Alternative GPIO setup using raspi-gpio"
 	@echo "  make status       - Show current GPIO state"
 	@echo "  make shutdown     - Turn OFF USB power (GPIO LOW)"
 	@echo "  make startup      - Turn ON USB power (GPIO HIGH)"
@@ -61,73 +63,129 @@ config:
 # Setup GPIO pin for output
 setup-gpio:
 	@echo "--- Setting up GPIO $(GPIO_PIN) for USB power control ---"
+	@echo "Checking GPIO interface availability..."
+	@if [ ! -d "$(GPIO_PATH)" ]; then \
+		echo "ERROR: /sys/class/gpio not available"; \
+		echo "Trying alternative raspi-gpio method..."; \
+		$(MAKE) setup-gpio-alt; \
+		exit 0; \
+	fi
+	@if [ ! -w "$(GPIO_EXPORT)" ]; then \
+		echo "ERROR: Cannot write to $(GPIO_EXPORT)"; \
+		echo "Make sure you're running as root: sudo make setup-gpio"; \
+		exit 1; \
+	fi
+	@if [ -d "$(GPIO_PIN_PATH)" ]; then \
+		echo "GPIO $(GPIO_PIN) already exported, cleaning up first..."; \
+		echo $(GPIO_PIN) > $(GPIO_UNEXPORT) 2>/dev/null || true; \
+		sleep 0.5; \
+	fi
+	@echo "Exporting GPIO $(GPIO_PIN)..."
+	@if ! echo $(GPIO_PIN) > $(GPIO_EXPORT); then \
+		echo "ERROR: Failed to export GPIO $(GPIO_PIN)"; \
+		echo "Trying alternative method..."; \
+		$(MAKE) setup-gpio-alt; \
+		exit 0; \
+	fi
+	@echo "Waiting for GPIO to initialize..."
+	@sleep 1
 	@if [ ! -d "$(GPIO_PIN_PATH)" ]; then \
-		echo "Exporting GPIO $(GPIO_PIN)..."; \
-		echo $(GPIO_PIN) > $(GPIO_EXPORT); \
-		sleep 0.1; \
+		echo "ERROR: GPIO $(GPIO_PIN) directory not created"; \
+		exit 1; \
 	fi
 	@echo "Setting GPIO $(GPIO_PIN) as output..."
-	@echo "out" > $(GPIO_DIRECTION)
+	@if ! echo "out" > $(GPIO_DIRECTION); then \
+		echo "ERROR: Failed to set GPIO direction"; \
+		exit 1; \
+	fi
 	@echo "Initializing GPIO $(GPIO_PIN) to LOW (USB OFF)..."
-	@echo "0" > $(GPIO_VALUE)
+	@if ! echo "0" > $(GPIO_VALUE); then \
+		echo "ERROR: Failed to set GPIO value"; \
+		exit 1; \
+	fi
 	@echo "--- GPIO setup complete ---"
+
+# Alternative GPIO setup using raspi-gpio command
+setup-gpio-alt:
+	@echo "--- Setting up GPIO $(GPIO_PIN) using raspi-gpio ---"
+	@if ! command -v raspi-gpio >/dev/null 2>&1; then \
+		echo "ERROR: raspi-gpio command not found"; \
+		echo "Install with: sudo apt install raspi-gpio"; \
+		exit 1; \
+	fi
+	@echo "Setting GPIO $(GPIO_PIN) as output with initial LOW state..."
+	@raspi-gpio set $(GPIO_PIN) op dl
+	@echo "--- Alternative GPIO setup complete ---"
+	@echo "Note: Using raspi-gpio method. Some status commands may not work."
 
 # Show current GPIO status
 status:
 	@echo "--- GPIO $(GPIO_PIN) Status ---"
+	@if command -v raspi-gpio >/dev/null 2>&1; then \
+		echo "Using raspi-gpio to check status:"; \
+		raspi-gpio get $(GPIO_PIN); \
+	fi
 	@if [ -d "$(GPIO_PIN_PATH)" ]; then \
-		echo "GPIO $(GPIO_PIN) is exported"; \
+		echo "Sysfs GPIO $(GPIO_PIN) is exported"; \
 		echo -n "Direction: "; cat $(GPIO_DIRECTION) 2>/dev/null || echo "unknown"; \
 		echo -n "Value: "; cat $(GPIO_VALUE) 2>/dev/null || echo "unknown"; \
-		VALUE=$$(cat $(GPIO_VALUE) 2>/dev/null); \
-		if [ "$$VALUE" = "1" ]; then \
+		VALUE=$(cat $(GPIO_VALUE) 2>/dev/null); \
+		if [ "$VALUE" = "1" ]; then \
 			echo "USB Power: ON"; \
-		elif [ "$$VALUE" = "0" ]; then \
+		elif [ "$VALUE" = "0" ]; then \
 			echo "USB Power: OFF"; \
 		else \
 			echo "USB Power: UNKNOWN"; \
 		fi; \
 	else \
-		echo "GPIO $(GPIO_PIN) is not exported"; \
-		echo "Run 'make setup-gpio' first"; \
+		echo "Sysfs GPIO $(GPIO_PIN) is not exported"; \
+		echo "Using raspi-gpio for status (if available)"; \
 	fi
 
-# Turn OFF USB power
+# Turn OFF USB power (try both methods)
 shutdown:
 	@echo "--- Shutting down USB power ---"
-	@if [ ! -d "$(GPIO_PIN_PATH)" ]; then \
-		echo "Setting up GPIO first..."; \
-		$(MAKE) setup-gpio; \
-	fi
 	@echo "Setting GPIO $(GPIO_PIN) LOW (USB OFF)..."
-	@echo "0" > $(GPIO_VALUE)
+	@if [ -d "$(GPIO_PIN_PATH)" ]; then \
+		echo "0" > $(GPIO_VALUE) || echo "Sysfs method failed"; \
+	fi
+	@if command -v raspi-gpio >/dev/null 2>&1; then \
+		raspi-gpio set $(GPIO_PIN) op dl || echo "raspi-gpio method failed"; \
+	fi
 	@sleep $(POWER_OFF_DELAY)
 	@echo "--- USB power shutdown complete ---"
 
-# Turn ON USB power
+# Turn ON USB power (try both methods)
 startup:
 	@echo "--- Starting up USB power ---"
-	@if [ ! -d "$(GPIO_PIN_PATH)" ]; then \
-		echo "Setting up GPIO first..."; \
-		$(MAKE) setup-gpio; \
-	fi
 	@echo "Setting GPIO $(GPIO_PIN) HIGH (USB ON)..."
-	@echo "1" > $(GPIO_VALUE)
+	@if [ -d "$(GPIO_PIN_PATH)" ]; then \
+		echo "1" > $(GPIO_VALUE) || echo "Sysfs method failed"; \
+	fi
+	@if command -v raspi-gpio >/dev/null 2>&1; then \
+		raspi-gpio set $(GPIO_PIN) op dh || echo "raspi-gpio method failed"; \
+	fi
 	@sleep $(POWER_ON_DELAY)
 	@echo "--- USB power startup complete ---"
 
 # Cycle USB power (OFF -> ON)
 cycle-power:
 	@echo "--- Cycling USB power ---"
-	@if [ ! -d "$(GPIO_PIN_PATH)" ]; then \
-		echo "Setting up GPIO first..."; \
-		$(MAKE) setup-gpio; \
-	fi
 	@echo "Turning USB power OFF..."
-	@echo "0" > $(GPIO_VALUE)
+	@if [ -d "$(GPIO_PIN_PATH)" ]; then \
+		echo "0" > $(GPIO_VALUE) || echo "Sysfs method failed"; \
+	fi
+	@if command -v raspi-gpio >/dev/null 2>&1; then \
+		raspi-gpio set $(GPIO_PIN) op dl || echo "raspi-gpio method failed"; \
+	fi
 	@sleep $(CYCLE_DELAY)
 	@echo "Turning USB power ON..."
-	@echo "1" > $(GPIO_VALUE)
+	@if [ -d "$(GPIO_PIN_PATH)" ]; then \
+		echo "1" > $(GPIO_VALUE) || echo "Sysfs method failed"; \
+	fi
+	@if command -v raspi-gpio >/dev/null 2>&1; then \
+		raspi-gpio set $(GPIO_PIN) op dh || echo "raspi-gpio method failed"; \
+	fi
 	@sleep $(POWER_ON_DELAY)
 	@echo "--- Power cycle complete ---"
 
@@ -135,19 +193,46 @@ cycle-power:
 test-gpio:
 	@echo "--- Testing GPIO $(GPIO_PIN) control ---"
 	@echo "This will blink the USB power 3 times..."
-	@if [ ! -d "$(GPIO_PIN_PATH)" ]; then \
-		echo "Setting up GPIO first..."; \
-		$(MAKE) setup-gpio; \
-	fi
 	@for i in 1 2 3; do \
-		echo "Blink $$i: ON"; \
-		echo "1" > $(GPIO_VALUE); \
+		echo "Blink $i: ON"; \
+		if [ -d "$(GPIO_PIN_PATH)" ]; then \
+			echo "1" > $(GPIO_VALUE) || echo "Sysfs failed"; \
+		fi; \
+		if command -v raspi-gpio >/dev/null 2>&1; then \
+			raspi-gpio set $(GPIO_PIN) op dh || echo "raspi-gpio failed"; \
+		fi; \
 		sleep 1; \
-		echo "Blink $$i: OFF"; \
-		echo "0" > $(GPIO_VALUE); \
+		echo "Blink $i: OFF"; \
+		if [ -d "$(GPIO_PIN_PATH)" ]; then \
+			echo "0" > $(GPIO_VALUE) || echo "Sysfs failed"; \
+		fi; \
+		if command -v raspi-gpio >/dev/null 2>&1; then \
+			raspi-gpio set $(GPIO_PIN) op dl || echo "raspi-gpio failed"; \
+		fi; \
 		sleep 1; \
 	done
 	@echo "--- GPIO test complete ---"
+
+# Diagnostic commands
+diagnose:
+	@echo "--- GPIO Diagnostic Information ---"
+	@echo "Kernel version:"
+	@uname -r
+	@echo ""
+	@echo "GPIO interface check:"
+	@ls -la /sys/class/gpio/ 2>/dev/null || echo "/sys/class/gpio not available"
+	@echo ""
+	@echo "raspi-gpio availability:"
+	@if command -v raspi-gpio >/dev/null 2>&1; then \
+		echo "raspi-gpio is available"; \
+		echo "Current GPIO $(GPIO_PIN) state:"; \
+		raspi-gpio get $(GPIO_PIN) || echo "Failed to get GPIO state"; \
+	else \
+		echo "raspi-gpio not found. Install with: sudo apt install raspi-gpio"; \
+	fi
+	@echo ""
+	@echo "Current user: $(whoami)"
+	@echo "Running with sudo: $(if [ $(id -u) -eq 0 ]; then echo 'Yes'; else echo 'No - try: sudo make diagnose'; fi)"
 
 # Cleanup GPIO resources
 cleanup-gpio:
