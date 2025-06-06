@@ -345,7 +345,7 @@ class RFComm:
         t1 = time.time()
         sent = self._send_chunks(msg_chunks, mst, dest, 3)
         t2 = time.time()
-        print(f"Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
+        print(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
         return sent
 
     def send_message(self, payload, mst, dest):
