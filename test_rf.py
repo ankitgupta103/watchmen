@@ -12,10 +12,10 @@ MAX_CHUNK_SIZE = 32
 hname = socket.gethostname()
 myname = b""
 othername = b""
-if hname == "central":
+if hname == "rpi2":
     myname = b"n1"
     othername = b"n2"
-if hname == "rpi2":
+if hname == "rpi3":
     myname = b"n2"
     othername = b"n1"
 print(f"{myname} : {othername}")
