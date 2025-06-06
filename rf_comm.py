@@ -165,7 +165,6 @@ class RFComm:
             has_payload, pipe = radio.available_pipe()
             if has_payload:
                 data = radio.read(MAX_CHUNK_SIZE)
-                num_messages += 1
                 datastr = data.rstrip(b'\x00').decode()
                 msgs_recd.append((datastr, time.time()))
                 print(f"==============={num_messages} Received data : {datastr}")
