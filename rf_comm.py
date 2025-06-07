@@ -67,7 +67,10 @@ class RFComm:
         self.node = node
 
     def process_message(self, mst, msgstr):
-        #print(f"Processing incoming message : {msgstr}")
+        if len(msgstr) > 100:
+            print(f"Processing incoming message : {msgstr[0:100]}...")
+        else:
+            print(f"Processing incoming message : {msgstr}")
         self.msg_received.append(msgstr)
         if self.node is not None:
             self.node.process_msg(mst, msgstr)
