@@ -14,7 +14,7 @@ from pyrf24 import RF24, RF24_PA_LOW, RF24_1MBPS, RF24_250KBPS
 
 radio = RF24(22, 0)
 MAX_DATA_SIZE = 32
-MAX_CHUNK_SIZE = 20
+MAX_CHUNK_SIZE = 19
 hname = socket.gethostname()
 
 """
