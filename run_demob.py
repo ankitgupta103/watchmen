@@ -3,6 +3,7 @@ import threading
 import image
 import json
 import socket
+import random
 from rf_comm import RFComm
 
 import constants
@@ -43,7 +44,7 @@ def save_image(msgstr):
             fname = f"/tmp/commandcenter_{random.randint(1000,2000)}.jpg"
             print(f"Saving image to {fname}")
             im.save(fname)
-            # im.show()
+            im.show()
     except Exception as e:
         print(f"Error loadig json {e}")
 
