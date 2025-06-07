@@ -44,8 +44,8 @@ def save_image(msgstr):
             print(f"Saving image to {fname}")
             im.save(fname)
             # im.show()
-    except:
-        print(f"Error loadig json {msgstr}")
+    except Exception as e:
+        print(f"Error loadig json {e}")
 
 class DevUnit:
     msg_queue = [] # str, type, dest tuple list
