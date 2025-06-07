@@ -1,4 +1,5 @@
 import time
+import threading
 import image
 import json
 import socket
@@ -47,11 +48,15 @@ def save_image(msgstr):
         print(f"Error loadig json {msgstr}")
 
 class DevUnit:
+    msg_queue = [] # str, type, dest tuple list
+    msg_queue_lock = threading.Lock()
+
     def __init__(self, devid):
         self.devid = devid
         self.rf = RFComm(devid)
         self.rf.add_node(self)
         self.rf.keep_reading()
+        self.keep_propagating()
 
     def process_msg(self, mst, msgstr):
         if is_node_passthrough(self.devid):
@@ -59,7 +64,8 @@ class DevUnit:
             if next_dest == None:
                 print(f"{self.devid} Weird no dest for {self.devid}")
                 return
-            self.rf.send_message(msgstr, mst, next_dest)
+            with self.msg_queue_lock:
+                self.msg_queue.append((msgstr, mst, next_dest))
         if is_node_src(self.devid):
             print(f"{self.devid}: Src should not be getting any messages")
         if is_node_dest(self.devid):
@@ -78,7 +84,21 @@ class DevUnit:
         im = {"i_m" : "Image metadata",
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
+        msgstr = f"Hello from {self.devid}"
         self.rf.send_message(msgstr, mst, next_dest)
+
+    def _keep_sending(self):
+        with self.msg_queue_lock:
+            for (msgstr, mst, dest) in self.msg_queue:
+                print(f"Propagating message {mst} to {dest}")
+                self.rf.send_message(msgstr, mst, next_dest)
+
+    # Non blocking, background thread
+    def keep_propagating(self):
+        # Start background thread to read incoming data
+        propogation_thread = threading.Thread(target=self._keep_sending, daemon=True)
+        # TODO fix and make it a clean exit on self deletion
+        propogation_thread.start()
 
 def run_unit():
     hname = get_hostname()
@@ -89,6 +109,7 @@ def run_unit():
     if is_node_src(devid):
         time.sleep(5)
         du.send_img()
+
     time.sleep(10000000)
 
 def main():
