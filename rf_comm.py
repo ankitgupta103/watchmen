@@ -106,7 +106,7 @@ class RFComm:
                     print(f"Ack {ackid} no matching unacked message")
             return
         if dest != self.devid:
-            print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
+            # print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
             return
 
         if msgtype == constants.MESSAGE_TYPE_NACK_CHUNK and dest == self.devid:
@@ -137,7 +137,7 @@ class RFComm:
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
             ri = random.randint(0, 100)
-            if ri < 30:
+            if ri < 20:
                 print(f"Flakiness dropping chunk : {i}")
                 return
             self.msg_chunks_received[cid].append(i)
@@ -230,7 +230,7 @@ class RFComm:
             if has_payload:
                 data = radio.read(MAX_DATA_SIZE)
                 datastr = data.rstrip(b'\x00').decode()
-                print(f"=============== Received data : {datastr}")
+                # print(f"=============== Received data : {datastr}")
                 self._process_read_message(datastr)
 
     # Non blocking, background thread
@@ -276,7 +276,7 @@ class RFComm:
         if len(msgstr) > MAX_DATA_SIZE:
             print(f"Message is exceeding length {len(msgstr)} : {msgstr}")
             return False
-        print(f"Sending message : {msgstr}")
+        # print(f"Sending message : {msgstr}")
         data_bytes = msgstr.encode('utf-8')
         total_len = len(data_bytes)
         buffer = data_bytes.ljust(MAX_DATA_SIZE, b'\x00')
