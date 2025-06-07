@@ -45,13 +45,13 @@ class RFComm:
     
     def __init__(self, devid):
         self.devid = devid
-        time.sleep(2)
         self.msg_chunks_expected = {} # Receiver uses this. cid->num_chunks
         self.msg_chunks_received = {} # Receiver uses this. cid->list of ids got
         self.msg_parts = {} # Receiver uses this. cid->data
         self.msg_cunks_missing = {} # Sender gets this from ack.
         self.node = None
         self.setup_rf()
+        time.sleep(0.5)
 
     def setup_rf(self):
         if not radio.begin():
@@ -139,7 +139,7 @@ class RFComm:
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
             ri = random.randint(0, 100)
-            if ri < 10:
+            if ri < 30:
                 print(f"Flakiness dropping chunk : {i}")
                 return
             self.msg_chunks_received[cid].append(i)
@@ -323,7 +323,7 @@ class RFComm:
 
     # Note retry here is separate retry per chunk.
     # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
-    def _send_chunks(self, msg_chunks, mst, dest, retry_count = 3):
+    def _send_chunks(self, msg_chunks, mst, dest, retry_count = 5):
         num_chunks = len(msg_chunks)
         print(f"Getting ready to push {num_chunks} chunks")
         chunk_identifier = random.randint(10,20) # TODO better.
@@ -373,7 +373,7 @@ class RFComm:
                 else:
                     print(f" =========== Looks like ack received for {msgid}")
                     return True # Hopefully lock is received
-            time.sleep(2)
+            time.sleep(0.5)
             ts = time.time_ns()
             if (ts - time_ack_start) > 5000000000:
                 print(f" Timed out received for {msgid}")
@@ -390,7 +390,7 @@ class RFComm:
             msgstr = msgstr[MAX_CHUNK_SIZE:]
         print(f"chunking {len(long_msg)} long message into {len(msg_chunks)} chunks")
         t1 = time.time()
-        sent = self._send_chunks(msg_chunks, mst, dest, 3)
+        sent = self._send_chunks(msg_chunks, mst, dest, 5)
         t2 = time.time()
         print(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
         return sent
