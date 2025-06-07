@@ -84,7 +84,6 @@ class DevUnit:
         im = {"i_m" : "Image metadata",
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
-        msgstr = f"Hello from {self.devid}"
         self.rf.send_message(msgstr, mst, next_dest)
 
     def _keep_sending(self):
