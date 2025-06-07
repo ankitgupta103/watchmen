@@ -214,7 +214,7 @@ class RFComm:
                 fname = f"/tmp/recompiled_{random.randint(1000,2000)}.jpg"
                 print(f"Saving image to {fname}")
                 im.save(fname)
-                im.show()
+                # im.show()
         except:
             if len(orig_payload) > 100:
                 print(f"Recompiled message =\n{orig_payload[0:100]}")

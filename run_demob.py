@@ -43,7 +43,7 @@ def save_image(msgstr):
             fname = f"/tmp/commandcenter_{random.randint(1000,2000)}.jpg"
             print(f"Saving image to {fname}")
             im.save(fname)
-            im.show()
+            # im.show()
     except:
         print(f"Error loadig json {msgstr}")
 
