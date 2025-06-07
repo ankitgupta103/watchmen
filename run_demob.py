@@ -88,10 +88,13 @@ class DevUnit:
         self.rf.send_message(msgstr, mst, next_dest)
 
     def _keep_sending(self):
-        with self.msg_queue_lock:
-            for (msgstr, mst, dest) in self.msg_queue:
-                print(f"Propagating message {mst} to {dest}")
-                self.rf.send_message(msgstr, mst, next_dest)
+        while True:
+            with self.msg_queue_lock:
+                if len(self.msg_queue) > 0:
+                    (msgstr, mst, dest) = self.msg_queue.pop()
+                    print(f"Propagating message {mst} to {dest}")
+                    self.rf.send_message(msgstr, mst, dest)
+                time.sleep(2)
 
     # Non blocking, background thread
     def keep_propagating(self):
