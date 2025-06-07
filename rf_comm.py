@@ -94,14 +94,14 @@ class RFComm:
             self.process_message(msgtype, msgpyl)
             return
         if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
-            print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
+            # print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
             ackid = msgpyl
             with self.msg_unacked_lock:
                 if ackid in self.msg_unacked:
                     unack = self.msg_unacked.pop(ackid, None)
                     time_to_ack = time.time() - unack[-1]
                     self.msg_acked[ackid] = (len(unack), time_to_ack)
-                    print(f"{ackid} --- Cleared ack, time for ack = {time_to_ack}")
+                    # print(f"{ackid} --- Cleared ack, time for ack = {time_to_ack}")
                 else:
                     print(f"Ack {ackid} no matching unacked message")
             return
