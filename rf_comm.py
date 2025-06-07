@@ -14,7 +14,7 @@ from pyrf24 import RF24, RF24_PA_LOW, RF24_1MBPS, RF24_250KBPS
 
 radio = RF24(22, 0)
 MAX_DATA_SIZE = 32
-MAX_CHUNK_SIZE = 20
+MAX_CHUNK_SIZE = 19
 hname = socket.gethostname()
 
 """
@@ -67,7 +67,10 @@ class RFComm:
         self.node = node
 
     def process_message(self, mst, msgstr):
-        #print(f"Processing incoming message : {msgstr}")
+        if len(msgstr) > 100:
+            print(f"Processing incoming message : {msgstr[0:100]}...")
+        else:
+            print(f"Processing incoming message : {msgstr}")
         self.msg_received.append(msgstr)
         if self.node is not None:
             self.node.process_msg(mst, msgstr)
@@ -137,8 +140,8 @@ class RFComm:
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
             ri = random.randint(0, 100)
-            if ri < 20:
-                print(f"Flakiness dropping chunk : {i}")
+            if ri < 10:
+                # print(f"Flakiness dropping chunk : {i}")
                 return
             self.msg_chunks_received[cid].append(i)
             self.msg_parts[cid].append((i, chunkdata))
@@ -198,7 +201,7 @@ class RFComm:
         ids = []
         parts = []
         for (cn, d) in p:
-            print(f"{cn} : {d}")
+            # print(f"{cn} : {d}")
             if cn not in ids:
                 ids.append(cn)
                 parts.append(d)
@@ -232,9 +235,12 @@ class RFComm:
             has_payload, pipe = radio.available_pipe()
             if has_payload:
                 data = radio.read(MAX_DATA_SIZE)
-                datastr = data.rstrip(b'\x00').decode()
+                try:
+                    datastr = data.rstrip(b'\x00').decode()
+                    self._process_read_message(datastr)
+                except Exception as e:
+                    print(f"Error reading data : {data}")
                 # print(f"=============== Received data : {datastr}")
-                self._process_read_message(datastr)
 
     # Non blocking, background thread
     def keep_reading(self):
@@ -343,7 +349,7 @@ class RFComm:
             return False
         for i in range(retry_count):
             chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
-            print(f"At retry count {retry_count} Receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+            print(f"At retry count {i} Receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered}")
             if len(chunks_undelivered) == 0:
                 break
             for cid in chunks_undelivered:

@@ -1,3 +1,4 @@
+import sys
 import time
 import threading
 import image
@@ -44,7 +45,7 @@ def save_image(msgstr):
             fname = f"/tmp/commandcenter_{random.randint(1000,2000)}.jpg"
             print(f"Saving image to {fname}")
             im.save(fname)
-            im.show()
+            # im.show()
     except Exception as e:
         print(f"Error loadig json {e}")
 
@@ -65,7 +66,9 @@ class DevUnit:
             if next_dest == None:
                 print(f"{self.devid} Weird no dest for {self.devid}")
                 return
+            print(f"In Passthrough mode, trying to aquire lock")
             with self.msg_queue_lock:
+                print(f"{self.devid} Adding message to send queue for {next_dest}")
                 self.msg_queue.append((msgstr, mst, next_dest))
         if is_node_src(self.devid):
             print(f"{self.devid}: Src should not be getting any messages")
@@ -76,25 +79,31 @@ class DevUnit:
                 save_image(msgstr)
 
     def send_img(self):
-        imgfile = "pencil.jpg"
+        imgfile = sys.argv[1]
         next_dest = get_next_dest(self.devid)
         if next_dest == None:
             print(f"{self.devid} Weird no dest for {self.devid}")
             return
         mst = constants.MESSAGE_TYPE_PHOTO
-        im = {"i_m" : "Image metadata",
+        im = {"i_m" : "{imgfile}",
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
         self.rf.send_message(msgstr, mst, next_dest)
 
     def _keep_sending(self):
         while True:
+            to_send = False
+            msgstr = None
+            mst = ""
+            dest = ""
             with self.msg_queue_lock:
                 if len(self.msg_queue) > 0:
                     (msgstr, mst, dest) = self.msg_queue.pop()
-                    print(f"Propagating message {mst} to {dest}")
-                    self.rf.send_message(msgstr, mst, dest)
-                time.sleep(2)
+                    to_send = True
+            if to_send:
+                print(f"Propagating message {mst} to {dest}")
+                self.rf.send_message(msgstr, mst, dest)
+            time.sleep(2)
 
     # Non blocking, background thread
     def keep_propagating(self):
