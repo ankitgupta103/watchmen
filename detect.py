@@ -1,3 +1,4 @@
+import sys
 import os
 import cv2
 from ultralytics import YOLO
@@ -9,9 +10,15 @@ testdir="/Users/ankitgupta/yolo/testdata/"
 #mname="yolo11n.pt"
 
 def has_person(results):
+    #print(results)
     for r in results:
         x = r.summary()
+        print(f"Box = {r.boxes.xywh}")
+        print(f"Box = {r.boxes.xywhn}")
+        print(f"Box = {r.boxes.xyxyn}")
+        print(f"Box = {r.boxes.xyxy}")
         for o in x:
+            print(f"detected object = {o['name']}")
             if o["name"] == "person":
                 return True
     return False
@@ -64,7 +71,7 @@ def eval_dir(detector, dname):
 def main():
     detector = Detector()
     detector.set_debug_mode()
-    detector.ImageHasPerson("/tmp/test1.jpg")
+    detector.ImageHasPerson(sys.argv[1])
     # eval_dir(detector, "/Users/ankitgupta/yolo/testdata/images_cv/")
 
 if __name__=="__main__":
