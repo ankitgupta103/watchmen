@@ -114,7 +114,7 @@ class RFComm:
 
         if msgtype == constants.MESSAGE_TYPE_NACK_CHUNK and dest == self.devid:
             cid, cliststr = self.sep_part(msgpyl, ';')
-            missing_chunks = eval(cliststr)
+            missing_chunks = cliststr.split(",")
             print(f"Receiver did not get chunks for {cid} : {missing_chunks}")
             for m in missing_chunks:
                 if m not in self.msg_cunks_missing[cid]:
