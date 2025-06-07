@@ -33,8 +33,9 @@ Protocol:
     Chunk Begin : MSGID;<MESSAGETYPE>CHUNKIDENTIFIER;NUMCHUNKS;MSGMETADATA
     Chunk Begin Ack:
     Chunk Item : MSGID;ChunkIdentifier;ChunkNum;Data
-    Chunk End : TODO
-    Chunk End Ack: TODO
+    Chunk End : ChunkIdentifier
+    Chunk End Ack: same as acknowledgement
+    Chunk Nack : MSGID;CID;Missing chunks
 """
 
 class RFComm:
@@ -118,6 +119,8 @@ class RFComm:
             for m in missing_chunks:
                 if m not in self.msg_cunks_missing[cid]:
                     self.msg_cunks_missing[cid].append(m)
+            # Should this need an ack? TODO
+            return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_BEGIN:
             mstcid, numchunkstr = self.sep_part(msgpyl, ';')
             mst = mstcid[0]
@@ -190,7 +193,7 @@ class RFComm:
         list_chunks = self._missing_chunk_helper(missing_chunks, 20)
         for chunks_to_send in list_chunks:
             msgstr = f"{cid};{chunks_to_send}"
-            succ = self._send_unicast(msgstr, constants.MESSAGE_TYPE_NACK_CHUNK, dest)
+            succ = self._send_unicast(msgstr, constants.MESSAGE_TYPE_NACK_CHUNK, dest, False, 0)
             if not succ:
                 return False
         return True
