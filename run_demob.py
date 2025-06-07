@@ -82,7 +82,7 @@ def run_unit():
     devid = constants.HN_ID[hname]
     du = DevUnit(devid)
     if is_node_src(devid):
-        du.sleep(5)
+        time.sleep(5)
         du.send_img()
     time.sleep(10000000)
 
