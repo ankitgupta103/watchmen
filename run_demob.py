@@ -1,49 +1,93 @@
 import time
 import socket
-from device import Device
-from central import CommandCentral
-from esp32_comm import EspComm
+from rf_comm import RFComm
+
+import constants
 
 def get_hostname():
     return socket.gethostname()
 
-# Expect : central, rpi2, rpi3, rpi4, rpi5
-def get_device_id():
-    return "CC"
-    hn = get_hostname()
-    if hn == "central":
-        return "CC"
-    return hn
+def is_node_src(devid):
+    return constants.PATH_DEMOB[0] == devid
+
+def is_node_dest(devid):
+    return constants.PATH_DEMOB[-1] == devid
+
+def is_node_passthrough(devid):
+    if is_node_src(devid) or is_node_dest(devid):
+        return False
+    return True
+
+def get_next_dest(devid):
+    idx = -1
+    num_nodes = len(constants.PATH_DEMOB)
+    for i in range(num_nodes):
+        if devid == constants.PATH_DEMOB[i]:
+            if i + 1 >= num_nodes:
+                return None
+            else:
+                return constants.PATH_DEMOB[i+1]
+    return None
+
+def save_image(msgstr):
+    try:
+        orig_msg = json.loads(msgstr)
+        print("Checking for image")
+        if "i_d" in orig_msg:
+            print("Seems like an image")
+            imstr = orig_msg["i_d"]
+            im = image.imstrtoimage(imstr)
+            fname = f"/tmp/recompiled_{random.randint(1000,2000)}.jpg"
+            print(f"Saving image to {fname}")
+            im.save(fname)
+            im.show()
+    except:
+        print(f"Error loadig json {msgstr}")
+
+class DevUnit:
+    def __init__(self, devid):
+        self.rf = RFComm(devid)
+        self.rf.add_node(self)
+        self.rf.keep_reading()
+
+    def process_message(self, mst, msgstr):
+        if is_node_passthrough(self.devid):
+            next_dest = get_next_dest(self.devid)
+            if next_dest == None:
+                print(f"{self.devid} Weird no dest for {self.devid}")
+                return
+            self.rf.send_message(msgstr, mst, next_dest)
+        if is_node_src(self.devid):
+            print(f"{self.devid}: Src should not be getting any messages")
+        if is_node_dest(self.devid):
+            print(f"########## Messsage receive at command center : {msgstr}")
+            save_image(msgstr)
+
+    def send_img(self):
+        imgfile = "pencil.jpg"
+        next_dest = get_next_dest(self.devid)
+        if next_dest == None:
+            print(f"{self.devid} Weird no dest for {self.devid}")
+            return
+        mst = constants.MESSAGE_TYPE_PHOTO
+        im = {"i_m" : "Image metadata",
+              "i_d" : image.image2string(imgfile)}
+        msgstr = json.dumps(im)
+        self.rf.send_message(msgstr, mst, dest)
 
 def run_unit():
-    devid = get_device_id()
-    ncomm = EspComm(devid)
-    if devid == "CC":
-        cc  = CommandCentral("CC", None, ncomm)
-        ncomm.add_node(cc)
-        ncomm.keep_reading()
-        for j in range(2):
-            time.sleep(5)
-            cc.send_spath()
-            time.sleep(10)
-            cc.console_output()
-            print(f"{j} rounds of Scan done.")
-        time.sleep(500)
-    else:
-        device = Device(devid, None, ncomm)
-        ncomm.add_node(device)
-        ncomm.keep_reading()
-        for j in range(1):
-            device.check_event()
-            device.send_scan(time.time_ns())
-            device.send_hb(time.time_ns())
-            time.sleep(8)
-            print(f"{j} rounds of Scan done.")
+    hname = get_hostname()
+    if hname not in constants.HN_ID:
+        return None
+    devid = constants.HN_ID[hname]
+    du = DevUnit(devid)
+    if is_node_src(devid):
+        du.sleep(5)
+        du.send_img()
+    time.sleep(10000000)
 
 def main():
     run_unit()
 
 if __name__=="__main__":
     main()
-
-
