@@ -203,6 +203,9 @@ class RFComm:
                 ids.append(cn)
                 parts.append(d)
         orig_payload = "".join(parts)
+        # Note no saving intermediate.
+        # TODO fill missing chunks with 0s
+        return orig_payload
         try:
             print("Checking for json")
             orig_msg = json.loads(orig_payload)
