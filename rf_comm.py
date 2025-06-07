@@ -238,7 +238,7 @@ class RFComm:
                 try:
                     datastr = data.rstrip(b'\x00').decode()
                     self._process_read_message(datastr)
-                except Exception as e 
+                except Exception as e:
                     print(f"Error reading data : {data}")
                 # print(f"=============== Received data : {datastr}")
 
