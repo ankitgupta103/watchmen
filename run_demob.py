@@ -64,7 +64,9 @@ class DevUnit:
             print(f"{self.devid}: Src should not be getting any messages")
         if is_node_dest(self.devid):
             print(f"########## Messsage receive at command center : {msgstr}")
-            save_image(msgstr)
+            # Hack for now
+            if len(msgstr) > 100:
+                save_image(msgstr)
 
     def send_img(self):
         imgfile = "pencil.jpg"
