@@ -46,6 +46,7 @@ def save_image(msgstr):
 
 class DevUnit:
     def __init__(self, devid):
+        self.devid = devid
         self.rf = RFComm(devid)
         self.rf.add_node(self)
         self.rf.keep_reading()
