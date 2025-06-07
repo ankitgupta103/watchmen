@@ -1,7 +1,7 @@
-opencv-python
 ultralytics
 geopy
 picamera2
 pillow
 pyserial
 opencv-python
+pyrf24
