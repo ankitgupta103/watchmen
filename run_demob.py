@@ -39,7 +39,7 @@ def save_image(msgstr):
             print("Seems like an image")
             imstr = orig_msg["i_d"]
             im = image.imstrtoimage(imstr)
-            fname = f"/tmp/recompiled_{random.randint(1000,2000)}.jpg"
+            fname = f"/tmp/commandcenter_{random.randint(1000,2000)}.jpg"
             print(f"Saving image to {fname}")
             im.save(fname)
             im.show()
@@ -53,7 +53,7 @@ class DevUnit:
         self.rf.add_node(self)
         self.rf.keep_reading()
 
-    def process_message(self, mst, msgstr):
+    def process_msg(self, mst, msgstr):
         if is_node_passthrough(self.devid):
             next_dest = get_next_dest(self.devid)
             if next_dest == None:
@@ -76,6 +76,7 @@ class DevUnit:
         im = {"i_m" : "Image metadata",
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
+        msgstr = "Hello from {self.devid}"
         self.rf.send_message(msgstr, mst, next_dest)
 
 def run_unit():
