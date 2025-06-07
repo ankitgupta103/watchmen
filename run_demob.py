@@ -78,8 +78,7 @@ class DevUnit:
             if len(msgstr) > 100:
                 save_image(msgstr)
 
-    def send_img(self):
-        imgfile = sys.argv[1]
+    def send_img(self, imgfile):
         next_dest = get_next_dest(self.devid)
         if next_dest == None:
             print(f"{self.devid} Weird no dest for {self.devid}")
@@ -119,8 +118,9 @@ def run_unit():
     devid = constants.HN_ID[hname]
     du = DevUnit(devid)
     if is_node_src(devid):
-        time.sleep(5)
-        du.send_img()
+        du.send_img("testdata/cropped.jpg")
+        time.sleep(60)
+        du.send_img(sys.argv[1])
 
     time.sleep(10000000)
 
