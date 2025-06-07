@@ -54,7 +54,7 @@ NO_DEST = "X"
 HN_ID = {
         "central" : "A",
         "rpi2" : "B",
-        "rpi3" : "C"
+        "rpi3" : "C",
         "rpi4" : "D"
         }
 
