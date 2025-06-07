@@ -340,11 +340,12 @@ class RFComm:
             return False
         for i in range(retry_count):
             chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
-            print(f"Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+            print(f"Receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered}")
             if len(chunks_undelivered) == 0:
                 break
             for cid in chunks_undelivered:
                 self._send_chunk_i(msg_chunks, chunk_identifier, cid, dest)
+            self.msg_cunks_missing[str(chunk_identifier)] = [] # Reset missing chunks after sending these chunks
             sent = self._send_chunk_end(chunk_identifier, dest)
             if not sent:
                 return False
@@ -353,7 +354,7 @@ class RFComm:
             print(f" ==== Successfully delivered all chunks!!!")
             return True
         else:
-            print(f" **** Finally after all attempts, Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+            print(f" **** Finally even after all attempts, Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
             return False
 
     def _send_with_retries(self, msgstr, msgid):
@@ -367,9 +368,7 @@ class RFComm:
         time_ack_start = time.time_ns()
         while not ack_received:
             with self.msg_unacked_lock:
-                if msgid in self.msg_unacked:
-                    print(f"Still waiting for ack for {msgid}")
-                else:
+                if msgid not in self.msg_unacked:
                     print(f" =========== Looks like ack received for {msgid}")
                     return True # Hopefully lock is received
             time.sleep(0.5)
