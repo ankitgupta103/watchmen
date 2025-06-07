@@ -156,7 +156,8 @@ class RFComm:
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
             print(f"At end I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
-            if len(missing_chunks) == 0:
+            # TODO expect at most 5% missing chunks.
+            if len(missing_chunks) * 20 < expected_chunks:
                 self.process_message(self._recompile_msg(cid))
             else:
                 succ = self._send_missing_chunks(cid, missing_chunks, src)
