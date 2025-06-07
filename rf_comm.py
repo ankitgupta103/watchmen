@@ -195,7 +195,7 @@ class RFComm:
         return True
 
     def _recompile_msg(self, cid):
-        print(self.msg_parts[cid])
+        #print(self.msg_parts[cid])
         p = sorted(self.msg_parts[cid], key=lambda x: x[0])
         parts = []
         for (_, d) in p:
@@ -209,10 +209,15 @@ class RFComm:
                 print("Seems like an image")
                 imstr = orig_msg["i_d"]
                 im = image.imstrtoimage(imstr)
-                im.save("/tmp/recompiled.jpg")
+                fname = f"/tmp/recompiled_{random.randint(1000,2000)}.jpg"
+                print(f"Saving image to {fname}")
+                im.save(fname)
                 im.show()
         except:
-            print(f"Recompiled message =\n{orig_payload}")
+            if len(orig_payload) > 100:
+                print(f"Recompiled message =\n{orig_payload[0:100]}")
+            else:
+                print(f"Recompiled message =\n{orig_payload}")
         return orig_payload
 
     def _read_from_rf(self):
@@ -447,7 +452,7 @@ def main():
         # test_send_types(rf, devid, dest)
         test_send_long_msg(rf, dest) # Assumes its an image
         test_send_img(rf, "pencil.jpg", dest)
-        time.sleep(10)
+        time.sleep(20)
     else:
         # Keep receiving
         time.sleep(100)
