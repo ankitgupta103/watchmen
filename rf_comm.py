@@ -111,7 +111,7 @@ class RFComm:
             print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
             return
 
-        if msgtype == constants.MESSAGE_TYPE_NACK and dest == self.devid:
+        if msgtype == constants.MESSAGE_TYPE_NACK_CHUNK and dest == self.devid:
             cid, cliststr = self.sep_part(msgpyl, ';')
             missing_chunks = eval(cliststr)
             print(f"Receiver did not get chunks for {cid} : {missing_chunks}")
