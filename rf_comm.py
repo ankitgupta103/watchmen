@@ -235,9 +235,12 @@ class RFComm:
             has_payload, pipe = radio.available_pipe()
             if has_payload:
                 data = radio.read(MAX_DATA_SIZE)
-                datastr = data.rstrip(b'\x00').decode()
+                try:
+                    datastr = data.rstrip(b'\x00').decode()
+                    self._process_read_message(datastr)
+                except Exception as e 
+                    print(f"Error reading data : {data}")
                 # print(f"=============== Received data : {datastr}")
-                self._process_read_message(datastr)
 
     # Non blocking, background thread
     def keep_reading(self):

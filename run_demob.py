@@ -66,6 +66,7 @@ class DevUnit:
             if next_dest == None:
                 print(f"{self.devid} Weird no dest for {self.devid}")
                 return
+            print(f"In Passthrough mode, trying to aquire lock")
             with self.msg_queue_lock:
                 print(f"{self.devid} Adding message to send queue for {next_dest}")
                 self.msg_queue.append((msgstr, mst, next_dest))
@@ -91,12 +92,18 @@ class DevUnit:
 
     def _keep_sending(self):
         while True:
+            to_send = False
+            msgstr = None
+            mst = ""
+            dest = ""
             with self.msg_queue_lock:
                 if len(self.msg_queue) > 0:
                     (msgstr, mst, dest) = self.msg_queue.pop()
-                    print(f"Propagating message {mst} to {dest}")
-                    self.rf.send_message(msgstr, mst, dest)
-                time.sleep(2)
+                    to_send = True
+            if to_send:
+                print(f"Propagating message {mst} to {dest}")
+                self.rf.send_message(msgstr, mst, dest)
+            time.sleep(2)
 
     # Non blocking, background thread
     def keep_propagating(self):
