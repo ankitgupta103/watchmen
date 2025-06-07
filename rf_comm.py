@@ -137,8 +137,8 @@ class RFComm:
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
             ri = random.randint(0, 100)
-            if ri < 20:
-                print(f"Flakiness dropping chunk : {i}")
+            if ri < 10:
+                # print(f"Flakiness dropping chunk : {i}")
                 return
             self.msg_chunks_received[cid].append(i)
             self.msg_parts[cid].append((i, chunkdata))
@@ -198,7 +198,7 @@ class RFComm:
         ids = []
         parts = []
         for (cn, d) in p:
-            print(f"{cn} : {d}")
+            # print(f"{cn} : {d}")
             if cn not in ids:
                 ids.append(cn)
                 parts.append(d)
@@ -343,7 +343,7 @@ class RFComm:
             return False
         for i in range(retry_count):
             chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
-            print(f"At retry count {retry_count} Receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+            print(f"At retry count {i} Receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered}")
             if len(chunks_undelivered) == 0:
                 break
             for cid in chunks_undelivered:
