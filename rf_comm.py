@@ -70,9 +70,7 @@ class RFComm:
         #print(f"Processing incoming message : {msgstr}")
         self.msg_received.append(msgstr)
         if self.node is not None:
-            # If in a real device, all messages are json
-            msg = json.loads(msgstr)
-            self.node.process_msg(mst, msg)
+            self.node.process_msg(mst, msgstr)
 
     def print_status(self):
         with self.msg_unacked_lock:
