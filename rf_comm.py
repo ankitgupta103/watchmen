@@ -187,7 +187,7 @@ class RFComm:
 
     def _send_missing_chunks(self, cid, missing_chunks, dest):
         # 7 for id, 3 for chunk id, 2 for backup :-)
-        list_chunks = self._missing_chunk_helper(missing_chunks, 20):
+        list_chunks = self._missing_chunk_helper(missing_chunks, 20)
         for chunks_to_send in list_chunks:
             msgstr = f"{cid};{chunks_to_send}"
             succ = self._send_unicast(msgstr, constants.MESSAGE_TYPE_NACK_CHUNK, dest)
