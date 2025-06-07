@@ -1,3 +1,4 @@
+import sys
 import time
 import threading
 import image
@@ -44,7 +45,7 @@ def save_image(msgstr):
             fname = f"/tmp/commandcenter_{random.randint(1000,2000)}.jpg"
             print(f"Saving image to {fname}")
             im.save(fname)
-            im.show()
+            # im.show()
     except Exception as e:
         print(f"Error loadig json {e}")
 
@@ -76,13 +77,13 @@ class DevUnit:
                 save_image(msgstr)
 
     def send_img(self):
-        imgfile = "pencil.jpg"
+        imgfile = sys.argv[1]
         next_dest = get_next_dest(self.devid)
         if next_dest == None:
             print(f"{self.devid} Weird no dest for {self.devid}")
             return
         mst = constants.MESSAGE_TYPE_PHOTO
-        im = {"i_m" : "Image metadata",
+        im = {"i_m" : "imgfile",
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
         self.rf.send_message(msgstr, mst, next_dest)
