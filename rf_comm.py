@@ -322,7 +322,7 @@ class RFComm:
 
     # Note retry here is separate retry per chunk.
     # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
-    def _send_chunks(self, msg_chunks, mst, dest, retry_count = 10):
+    def _send_chunks(self, msg_chunks, mst, dest, retry_count = 50):
         num_chunks = len(msg_chunks)
         print(f"Getting ready to push {num_chunks} chunks")
         chunk_identifier = random.randint(10,20) # TODO better.
@@ -388,7 +388,7 @@ class RFComm:
             msgstr = msgstr[MAX_CHUNK_SIZE:]
         print(f"chunking {len(long_msg)} long message into {len(msg_chunks)} chunks")
         t1 = time.time()
-        sent = self._send_chunks(msg_chunks, mst, dest, 10)
+        sent = self._send_chunks(msg_chunks, mst, dest, 50)
         t2 = time.time()
         print(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
         return sent
