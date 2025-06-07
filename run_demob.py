@@ -1,4 +1,6 @@
 import time
+import image
+import json
 import socket
 from rf_comm import RFComm
 
@@ -74,7 +76,7 @@ class DevUnit:
         im = {"i_m" : "Image metadata",
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
-        self.rf.send_message(msgstr, mst, dest)
+        self.rf.send_message(msgstr, mst, next_dest)
 
 def run_unit():
     hname = get_hostname()
