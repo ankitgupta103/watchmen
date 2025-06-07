@@ -68,7 +68,7 @@ class RFComm:
         self.node = node
 
     def process_message(self, msgstr):
-        print(f"Processing incoming message : {msgstr}")
+        #print(f"Processing incoming message : {msgstr}")
         self.msg_received.append(msgstr)
         if self.node is not None:
             # If in a real device, all messages are json
@@ -140,11 +140,9 @@ class RFComm:
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
             ri = random.randint(0, 100)
-            if ri < 30:
+            if ri < 10:
                 print(f"Flakiness dropping chunk : {i}")
                 return
-            if len(self.msg_chunks_received) % 10 == 0:
-                print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
             self.msg_chunks_received[cid].append(i)
             self.msg_parts[cid].append((i, chunkdata))
             return
@@ -157,13 +155,10 @@ class RFComm:
                     missing_chunks.append(i)
             print(f"At end I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             # TODO expect at most 5% missing chunks.
-            if len(missing_chunks) * 20 < expected_chunks:
+            if len(missing_chunks) == 0:
                 self.process_message(self._recompile_msg(cid))
             else:
                 succ = self._send_missing_chunks(cid, missing_chunks, src)
-                if not succ:
-                    # Dont send ack
-                    return
             self._send_unicast(msgid, constants.MESSAGE_TYPE_ACK, src, False, 0)
             return
         
@@ -207,8 +202,11 @@ class RFComm:
             parts.append(d)
         orig_payload = "".join(parts)
         try:
+            print("Checking for json")
             orig_msg = json.loads(orig_payload)
+            print("Checking for image")
             if "i_d" in orig_msg:
+                print("Seems like an image")
                 imstr = orig_msg["i_d"]
                 im = image.imstrtoimage(imstr)
                 im.save("/tmp/recompiled.jpg")
@@ -420,7 +418,6 @@ def test_send_long_msg(rf, dest):
     long_string = ""
     for i in range(100):
         long_string = long_string + str(i) + "_"
-    print(long_string)
     rf.send_message(long_string, mst, dest)
 
 def test_send_types(rf, devid, dest):
