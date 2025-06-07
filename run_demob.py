@@ -67,6 +67,7 @@ class DevUnit:
                 print(f"{self.devid} Weird no dest for {self.devid}")
                 return
             with self.msg_queue_lock:
+                print(f"{self.devid} Adding message to send queue for {next_dest}")
                 self.msg_queue.append((msgstr, mst, next_dest))
         if is_node_src(self.devid):
             print(f"{self.devid}: Src should not be getting any messages")
@@ -83,7 +84,7 @@ class DevUnit:
             print(f"{self.devid} Weird no dest for {self.devid}")
             return
         mst = constants.MESSAGE_TYPE_PHOTO
-        im = {"i_m" : "imgfile",
+        im = {"i_m" : "{imgfile}",
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
         self.rf.send_message(msgstr, mst, next_dest)
