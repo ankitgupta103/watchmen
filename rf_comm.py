@@ -98,9 +98,6 @@ class RFComm:
         if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
             print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
             ackid = msgpyl
-            if False and "missing_chunks" in msg:  # Disabling for now
-                print(f"Receiver did not get chunks : {msg['missing_chunks']}")
-                self.msg_cunks_missing[msg["cid"]] = eval(msg["missing_chunks"])
             with self.msg_unacked_lock:
                 if ackid in self.msg_unacked:
                     unack = self.msg_unacked.pop(ackid, None)
@@ -114,6 +111,13 @@ class RFComm:
             print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
             return
 
+        if msgtype == constants.MESSAGE_TYPE_NACK and dest == self.devid:
+            cid, cliststr = self.sep_part(msgpyl, ';')
+            missing_chunks = eval(cliststr)
+            print(f"Receiver did not get chunks for {cid} : {missing_chunks}")
+            for m in missing_chunks:
+                if m not in self.msg_cunks_missing[cid]:
+                    self.msg_cunks_missing[cid].append(m)
         if msgtype == constants.MESSAGE_TYPE_CHUNK_BEGIN:
             mstcid, numchunkstr = self.sep_part(msgpyl, ';')
             mst = mstcid[0]
@@ -132,6 +136,10 @@ class RFComm:
             cid, remaining = self.sep_part(msgpyl, ';')
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
+            ri = random.randint(0, 100)
+            if ri < 30:
+                print(f"Flakiness dropping chunk : {i}")
+                return
             if len(self.msg_chunks_received) % 10 == 0:
                 print(f"at ci : self.msg_chunks_received = {self.msg_chunks_received}")
             self.msg_chunks_received[cid].append(i)
@@ -147,16 +155,45 @@ class RFComm:
             print(f"At end I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             if len(missing_chunks) == 0:
                 self.process_message(self._recompile_msg(cid))
-            msg_to_send = f"{msgid}"
-            # TODO should send missing chunks here and parse it above.
-            # msg_to_send = f"{cid} : {len(missing_chunks)} / {expected_chunks}"
-            self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
+            else:
+                succ = self._send_missing_chunks(cid, missing_chunks, src)
+                if not succ:
+                    # Dont send ack
+                    return
+            self._send_unicast(msgid, constants.MESSAGE_TYPE_ACK, src, False, 0)
             return
         
         self.process_message(msgpyl)
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
         msg_to_send = msgid
         self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
+
+    def _missing_chunk_helper(self, missing_chunks, strlimit):
+        if len(missing_chunks) == 0:
+            return []
+        chunk_strings = []
+        temp_chunk = [str(missing_chunks[0])]
+        for i in range(1, len(missing_chunks)):
+            c = str(missing_chunks[i])
+            temp_chunk.append(c)
+            cstr = ",".join(temp_chunk)
+            if len(cstr) > strlimit:
+                temp_chunk.pop()
+                chunk_strings.append(",".join(temp_chunk))
+                temp_chunk = [c]
+        if len(temp_chunk) > 0:
+            chunk_strings.append(",".join(temp_chunk))
+        return chunk_strings
+
+    def _send_missing_chunks(self, cid, missing_chunks, dest):
+        # 7 for id, 3 for chunk id, 2 for backup :-)
+        list_chunks = self._missing_chunk_helper(missing_chunks, 20):
+        for chunks_to_send in list_chunks:
+            msgstr = f"{cid};{chunks_to_send}"
+            succ = self._send_unicast(msgstr, constants.MESSAGE_TYPE_NACK_CHUNK, dest)
+            if not succ:
+                return False
+        return True
 
     def _recompile_msg(self, cid):
         print(self.msg_parts[cid])
@@ -239,9 +276,6 @@ class RFComm:
         radio.listen = True
         return succ
   
-    # TODO mst is stuffed into ID and in message both places.
-    # It is in msg just so we can take it out and stuff it into id.
-    # Fixit.
     # No ack, no retry
     def _send_broadcast(self, payload, mst):
         msgid = self._get_msg_id(mst, constants.NO_DEST) # Message type has to improve
@@ -250,7 +284,6 @@ class RFComm:
 
     # dest = None = broadcast, no ack waited, assumed success.
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
-    # TODO set limit on size
     def _send_unicast(self, payload, mst, dest, wait_for_ack = True, retry_count = 3):
         msgid = self._get_msg_id(mst, dest) # Message type has to improve
         msgstr = f"{msgid};{payload}"
@@ -272,12 +305,10 @@ class RFComm:
         payload = f"{chunk_identifier};{i};{msg_chunks[i]}"
         msgstr = f"{msgid};{payload}"
         self._actual_send(msgstr)
-        # time.sleep(0.1) # TODO Needed for corruption free sending.
 
     def _send_chunk_end(self, chunk_identifier, dest):
         payload = f"{chunk_identifier}"
         sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 3)
-        # time.sleep(1) # TODO Needed for corruption free sending.
         return sent 
 
     # Note retry here is separate retry per chunk.
@@ -289,7 +320,6 @@ class RFComm:
         self.msg_cunks_missing[str(chunk_identifier)] = []
         payload = f"{mst}{chunk_identifier};{num_chunks}"
         sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 3)
-        # time.sleep(1) # TODO Needed for corruption free sending.
         if not sent:
             print(f"Failed to send chunk begin")
             return False
