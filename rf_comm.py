@@ -17,7 +17,6 @@ MAX_DATA_SIZE = 32
 MAX_CHUNK_SIZE = 20
 hname = socket.gethostname()
 
-
 """
 MessageID = MSDIII where
   M = message type
@@ -197,9 +196,13 @@ class RFComm:
     def _recompile_msg(self, cid):
         #print(self.msg_parts[cid])
         p = sorted(self.msg_parts[cid], key=lambda x: x[0])
+        ids = []
         parts = []
-        for (_, d) in p:
-            parts.append(d)
+        for (cn, d) in p:
+            print(f"{cn} : {d}")
+            if cn not in ids:
+                ids.append(cn)
+                parts.append(d)
         orig_payload = "".join(parts)
         try:
             print("Checking for json")
