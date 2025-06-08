@@ -68,7 +68,7 @@ class CommandCenter:
             for x in self.node_map.keys():
                 print(f" ####### {x} : {self.node_map[x]}")
             print("#######################################################")
-            time.sleep(60)
+            time.sleep(10)
 
     # A:1205:100:12
     def process_hb(self, hbstr):
