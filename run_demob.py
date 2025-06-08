@@ -196,7 +196,7 @@ class DevUnit:
                 self.send_img("testdata/cropped.jpg")
                 time.sleep(60)
                 self.send_img("testdata/forest_man_2.jpg")
-            time.sleep(10)
+            time.sleep(60)
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
