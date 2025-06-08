@@ -140,7 +140,7 @@ class RFComm:
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
             ri = random.randint(0, 100)
-            if ri < 10:
+            if ri < 3:
                 # print(f"Flakiness dropping chunk : {i}")
                 return
             self.msg_chunks_received[cid].append(i)
