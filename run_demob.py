@@ -195,9 +195,10 @@ class DevUnit:
                 self.send_event()
                 time.sleep(10)
                 self.send_img("testdata/cropped.jpg")
-                time.sleep(60)
+                time.sleep(120)
                 self.send_img("testdata/forest_man_2.jpg")
-            time.sleep(300)
+                time.sleep(600)
+            time.sleep(1800) # Every 30 mins
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
