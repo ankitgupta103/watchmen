@@ -139,10 +139,7 @@ class RFComm:
             cid, remaining = self.sep_part(msgpyl, ';')
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
-            ri = random.randint(0, 100)
-            if ri < 3:
-                # print(f"Flakiness dropping chunk : {i}")
-                return
+            # print(f"Flakiness dropping chunk : {i}")
             self.msg_chunks_received[cid].append(i)
             self.msg_parts[cid].append((i, chunkdata))
             return
@@ -164,9 +161,9 @@ class RFComm:
             return
         
         self.process_message(msgid, msgtype, msgpyl)
-        print(f"{self.devid} : Sending ack for {msgid} to {src}")
-        msg_to_send = msgid
         # Disable acking except on chunks
+        # print(f"{self.devid} : Sending ack for {msgid} to {src}")
+        # msg_to_send = msgid
         # self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
 
     def _missing_chunk_helper(self, missing_chunks, strlimit):
