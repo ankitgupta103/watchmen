@@ -171,7 +171,7 @@ class DevUnit:
             if to_send:
                 print(f"Propagating message {mst} to {dest}")
                 self.rf.send_message(msgstr, mst, dest)
-            time.sleep(2)
+            time.sleep(0.5)
 
     # Non blocking, background thread
     def keep_propagating(self):
