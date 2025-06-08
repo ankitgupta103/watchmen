@@ -87,7 +87,7 @@ class CommandCenter:
             hbcount = 1
         else:
             print(f"Updating {nodeid} HB")
-            (hbc, _, _, _, _, el) = self.node_map[nodeid]
+            (hbc, _, _, _, el) = self.node_map[nodeid]
             print("1")
             hbcount = hbc + 1
             print("2")
