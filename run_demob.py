@@ -114,9 +114,10 @@ class CommandCenter:
         elif mst == constants.MESSAGE_TYPE_HEARTBEAT:
             print(f"########## Messsage receive at command center : {mst} : {msgstr}")
             self.process_hb(msgstr)
-        else:
+        elif mst == constants.MESSAGE_TYPE_EVENT:
             print(f"########## Messsage receive at command center : {mst} : {msgstr}")
-            # TODO else process gps event etc
+            self.process_event(msgstr)
+        return True
 
 class DevUnit:
     msg_queue = [] # str, type, dest tuple list
