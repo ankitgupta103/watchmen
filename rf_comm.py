@@ -66,14 +66,14 @@ class RFComm:
     def add_node(self, node):
         self.node = node
 
-    def process_message(self, mst, msgstr):
+    def process_message(self, msgid, mst, msgstr):
         if len(msgstr) > 100:
             print(f"Processing incoming message : {msgstr[0:100]}...")
         else:
             print(f"Processing incoming message : {msgstr}")
         self.msg_received.append(msgstr)
         if self.node is not None:
-            self.node.process_msg(mst, msgstr)
+            self.node.process_msg(msgid, mst, msgstr)
 
     def print_status(self):
         with self.msg_unacked_lock:
@@ -94,7 +94,7 @@ class RFComm:
         (msgtype, src, dest, rid) = self._parse_msg_id(msgid)
         if dest is None or dest == "None":
             print(f"{msgstr} is a broadcast")
-            self.process_message(msgtype, msgpyl)
+            self.process_message(msgid, msgtype, msgpyl)
             return
         if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
             # print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
@@ -157,13 +157,13 @@ class RFComm:
             # TODO expect at most 5% missing chunks.
             if len(missing_chunks) == 0:
                 # Hack this has to be the message type in BEGIN
-                self.process_message(constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
+                self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             else:
                 succ = self._send_missing_chunks(cid, missing_chunks, src)
             self._send_unicast(msgid, constants.MESSAGE_TYPE_ACK, src, False, 0)
             return
         
-        self.process_message(msgtype, msgpyl)
+        self.process_message(msgid, msgtype, msgpyl)
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
         msg_to_send = msgid
         self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
