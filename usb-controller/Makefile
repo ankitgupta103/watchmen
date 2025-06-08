@@ -46,6 +46,9 @@ all:
 	@echo "  - MOSFET VCC    -> Pi Pin 2 (5V)"
 	@echo "  - MOSFET Trigger -> Pi Pin 11 (GPIO $(GPIO_PIN))"
 	@echo "  - MOSFET controls USB hub power"
+	@echo ""
+	@echo "Pi 5 Support: Uses pinctrl for GPIO control"
+	@echo "Older Pi: Uses raspi-gpio or sysfs interface"
 
 # Show current configuration
 config:
@@ -105,18 +108,26 @@ setup-gpio:
 	fi
 	@echo "--- GPIO setup complete ---"
 
-# Alternative GPIO setup using raspi-gpio command
+# Alternative GPIO setup using raspi-gpio command or pinctrl (Pi 5)
 setup-gpio-alt:
-	@echo "--- Setting up GPIO $(GPIO_PIN) using raspi-gpio ---"
-	@if ! command -v raspi-gpio >/dev/null 2>&1; then \
-		echo "ERROR: raspi-gpio command not found"; \
-		echo "Install with: sudo apt install raspi-gpio"; \
+	@echo "--- Setting up GPIO $(GPIO_PIN) using modern GPIO tools ---"
+	@if command -v pinctrl >/dev/null 2>&1; then \
+		echo "Using pinctrl (Raspberry Pi 5 method)..."; \
+		echo "Setting GPIO $(GPIO_PIN) as output with initial LOW state..."; \
+		pinctrl set $(GPIO_PIN) op dl; \
+		echo "--- pinctrl GPIO setup complete ---"; \
+	elif command -v raspi-gpio >/dev/null 2>&1; then \
+		echo "Using raspi-gpio method..."; \
+		echo "Setting GPIO $(GPIO_PIN) as output with initial LOW state..."; \
+		raspi-gpio set $(GPIO_PIN) op dl; \
+		echo "--- raspi-gpio GPIO setup complete ---"; \
+	else \
+		echo "ERROR: Neither pinctrl nor raspi-gpio found"; \
+		echo "For Pi 5: pinctrl should be available by default"; \
+		echo "For older Pi: install with: sudo apt install raspi-gpio"; \
 		exit 1; \
 	fi
-	@echo "Setting GPIO $(GPIO_PIN) as output with initial LOW state..."
-	@raspi-gpio set $(GPIO_PIN) op dl
-	@echo "--- Alternative GPIO setup complete ---"
-	@echo "Note: Using raspi-gpio method. Some status commands may not work."
+	@echo "Note: Using modern GPIO method. Some sysfs status commands may not work."
 
 # Show current GPIO status
 status:
@@ -142,27 +153,31 @@ status:
 		echo "Using raspi-gpio for status (if available)"; \
 	fi
 
-# Turn OFF USB power (try both methods)
+# Turn OFF USB power (try multiple methods)
 shutdown:
 	@echo "--- Shutting down USB power ---"
 	@echo "Setting GPIO $(GPIO_PIN) LOW (USB OFF)..."
 	@if [ -d "$(GPIO_PIN_PATH)" ]; then \
 		echo "0" > $(GPIO_VALUE) || echo "Sysfs method failed"; \
 	fi
-	@if command -v raspi-gpio >/dev/null 2>&1; then \
+	@if command -v pinctrl >/dev/null 2>&1; then \
+		pinctrl set $(GPIO_PIN) op dl || echo "pinctrl method failed"; \
+	elif command -v raspi-gpio >/dev/null 2>&1; then \
 		raspi-gpio set $(GPIO_PIN) op dl || echo "raspi-gpio method failed"; \
 	fi
 	@sleep $(POWER_OFF_DELAY)
 	@echo "--- USB power shutdown complete ---"
 
-# Turn ON USB power (try both methods)
+# Turn ON USB power (try multiple methods)
 startup:
 	@echo "--- Starting up USB power ---"
 	@echo "Setting GPIO $(GPIO_PIN) HIGH (USB ON)..."
 	@if [ -d "$(GPIO_PIN_PATH)" ]; then \
 		echo "1" > $(GPIO_VALUE) || echo "Sysfs method failed"; \
 	fi
-	@if command -v raspi-gpio >/dev/null 2>&1; then \
+	@if command -v pinctrl >/dev/null 2>&1; then \
+		pinctrl set $(GPIO_PIN) op dh || echo "pinctrl method failed"; \
+	elif command -v raspi-gpio >/dev/null 2>&1; then \
 		raspi-gpio set $(GPIO_PIN) op dh || echo "raspi-gpio method failed"; \
 	fi
 	@sleep $(POWER_ON_DELAY)
