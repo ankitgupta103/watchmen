@@ -166,7 +166,8 @@ class RFComm:
         self.process_message(msgid, msgtype, msgpyl)
         print(f"{self.devid} : Sending ack for {msgid} to {src}")
         msg_to_send = msgid
-        self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
+        # Disable acking except on chunks
+        # self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
 
     def _missing_chunk_helper(self, missing_chunks, strlimit):
         if len(missing_chunks) == 0:
