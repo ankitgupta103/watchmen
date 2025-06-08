@@ -189,14 +189,15 @@ class DevUnit:
             self.send_heartbeat(photos_taken, events_seen)
             # TODO take photo
             photos_taken += 1
-            if is_node_src(self.devid) and photos_taken == 2: # Hack this should be is person detected
+            if is_node_src(self.devid):
                 events_seen += 1
+                time.sleep(5)
                 self.send_event()
                 time.sleep(10)
                 self.send_img("testdata/cropped.jpg")
                 time.sleep(60)
                 self.send_img("testdata/forest_man_2.jpg")
-            time.sleep(60)
+            time.sleep(300)
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
