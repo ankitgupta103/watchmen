@@ -72,21 +72,17 @@ class CommandCenter:
 
     # A:1205:100:12
     def process_hb(self, hbstr):
-        print("1")
         parts = hbstr.split(':')
-        print("2")
         if len(parts) != 4:
             print(f"Error parsing hb : {hbstr}")
             return
-        print("3")
         nodeid = parts[0]
         hbtime = parts[1]
         photos_taken = int(parts[2])
         events_seen = int(parts[3])
-        print("4")
         hbcount = 0
         eventtslist = []
-        if nodeid not in self.node_map.keys:
+        if nodeid not in self.node_map.keys():
             print(f"Seeing {nodeid} HB for the first time")
             hbcount = 1
         else:
@@ -94,7 +90,6 @@ class CommandCenter:
             (hbc, _, _, _, _, el) = self.node_map[nodeid]
             hbcount = hbc + 1
             eventtslist = el
-        print("5")
         self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, eventtslist)
     
     # A:1205
