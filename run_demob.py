@@ -72,14 +72,18 @@ class CommandCenter:
 
     # A:1205:100:12
     def process_hb(self, hbstr):
+        print("1")
         parts = hbstr.split(':')
+        print("2")
         if len(parts) != 4:
             print(f"Error parsing hb : {hbstr}")
             return
+        print("3")
         nodeid = parts[0]
         hbtime = parts[1]
         photos_taken = int(parts[2])
         events_seen = int(parts[3])
+        print("4")
         hbcount = 0
         eventtslist = []
         if nodeid not in self.node_map.keys:
@@ -90,6 +94,7 @@ class CommandCenter:
             (hbc, _, _, _, _, el) = self.node_map[nodeid]
             hbcount = hbc + 1
             eventtslist = el
+        print("5")
         self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, eventtslist)
     
     # A:1205
@@ -194,7 +199,7 @@ class DevUnit:
                 self.send_img("testdata/cropped.jpg")
                 time.sleep(60)
                 self.send_img("testdata/forest_man_2.jpg")
-            time.sleep(60)
+            time.sleep(10)
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
