@@ -82,11 +82,13 @@ class CommandCenter:
         events_seen = int(parts[3])
         hbcount = 0
         eventtslist = []
-        if nodeid not in self.node_map:
+        if nodeid not in self.node_map.keys:
+            print(f"Seeing {nodeid} HB for the first time")
             hbcount = 1
         else:
-            (hbcount, _, _, _, _, el) = self.node_map[nodeid]
-            hbcount = hbcount + 1
+            print(f"Updating {nodeid} HB")
+            (hbc, _, _, _, _, el) = self.node_map[nodeid]
+            hbcount = hbc + 1
             eventtslist = el
         self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, eventtslist)
     
@@ -224,7 +226,7 @@ def run_unit():
     if is_node_dest(devid):
         cc = CommandCenter(devid)
         cc.print_status()
-    if not is_node_dest(devid):
+    else:
         du = DevUnit(devid)
         du.keep_sending_to_cc()
     time.sleep(10000000)
