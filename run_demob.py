@@ -39,9 +39,30 @@ def get_time_str():
     t = datetime.now()
     return f"{str(t.hour).zfill(2)}{str(t.minute).zfill(2)}"
 
-def save_image(msgstr):
-    try:
-        orig_msg = json.loads(msgstr)
+class CommandCenter:
+    def __init__(self, devid):
+        self.devid = devid
+        self.rf = RFComm(devid)
+        self.rf.add_node(self)
+        self.rf.keep_reading()
+        self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
+        self.images_saved = []
+
+    def print_status(self):
+        while True:
+            print("######### Command Center printing status ##############")
+            for x in self.node_map.keys():
+                print(f" ####### {x} : {self.node_map[x]}")
+            for x in self.images_saved:
+                print(f"Saved image : {x}")
+            print("#######################################################")
+            time.sleep(10)
+
+    def process_image(self, msgstr):
+        try:
+            orig_msg = json.loads(msgstr)
+        except Exception as e:
+            print(f"Error loadig json {e}")
         print("Checking for image")
         if "i_d" in orig_msg:
             print("Seems like an image")
@@ -50,25 +71,8 @@ def save_image(msgstr):
             fname = f"/tmp/commandcenter_{random.randint(1000,2000)}.jpg"
             print(f"Saving image to {fname}")
             im.save(fname)
+            self.images_saved.append(fname)
             # im.show()
-    except Exception as e:
-        print(f"Error loadig json {e}")
-
-class CommandCenter:
-    def __init__(self, devid):
-        self.devid = devid
-        self.rf = RFComm(devid)
-        self.rf.add_node(self)
-        self.rf.keep_reading()
-        self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
-
-    def print_status(self):
-        while True:
-            print("######### Command Center printing status ##############")
-            for x in self.node_map.keys():
-                print(f" ####### {x} : {self.node_map[x]}")
-            print("#######################################################")
-            time.sleep(10)
 
     # A:1205:100:12
     def process_hb(self, hbstr):
@@ -110,7 +114,7 @@ class CommandCenter:
     def process_msg(self, mst, msgstr):
         if mst == constants.MESSAGE_TYPE_PHOTO:
             print(f"########## Image receive at command center")
-            save_image(msgstr)
+            self.process_image(msgstr)
         elif mst == constants.MESSAGE_TYPE_HEARTBEAT:
             print(f"########## Messsage receive at command center : {mst} : {msgstr}")
             self.process_hb(msgstr)
