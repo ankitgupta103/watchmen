@@ -87,10 +87,8 @@ class CommandCenter:
         hbcount = 0
         eventtslist = []
         if nodeid not in self.node_map.keys():
-            print(f"Seeing {nodeid} HB for the first time")
             hbcount = 1
         else:
-            print(f"Updating {nodeid} HB")
             (hbc, _, _, _, el) = self.node_map[nodeid]
             hbcount = hbc + 1
             eventtslist = el
