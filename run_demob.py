@@ -95,8 +95,8 @@ class CommandCenter:
     # A:1205
     def process_event(self, eventstr):
         parts = eventstr.split(':')
-        if len(parts) != 4:
-            print(f"Error parsing hb : {hbstr}")
+        if len(parts) != 2:
+            print(f"Error parsing event message : {eventstr}")
             return
         nodeid = parts[0]
         eventtime = parts[1]
