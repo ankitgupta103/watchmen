@@ -302,7 +302,7 @@ class RFComm:
 
     # dest = None = broadcast, no ack waited, assumed success.
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
-    def _send_unicast(self, payload, mst, dest, wait_for_ack = True, retry_count = 3):
+    def _send_unicast(self, payload, mst, dest, wait_for_ack = False, retry_count = 1):
         msgid = self._get_msg_id(mst, dest) # Message type has to improve
         msgstr = f"{msgid};{payload}"
         if not wait_for_ack:
