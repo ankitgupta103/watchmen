@@ -47,6 +47,7 @@ class CommandCenter:
         self.rf.keep_reading()
         self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
         self.images_saved = []
+        self.msgids_seen = []
 
     def print_status(self):
         while True:
@@ -109,7 +110,12 @@ class CommandCenter:
         event_ts_list.append(eventtime)
         self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, event_ts_list)
 
-    def process_msg(self, mst, msgstr):
+    def process_msg(self, msgid, mst, msgstr):
+        if msgid not in self.msgids_seen:
+            self.msgids_seen.append(msgid)
+        else:
+            print(f"Skipping message id : {msgid}")
+            return
         if mst == constants.MESSAGE_TYPE_PHOTO:
             print(f"########## Image receive at command center")
             self.process_image(msgstr)
@@ -131,8 +137,14 @@ class DevUnit:
         self.rf.add_node(self)
         self.rf.keep_reading()
         self.keep_propagating()
+        self.msgids_seen = []
        
-    def process_msg(self, mst, msgstr):
+    def process_msg(self, msgid, mst, msgstr):
+        if msgid not in self.msgids_seen:
+            self.msgids_seen.append(msgid)
+        else:
+            print(f"Skipping message id : {msgid}")
+            return
         if is_node_passthrough(self.devid):
             next_dest = get_next_dest(self.devid)
             if next_dest == None:
