@@ -88,13 +88,9 @@ class CommandCenter:
         else:
             print(f"Updating {nodeid} HB")
             (hbc, _, _, _, el) = self.node_map[nodeid]
-            print("1")
             hbcount = hbc + 1
-            print("2")
             eventtslist = el
-            print("3")
         self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, eventtslist)
-        print("4")
     
     # A:1205
     def process_event(self, eventstr):
