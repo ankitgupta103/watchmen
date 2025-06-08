@@ -1,3 +1,4 @@
+from datetime import datetime
 import sys
 import time
 import threading
@@ -33,6 +34,10 @@ def get_next_dest(devid):
             else:
                 return constants.PATH_DEMOB[i+1]
     return None
+
+def get_time_str():
+    t = datetime.now()
+    return f"{str(t.hour).zfill(2)}{str(t.minute).zfill(2)}"
 
 def save_image(msgstr):
     try:
@@ -85,11 +90,13 @@ class DevUnit:
             return
         mst = constants.MESSAGE_TYPE_PHOTO
         im = {"i_m" : "{imgfile}",
+              "i_s" : self.devid,
+              "i_t" : str(int(time.time())),
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
         self.rf.send_message(msgstr, mst, next_dest)
 
-    def _keep_sending(self):
+    def _keep_propagating(self):
         while True:
             to_send = False
             msgstr = None
@@ -107,9 +114,30 @@ class DevUnit:
     # Non blocking, background thread
     def keep_propagating(self):
         # Start background thread to read incoming data
-        propogation_thread = threading.Thread(target=self._keep_sending, daemon=True)
+        propogation_thread = threading.Thread(target=self._keep_propagating, daemon=True)
         # TODO fix and make it a clean exit on self deletion
         propogation_thread.start()
+
+    # A:1205:100:12
+    # Name, time, images taken, events noticed.
+    def send_heartbeat(self):
+        msgstr = f"{self.devid}:{get_time_str}:1000:12"
+        next_dest = get_next_dest(self.devid)
+        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_HEARTBEAT, next_dest)
+
+    # A:23.1,67.1
+    # Name:GPS
+    def send_gps(self):
+        next_dest = get_next_dest(self.devid)
+        msgstr = f"{self.devid}:28.4:77.0"
+        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
+
+    # A:1205
+    # Name, time
+    def send_event(self):
+        msgstr = f"{self.devid}:{get_time_str}"
+        next_dest = get_next_dest(self.devid)
+        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest)
 
 def run_unit():
     hname = get_hostname()
@@ -117,10 +145,20 @@ def run_unit():
         return None
     devid = constants.HN_ID[hname]
     du = DevUnit(devid)
-    if is_node_src(devid):
-        du.send_img("testdata/cropped.jpg")
-        time.sleep(60)
-        du.send_img(sys.argv[1])
+    if not is_node_dest(devid):
+        du.send_gps()
+        time.sleep(10)
+        du.send_heartbeat()
+        time.sleep(10)
+        du.send_heartbeat()
+        time.sleep(10)
+        du.send_heartbeat()
+        time.sleep(10)
+        if is_node_src(devid):
+            du.send_event()
+            du.send_img("testdata/cropped.jpg")
+            time.sleep(60)
+            du.send_img(sys.argv[1])
 
     time.sleep(10000000)
 
