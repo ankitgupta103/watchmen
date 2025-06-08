@@ -166,7 +166,7 @@ class DevUnit:
             dest = ""
             with self.msg_queue_lock:
                 if len(self.msg_queue) > 0:
-                    (msgstr, mst, dest) = self.msg_queue.pop()
+                    (msgstr, mst, dest) = self.msg_queue.pop(0)
                     to_send = True
             if to_send:
                 print(f"Propagating message {mst} to {dest}")
