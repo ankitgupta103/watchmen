@@ -78,10 +78,10 @@ class DevUnit:
         if is_node_src(self.devid):
             print(f"{self.devid}: Src should not be getting any messages")
         if is_node_dest(self.devid):
-            print(f"########## Messsage receive at command center : {msgstr}")
-            # Hack for now
-            if len(msgstr) > 100:
+            print(f"########## Messsage receive at command center : {mst} : {msgstr}")
+            if mst == constants.MESSAGE_TYPE_PHOTO:
                 save_image(msgstr)
+            # TODO else process heartbeats etc
 
     def send_img(self, imgfile):
         next_dest = get_next_dest(self.devid)
@@ -118,10 +118,29 @@ class DevUnit:
         # TODO fix and make it a clean exit on self deletion
         propogation_thread.start()
 
+    def keep_sending_to_cc(self):
+        self.send_gps()
+        time.sleep(10)
+        photos_taken = 0
+        events_seen = 0
+        while True:
+            self.send_heartbeat()
+            # TODO take photo
+            photos_taken += 1
+            if is_node_src(self.devid) and photos_taken == 2: # Hack this should be is person detected
+                events_seen += 1
+                self.send_event()
+                time.sleep(10)
+                self.send_img("testdata/cropped.jpg")
+                time.sleep(60)
+                self.send_img("testdata/forest_man_2.jpg")
+            time.sleep(60)
+
     # A:1205:100:12
     # Name, time, images taken, events noticed.
     def send_heartbeat(self):
-        msgstr = f"{self.devid}:{get_time_str}:1000:12"
+        t = get_time_str()
+        msgstr = f"{self.devid}:{t}:1000:12"
         next_dest = get_next_dest(self.devid)
         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_HEARTBEAT, next_dest)
 
@@ -135,7 +154,8 @@ class DevUnit:
     # A:1205
     # Name, time
     def send_event(self):
-        msgstr = f"{self.devid}:{get_time_str}"
+        t = get_time_str()
+        msgstr = f"{self.devid}:{t}"
         next_dest = get_next_dest(self.devid)
         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest)
 
@@ -146,20 +166,7 @@ def run_unit():
     devid = constants.HN_ID[hname]
     du = DevUnit(devid)
     if not is_node_dest(devid):
-        du.send_gps()
-        time.sleep(10)
-        du.send_heartbeat()
-        time.sleep(10)
-        du.send_heartbeat()
-        time.sleep(10)
-        du.send_heartbeat()
-        time.sleep(10)
-        if is_node_src(devid):
-            du.send_event()
-            du.send_img("testdata/cropped.jpg")
-            time.sleep(60)
-            du.send_img(sys.argv[1])
-
+        du.keep_sending_to_cc()
     time.sleep(10000000)
 
 def main():
