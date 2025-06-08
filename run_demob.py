@@ -66,7 +66,7 @@ class CommandCenter:
         while True:
             print("######### Command Center printing status ##############")
             for x in self.node_map.keys():
-                print(f" ####### {x} : {node_map[x]}")
+                print(f" ####### {x} : {self.node_map[x]}")
             print("#######################################################")
             time.sleep(60)
 
