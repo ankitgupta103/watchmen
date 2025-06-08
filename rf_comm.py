@@ -236,7 +236,7 @@ class RFComm:
             if has_payload:
                 data = radio.read(MAX_DATA_SIZE)
                 try:
-                    datastr = data.rstrip(b'\x00').decode()
+                    datastr = data.rstrip(b'\x00').decode("utf-8")
                 except Exception as e:
                     print(f"Error reading data : {data}")
                 self._process_read_message(datastr)
