@@ -237,9 +237,9 @@ class RFComm:
                 data = radio.read(MAX_DATA_SIZE)
                 try:
                     datastr = data.rstrip(b'\x00').decode()
-                    self._process_read_message(datastr)
                 except Exception as e:
                     print(f"Error reading data : {data}")
+                self._process_read_message(datastr)
                 # print(f"=============== Received data : {datastr}")
 
     # Non blocking, background thread
