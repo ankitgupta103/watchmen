@@ -382,7 +382,8 @@ class RFComm:
                     return True # Hopefully lock is received
             time.sleep(0.5)
             ts = time.time_ns()
-            if (ts - time_ack_start) > 5000000000:
+            # Allow 15 secs for an ack
+            if (ts - time_ack_start) > 15000000000:
                 print(f" Timed out received for {msgid}")
                 break
         return False

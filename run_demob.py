@@ -54,6 +54,68 @@ def save_image(msgstr):
     except Exception as e:
         print(f"Error loadig json {e}")
 
+class CommandCenter:
+    def __init__(self, devid):
+        self.devid = devid
+        self.rf = RFComm(devid)
+        self.rf.add_node(self)
+        self.rf.keep_reading()
+        self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
+
+    def print_status(self):
+        while True:
+            print("######### Command Center printing status ##############")
+            for x in self.node_map.keys():
+                print(f" ####### {x} : {node_map[x]}")
+            print("#######################################################")
+            time.sleep(60)
+
+    # A:1205:100:12
+    def process_hb(self, hbstr):
+        parts = hbstr.split(':')
+        if len(parts) != 4:
+            print(f"Error parsing hb : {hbstr}")
+            return
+        nodeid = parts[0]
+        hbtime = parts[1]
+        photos_taken = int(parts[2])
+        events_seen = int(parts[3])
+        hbcount = 0
+        eventtslist = []
+        if nodeid not in self.node_map:
+            hbcount = 1
+        else:
+            (hbcount, _, _, _, _, el) = self.node_map[nodeid]
+            hbcount = hbcount + 1
+            eventtslist = el
+        self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, eventtslist)
+    
+    # A:1205
+    def process_event(self, eventstr):
+        parts = eventstr.split(':')
+        if len(parts) != 4:
+            print(f"Error parsing hb : {hbstr}")
+            return
+        nodeid = parts[0]
+        eventtime = parts[1]
+        if nodeid not in self.node_map:
+            print(f"Wierd that node {nodeid} not in map yet")
+            return
+        (hbcount, hbtime, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
+        event_ts_list.append(eventtime)
+        self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, event_ts_list)
+
+    def process_msg(self, mst, msgstr):
+        if mst == constants.MESSAGE_TYPE_PHOTO:
+            print(f"########## Image receive at command center")
+            save_image(msgstr)
+        elif mst == constants.MESSAGE_TYPE_HEARTBEAT:
+            print(f"########## Messsage receive at command center : {mst} : {msgstr}")
+            self.process_hb(msgstr)
+        else:
+            print(f"########## Messsage receive at command center : {mst} : {msgstr}")
+            # TODO else process gps event etc
+
 class DevUnit:
     msg_queue = [] # str, type, dest tuple list
     msg_queue_lock = threading.Lock()
@@ -64,7 +126,7 @@ class DevUnit:
         self.rf.add_node(self)
         self.rf.keep_reading()
         self.keep_propagating()
-
+       
     def process_msg(self, mst, msgstr):
         if is_node_passthrough(self.devid):
             next_dest = get_next_dest(self.devid)
@@ -77,11 +139,6 @@ class DevUnit:
                 self.msg_queue.append((msgstr, mst, next_dest))
         if is_node_src(self.devid):
             print(f"{self.devid}: Src should not be getting any messages")
-        if is_node_dest(self.devid):
-            print(f"########## Messsage receive at command center : {mst} : {msgstr}")
-            if mst == constants.MESSAGE_TYPE_PHOTO:
-                save_image(msgstr)
-            # TODO else process heartbeats etc
 
     def send_img(self, imgfile):
         next_dest = get_next_dest(self.devid)
@@ -124,7 +181,7 @@ class DevUnit:
         photos_taken = 0
         events_seen = 0
         while True:
-            self.send_heartbeat()
+            self.send_heartbeat(photos_taken, events_seen)
             # TODO take photo
             photos_taken += 1
             if is_node_src(self.devid) and photos_taken == 2: # Hack this should be is person detected
@@ -138,9 +195,9 @@ class DevUnit:
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
-    def send_heartbeat(self):
+    def send_heartbeat(self, photos_taken, events_seen):
         t = get_time_str()
-        msgstr = f"{self.devid}:{t}:1000:12"
+        msgstr = f"{self.devid}:{t}:{photos_taken}:{events_seen}"
         next_dest = get_next_dest(self.devid)
         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_HEARTBEAT, next_dest)
 
@@ -164,8 +221,11 @@ def run_unit():
     if hname not in constants.HN_ID:
         return None
     devid = constants.HN_ID[hname]
-    du = DevUnit(devid)
+    if is_node_dest(devid):
+        cc = CommandCenter(devid)
+        cc.print_status()
     if not is_node_dest(devid):
+        du = DevUnit(devid)
         du.keep_sending_to_cc()
     time.sleep(10000000)
 
