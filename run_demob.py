@@ -193,11 +193,13 @@ class DevUnit:
         propogation_thread.start()
 
     def keep_sending_to_cc(self):
-        self.send_gps()
+        # self.send_gps()
         time.sleep(10)
         photos_taken = 0
         events_seen = 0
         while True:
+            self.send_heartbeat(photos_taken, events_seen)
+            time.sleep(2)
             self.send_heartbeat(photos_taken, events_seen)
             # TODO take photo
             photos_taken += 1
@@ -209,7 +211,6 @@ class DevUnit:
                 self.send_img("testdata/cropped.jpg")
                 time.sleep(120)
                 self.send_img("testdata/forest_man_2.jpg")
-                time.sleep(600)
             time.sleep(1800) # Every 30 mins
 
     # A:1205:100:12
