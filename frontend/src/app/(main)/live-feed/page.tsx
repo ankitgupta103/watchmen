@@ -1,3 +1,4 @@
+import { getOrg } from '@/lib/auth/getOrg';
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcher } from '@/lib/fetcher';
 import { Machine } from '@/lib/types/machine';
@@ -5,10 +6,9 @@ import { Machine } from '@/lib/types/machine';
 import CriticalAlertSystem from './components/live-alert';
 import LiveFeedWrapper from './components/live-feed-wrapper';
 import PageHeader from './components/page-header';
-import { getOrg } from '@/lib/auth/getOrg';
 
 export default async function LiveFeed() {
-  const {organization_uid} = await getOrg();
+  const { organization_uid } = await getOrg();
 
   const machines = await fetcher<{
     status: string;

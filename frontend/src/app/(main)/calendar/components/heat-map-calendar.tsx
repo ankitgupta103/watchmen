@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   ChevronLeft,
   ChevronRight,
   Filter,
-  MapPin,
   Loader2,
+  MapPin,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -18,10 +18,10 @@ import 'leaflet/dist/leaflet.css';
 
 import dynamic from 'next/dynamic';
 
-import { DayActivity } from '@/lib/types/activity';
-import { Machine, HealthEvent, SuspiciousEvent } from '@/lib/types/machine';
-import { cn } from '@/lib/utils';
 import { API_BASE_URL } from '@/lib/constants';
+import { DayActivity } from '@/lib/types/activity';
+import { HealthEvent, Machine, SuspiciousEvent } from '@/lib/types/machine';
+import { cn } from '@/lib/utils';
 
 const MapFilter = dynamic(() => import('./map-filter'), {
   ssr: false,
@@ -67,7 +67,10 @@ const MONTHS = [
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProps) {
+export default function HeatMapCalendar({
+  machines,
+  orgId,
+}: HeatMapCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date(),
   );
@@ -102,94 +105,108 @@ export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProp
   // Create a map of machine IDs to machine objects for quick lookup
   const machineMap = useMemo(() => {
     const map = new Map<number, Machine>();
-    filteredMachines.forEach(machine => {
+    filteredMachines.forEach((machine) => {
       map.set(machine.id, machine);
     });
     return map;
   }, [filteredMachines]);
 
   // Function to fetch events for a specific date
-  const fetchEventsForDate = useCallback(async (date: Date): Promise<S3EventData | null> => {
-    const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD format
-    
-    try {
-      const params = new URLSearchParams({
-        org_id: String(orgId),
-        date: dateStr,
-      });
+  // const fetchEventsForDate = useCallback(
+  //   async (date: Date): Promise<S3EventData | null> => {
+  //     const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-      // Add machine filter if area filter is active
-      if (areaFilter) {
-        filteredMachines.forEach(machine => {
-          params.append('machine_ids', machine.id.toString());
-        });
-      }
+  //     try {
+  //       const params = new URLSearchParams({
+  //         org_id: String(orgId),
+  //         date: dateStr,
+  //       });
 
-      const response = await fetch(`${API_BASE_URL}/calendar/day-events/?${params}`);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          // No events for this date
-          return { health: [], suspicious: [], generic: [] };
-        }
-        throw new Error(`Failed to fetch events: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      return result.data.events; // Extract events from API response
-    } catch (error) {
-      console.error('Error fetching events for date:', date, error);
-      return null;
-    }
-  }, [orgId, areaFilter, filteredMachines]);
+  //       // Add machine filter if area filter is active
+  //       if (areaFilter) {
+  //         filteredMachines.forEach((machine) => {
+  //           params.append('machine_ids', machine.id.toString());
+  //         });
+  //       }
+
+  //       const response = await fetch(
+  //         `${API_BASE_URL}/calendar/day-events/?${params}`,
+  //       );
+
+  //       if (!response.ok) {
+  //         if (response.status === 404) {
+  //           // No events for this date
+  //           return { health: [], suspicious: [], generic: [] };
+  //         }
+  //         throw new Error(`Failed to fetch events: ${response.statusText}`);
+  //       }
+
+  //       const result = await response.json();
+  //       return result.data.events; // Extract events from API response
+  //     } catch (error) {
+  //       console.error('Error fetching events for date:', date, error);
+  //       return null;
+  //     }
+  //   },
+  //   [orgId, areaFilter, filteredMachines],
+  // );
 
   // Function to fetch events for entire month (optimized)
-  const fetchMonthEvents = useCallback(async (year: number, month: number) => {
-    const monthKey = `${year}-${month}`;
-    if (loadedMonths.has(monthKey)) return;
+  const fetchMonthEvents = useCallback(
+    async (year: number, month: number) => {
+      const monthKey = `${year}-${month}`;
+      if (loadedMonths.has(monthKey)) return;
 
-    setLoading(true);
-    
-    try {
-      // Calculate start and end dates for the month
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0); // Last day of month
-      
-      const params = new URLSearchParams({
-        org_id: String(orgId),
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-        summary_only: 'false', // Get full data for calendar
-      });
+      setLoading(true);
 
-      // Add machine filter if area filter is active
-      if (areaFilter) {
-        filteredMachines.forEach(machine => {
-          params.append('machine_ids', machine.id.toString());
+      try {
+        // Calculate start and end dates for the month
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0); // Last day of month
+
+        const params = new URLSearchParams({
+          org_id: String(orgId),
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          summary_only: 'false', // Get full data for calendar
         });
-      }
 
-      const response = await fetch(`${API_BASE_URL}/calendar/date-range-events/?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch month events: ${response.statusText}`);
+        // Add machine filter if area filter is active
+        if (areaFilter) {
+          filteredMachines.forEach((machine) => {
+            params.append('machine_ids', machine.id.toString());
+          });
+        }
+
+        console.log('ssssssssss',params)
+
+        const response = await fetch(
+          `${API_BASE_URL}/calendar/date-range-events/?${params}`,
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch month events: ${response.statusText}`,
+          );
+        }
+
+        const result = await response.json();
+        const monthData = result.data.date_events;
+
+        setEventData((prev) => ({
+          ...prev,
+          ...monthData,
+        }));
+
+        setLoadedMonths((prev) => new Set([...prev, monthKey]));
+      } catch (error) {
+        console.error('Error fetching month events:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      const result = await response.json();
-      const monthData = result.data.date_events;
-      
-      setEventData(prev => ({
-        ...prev,
-        ...monthData
-      }));
-      
-      setLoadedMonths(prev => new Set([...prev, monthKey]));
-    } catch (error) {
-      console.error('Error fetching month events:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId, areaFilter, filteredMachines, loadedMonths]);
+    },
+    [orgId, areaFilter, filteredMachines, loadedMonths],
+  );
 
   // Clear loaded months when area filter changes to refetch with new filter
   useEffect(() => {
@@ -227,7 +244,7 @@ export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProp
         // Get machine info from machine map
         const machineId = event.machine_id;
         const machine = machineMap.get(machineId);
-        
+
         // If area filter is active and machine not in filtered list, skip
         if (areaFilter && !machine) return;
 
@@ -245,7 +262,7 @@ export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProp
         // Get machine info from machine map
         const machineId = event.machine_id;
         const machine = machineMap.get(machineId);
-        
+
         // If area filter is active and machine not in filtered list, skip
         if (areaFilter && !machine) return;
 
@@ -264,7 +281,7 @@ export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProp
       dayEvents.generic?.forEach((event) => {
         const machineId = parseInt(event.machine_id);
         const machine = machineMap.get(machineId);
-        
+
         if (areaFilter && !machine) return;
 
         dayActivity.unknownCount++;
@@ -277,7 +294,10 @@ export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProp
       });
 
       // Calculate intensity for each day
-      const totalEvents = dayActivity.suspiciousCount + dayActivity.healthIssues + dayActivity.unknownCount;
+      const totalEvents =
+        dayActivity.suspiciousCount +
+        dayActivity.healthIssues +
+        dayActivity.unknownCount;
       const hasOffline = dayActivity.offlineCount > 0;
       const hasCriticalHealth = dayActivity.events.some(
         (e) => e.type === 'health' && e.details.severity === 'critical',
@@ -354,7 +374,7 @@ export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProp
 
   return (
     <>
-      <div className="relative flex gap-4 overflow-y-auto">
+      <div className="relative flex xl:flex-row flex-col gap-4 overflow-y-auto">
         {/* Calendar */}
         <div className="mb-4 flex-1">
           <Card className="h-fit">
@@ -512,7 +532,7 @@ export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProp
         </div>
 
         {/* Details Panel */}
-        <div className="sticky top-0 mb-4 h-fit w-96 space-y-4">
+        <div className="sticky top-0 mb-4 h-fit w-full xl:w-96 space-y-4">
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
@@ -601,8 +621,8 @@ export default function HeatMapCalendar({ machines, orgId }: HeatMapCalendarProp
                                 event.type === 'suspicious'
                                   ? 'destructive'
                                   : event.type === 'health'
-                                  ? 'secondary'
-                                  : 'outline'
+                                    ? 'secondary'
+                                    : 'outline'
                               }
                               className="text-xs"
                             >
