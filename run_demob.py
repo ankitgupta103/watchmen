@@ -94,7 +94,7 @@ class CommandCenter:
         self.msgids_seen = []
         
         self.writer = QueueWriterJson()
-        self.mission_id = "demob_mission_001"
+        self.mission_id = "_all_"
         
         self.detector = Detector()
         self.detector.set_detection_category("all")
@@ -130,7 +130,7 @@ class CommandCenter:
             message_data = {
                 "event_type": "health",
                 "machine_id": machine_id,
-                "machine_name": f"Camera_{machine_id}",
+                "machine_name": f"{machine_id}",
                 "timestamp": datetime.now().isoformat(),
                 "type": event_type,
                 "severity": severity,
@@ -138,7 +138,7 @@ class CommandCenter:
                 "reported_by": self.devid
             }
             
-            filename = f"health_{machine_id}_{epoch_ms}.json"
+            filename = f"{epoch_ms}.json"
             
             priority = 3 if severity in ["high", "critical"] else 1
             
@@ -168,7 +168,7 @@ class CommandCenter:
             message_data = {
                 "event_type": "suspicious",
                 "machine_id": machine_id,
-                "machine_name": f"Camera_{machine_id}",
+                "machine_name": f"{machine_id}",
                 "timestamp": datetime.now().isoformat(),
                 "type": event_details["type"],
                 "confidence": confidence,
@@ -185,7 +185,7 @@ class CommandCenter:
                 "reported_by": self.devid
             }
             
-            filename = f"suspicious_{machine_id}_{epoch_ms}.json"
+            filename = f"{epoch_ms}.json"
             
             priority = 3 if event_details["severity"] in ["high", "critical"] else 2
             
@@ -310,7 +310,7 @@ class CommandCenter:
                 }
             }
             
-            filename = f"summary_{epoch_ms}.json"
+            filename = f"{epoch_ms}.json"
             
             self.writer.write_message(
                 message_data=message_data,
