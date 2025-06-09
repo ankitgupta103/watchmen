@@ -10,7 +10,7 @@ import threading
 import constants
 import image
 
-from pyrf24 import RF24, RF24_PA_LOW, RF24_1MBPS, RF24_250KBPS
+from pyrf24 import RF24, RF24_PA_LOW, RF24_PA_MAX, RF24_1MBPS, RF24_250KBPS
 
 radio = RF24(22, 0)
 MAX_DATA_SIZE = 32
@@ -59,7 +59,7 @@ class RFComm:
     def setup_rf(self):
         if not radio.begin():
             raise RuntimeError("nRF24L01+ not responding")
-        radio.setPALevel(RF24_PA_LOW)
+        radio.setPALevel(RF24_PA_MAX)
         radio.setDataRate(RF24_250KBPS)
         radio.setChannel(76)
         radio.stop_listening(b"n1")
