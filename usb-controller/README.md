@@ -34,7 +34,7 @@ Wants=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/home/pi/Documents/usb-power-cycle.sh # Path to your script
+ExecStart=/home/pi/Documents/watchmen/usb-controller/usb-camera-power-cycle.sh
 Restart=always
 RestartSec=10
 StandardOutput=journal
