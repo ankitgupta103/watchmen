@@ -218,7 +218,7 @@ class CommandCenter:
             print(f"❌ Error uploading image {image_path}: {e}")
             return None
 
-    def publish_suspicious_event(self, machine_id, image_path, event_details, detected_objects=None, confidence=0.85, timestamp=None):
+    def publish_suspicious_event_with_upload(self, machine_id, image_path, event_details, detected_objects=None, confidence=0.85, timestamp=None):
         """Publish suspicious event data to cloud using actual image upload"""
         try:
             if timestamp is None:
@@ -510,15 +510,18 @@ class CommandCenter:
                 print(f"Suspicious event - objects detected!")
                 self.events_detected += 1
                 
+                # Upload and publish cropped images with the new method
                 for cropped_file in detection_result["cropped_files"]:
-                    self.publish_cropped_image_as_suspicious(cropped_file, detection_result, timestamp=image_timestamp)
+                    self.publish_cropped_image_as_suspicious_with_upload(cropped_file, detection_result, image_timestamp)
                     time.sleep(1)
                 
-                self.publish_original_image_as_suspicious(image_file, detection_result, timestamp=image_timestamp)
+                # Upload and publish original image with the new method
+                self.publish_original_image_as_suspicious_with_upload(image_file, detection_result, image_timestamp)
                 
             else:
                 print(f"🚨 SUSPICIOUS EVENT - NO OBJECTS DETECTED (Low Severity)")
-                self.publish_original_image_as_suspicious(image_file, detection_result, timestamp=image_timestamp)
+                # Upload and publish original image with the new method
+                self.publish_original_image_as_suspicious_with_upload(image_file, detection_result, image_timestamp)
             
             self.processed_images.add(image_file)
             self.images_processed += 1
@@ -534,6 +537,86 @@ class CommandCenter:
         print(f"Total processed: {self.images_processed}")
         print(f"Events detected: {self.events_detected}")
 
+    def publish_cropped_image_as_suspicious_with_upload(self, cropped_file, detection_result, timestamp):
+        """Publish cropped image as suspicious event with file upload"""
+        try:
+            # Extract detection information from filename
+            filename = os.path.basename(cropped_file)
+            detected_objects = []
+            confidence = 0.85
+            
+            if "_cropped.jpg" in filename:
+                parts = filename.replace("_cropped.jpg", "").split("_")
+                if len(parts) >= 3:
+                    detected_objects = [parts[-2]]  # Object type
+                    try:
+                        confidence = float(parts[-1].replace("conf", ""))
+                    except:
+                        confidence = 0.85
+            
+            # Get event details based on detection
+            event_details = get_suspicious_event_details(detected_objects, [confidence])
+            
+            # Upload image and publish suspicious event
+            success = self.publish_suspicious_event_with_upload(
+                self.devid,
+                cropped_file,  # Pass file path for upload
+                event_details,
+                detected_objects,
+                confidence,
+                timestamp
+            )
+            
+            if success:
+                print(f"📤 Published cropped suspicious event: {filename}")
+            
+        except Exception as e:
+            print(f"❌ Error publishing cropped image {cropped_file}: {e}")
+
+    def publish_original_image_as_suspicious_with_upload(self, image_file, detection_result, timestamp):
+        """Publish original image as suspicious event with file upload"""
+        try:
+            # Determine what was detected
+            detected_objects = []
+            confidence = 0.85
+            
+            if detection_result["has_detection"] and detection_result["cropped_files"]:
+                # Extract objects from cropped filenames
+                for cropped_file in detection_result["cropped_files"]:
+                    filename = os.path.basename(cropped_file)
+                    if "_cropped.jpg" in filename:
+                        parts = filename.replace("_cropped.jpg", "").split("_")
+                        if len(parts) >= 3:
+                            obj_name = parts[-2]
+                            if obj_name not in detected_objects:
+                                detected_objects.append(obj_name)
+                            try:
+                                conf = float(parts[-1].replace("conf", ""))
+                                confidence = max(confidence, conf)
+                            except:
+                                pass
+            
+            # Get event details (will be low severity if no detections)
+            confidences = [confidence] if detected_objects else []
+            event_details = get_suspicious_event_details(detected_objects, confidences)
+            
+            # Upload image and publish suspicious event
+            success = self.publish_suspicious_event_with_upload(
+                self.devid,
+                image_file,  # Pass file path for upload
+                event_details,
+                detected_objects,
+                confidence,
+                timestamp
+            )
+            
+            if success:
+                print(f"📤 Published original suspicious event: {os.path.basename(image_file)} ({event_details['type']})")
+            
+        except Exception as e:
+            print(f"❌ Error publishing original image {image_file}: {e}")
+
+    # Keep the original base64 methods for backward compatibility with RF communication
     def publish_cropped_image_as_suspicious(self, cropped_file, detection_result):
         """Publish cropped image as suspicious event"""
         try:
@@ -557,6 +640,7 @@ class CommandCenter:
             # Convert image to base64
             image_base64 = image.image2string(cropped_file)
             
+            # Use the old base64 publish method for RF communication
             self.publish_suspicious_event(
                 self.devid,
                 image_base64,
@@ -600,6 +684,7 @@ class CommandCenter:
             # Convert image to base64
             image_base64 = image.image2string(image_file)
             
+            # Use the old base64 publish method for RF communication
             self.publish_suspicious_event(
                 self.devid,
                 image_base64,
@@ -690,7 +775,7 @@ class CommandCenter:
             timestamp = datetime.now(timezone.utc)
             
             # Upload the saved image and publish suspicious event
-            self.publish_suspicious_event(
+            self.publish_suspicious_event_with_upload(
                 source_node, 
                 fname,  
                 event_details,
