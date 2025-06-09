@@ -400,7 +400,7 @@ class CommandCenter:
                 destination_ids=["s3"]
             )
             
-            print(f"📊 Summary published - Processed: {self.images_processed}, Events: {self.events_detected}")
+            print(f"Summary published - Processed: {self.images_processed}, Events: {self.events_detected}")
                 
         except Exception as e:
             print(f"Error publishing summary: {e}")
@@ -417,7 +417,7 @@ class CommandCenter:
             print(f"Warning: Image directory {self.image_directory} does not exist")
             return []
         
-        print(f"🔍 Scanning for images in: {self.image_directory}")
+        print(f"Scanning for images in: {self.image_directory}")
         
         for extension in image_extensions:
             pattern = os.path.join(self.image_directory, extension)  # Direct files in directory
@@ -435,14 +435,14 @@ class CommandCenter:
             
         # Remove duplicates and sort
         image_files = sorted(list(set(image_files)))
-        print(f"📁 Total image files found: {len(image_files)}")
+        print(f"Total image files found: {len(image_files)}")
         
         return image_files
 
     def process_image_with_enhanced_detector(self, image_path):
         """Process image with enhanced detector and return results"""
         try:
-            print(f"🔍 Processing image with AI detector: {os.path.basename(image_path)}")
+            print(f"Processing image with AI detector: {os.path.basename(image_path)}")
             
             # Run detection
             has_objects = self.detector.ImageHasTargetObjects(image_path, crop_objects=True)
@@ -454,7 +454,7 @@ class CommandCenter:
                 crop_dir = os.path.dirname(image_path)
                 cropped_files = glob.glob(os.path.join(crop_dir, crop_pattern))
                 
-                print(f"Detection found! Generated {len(cropped_files)} cropped images")
+                print(f"✅ Detection found! Generated {len(cropped_files)} cropped images")
                 
                 return {
                     "has_detection": True,
@@ -462,7 +462,7 @@ class CommandCenter:
                     "original_file": image_path
                 }
             else:
-                print(f"No objects detected in image")
+                print(f"❌ No objects detected in image")
                 return {
                     "has_detection": False,
                     "cropped_files": [],
@@ -511,14 +511,14 @@ class CommandCenter:
                 self.events_detected += 1
                 
                 for cropped_file in detection_result["cropped_files"]:
-                    self.publish_cropped_image_as_suspicious(cropped_file, detection_result, image_timestamp)
+                    self.publish_cropped_image_as_suspicious(cropped_file, detection_result, timestamp=image_timestamp)
                     time.sleep(1)
                 
-                self.publish_original_image_as_suspicious(image_file, detection_result, image_timestamp)
+                self.publish_original_image_as_suspicious(image_file, detection_result, timestamp=image_timestamp)
                 
             else:
                 print(f"🚨 SUSPICIOUS EVENT - NO OBJECTS DETECTED (Low Severity)")
-                self.publish_original_image_as_suspicious(image_file, detection_result, image_timestamp)
+                self.publish_original_image_as_suspicious(image_file, detection_result, timestamp=image_timestamp)
             
             self.processed_images.add(image_file)
             self.images_processed += 1
