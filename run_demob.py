@@ -9,6 +9,7 @@ import random
 from rf_comm import RFComm
 
 import constants
+from vyomcloudbridge.services.queue_writer_json import QueueWriterJson
 
 def get_hostname():
     return socket.gethostname()
@@ -48,8 +49,103 @@ class CommandCenter:
         self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
         self.images_saved = []
         self.msgids_seen = []
+        
+        self.writer = QueueWriterJson()
+        self.mission_id = "demob_mission_001"
+        print(f"Command Center {devid} initialized with vyomcloudbridge writer")
+
+    def publish_health_event(self, machine_id):
+        """Publish health event data to cloud"""
+        try:
+            epoch_ms = int(time.time() * 1000)
+            message_data = {
+                "timestamp": datetime.now().isoformat(),
+                "machine_id": machine_id,
+                "type": "unknown",
+                "severity": "low"
+            }
+            
+            filename = f"health_{machine_id}_{epoch_ms}.json"
+            
+            self.writer.write_message(
+                message_data=message_data,
+                filename=filename,
+                data_source="watchmen-health",
+                data_type="json",
+                mission_id=self.mission_id,
+                priority=1,
+                destination_ids=["s3"]
+            )
+            
+            print(f"Health event published for machine {machine_id}")
+                
+        except Exception as e:
+            print(f"Error publishing health event for {machine_id}: {e}")
+
+    def publish_suspicious_event(self, machine_id, image_base64, confidence=0.85):
+        """Publish suspicious event data to cloud"""
+        try:
+            epoch_ms = int(time.time() * 1000)
+            message_data = {
+                "machine_id": machine_id,
+                "timestamp": datetime.now().isoformat(),
+                "url": image_base64,  # Image as base64
+                "confidence": confidence,
+                "type": "unknown"
+            }
+            
+            filename = f"suspicious_{machine_id}_{epoch_ms}.json"
+            
+            self.writer.write_message(
+                message_data=message_data,
+                filename=filename,
+                data_source="watchmen-suspicious",
+                data_type="json",
+                mission_id=self.mission_id,
+                priority=3,
+                destination_ids=["s3"]
+            )
+            
+            print(f"Suspicious event published for machine {machine_id}")
+                
+        except Exception as e:
+            print(f"Error publishing suspicious event for {machine_id}: {e}")
+
+    def publish_summary(self):
+        """Publish network summary"""
+        try:
+            epoch_ms = int(time.time() * 1000)
+            
+            total_nodes = len(self.node_map)
+            total_images = len(self.images_saved)
+            
+            message_data = {
+                "timestamp": datetime.now().isoformat(),
+                "machine_id": self.devid,
+                "total_nodes": total_nodes,
+                "total_images": total_images,
+                "active_nodes": list(self.node_map.keys())
+            }
+            
+            filename = f"summary_{epoch_ms}.json"
+            
+            self.writer.write_message(
+                message_data=message_data,
+                filename=filename,
+                data_source="watchmen-summary",
+                data_type="json",
+                mission_id=self.mission_id,
+                priority=1,
+                destination_ids=["s3"]
+            )
+            
+            print(f"Summary published successfully")
+                
+        except Exception as e:
+            print(f"Error publishing summary: {e}")
 
     def print_status(self):
+        status_count = 0
         while True:
             print("######### Command Center printing status ##############")
             for x in self.node_map.keys():
@@ -57,13 +153,21 @@ class CommandCenter:
             for x in self.images_saved:
                 print(f"Saved image : {x}")
             print("#######################################################")
+            
+            # TODO: Publish summary every 10 status updates (every 100 seconds)
+            status_count += 1
+            if status_count % 10 == 0:
+                self.publish_summary()
+            
             time.sleep(10)
 
     def process_image(self, msgstr):
         try:
             orig_msg = json.loads(msgstr)
         except Exception as e:
-            print(f"Error loadig json {e}")
+            print(f"Error loading json {e}")
+            return
+            
         print("Checking for image")
         if "i_d" in orig_msg:
             print("Seems like an image")
@@ -73,7 +177,13 @@ class CommandCenter:
             print(f"Saving image to {fname}")
             im.save(fname)
             self.images_saved.append(fname)
-            # im.show()
+            
+            # Extract source node and publish suspicious event with image as base64
+            source_node = orig_msg.get("i_s", "unknown")
+            image_base64 = orig_msg.get("i_d", "") 
+            confidence = 0.85  # TODO: Default confidence, would come from AI model
+            
+            self.publish_suspicious_event(source_node, image_base64, confidence)
 
     # A:1205:100:12
     def process_hb(self, hbstr):
@@ -94,6 +204,9 @@ class CommandCenter:
             hbcount = hbc + 1
             eventtslist = el
         self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, eventtslist)
+        
+        # Publish health event
+        self.publish_health_event(nodeid)
     
     # A:1205
     def process_event(self, eventstr):
