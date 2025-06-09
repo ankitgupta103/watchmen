@@ -9,7 +9,7 @@ import random
 import os
 import glob
 from pathlib import Path
-from rf_comm import RFComm
+# from rf_comm import RFComm
 
 import constants
 from detect_enhanced import Detector  # Using enhanced detector
@@ -74,8 +74,29 @@ class CommandCenter:
         self.msgids_seen = []
         
         self.writer = QueueWriterJson()
-        self.mission_id = "_all_"
-        print(f"Command Center {devid} initialized with vyomcloudbridge writer")
+        self.mission_id = "demob_mission_001"
+        
+        self.detector = Detector()
+        self.detector.set_detection_category("all")
+        
+        # Image processing settings
+        self.image_directory = "/home/pi/Documents/images"
+        self.processed_images = set()
+        self.images_processed = 0
+        self.events_detected = 0
+        
+        # Check if image directory exists and show available images
+        if os.path.exists(self.image_directory):
+            available_images = self.get_image_files()
+            print(f"📁 Image directory found: {self.image_directory}")
+            print(f"📸 Available images: {len(available_images)}")
+            if available_images:
+                print(f"📋 Sample images: {[os.path.basename(f) for f in available_images[:3]]}")
+        else:
+            print(f"⚠️  Warning: Image directory not found: {self.image_directory}")
+            print(f"🔧 Please create the directory and add some images to process")
+        
+        print(f"Command Center {devid} initialized with vyomcloudbridge writer and AI detector")
 
     def publish_health_event(self, machine_id, event_type="unknown", severity="low", details=""):
         """Publish health event data to cloud"""
@@ -154,14 +175,22 @@ class CommandCenter:
             epoch_ms = int(time.time() * 1000)
             
             total_nodes = len(self.node_map)
-            total_images = len(self.images_saved)
+            total_images = len(self.images_saved) + self.images_processed
             
             message_data = {
                 "timestamp": datetime.now().isoformat(),
                 "machine_id": self.devid,
                 "total_nodes": total_nodes,
                 "total_images": total_images,
-                "active_nodes": list(self.node_map.keys())
+                "images_processed_locally": self.images_processed,
+                "events_detected_locally": self.events_detected,
+                "active_nodes": list(self.node_map.keys()),
+                "command_center_stats": {
+                    "ai_detection_enabled": True,
+                    "processed_images": self.images_processed,
+                    "detected_events": self.events_detected,
+                    "detection_rate": (self.events_detected / max(1, self.images_processed)) * 100
+                }
             }
             
             filename = f"summary_{epoch_ms}.json"
@@ -176,22 +205,203 @@ class CommandCenter:
                 destination_ids=["s3"]
             )
             
-            print(f"Summary published successfully")
+            print(f"📊 Summary published - Processed: {self.images_processed}, Events: {self.events_detected}")
                 
         except Exception as e:
             print(f"Error publishing summary: {e}")
 
+    def get_image_files(self):
+        """Get all image files from the specified directory"""
+        image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.gif', '*.tiff']
+        image_files = []
+        
+        if not os.path.exists(self.image_directory):
+            print(f"Warning: Image directory {self.image_directory} does not exist")
+            return []
+        
+        for extension in image_extensions:
+            pattern = os.path.join(self.image_directory, '**', extension)
+            image_files.extend(glob.glob(pattern, recursive=True))
+            
+        return sorted(image_files)
+
+    def process_image_with_enhanced_detector(self, image_path):
+        """Process image with enhanced detector and return results"""
+        try:
+            print(f"🔍 Processing image with AI detector: {os.path.basename(image_path)}")
+            
+            # Run detection
+            has_objects = self.detector.ImageHasTargetObjects(image_path, crop_objects=True)
+            
+            if has_objects:
+                # Get cropped object files (they're saved in the same directory with modified names)
+                base_name = os.path.splitext(os.path.basename(image_path))[0]
+                crop_pattern = f"{base_name}_*_cropped.jpg"
+                crop_dir = os.path.dirname(image_path)
+                cropped_files = glob.glob(os.path.join(crop_dir, crop_pattern))
+                
+                print(f"✅ Detection found! Generated {len(cropped_files)} cropped images")
+                
+                return {
+                    "has_detection": True,
+                    "cropped_files": cropped_files,
+                    "original_file": image_path
+                }
+            else:
+                print(f"❌ No objects detected in image")
+                return {
+                    "has_detection": False,
+                    "cropped_files": [],
+                    "original_file": image_path
+                }
+                
+        except Exception as e:
+            print(f"💥 Error processing image {image_path}: {e}")
+            return {
+                "has_detection": False,
+                "cropped_files": [],
+                "original_file": image_path,
+                "error": str(e)
+            }
+
+    def process_images_from_directory(self):
+        """Process all images from the directory one by one"""
+        print(f"\n🚀 Starting image processing from directory: {self.image_directory}")
+        
+        image_files = self.get_image_files()
+        
+        if not image_files:
+            print(f"❗ No images found in {self.image_directory}")
+            return
+        
+        print(f"📁 Found {len(image_files)} images to process")
+        
+        for image_file in image_files:
+            if image_file in self.processed_images:
+                continue  # Skip already processed images
+                
+            print(f"\n{'='*60}")
+            print(f"📸 Processing image {len(self.processed_images) + 1}/{len(image_files)}")
+            print(f"📸 File: {os.path.basename(image_file)}")
+            print(f"{'='*60}")
+            
+            # Process with enhanced detector
+            detection_result = self.process_image_with_enhanced_detector(image_file)
+            
+            if detection_result["has_detection"]:
+                print(f"🚨 SUSPICIOUS EVENT DETECTED!")
+                self.events_detected += 1
+                
+                # Publish cropped images as suspicious events
+                for cropped_file in detection_result["cropped_files"]:
+                    self.publish_cropped_image_event(cropped_file, detection_result)
+                    time.sleep(1)
+                
+                # Publish original image
+                self.publish_original_image_event(image_file, detection_result)
+                
+            else:
+                print(f"✅ Image processed - no suspicious activity")
+                # Publish as health event (system is working)
+                self.publish_health_event(
+                    self.devid, 
+                    "image_processed", 
+                    "low", 
+                    f"Processed image {os.path.basename(image_file)} - no detections"
+                )
+            
+            self.processed_images.add(image_file)
+            self.images_processed += 1
+            
+            # Wait before processing next image
+            print(f"⏳ Waiting 5 seconds before next image...")
+            time.sleep(5)
+        
+        print(f"\n🎉 Image processing completed!")
+        print(f"📊 Total processed: {self.images_processed}")
+        print(f"🚨 Events detected: {self.events_detected}")
+
+    def publish_cropped_image_event(self, cropped_file, detection_result):
+        """Publish cropped image as suspicious event"""
+        try:
+            # Extract detection information from filename
+            filename = os.path.basename(cropped_file)
+            detected_objects = []
+            confidence = 0.85
+            
+            if "_cropped.jpg" in filename:
+                parts = filename.replace("_cropped.jpg", "").split("_")
+                if len(parts) >= 3:
+                    detected_objects = [parts[-2]]  # Object type
+                    try:
+                        confidence = float(parts[-1].replace("conf", ""))
+                    except:
+                        confidence = 0.85
+            
+            # Convert image to base64
+            image_base64 = image.image2string(cropped_file)
+            
+            self.publish_suspicious_event(
+                self.devid,
+                image_base64,
+                confidence,
+                detected_objects[0] if detected_objects else "unknown",
+                detected_objects
+            )
+            
+            print(f"📤 Published cropped image: {filename}")
+            
+        except Exception as e:
+            print(f"❌ Error publishing cropped image {cropped_file}: {e}")
+
+    def publish_original_image_event(self, image_file, detection_result):
+        """Publish original image as suspicious event"""
+        try:
+            # Convert image to base64
+            image_base64 = image.image2string(image_file)
+            
+            self.publish_suspicious_event(
+                self.devid,
+                image_base64,
+                0.85,  # Default confidence for original
+                "multiple_objects",
+                ["detected_objects"]
+            )
+            
+            print(f"📤 Published original image: {os.path.basename(image_file)}")
+            
+        except Exception as e:
+            print(f"❌ Error publishing original image {image_file}: {e}")
+
+    def run_image_processing_cycle(self):
+        """Run image processing in a separate thread"""
+        def processing_thread():
+            time.sleep(5)  # Give system time to initialize
+            self.process_images_from_directory()
+        
+        thread = threading.Thread(target=processing_thread, daemon=True)
+        thread.start()
+        return thread
+
     def print_status(self):
         status_count = 0
+        
+        # Start image processing in background
+        processing_thread = self.run_image_processing_cycle()
+        
         while True:
-            print("######### Command Center printing status ##############")
+            print("######### Command Center Status ##############")
+            print(f"📊 Images processed: {self.images_processed}")
+            print(f"🚨 Events detected: {self.events_detected}")
+            print(f"🔗 Connected nodes: {len(self.node_map)}")
+            
             for x in self.node_map.keys():
                 print(f" ####### {x} : {self.node_map[x]}")
             for x in self.images_saved:
-                print(f"Saved image : {x}")
+                print(f"💾 Saved image : {x}")
             print("#######################################################")
             
-            # Publish summary every 10 status updates (every 100 seconds)
+            # Publish summary every 10 status updates
             status_count += 1
             if status_count % 10 == 0:
                 self.publish_summary()
@@ -541,24 +751,28 @@ class DevUnit:
 def run_unit():
     hname = get_hostname()
     if hname not in constants.HN_ID:
-        print(f"Hostname {hname} not found in constants.HN_ID")
-        print(f"Available hostnames: {list(constants.HN_ID.keys())}")
+        print(f"❌ Hostname {hname} not found in constants.HN_ID")
+        print(f"📋 Available hostnames: {list(constants.HN_ID.keys())}")
         return None
         
     devid = constants.HN_ID[hname]
-    print(f"Device ID: {devid}, Hostname: {hname}")
+    print(f"🚀 Starting Watchmen System")
+    print(f"🏷️  Device ID: {devid}")
+    print(f"🖥️  Hostname: {hname}")
+    print(f"📁 Image directory: /home/pi/Documents/images")
+    
+    # Check camera flag
+    has_camera = len(sys.argv) > 1 and sys.argv[1] == "c"
+    print(f"📷 Camera mode: {'ENABLED' if has_camera else 'DISABLED'}")
     
     if is_node_dest(devid):
-        print(f"Running as Command Center")
+        print(f"🎯 Running as Command Center with AI Detection")
         cc = CommandCenter(devid)
         cc.print_status()
     else:
-        print(f"Running as Device Unit")
+        print(f"📡 Running as Device Unit")
         du = DevUnit(devid)
-        has_camera = False
-        if len(sys.argv) > 1:
-            has_camera = sys.argv[1] == "c"
-        print(f"Camera enabled: {has_camera}")
+        print(f"📷 Camera enabled: {has_camera}")
         du.keep_sending_to_cc(has_camera)
     
     time.sleep(10000000)
