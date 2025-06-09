@@ -199,8 +199,9 @@ class DevUnit:
         events_seen = 0
         while True:
             self.send_heartbeat(photos_taken, events_seen)
-            time.sleep(2)
+            time.sleep(5)
             self.send_heartbeat(photos_taken, events_seen)
+            time.sleep(5)
             # TODO take photo
             photos_taken += 1
             if is_node_src(self.devid):
