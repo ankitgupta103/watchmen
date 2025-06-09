@@ -210,7 +210,7 @@ class DevUnit:
                 self.send_event()
                 time.sleep(10)
                 self.send_img("testdata/cropped.jpg")
-                time.sleep(120)
+                time.sleep(60)
                 self.send_img("testdata/forest_man_2.jpg")
             time.sleep(1800) # Every 30 mins
 
