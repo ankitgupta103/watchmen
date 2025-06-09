@@ -74,7 +74,7 @@ class CommandCenter:
         self.msgids_seen = []
         
         self.writer = QueueWriterJson()
-        self.mission_id = "demob_mission_001"
+        self.mission_id = "_all_"
         print(f"Command Center {devid} initialized with vyomcloudbridge writer")
 
     def publish_health_event(self, machine_id, event_type="unknown", severity="low", details=""):
