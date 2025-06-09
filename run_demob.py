@@ -66,9 +66,9 @@ def get_severity_from_detection(detected_objects, confidence_scores):
 class CommandCenter:
     def __init__(self, devid):
         self.devid = devid
-        self.rf = RFComm(devid)
-        self.rf.add_node(self)
-        self.rf.keep_reading()
+        # self.rf = RFComm(devid)
+        # self.rf.add_node(self)
+        # self.rf.keep_reading()
         self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
         self.images_saved = []
         self.msgids_seen = []
@@ -292,9 +292,9 @@ class DevUnit:
 
     def __init__(self, devid):
         self.devid = devid
-        self.rf = RFComm(devid)
-        self.rf.add_node(self)
-        self.rf.keep_reading()
+        # self.rf = RFComm(devid)
+        # self.rf.add_node(self)
+        # self.rf.keep_reading()
         self.keep_propagating()
         self.msgids_seen = []
         
@@ -439,7 +439,7 @@ class DevUnit:
         
         msgstr = json.dumps(im)
         print(f"Sending {'cropped' if is_cropped else 'original'} image: {imgfile} (detection: {detection_type})")
-        self.rf.send_message(msgstr, mst, next_dest)
+        # self.rf.send_message(msgstr, mst, next_dest)
 
     def _keep_propagating(self):
         while True:
@@ -453,7 +453,7 @@ class DevUnit:
                     to_send = True
             if to_send:
                 print(f"Propagating message {mst} to {dest}")
-                self.rf.send_message(msgstr, mst, dest)
+                # self.rf.send_message(msgstr, mst, dest)
             time.sleep(0.5)
 
     def keep_propagating(self):
@@ -525,18 +525,18 @@ class DevUnit:
         t = get_time_str()
         msgstr = f"{self.devid}:{t}:{photos_taken}:{events_seen}"
         next_dest = get_next_dest(self.devid)
-        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_HEARTBEAT, next_dest)
+        # self.rf.send_message(msgstr, constants.MESSAGE_TYPE_HEARTBEAT, next_dest)
 
     def send_gps(self):
         next_dest = get_next_dest(self.devid)
         msgstr = f"{self.devid}:28.4:77.0"
-        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
+        # self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
 
     def send_event(self):
         t = get_time_str()
         msgstr = f"{self.devid}:{t}"
         next_dest = get_next_dest(self.devid)
-        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest)
+        # self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest)
 
 def run_unit():
     hname = get_hostname()
