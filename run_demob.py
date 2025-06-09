@@ -15,7 +15,7 @@ import constants
 from detect_enhanced import Detector  # Using enhanced detector
 from vyomcloudbridge.services.queue_writer_json import QueueWriterJson
 from vyomcloudbridge.utils.configs import Configs
-from vyomcloudbridge.utils.upload_dir import get_mission_upload_dir
+from vyomcloudbridge.utils.common import get_mission_upload_dir
 
 def get_hostname():
     return socket.gethostname()
