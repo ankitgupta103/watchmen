@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 import time
 import threading
@@ -14,6 +14,8 @@ from pathlib import Path
 import constants
 from detect_enhanced import Detector  # Using enhanced detector
 from vyomcloudbridge.services.queue_writer_json import QueueWriterJson
+from vyomcloudbridge.utils.configs import Configs
+from vyomcloudbridge.utils.upload_dir import get_mission_upload_dir
 
 def get_hostname():
     return socket.gethostname()
@@ -96,6 +98,14 @@ class CommandCenter:
         self.writer = QueueWriterJson()
         self.mission_id = "_all_"
         
+        # Get machine configuration
+        self.machine_config = Configs.get_machine_config()
+        self.machine_id = self.machine_config.get("machine_id", "-") or "-"
+        self.organization_id = self.machine_config.get("organization_id", "-") or "-"
+        
+        print(f"Machine ID: {self.machine_id}")
+        print(f"Organization ID: {self.organization_id}")
+        
         self.detector = Detector()
         self.detector.set_detection_category("all")
         
@@ -157,10 +167,71 @@ class CommandCenter:
         except Exception as e:
             print(f"Error publishing health event for {machine_id}: {e}")
 
-    def publish_suspicious_event(self, machine_id, image_base64, event_details, detected_objects=None, confidence=0.85):
-        """Publish suspicious event data to cloud using proper TS types"""
+    def upload_image_and_get_url(self, image_path, data_source="watchmen-suspicious", timestamp=None):
+        """Upload image file and return the URL for use in suspicious events"""
         try:
-            epoch_ms = int(time.time() * 1000)
+            if timestamp is None:
+                timestamp = datetime.now(timezone.utc)
+            
+            # Get mission upload directory
+            mission_upload_dir = get_mission_upload_dir(
+                organization_id=self.organization_id,
+                machine_id=self.machine_id,
+                mission_id="_all_",
+                data_source=data_source,
+                date=timestamp.strftime("%Y-%m-%d"),
+                project_id="_all_"
+            )
+            
+            # Read image file as binary
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+            
+            # Create unique filename with timestamp
+            original_filename = os.path.basename(image_path)
+            name, ext = os.path.splitext(original_filename)
+            timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+            unique_filename = f"{name}_{timestamp_str}{ext}"
+            
+            # Upload image using writer
+            success, error = self.writer.write_message(
+                message_data=image_data,
+                filename=unique_filename,
+                data_source=data_source,
+                data_type="image",
+                mission_id=self.mission_id,
+                priority=2,
+                destination_ids=["s3"],
+                merge_chunks=False
+            )
+            
+            if success:
+                # Construct the URL path (this would be the actual S3/cloud URL)
+                image_url = f"{mission_upload_dir}/{unique_filename}"
+                print(f"📤 Image uploaded successfully: {unique_filename}")
+                return image_url
+            else:
+                print(f"❌ Failed to upload image {original_filename}: {error}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error uploading image {image_path}: {e}")
+            return None
+
+    def publish_suspicious_event(self, machine_id, image_path, event_details, detected_objects=None, confidence=0.85, timestamp=None):
+        """Publish suspicious event data to cloud using actual image upload"""
+        try:
+            if timestamp is None:
+                timestamp = datetime.now(timezone.utc)
+                
+            epoch_ms = int(timestamp.timestamp() * 1000)
+            
+            # Upload image and get URL
+            image_url = self.upload_image_and_get_url(image_path, "watchmen-suspicious", timestamp)
+            
+            if not image_url:
+                print(f"❌ Failed to upload image, skipping suspicious event")
+                return False
             
             # Suspicious event types from TS: 'human_detection' | 'weapon_detection' | 'unusual_activity'
             # Marked from TS: 'ignored' | 'noted' | 'unreviewed'
@@ -169,17 +240,18 @@ class CommandCenter:
                 "event_type": "suspicious",
                 "machine_id": machine_id,
                 "machine_name": f"{machine_id}",
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": timestamp.isoformat(),
                 "type": event_details["type"],
                 "confidence": confidence,
-                "url": image_base64,  # Image as base64
-                "marked": "unreviewed",  # Default to unreviewed
+                "url": image_url, 
+                "marked": "unreviewed",
                 "severity": event_details["severity"],
                 "detected_objects": detected_objects or [],
                 "details": {
                     "description": event_details["description"],
                     "detection_count": len(detected_objects) if detected_objects else 0,
-                    "max_confidence": confidence
+                    "max_confidence": confidence,
+                    "original_filename": os.path.basename(image_path)
                 },
                 "mission_id": self.mission_id,
                 "reported_by": self.devid
@@ -189,7 +261,7 @@ class CommandCenter:
             
             priority = 3 if event_details["severity"] in ["high", "critical"] else 2
             
-            self.writer.write_message(
+            success, error = self.writer.write_message(
                 message_data=message_data,
                 filename=filename,
                 data_source="watchmen-suspicious",
@@ -199,10 +271,16 @@ class CommandCenter:
                 destination_ids=["s3"]
             )
             
-            print(f"Suspicious event published for {machine_id}: {event_details['type']} ({event_details['severity']}) - confidence: {confidence}")
+            if success:
+                print(f"🚨 Suspicious event published for {machine_id}: {event_details['type']} ({event_details['severity']}) - Image: {image_url}")
+                return True
+            else:
+                print(f"❌ Failed to publish suspicious event: {error}")
+                return False
                 
         except Exception as e:
-            print(f"Error publishing suspicious event for {machine_id}: {e}")
+            print(f"❌ Error publishing suspicious event for {machine_id}: {e}")
+            return False
 
     def check_system_health(self):
         """Check system health and publish health events every 60 seconds"""
@@ -421,6 +499,9 @@ class CommandCenter:
             print(f"File: {os.path.basename(image_file)}")
             print(f"{'='*60}")
             
+            # Use same timestamp for all uploads related to this image
+            image_timestamp = datetime.now(timezone.utc)
+            
             # Process with enhanced detector
             detection_result = self.process_image_with_enhanced_detector(image_file)
             
@@ -429,18 +510,15 @@ class CommandCenter:
                 print(f"Suspicious event - objects detected!")
                 self.events_detected += 1
                 
-                # Publish cropped images as suspicious events
                 for cropped_file in detection_result["cropped_files"]:
-                    self.publish_cropped_image_as_suspicious(cropped_file, detection_result)
+                    self.publish_cropped_image_as_suspicious(cropped_file, detection_result, image_timestamp)
                     time.sleep(1)
                 
-                # Publish original image as suspicious event
-                self.publish_original_image_as_suspicious(image_file, detection_result)
+                self.publish_original_image_as_suspicious(image_file, detection_result, image_timestamp)
                 
             else:
-                print(f"Suspicious event - no objects detected (Low Severity)")
-                # Still publish as suspicious event with low severity
-                self.publish_original_image_as_suspicious(image_file, detection_result)
+                print(f"🚨 SUSPICIOUS EVENT - NO OBJECTS DETECTED (Low Severity)")
+                self.publish_original_image_as_suspicious(image_file, detection_result, image_timestamp)
             
             self.processed_images.add(image_file)
             self.images_processed += 1
@@ -583,30 +661,42 @@ class CommandCenter:
             
         print("Checking for image")
         if "i_d" in orig_msg:
-            print("Seems like an image")
+            print("Received image from remote device")
+            
+            # Save image locally first
             imstr = orig_msg["i_d"]
             im = image.imstrtoimage(imstr)
             fname = f"/tmp/commandcenter_{random.randint(1000,2000)}.jpg"
-            print(f"Saving image to {fname}")
+            print(f"Saving received image to {fname}")
             im.save(fname)
             self.images_saved.append(fname)
             
             # Extract detection results from message
             source_node = orig_msg.get("i_s", "unknown")
-            image_base64 = orig_msg.get("i_d", "") 
             detected_objects = orig_msg.get("detected_objects", [])
             confidence = orig_msg.get("confidence", 0.85)
             detection_type = orig_msg.get("detection_type", "unknown")
+            severity = orig_msg.get("severity", "low")
+            description = orig_msg.get("description", "Remote image processed")
             
-            # Get proper event details
-            event_details = get_suspicious_event_details(detected_objects, [confidence])
+            # Create event details structure
+            event_details = {
+                "type": detection_type,
+                "severity": severity,
+                "description": description
+            }
             
+            # Use current timestamp for consistency
+            timestamp = datetime.now(timezone.utc)
+            
+            # Upload the saved image and publish suspicious event
             self.publish_suspicious_event(
                 source_node, 
-                image_base64, 
+                fname,  
                 event_details,
                 detected_objects,
-                confidence
+                confidence,
+                timestamp
             )
 
     def process_hb(self, hbstr):
@@ -686,6 +776,14 @@ class DevUnit:
         # self.rf.keep_reading()
         self.keep_propagating()
         self.msgids_seen = []
+        
+        # Get machine configuration
+        self.machine_config = Configs.get_machine_config()
+        self.machine_id = self.machine_config.get("machine_id", "-") or "-"
+        self.organization_id = self.machine_config.get("organization_id", "-") or "-"
+        
+        print(f"🏷️  Machine ID: {self.machine_id}")
+        print(f"🏢 Organization ID: {self.organization_id}")
         
         # Initialize enhanced detector
         self.detector = Detector()
@@ -823,6 +921,9 @@ class DevUnit:
         
         mst = constants.MESSAGE_TYPE_PHOTO
         
+        # Use consistent timestamp for this image
+        image_timestamp = datetime.now(timezone.utc)
+        
         # Extract detection information from filename if cropped
         detected_objects = []
         confidence = 0.85
@@ -861,19 +962,22 @@ class DevUnit:
         im = {
             "i_m": f"Image from {self.devid}",
             "i_s": self.devid,
-            "i_t": str(int(time.time())),
-            "i_d": image.image2string(imgfile),
+            "i_t": image_timestamp.isoformat(),  
+            "i_d": image.image2string(imgfile),  # Still base64 for RF transmission
             "is_cropped": is_cropped,
             "detected_objects": detected_objects,
             "confidence": confidence,
             "detection_type": event_details["type"],  # Use proper suspicious event type
             "severity": event_details["severity"],
+            "description": event_details["description"],
             "has_detection": detection_result["has_detection"] if detection_result else False,
-            "description": event_details["description"]
+            "original_filename": os.path.basename(imgfile),
+            "machine_id": self.machine_id,
+            "organization_id": self.organization_id
         }
         
         msgstr = json.dumps(im)
-        print(f"📤 Sending {'cropped' if is_cropped else 'original'} suspicious event: {os.path.basename(imgfile)} ({event_details['type']}, {event_details['severity']})")
+        print(f"Sending {'cropped' if is_cropped else 'original'} suspicious event: {os.path.basename(imgfile)} ({event_details['type']}, {event_details['severity']})")
         # self.rf.send_message(msgstr, mst, next_dest)
 
     def _keep_propagating(self):
@@ -1036,6 +1140,10 @@ def run_unit():
     print(f"   ALL images → Suspicious events (with severity based on detections)")
     print(f"   Heartbeats, GPS, Events → Health messages")
     print(f"   System status checks → Health events (every 60 seconds)")
+    print(f"Image Upload:")
+    print(f"   Images uploaded as files (not base64)")
+    print(f"   Image URLs stored in suspicious event data")
+    print(f"   Consistent timestamps for related images")
     
     if is_node_dest(devid):
         print(f"Running as Command Center with AI Detection & MQTT Publishing")
