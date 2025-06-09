@@ -17,6 +17,9 @@ MAX_DATA_SIZE = 32
 MAX_CHUNK_SIZE = 19
 hname = socket.gethostname()
 
+# This controls the manual acking on unicast (non chunked) messages
+ACKING_ENABLED = False
+
 """
 MessageID = MSDIII where
   M = message type
@@ -163,9 +166,10 @@ class RFComm:
         
         self.process_message(msgid, msgtype, msgpyl)
         # Disable acking except on chunks
-        # print(f"{self.devid} : Sending ack for {msgid} to {src}")
-        # msg_to_send = msgid
-        # self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
+        if ACKING_ENABLED:
+            print(f"{self.devid} : Sending ack for {msgid} to {src}")
+            msg_to_send = msgid
+            self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
 
     def _missing_chunk_helper(self, missing_chunks, strlimit):
         if len(missing_chunks) == 0:
@@ -301,7 +305,7 @@ class RFComm:
 
     # dest = None = broadcast, no ack waited, assumed success.
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
-    def _send_unicast(self, payload, mst, dest, wait_for_ack = False, retry_count = 1):
+    def _send_unicast(self, payload, mst, dest, wait_for_ack = True, retry_count = 3):
         msgid = self._get_msg_id(mst, dest) # Message type has to improve
         msgstr = f"{msgid};{payload}"
         if not wait_for_ack:
@@ -413,7 +417,10 @@ class RFComm:
                 return False
         if len(payload) < 30:
             msg = payload
-            sent = self._send_unicast(msg, mst, dest)
+            if ACKING_ENABLED:
+                sent = self._send_unicast(msg, mst, dest)
+            else:
+                sent = self._send_unicast(msg, mst, dest, False, 1)
             return sent
         else:
             print("Too big, will chunk msg {len(payload)}")
