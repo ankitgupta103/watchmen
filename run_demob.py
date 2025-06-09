@@ -192,9 +192,9 @@ class DevUnit:
         # TODO fix and make it a clean exit on self deletion
         propogation_thread.start()
 
-    def keep_sending_to_cc(self):
+    def keep_sending_to_cc(self, has_camera):
         # self.send_gps()
-        time.sleep(10)
+        # time.sleep(10)
         photos_taken = 0
         events_seen = 0
         while True:
@@ -204,7 +204,7 @@ class DevUnit:
             time.sleep(5)
             # TODO take photo
             photos_taken += 1
-            if is_node_src(self.devid):
+            if has_camera:
                 events_seen += 1
                 time.sleep(5)
                 self.send_event()
@@ -247,7 +247,10 @@ def run_unit():
         cc.print_status()
     else:
         du = DevUnit(devid)
-        du.keep_sending_to_cc()
+        has_camera = False
+        if len(sys.argv) > 1:
+            has_camera = sys.argv[1] == "c"
+        du.keep_sending_to_cc(has_camera)
     time.sleep(10000000)
 
 def main():
