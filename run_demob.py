@@ -212,18 +212,37 @@ class CommandCenter:
 
     def get_image_files(self):
         """Get all image files from the specified directory"""
-        image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.gif', '*.tiff']
+        image_extensions = [
+            '*.jpg', '*.jpeg', '*.png', '*.bmp', '*.gif', '*.tiff', '*.tif',
+            '*.JPG', '*.JPEG', '*.PNG', '*.BMP', '*.GIF', '*.TIFF', '*.TIF'
+        ]
         image_files = []
         
         if not os.path.exists(self.image_directory):
             print(f"Warning: Image directory {self.image_directory} does not exist")
             return []
         
+        print(f"🔍 Scanning for images in: {self.image_directory}")
+        
         for extension in image_extensions:
-            pattern = os.path.join(self.image_directory, '**', extension)
-            image_files.extend(glob.glob(pattern, recursive=True))
+            pattern = os.path.join(self.image_directory, extension)  # Direct files in directory
+            found_files = glob.glob(pattern)
+            if found_files:
+                print(f"   Found {len(found_files)} {extension} files")
+            image_files.extend(found_files)
             
-        return sorted(image_files)
+            # Also check subdirectories
+            pattern_recursive = os.path.join(self.image_directory, '**', extension)
+            found_files_recursive = glob.glob(pattern_recursive, recursive=True)
+            # Remove duplicates already found in direct search
+            new_files = [f for f in found_files_recursive if f not in found_files]
+            image_files.extend(new_files)
+            
+        # Remove duplicates and sort
+        image_files = sorted(list(set(image_files)))
+        print(f"📁 Total image files found: {len(image_files)}")
+        
+        return image_files
 
     def process_image_with_enhanced_detector(self, image_path):
         """Process image with enhanced detector and return results"""
@@ -538,18 +557,37 @@ class DevUnit:
 
     def get_image_files(self):
         """Get all image files from the specified directory"""
-        image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.gif', '*.tiff']
+        image_extensions = [
+            '*.jpg', '*.jpeg', '*.png', '*.bmp', '*.gif', '*.tiff', '*.tif',
+            '*.JPG', '*.JPEG', '*.PNG', '*.BMP', '*.GIF', '*.TIFF', '*.TIF'
+        ]
         image_files = []
         
         if not os.path.exists(self.image_directory):
             print(f"Warning: Image directory {self.image_directory} does not exist")
             return []
         
+        print(f"🔍 Scanning for images in: {self.image_directory}")
+        
         for extension in image_extensions:
-            pattern = os.path.join(self.image_directory, '**', extension)
-            image_files.extend(glob.glob(pattern, recursive=True))
+            pattern = os.path.join(self.image_directory, extension)  # Direct files in directory
+            found_files = glob.glob(pattern)
+            if found_files:
+                print(f"   Found {len(found_files)} {extension} files")
+            image_files.extend(found_files)
             
-        return sorted(image_files)
+            # Also check subdirectories
+            pattern_recursive = os.path.join(self.image_directory, '**', extension)
+            found_files_recursive = glob.glob(pattern_recursive, recursive=True)
+            # Remove duplicates already found in direct search
+            new_files = [f for f in found_files_recursive if f not in found_files]
+            image_files.extend(new_files)
+            
+        # Remove duplicates and sort
+        image_files = sorted(list(set(image_files)))
+        print(f"📁 Total image files found: {len(image_files)}")
+        
+        return image_files
 
     def process_image_with_enhanced_detector(self, image_path):
         """Process image with enhanced detector and return results"""
