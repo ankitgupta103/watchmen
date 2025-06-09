@@ -154,10 +154,11 @@ class RFComm:
             # TODO expect at most 5% missing chunks.
             if len(missing_chunks) == 0:
                 # Hack this has to be the message type in BEGIN
+                self._send_unicast(msgid, constants.MESSAGE_TYPE_ACK, src, False, 0)
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             else:
+                self._send_unicast(msgid, constants.MESSAGE_TYPE_ACK, src, False, 0)
                 succ = self._send_missing_chunks(cid, missing_chunks, src)
-            self._send_unicast(msgid, constants.MESSAGE_TYPE_ACK, src, False, 0)
             return
         
         self.process_message(msgid, msgtype, msgpyl)
