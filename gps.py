@@ -35,8 +35,8 @@ class Gps:
             msg_type = msg.sentence_type
             if msg_type == 'GLL':
                 print("Geographic Position:")
-                lat = print(GPS_ACC.format(msg.latitude))
-                lng = print(GPS_ACC.format(msg.longitude))
+                lat = GPS_ACC.format(msg.latitude)
+                lng = GPS_ACC.format(msg.longitude)
                 return (lat, lng)
         except Exception as e:
             print(f"Error parsing: {e}")
