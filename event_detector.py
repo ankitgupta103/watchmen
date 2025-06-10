@@ -4,6 +4,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Any
+import random
+import string
 
 import cv2
 from ultralytics import YOLO
@@ -28,6 +30,10 @@ SEVERITY_CRITICAL = 3
 POTENTIAL_WEAPONS = {"knife", "scissors", "baseball bat", "gun"}
 BAG_OBJECTS = {"backpack", "handbag", "suitcase"}
 
+def generate_random_string(length: int = 3) -> str:
+    """Generate a random alphanumeric string of given length (default 3)."""
+    chars = string.ascii_letters + string.digits
+    return ''.join(random.choices(chars, k=length))
 
 class EventDetector:
     """
@@ -193,7 +199,7 @@ class ProcessingService:
 
 
         # 1. Save the full image to the determined directory.
-        full_image_name = f"{severity}_{timestamp}_f.jpg"
+        full_image_name = f"{severity}_{timestamp}_{generate_random_string()}_f.jpg"
         full_save_path = save_dir / full_image_name
         cv2.imwrite(str(full_save_path), original_image)
         logging.info(f"Saved full image to: {full_save_path}")
