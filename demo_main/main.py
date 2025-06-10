@@ -159,8 +159,7 @@ class CommandCenter:
                 data_type="json",
                 mission_id=self.mission_id,
                 priority=priority,
-                destination_ids=["s3"],
-                merge_chunks=True
+                destination_ids=["s3"]
             )
             
             print(f"Health event published for {machine_id}: {event_type} ({severity})")
@@ -203,7 +202,7 @@ class CommandCenter:
                 mission_id=self.mission_id,
                 priority=2,
                 destination_ids=["s3"],
-                merge_chunks=True
+                merge_chunks=False
             )
             
             if success:
@@ -269,8 +268,7 @@ class CommandCenter:
                 data_type="json",
                 mission_id=self.mission_id,
                 priority=priority,
-                destination_ids=["s3"],
-                merge_chunks=True
+                destination_ids=["s3"]
             )
             
             if success:
@@ -399,8 +397,7 @@ class CommandCenter:
                 data_type="json",
                 mission_id=self.mission_id,
                 priority=1,
-                destination_ids=["s3"],
-                merge_chunks=True
+                destination_ids=["s3"]
             )
             
             print(f"Summary published - Processed: {self.images_processed}, Events: {self.events_detected}")
@@ -853,360 +850,6 @@ class CommandCenter:
             self.process_event(msgstr)
         return True
 
-class DevUnit:
-    msg_queue = [] # str, type, dest tuple list
-    msg_queue_lock = threading.Lock()
-
-    def __init__(self, devid):
-        self.devid = devid
-        # self.rf = RFComm(devid)
-        # self.rf.add_node(self)
-        # self.rf.keep_reading()
-        self.keep_propagating()
-        self.msgids_seen = []
-        
-        # Get machine configuration
-        self.machine_config = Configs.get_machine_config()
-        self.machine_id = self.machine_config.get("machine_id", "-") or "-"
-        self.organization_id = self.machine_config.get("organization_id", "-") or "-"
-        
-        print(f"🏷️  Machine ID: {self.machine_id}")
-        print(f"🏢 Organization ID: {self.organization_id}")
-        
-        # Initialize enhanced detector
-        self.detector = Detector()
-        self.detector.set_detection_category("all")  # Detect all objects
-        
-        # Image processing settings
-        self.image_directory = "/home/pi/Documents/images"
-        self.processed_images = set()  # Track processed images
-        self.images_processed = 0
-        self.events_detected = 0
-        
-        # Health monitoring
-        self.last_health_check = 0
-        self.health_check_interval = 60  # 60 seconds
-        self.system_start_time = time.time()
-        
-        print(f"DevUnit {devid} initialized with AI detector")
-       
-    def process_msg(self, msgid, mst, msgstr):
-        if msgid not in self.msgids_seen:
-            self.msgids_seen.append(msgid)
-        else:
-            print(f"Skipping message id : {msgid}")
-            return
-        if is_node_passthrough(self.devid):
-            next_dest = get_next_dest(self.devid)
-            if next_dest == None:
-                print(f"{self.devid} Weird no dest for {self.devid}")
-                return
-            print(f"In Passthrough mode, trying to acquire lock")
-            with self.msg_queue_lock:
-                print(f"{self.devid} Adding message to send queue for {next_dest}")
-                self.msg_queue.append((msgstr, mst, next_dest))
-        if is_node_src(self.devid):
-            print(f"{self.devid}: Src should not be getting any messages")
-
-    def get_image_files(self):
-        """Get all image files from the specified directory"""
-        image_extensions = [
-            '*.jpg', '*.jpeg', '*.png', '*.bmp', '*.gif', '*.tiff', '*.tif',
-            '*.JPG', '*.JPEG', '*.PNG', '*.BMP', '*.GIF', '*.TIFF', '*.TIF'
-        ]
-        image_files = []
-        
-        if not os.path.exists(self.image_directory):
-            print(f"Warning: Image directory {self.image_directory} does not exist")
-            return []
-        
-        print(f"🔍 Scanning for images in: {self.image_directory}")
-        
-        for extension in image_extensions:
-            pattern = os.path.join(self.image_directory, extension)  # Direct files in directory
-            found_files = glob.glob(pattern)
-            if found_files:
-                print(f"   Found {len(found_files)} {extension} files")
-            image_files.extend(found_files)
-            
-            # Also check subdirectories
-            pattern_recursive = os.path.join(self.image_directory, '**', extension)
-            found_files_recursive = glob.glob(pattern_recursive, recursive=True)
-            # Remove duplicates already found in direct search
-            new_files = [f for f in found_files_recursive if f not in found_files]
-            image_files.extend(new_files)
-            
-        # Remove duplicates and sort
-        image_files = sorted(list(set(image_files)))
-        print(f"📁 Total image files found: {len(image_files)}")
-        
-        return image_files
-
-    def process_image_with_enhanced_detector(self, image_path):
-        """Process image with enhanced detector and return results"""
-        try:
-            print(f"🔍 Processing image with AI detector: {os.path.basename(image_path)}")
-            
-            # Run detection
-            has_objects = self.detector.ImageHasTargetObjects(image_path, crop_objects=True)
-            
-            if has_objects:
-                # Get cropped object files (they're saved in the same directory with modified names)
-                base_name = os.path.splitext(os.path.basename(image_path))[0]
-                crop_pattern = f"{base_name}_*_cropped.jpg"
-                crop_dir = os.path.dirname(image_path)
-                cropped_files = glob.glob(os.path.join(crop_dir, crop_pattern))
-                
-                print(f"✅ Detection found! Generated {len(cropped_files)} cropped images")
-                
-                return {
-                    "has_detection": True,
-                    "cropped_files": cropped_files,
-                    "original_file": image_path
-                }
-            else:
-                print(f"❌ No objects detected in image")
-                return {
-                    "has_detection": False,
-                    "cropped_files": [],
-                    "original_file": image_path
-                }
-                
-        except Exception as e:
-            print(f"💥 Error processing image {image_path}: {e}")
-            return {
-                "has_detection": False,
-                "cropped_files": [],
-                "original_file": image_path,
-                "error": str(e)
-            }
-
-    def send_processed_images(self, detection_result):
-        """Send cropped images first, then original image - ALL AS SUSPICIOUS EVENTS"""
-        next_dest = get_next_dest(self.devid)
-        if next_dest == None:
-            print(f"{self.devid} Weird no dest for {self.devid}")
-            return
-        
-        try:
-            # First, send cropped images if any detections
-            for cropped_file in detection_result["cropped_files"]:
-                self.send_img(cropped_file, is_cropped=True, detection_result=detection_result)
-                time.sleep(2)  # Small delay between sends
-            
-            # Then send original image - ALWAYS AS SUSPICIOUS EVENT
-            self.send_img(detection_result["original_file"], is_cropped=False, detection_result=detection_result)
-            
-        except Exception as e:
-            print(f"Error sending images: {e}")
-
-    def send_img(self, imgfile, is_cropped=False, detection_result=None):
-        """Send image as suspicious event message"""
-        next_dest = get_next_dest(self.devid)
-        if next_dest == None:
-            print(f"{self.devid} Weird no dest for {self.devid}")
-            return
-        
-        mst = constants.MESSAGE_TYPE_PHOTO
-        
-        # Use consistent timestamp for this image
-        image_timestamp = datetime.now(timezone.utc)
-        
-        # Extract detection information from filename if cropped
-        detected_objects = []
-        confidence = 0.85
-        
-        if is_cropped and detection_result:
-            # Parse object type from cropped filename
-            filename = os.path.basename(imgfile)
-            if "_cropped.jpg" in filename:
-                parts = filename.replace("_cropped.jpg", "").split("_")
-                if len(parts) >= 3:
-                    detected_objects = [parts[-2]]  # Object type
-                    try:
-                        confidence = float(parts[-1].replace("conf", ""))
-                    except:
-                        confidence = 0.85
-        elif detection_result and detection_result["has_detection"]:
-            # For original images with detections
-            for cropped_file in detection_result["cropped_files"]:
-                filename = os.path.basename(cropped_file)
-                if "_cropped.jpg" in filename:
-                    parts = filename.replace("_cropped.jpg", "").split("_")
-                    if len(parts) >= 3:
-                        obj_name = parts[-2]
-                        if obj_name not in detected_objects:
-                            detected_objects.append(obj_name)
-                        try:
-                            conf = float(parts[-1].replace("conf", ""))
-                            confidence = max(confidence, conf)
-                        except:
-                            pass
-        
-        # Get suspicious event details based on detection
-        confidences = [confidence] if detected_objects else []
-        event_details = get_suspicious_event_details(detected_objects, confidences)
-        
-        im = {
-            "i_m": f"Image from {self.devid}",
-            "i_s": self.devid,
-            "i_t": image_timestamp.isoformat(),  
-            "i_d": image.image2string(imgfile),  # Still base64 for RF transmission
-            "is_cropped": is_cropped,
-            "detected_objects": detected_objects,
-            "confidence": confidence,
-            "detection_type": event_details["type"],  # Use proper suspicious event type
-            "severity": event_details["severity"],
-            "description": event_details["description"],
-            "has_detection": detection_result["has_detection"] if detection_result else False,
-            "original_filename": os.path.basename(imgfile),
-            "machine_id": self.machine_id,
-            "organization_id": self.organization_id
-        }
-        
-        msgstr = json.dumps(im)
-        print(f"Sending {'cropped' if is_cropped else 'original'} suspicious event: {os.path.basename(imgfile)} ({event_details['type']}, {event_details['severity']})")
-        # self.rf.send_message(msgstr, mst, next_dest)
-
-    def _keep_propagating(self):
-        while True:
-            to_send = False
-            msgstr = None
-            mst = ""
-            dest = ""
-            with self.msg_queue_lock:
-                if len(self.msg_queue) > 0:
-                    (msgstr, mst, dest) = self.msg_queue.pop(0)
-                    to_send = True
-            if to_send:
-                print(f"Propagating message {mst} to {dest}")
-                # self.rf.send_message(msgstr, mst, dest)
-            time.sleep(0.5)
-
-    def keep_propagating(self):
-        propogation_thread = threading.Thread(target=self._keep_propagating, daemon=True)
-        propogation_thread.start()
-
-    def process_images_from_directory(self):
-        """Process all images from the directory one by one - ALL AS SUSPICIOUS EVENTS"""
-        image_files = self.get_image_files()
-        
-        if not image_files:
-            print(f"❗ No images found in {self.image_directory}")
-            return
-        
-        print(f"📁 Found {len(image_files)} images to process")
-        print(f"🚨 ALL images will be sent as SUSPICIOUS EVENTS with appropriate severity")
-        
-        for image_file in image_files:
-            if image_file in self.processed_images:
-                continue  # Skip already processed images
-                
-            print(f"\n{'='*50}")
-            print(f"📸 Processing image {len(self.processed_images) + 1}/{len(image_files)}: {os.path.basename(image_file)}")
-            print(f"{'='*50}")
-            
-            # Process with enhanced detector
-            detection_result = self.process_image_with_enhanced_detector(image_file)
-            
-            if detection_result["has_detection"]:
-                print(f"🚨 SUSPICIOUS EVENT - OBJECTS DETECTED!")
-                self.events_detected += 1
-                self.send_event()  # Send event notification
-                time.sleep(2)
-                
-                # Send processed images (cropped first, then original) - ALL AS SUSPICIOUS
-                self.send_processed_images(detection_result)
-            else:
-                print(f"🚨 SUSPICIOUS EVENT - NO OBJECTS DETECTED (Low Severity)")
-                # Still send original image as suspicious event with low severity
-                self.send_img(image_file, is_cropped=False, detection_result=detection_result)
-            
-            self.processed_images.add(image_file)
-            self.images_processed += 1
-            
-            # Send heartbeat after processing each image (health message)
-            time.sleep(5)
-            self.send_heartbeat(self.images_processed, self.events_detected)
-            
-            # Check system health periodically 
-            self.check_system_health()
-            
-            # Wait before processing next image
-            time.sleep(10)
-
-    def check_system_health(self):
-        """Check system health and send health events every 60 seconds"""
-        current_time = time.time()
-        
-        if current_time - self.last_health_check >= self.health_check_interval:
-            self.last_health_check = current_time
-            
-            print(f"Performing health check for device {self.devid}")
-            
-            # These would be sent as health messages via RF/communication
-            # For now, just log them locally since RF is disabled
-            
-            # AI detector health
-            try:
-                if hasattr(self.detector, 'model') and self.detector.model:
-                    print(f"Health: AI detector operational")
-                else:
-                    print(f"Health: AI detector not available (HIGH severity)")
-            except Exception as e:
-                print(f"Health: AI detector error - {str(e)} (CRITICAL severity)")
-            
-            # Image directory health
-            if os.path.exists(self.image_directory):
-                print(f"Health: Image directory accessible - {len(self.get_image_files())} images")
-            else:
-                print(f"Health: Image directory not accessible (MEDIUM severity)")
-            
-            # System uptime
-            uptime_hours = (current_time - self.system_start_time) / 3600
-            print(f"Health: Uptime {uptime_hours:.1f}h, Processed: {self.images_processed}, Events: {self.events_detected}")
-
-    def keep_sending_to_cc(self, has_camera):
-        photos_taken = 0
-        events_seen = 0
-        
-        # Initial heartbeat
-        self.send_heartbeat(photos_taken, events_seen)
-        time.sleep(5)
-        
-        if has_camera:
-            # Process images from directory - ALL AS SUSPICIOUS EVENTS
-            self.process_images_from_directory()
-        else:
-            # Original behavior for non-camera devices
-            while True:
-                self.send_heartbeat(photos_taken, events_seen)
-                self.check_system_health()  # Health checks every 60s
-                time.sleep(1800)  # Every 30 mins
-
-    def send_heartbeat(self, photos_taken, events_seen):
-        """Send heartbeat - this is a HEALTH message"""
-        t = get_time_str()
-        msgstr = f"{self.devid}:{t}:{photos_taken}:{events_seen}"
-        next_dest = get_next_dest(self.devid)
-        print(f"Sending heartbeat (health message): {msgstr}")
-        # self.rf.send_message(msgstr, constants.MESSAGE_TYPE_HEARTBEAT, next_dest)
-
-    def send_gps(self):
-        """Send GPS - this is a HEALTH message"""
-        next_dest = get_next_dest(self.devid)
-        msgstr = f"{self.devid}:28.4:77.0"
-        print(f"Sending GPS (health message): {msgstr}")
-        # self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
-
-    def send_event(self):
-        """Send event notification - this is a HEALTH message"""
-        t = get_time_str()
-        msgstr = f"{self.devid}:{t}"
-        next_dest = get_next_dest(self.devid)
-        print(f"Sending event notification (health message): {msgstr}")
-        # self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest)
-
 def run_unit():
     hname = get_hostname()
     if hname not in constants.HN_ID:
@@ -1239,8 +882,7 @@ def run_unit():
         cc.print_status()
     else:
         print(f"Running as Device Unit with AI Detection (RF communication disabled)")
-        du = DevUnit(devid)
-        du.keep_sending_to_cc(has_camera)
+        print(f"Note: Device units not implemented in this version")
     
     time.sleep(10000000)
 
