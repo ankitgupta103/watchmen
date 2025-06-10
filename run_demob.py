@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 import sys
 import time
 import threading
@@ -10,6 +11,9 @@ from rf_comm import RFComm
 
 import gps
 import constants
+
+ALLDIR = "/home/ankitgupta/processed"
+CRITICAL_DIR = "/home/ankitgupta/processed/critical"
 
 def get_hostname():
     return socket.gethostname()
@@ -35,6 +39,12 @@ def get_next_dest(devid):
             else:
                 return constants.PATH_DEMOB[i+1]
     return None
+
+def get_files_in_dir(alldir, criticaldir):
+    allfiles = os.listdir(alldir)
+    total_images_taken = len(allfiles)
+    criticalfiles = os.listdir(criticaldir)
+    return (total_images_taken, criticalfiles)
 
 def get_time_str():
     t = datetime.now()
@@ -155,6 +165,9 @@ class DevUnit:
         self.rf.keep_reading()
         self.keep_propagating()
         self.msgids_seen = []
+        self.photos_taken = 0
+        self.critical_images_processed = []
+        self.critical_images_sent = []
 
     def process_msg(self, msgid, mst, msgstr):
         if msgid not in self.msgids_seen:
@@ -174,12 +187,27 @@ class DevUnit:
         if is_node_src(self.devid):
             print(f"{self.devid}: Src should not be getting any messages")
 
+    def get_images_to_send(critical_images):
+        cropped = None
+        full = None
+        for f in critical_images:
+            if c not in self.critical_images_processed:
+                self.critical_images_processed.append(c)
+                if f.find("_c.jpg"):
+                    cropped = f
+                if f.finf("_f.jpg"):
+                    full = f
+        return (cropped, full)
+
+        return critical_images[0]
+
     def send_img(self, imgfile):
         next_dest = get_next_dest(self.devid)
         if next_dest == None:
             print(f"{self.devid} Weird no dest for {self.devid}")
             return
         mst = constants.MESSAGE_TYPE_PHOTO
+        # TODO remove dir prefix
         im = {"i_m" : "{imgfile}",
               "i_s" : self.devid,
               "i_t" : str(int(time.time())),
@@ -209,27 +237,30 @@ class DevUnit:
         # TODO fix and make it a clean exit on self deletion
         propogation_thread.start()
 
-    def keep_sending_to_cc(self, has_camera):
+    def keep_sending_to_cc(self):
         self.send_gps()
         time.sleep(5)
-        photos_taken = 0
+        photos_seen = 0
         events_seen = 0
         while True:
+            (photos_seen, critical_images) = get_files_in_dir(ALLDIR, CRITICAL_DIR)
+            printf(f"Taken sofar={self.photos_taken}, now={photos_seen}")
+            printf(f"Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
+            if len(critical_images) > 0:
+                (cropped, full) = self.get_images_to_send(critical_images)
+                if cropped or full:
+                    events_seen += 1
+                    self.send_event()
+                    time.sleep(10)
+                if cropped:
+                    self.send_img(cropped)
+                    time.sleep(60)
+                if full:
+                    self.send_img(full)
+
             self.send_heartbeat(photos_taken, events_seen)
             time.sleep(5)
-            self.send_heartbeat(photos_taken, events_seen)
-            time.sleep(5)
-            # TODO take photo
-            photos_taken += 1
-            if has_camera:
-                events_seen += 1
-                time.sleep(5)
-                self.send_event()
-                time.sleep(10)
-                self.send_img("testdata/cropped.jpg")
-                time.sleep(60)
-                self.send_img("testdata/forest_man_2.jpg")
-            time.sleep(1800) # Every 30 mins
+            time.sleep(300) # Every 30 mins
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
@@ -268,10 +299,7 @@ def run_unit():
         cc.print_status()
     else:
         du = DevUnit(devid)
-        has_camera = False
-        if len(sys.argv) > 1:
-            has_camera = sys.argv[1] == "c"
-        du.keep_sending_to_cc(has_camera)
+        du.keep_sending_to_cc()
     time.sleep(10000000)
 
 def main():
