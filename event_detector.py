@@ -29,7 +29,6 @@ POTENTIAL_WEAPONS = {"knife", "scissors", "baseball bat", "gun"}
 BAG_OBJECTS = {"backpack", "handbag", "suitcase"}
 
 
-
 class EventDetector:
     """
     A class to detect objects in images using a YOLO model and determine event severity.
@@ -138,7 +137,7 @@ class ProcessingService:
         self.critical_dir.mkdir(exist_ok=True)
         logging.info(f"Monitoring source directory: {self.source_dir}")
         logging.info(f"Processed images will be saved to: {self.processed_dir}")
-        logging.info(f"Images with people will be saved to: {self.critical_dir}")
+        logging.info(f"Critical images (person/bag/weapon) will be saved to: {self.critical_dir}")
 
 
     def process_and_store_image(self, image_path: Path):
@@ -167,14 +166,23 @@ class ProcessingService:
             return
 
         detected_labels = {obj['label'] for obj in detected_objects}
-        is_person_present = "person" in detected_labels
+        has_person = "person" in detected_labels
+        has_bag = not detected_labels.isdisjoint(BAG_OBJECTS)
+        has_weapon = not detected_labels.isdisjoint(POTENTIAL_WEAPONS)
+        is_critical = has_person or has_bag or has_weapon
+        save_dir = self.critical_dir if is_critical else self.processed_dir
         
-        save_dir = self.critical_dir if is_person_present else self.processed_dir
-        
-        if is_person_present:
-            logging.warning(f"PERSON DETECTED. Saving to critical folder: {save_dir}")
+        if is_critical:
+            critical_reasons = []
+            if has_person:
+                critical_reasons.append("person")
+            if has_bag:
+                critical_reasons.append("bag")
+            if has_weapon:
+                critical_reasons.append("weapon")
+            logging.warning(f"CRITICAL CONTENT DETECTED ({', '.join(critical_reasons)}). Saving to critical folder: {save_dir}")
         else:
-            logging.info(f"No person detected. Saving to standard folder: {save_dir}")
+            logging.info(f"No critical content detected. Saving to standard folder: {save_dir}")
 
 
         # 1. Save the full image to the determined directory.
