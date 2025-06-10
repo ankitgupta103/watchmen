@@ -46,7 +46,7 @@ class CommandCenter:
         self.rf = RFComm(devid)
         self.rf.add_node(self)
         self.rf.keep_reading()
-        self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
+        self.node_map = {} # id->(num HB, last HB, gps, Num photos, Num events, [Event TS])
         self.images_saved = []
         self.msgids_seen = []
 
@@ -87,14 +87,15 @@ class CommandCenter:
         photos_taken = int(parts[2])
         events_seen = int(parts[3])
         hbcount = 0
+        gpsloc = ""
         eventtslist = []
         if nodeid not in self.node_map.keys():
             hbcount = 1
         else:
-            (hbc, _, _, _, el) = self.node_map[nodeid]
+            (hbc, _, gpsloc, _, _, el) = self.node_map[nodeid]
             hbcount = hbc + 1
             eventtslist = el
-        self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, eventtslist)
+        self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, eventtslist)
     
     # A:1205
     def process_event(self, eventstr):
@@ -107,9 +108,22 @@ class CommandCenter:
         if nodeid not in self.node_map:
             print(f"Wierd that node {nodeid} not in map yet")
             return
-        (hbcount, hbtime, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
+        (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
         event_ts_list.append(eventtime)
-        self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, event_ts_list)
+        self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
+
+    def process_gps(self, msgstr):
+        parts = eventstr.split(':')
+        if len(parts) != 2:
+            print(f"Error parsing event message : {eventstr}")
+            return
+        nodeid = parts[0]
+        gpsloc = parts[1]
+        if nodeid not in self.node_map:
+            print(f"Wierd that node {nodeid} not in map yet")
+            return
+        (hbcount, hbtime, _, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
+        self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
 
     def process_msg(self, msgid, mst, msgstr):
         if msgid not in self.msgids_seen:
@@ -126,6 +140,9 @@ class CommandCenter:
         elif mst == constants.MESSAGE_TYPE_EVENT:
             print(f"########## Messsage receive at command center : {mst} : {msgstr}")
             self.process_event(msgstr)
+        elif mst == constants.MESSAGE_TYPE_GPS:
+            print(f"########## Messsage receive at command center : {mst} : {msgstr}")
+            self.process_gps(msgstr)
         return True
 
 class DevUnit:
@@ -231,7 +248,7 @@ class DevUnit:
         if loc is not None:
             (lat, lng) = loc
             next_dest = get_next_dest(self.devid)
-            msgstr = f"{self.devid}:{lat}:{lng}"
+            msgstr = f"{self.devid}:{lat,lng}"
             self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
 
     # A:1205
