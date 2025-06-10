@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 SERVICE_NAME="event-detector"
 SERVICE_FILE="${SERVICE_NAME}.service"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="${SCRIPT_DIR}/event_detector.py"
+PYTHON_FILE_PATH="${SCRIPT_DIR}/event_detector.py"
 SYSTEMD_DIR="/etc/systemd/system"
 WATCH_FOLDER="/home/pi/Documents/images"
 OUTPUT_FOLDER="/home/pi/Documents/processed_images"
@@ -43,12 +43,12 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Check if Python script exists
-if [[ ! -f "$PYTHON_SCRIPT" ]]; then
-    print_error "Python script not found: $PYTHON_SCRIPT"
+if [[ ! -f "$PYTHON_FILE_PATH" ]]; then
+    print_error "Python script not found: $PYTHON_FILE_PATH"
     exit 1
 fi
 
-print_status "Found Python script: $PYTHON_SCRIPT"
+print_status "Found Python script: $PYTHON_FILE_PATH"
 
 # Check if Python3 is installed
 if ! command -v python3 &> /dev/null; then
@@ -78,7 +78,7 @@ Wants=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 ${PYTHON_SCRIPT} ${WATCH_FOLDER} --output ${OUTPUT_FOLDER}
+ExecStart=/bin/bash -lic 'source /home/pi/.bashrc && python ${PYTHON_FILE_PATH} ${WATCH_FOLDER} --output ${OUTPUT_FOLDER}'
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -91,23 +91,6 @@ Group=pi
 # Working Directory
 WorkingDirectory=${SCRIPT_DIR}
 
-# Environment Variables
-Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Environment="PYTHONPATH=${SCRIPT_DIR}"
-Environment="PYTHONUNBUFFERED=1"
-
-# Security settings
-PrivateNetwork=false
-ProtectSystem=strict
-ProtectHome=false
-ReadWritePaths=/home/pi/Documents
-NoNewPrivileges=yes
-
-# Resource limits
-LimitNOFILE=65536
-TimeoutStartSec=60
-TimeoutStopSec=30
-
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -117,7 +100,7 @@ chmod 644 "${SYSTEMD_DIR}/${SERVICE_FILE}"
 print_status "Service file created: ${SYSTEMD_DIR}/${SERVICE_FILE}"
 
 # Make Python script executable
-chmod +x "$PYTHON_SCRIPT"
+chmod +x "$PYTHON_FILE_PATH"
 print_status "Made Python script executable"
 
 # Reload systemd to recognize the new service
