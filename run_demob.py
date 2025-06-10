@@ -116,11 +116,12 @@ class CommandCenter:
     # A:1205
     def process_event(self, eventstr):
         parts = eventstr.split(':')
-        if len(parts) != 2:
+        if len(parts) != 3:
             print(f"Error parsing event message : {eventstr}")
             return
         nodeid = parts[0]
         eventtime = parts[1]
+        evid = parts[2]
         if nodeid not in self.node_map:
             print(f"Wierd that node {nodeid} not in map yet")
             return
@@ -201,9 +202,11 @@ class DevUnit:
                 self.critical_images_processed.append(f)
                 if f.find("_c.jpg") >= 0:
                     cropped = f
-                if f.find("_f.jpg") >= 0:
+                fname = f.split("/").pop()
+                evid = fname.split("_")[2]
+                if f.find(f"{evid}_f.jpg") >= 0:
                     full = f
-        return (cropped, full)
+        return (evid, cropped, full)
 
     def send_img(self, imgfile):
         next_dest = get_next_dest(self.devid)
@@ -212,10 +215,10 @@ class DevUnit:
             return
         mst = constants.MESSAGE_TYPE_PHOTO
         fname = imgfile.split("/").pop()
-        # TODO remove dir prefix
         im = {"i_f" : "{fname}",
               "i_s" : self.devid,
               "i_t" : str(int(time.time())),
+              "e_i" : evid,
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
         self.rf.send_message(msgstr, mst, next_dest)
@@ -254,17 +257,17 @@ class DevUnit:
             print(f"Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
             self.photos_taken = photos_seen
             if len(critical_images) > 0:
-                (cropped, full) = self.get_images_to_send(critical_images)
+                (evid, cropped, full) = self.get_images_to_send(critical_images)
                 if cropped or full:
                     print(f"{cropped}, {full}")
                     events_seen += 1
-                    self.send_event()
+                    self.send_event(evid)
                     time.sleep(10)
                 if cropped:
-                    self.send_img(cropped)
+                    self.send_img(cropped, evid)
                     time.sleep(60)
                 if full:
-                    self.send_img(full)
+                    self.send_img(full, evid)
 
             self.send_heartbeat(self.photos_taken, events_seen)
             time.sleep(300) # Every 30 mins
@@ -290,9 +293,9 @@ class DevUnit:
 
     # A:1205
     # Name, time
-    def send_event(self):
+    def send_event(self, evid):
         t = get_time_str()
-        msgstr = f"{self.devid}:{t}"
+        msgstr = f"{self.devid}:{t}:{evid}"
         next_dest = get_next_dest(self.devid)
         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest)
 
