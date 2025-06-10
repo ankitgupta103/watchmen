@@ -271,15 +271,23 @@ class DevUnit:
     def keep_propagating(self):
         # Start background thread to read incoming data
         propogation_thread = threading.Thread(target=self._keep_propagating, daemon=True)
-        # TODO fix and make it a clean exit on self deletion
         propogation_thread.start()
 
+    def _keep_beating_heart(self):
+        self.send_gps()
+        while True:
+            self.send_heartbeat(self.photos_taken, len(self.critical_images_processed))
+            time.sleep(300) # Every 5 mins
+
+    # Non blocking, background thread
+    def keep_beating_heart(self):
+        hb_thread = threading.Thread(target=self._keep_beating_heart, daemon=True)
+        hb_thread.start()
+
     def keep_sending_to_cc(self):
-        # self.send_gps()
-        time.sleep(5)
+        keep_beating_heart()
         photos_seen = 0
         events_seen = 0
-        self.send_heartbeat(self.photos_taken, events_seen)
         while True:
             (photos_seen, critical_images) = get_files_in_dir(ALLDIR, CRITICAL_DIR)
             print(f"Taken sofar={self.photos_taken}, now={photos_seen}")
@@ -297,9 +305,7 @@ class DevUnit:
                     time.sleep(60)
                 if full:
                     self.send_img(full, evid)
-
-            self.send_heartbeat(self.photos_taken, events_seen)
-            time.sleep(300) # Every 30 mins
+                time.sleep(10)
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
