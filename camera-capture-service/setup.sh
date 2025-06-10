@@ -54,6 +54,7 @@ echo "Directories created and permissions set."
 
 # 4. Create the main USB control script
 echo "[3/6] Creating the USB control script at $SCRIPT_PATH..."
+read -p "Enter the complete path to the camera images folder: " CAMERA_IMAGE_FOLDER
 
 # Use a heredoc to write the provided script to the file
 cat > "$SCRIPT_PATH" << 'EOF'
@@ -66,7 +67,7 @@ cat > "$SCRIPT_PATH" << 'EOF'
 USB_HUB="1-1"
 OFF_TIME=60
 MAX_MOUNT_WAIT=10
-DEST_DIR="/home/pi/Documents/images"
+DEST_DIR="$CAMERA_IMAGE_FOLDER" # INPUT
 LOG_FILE="/var/log/usb-cycle.log"
 
 # Image file extensions to move
