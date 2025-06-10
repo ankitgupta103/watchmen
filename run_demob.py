@@ -96,8 +96,11 @@ class CommandCenter:
             # im.show()
             # SENDING TO VYOM
             try:
+                imf = orig_msg["i_f"]
+                file_name_suffix = imf.split("_")[-1].split(".")[0]
+                filename = f"{evid}_{file_name_suffix}.jpg"
                 image_bytes = image.imstrtobytes(imstr)
-                self.vyom_client.on_image_arrive(node_hn=ims, image=image_bytes, filename=f"TODO.jpg")
+                self.vyom_client.on_image_arrive(node_hn=ims, image=image_bytes, filename=filename)
             except Exception as e:
                 print(f"Error sending image to vyom client {e}")
 
@@ -151,7 +154,7 @@ class CommandCenter:
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
         # SENDING TO VYOM
         try:
-            self.vyom_client.on_event_arrive(node_hn=nodeid, filename=f"TODO.jpg")
+            self.vyom_client.on_event_arrive(node_hn=nodeid, filename=evid)
         except Exception as e:
             print(f"Error sending event to vyom client {e}")
 
