@@ -159,7 +159,8 @@ class CommandCenter:
                 data_type="json",
                 mission_id=self.mission_id,
                 priority=priority,
-                destination_ids=["s3"]
+                destination_ids=["s3"],
+                merge_chunks=True
             )
             
             print(f"Health event published for {machine_id}: {event_type} ({severity})")
@@ -202,7 +203,7 @@ class CommandCenter:
                 mission_id=self.mission_id,
                 priority=2,
                 destination_ids=["s3"],
-                merge_chunks=False
+                merge_chunks=True
             )
             
             if success:
@@ -268,7 +269,8 @@ class CommandCenter:
                 data_type="json",
                 mission_id=self.mission_id,
                 priority=priority,
-                destination_ids=["s3"]
+                destination_ids=["s3"],
+                merge_chunks=True
             )
             
             if success:
@@ -397,7 +399,8 @@ class CommandCenter:
                 data_type="json",
                 mission_id=self.mission_id,
                 priority=1,
-                destination_ids=["s3"]
+                destination_ids=["s3"],
+                merge_chunks=True
             )
             
             print(f"Summary published - Processed: {self.images_processed}, Events: {self.events_detected}")
