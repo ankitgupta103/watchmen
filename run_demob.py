@@ -285,7 +285,7 @@ class DevUnit:
         hb_thread.start()
 
     def keep_sending_to_cc(self):
-        keep_beating_heart()
+        self.keep_beating_heart()
         photos_seen = 0
         events_seen = 0
         while True:
