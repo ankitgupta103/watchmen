@@ -209,7 +209,7 @@ class ProcessingService:
                 logging.warning(f"Skipping empty crop for object {i+1} in {image_path.name}")
 
         # 3. Handle critical severity
-        if severity == SEVERITY_CRITICAL:
+        if severity == SEVERITY_CRITICAL or severity == SEVERITY_HIGH:
             critical_full_path = self.critical_dir / full_image_name
             cv2.imwrite(str(critical_full_path), original_image)
             logging.info(f"CRITICAL event: Copied full image to {critical_full_path}")
