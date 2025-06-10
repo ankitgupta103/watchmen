@@ -174,7 +174,8 @@ class ProcessingService:
             return
 
         severity = self.detector.determine_severity(detected_objects)
-        timestamp = int(time.time())
+        # Use hhmmss format for timestamp
+        timestamp = time.strftime("%H%M%S", time.localtime())
 
         # 1. Save the full image
         full_image_name = f"{severity}_{timestamp}_f.jpg"
