@@ -189,7 +189,7 @@ move_images() {
                 # Try to copy first, then remove original if copy succeeds
                 if cp "$image_file" "$dest_file" 2>>"$LOG_FILE"; then
                     # Set permissions so user can delete later
-                    chmod 644 "$dest_file"
+                    chmod 777 "$dest_file"
                     # Optionally, set ownership (replace 'pi' with your username if needed)
                     # chown pi:pi "$dest_file"
                     # Copy successful, now remove original
