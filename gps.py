@@ -31,7 +31,6 @@ class Gps:
         try:
             msg = pynmea2.parse(sentence.decode('ascii', errors='ignore').strip())
             msg_type = msg.sentence_type
-            print(f"Getting GPS")
             if msg_type == 'GLL':
                 print("Geographic Position:")
                 lat = print("{:.1f}".format(msg.latitude))
