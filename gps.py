@@ -3,8 +3,8 @@ import pynmea2
 
 class Gps:
     def __init__(self):
-        self.lat = ""
-        self.lng = ""
+        self.lat = None
+        self.lng = None
         self.setup()
 
     def setup(self):
@@ -16,7 +16,7 @@ class Gps:
             for i in range(100):
                 data = ser.readline()
                 if data:
-                    gps = parse_gps(data)
+                    gps = self.parse_gps(data)
                     if gps is not None:
                         (self.lat, self.lng) = gps
                         return
@@ -27,7 +27,7 @@ class Gps:
                 ser.close()
                 print("GPS connection closed")
 
-    def parse_gps(sentence):
+    def parse_gps(self, sentence):
         try:
             msg = pynmea2.parse(sentence.decode('ascii', errors='ignore').strip())
             msg_type = msg.sentence_type
@@ -41,6 +41,11 @@ class Gps:
             print(f"Error parsing: {e}")
             print(f"Raw data: {sentence.decode('ascii', errors='ignore').strip()}")
         return None
+
+    def get_lat_lng(self):
+        if self.lat == None or self.lng == None:
+            return None
+        return (self.lat, self.lng)
 
 def main():
     gps = Gps()
