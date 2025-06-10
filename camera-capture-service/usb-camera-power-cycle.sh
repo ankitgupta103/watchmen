@@ -24,33 +24,33 @@ mkdir -p "$DEST_DIR"
 # Function to safely eject all USB devices
 eject_usb_devices() {
     log_message "Ejecting all USB devices..."
-    
+
     # Find all mounted USB devices
     MOUNT_POINTS=$(findmnt -lo TARGET,SOURCE -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/" | grep -v "^/$")
-    
+
     if [ -z "$MOUNT_POINTS" ]; then
         log_message "No USB devices found to eject"
         return 0
     fi
-    
+
     local eject_success=true
-    
+
     # Process each mount point
     while IFS= read -r line; do
         # Extract mount point (first field) and device (second field)
         mount_point=$(echo "$line" | awk '{print $1}')
         device=$(echo "$line" | awk '{print $2}')
-        
+
         if [ -n "$mount_point" ] && [ -d "$mount_point" ]; then
             log_message "Ejecting: $mount_point ($device)"
-            
+
             # First try to sync any pending writes
             sync
-            
+
             # Attempt to unmount the device
             if umount "$mount_point" 2>>"$LOG_FILE"; then
                 log_message "Successfully ejected: $mount_point"
-                
+
                 # If it's a removable device, try to eject it as well
                 if [ -n "$device" ] && [ -b "$device" ]; then
                     # Extract the base device (remove partition numbers)
@@ -62,7 +62,7 @@ eject_usb_devices() {
                 fi
             else
                 log_message "WARNING: Failed to eject $mount_point"
-                
+
                 # Try to force unmount as a last resort
                 log_message "Attempting force unmount of $mount_point"
                 if umount -f "$mount_point" 2>>"$LOG_FILE"; then
@@ -73,18 +73,18 @@ eject_usb_devices() {
                 fi
             fi
         fi
-        
+
     done <<< "$MOUNT_POINTS"
-    
+
     # Give a moment for the system to process the unmounts
     sleep 1
-    
+
     if [ "$eject_success" = true ]; then
         log_message "All USB devices ejected successfully"
     else
         log_message "WARNING: Some USB devices could not be ejected properly"
     fi
-    
+
     return 0
 }
 
@@ -95,7 +95,13 @@ check_destination() {
         log_message "ERROR: Cannot create destination directory $DEST_DIR"
         return 1
     fi
-    
+
+    # Ensure the destination directory is owned by the 'pi' user
+    # This is crucial for allowing the user to manage the directory and its contents
+    if ! chown pi:pi "$DEST_DIR" 2>>"$LOG_FILE"; then
+        log_message "WARNING: Could not change ownership of $DEST_DIR"
+    fi
+
     # Check if destination is writable
     if [ ! -w "$DEST_DIR" ]; then
         log_message "ERROR: Destination directory $DEST_DIR is not writable"
@@ -106,7 +112,7 @@ check_destination() {
             return 1
         fi
     fi
-    
+
     log_message "Destination directory $DEST_DIR is ready"
     return 0
 }
@@ -114,43 +120,43 @@ check_destination() {
 # Function to find and move images from USB devices
 move_images() {
     log_message "Looking for mounted USB devices..."
-    
+
     # Check destination directory first
     if ! check_destination; then
         log_message "ERROR: Destination directory check failed, skipping image transfer"
         return 1
     fi
-    
+
     # Find all mounted USB devices (typically under /media/pi/ or /mnt/)
     # Check common mount points
     MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^(/media/|/mnt/)" | grep -v "^/$")
-    
+
     if [ -z "$MOUNT_POINTS" ]; then
         log_message "No USB devices found mounted"
         return
     fi
-    
+
     # Process each mount point
     while IFS= read -r mount_point; do
         log_message "Checking USB device at: $mount_point"
-        
+
         # Check mount point accessibility
         if [ ! -r "$mount_point" ]; then
             log_message "ERROR: Cannot read from $mount_point - permission denied"
             continue
         fi
-        
+
         # Check if mount point is read-only
         mount_info=$(mount | grep " $mount_point ")
         if echo "$mount_info" | grep -q "ro,"; then
             log_message "WARNING: $mount_point is mounted read-only"
         fi
         log_message "Mount info: $mount_info"
-        
+
         # Count images before moving
         image_count=0
         failed_count=0
-        
+
         # Build find command for all image extensions
         find_cmd="find \"$mount_point\" -type f \( "
         first=true
@@ -163,35 +169,37 @@ move_images() {
             fi
         done
         find_cmd="$find_cmd \)"
-        
+
         # Find and copy/move images (use a more robust approach)
         eval "$find_cmd" -print0 | while IFS= read -r -d '' image_file; do
             if [ -f "$image_file" ]; then
                 # Get original filename for logging
                 original_filename=$(basename "$image_file")
-                
+
                 # Use original filename in destination
                 dest_file="$DEST_DIR/$original_filename"
-                
+
                 # Skip if file already exists in destination
                 if [ -f "$dest_file" ]; then
                     log_message "SKIP: $original_filename (already exists)"
                     continue
                 fi
-                
+
                 # Check if file is readable
                 if [ ! -r "$image_file" ]; then
                     log_message "ERROR: Cannot read $original_filename - permission denied"
                     failed_count=$((failed_count + 1))
                     continue
                 fi
-                
+
                 # Try to copy first, then remove original if copy succeeds
                 if cp "$image_file" "$dest_file" 2>>"$LOG_FILE"; then
-                    # Set permissions so user can delete later
-                    chmod 777 "$dest_file"
-                    # Optionally, set ownership (replace 'pi' with your username if needed)
-                    # chown pi:pi "$dest_file"
+                    # Change ownership to the 'pi' user so they can manage the file
+                    chown pi:pi "$dest_file"
+                    
+                    # Set safer permissions (owner/group can read/write, others can read)
+                    chmod 664 "$dest_file"
+                    
                     # Copy successful, now remove original
                     if rm "$image_file" 2>>"$LOG_FILE"; then
                         log_message "Moved: $original_filename"
@@ -207,18 +215,18 @@ move_images() {
                     log_message "Copy error: $error_msg"
                     log_message "Source: $image_file"
                     log_message "Dest: $dest_file"
-                    
+
                     # Check available space
                     df_output=$(df -h "$DEST_DIR" 2>/dev/null)
                     log_message "Destination space: $df_output"
-                    
+
                     failed_count=$((failed_count + 1))
                 fi
             fi
         done
-        
+
         log_message "Transfer complete: $image_count moved, $failed_count failed from $mount_point"
-        
+
     done <<< "$MOUNT_POINTS"
 }
 
@@ -234,11 +242,11 @@ usb_power_on() {
 usb_power_off() {
     # First eject all USB devices safely
     eject_usb_devices
-    
+
     # Ensure all file operations are completed
     sync
     sleep 2
-    
+
     log_message "Powering OFF USB hub $USB_HUB"
     uhubctl -a off -l "$USB_HUB" >/dev/null 2>&1
     sleep 1
@@ -250,13 +258,13 @@ wait_for_usb_mount() {
     local attempts=0
     local max_attempts=20  # 20 attempts x 0.5s = 10s max
     local devices_found=false
-    
+
     log_message "Waiting for USB devices to mount..."
-    
+
     while [ $attempts -lt $max_attempts ]; do
         # Check for mounted USB devices
         MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^(/media/|/mnt/)" | grep -v "^/$")
-        
+
         if [ -n "$MOUNT_POINTS" ]; then
             devices_found=true
             local wait_time=$((attempts / 2))
@@ -266,11 +274,11 @@ wait_for_usb_mount() {
             sleep 0.5
             break
         fi
-        
+
         sleep 0.5
         attempts=$((attempts + 1))
     done
-    
+
     if [ "$devices_found" = false ]; then
         log_message "No USB devices detected after ${MAX_MOUNT_WAIT}s timeout"
     fi
@@ -283,10 +291,10 @@ log_message "Configuration: OFF=${OFF_TIME}s, Destination=$DEST_DIR"
 while true; do
     # Power on USB
     usb_power_on
-    
+
     # Wait for devices to mount (smart polling)
     wait_for_usb_mount
-    
+
     # Move images
     log_message "Starting image transfer..."
     start_time=$(date +%s)
@@ -294,13 +302,13 @@ while true; do
     end_time=$(date +%s)
     transfer_time=$((end_time - start_time))
     log_message "Image transfer completed in ${transfer_time}s"
-    
+
     # Brief delay to ensure all operations complete
     sleep 1
-    
+
     # Power off USB with safe ejection
     usb_power_off
-    
+
     # Wait for OFF period
     log_message "USB will remain OFF for $OFF_TIME seconds"
     sleep $OFF_TIME
