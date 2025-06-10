@@ -147,6 +147,7 @@ class CommandCenter:
         eventtime = parts[1]
         evid = parts[2]
         if nodeid not in self.node_map:
+            self.node_map[nodeid] = (0, "", "", 1, 1, [eventtime])
             print(f"Wierd that node {nodeid} not in map yet")
             return
         (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
