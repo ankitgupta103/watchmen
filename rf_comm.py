@@ -19,6 +19,7 @@ hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = False
+FLAKINESS = 10  # 0-100 %
 
 """
 MessageID = MSDIII where
@@ -150,7 +151,10 @@ class RFComm:
             cid, remaining = self.sep_part(msgpyl, ';')
             istr, chunkdata = self.sep_part(remaining, ';')
             i = int(istr)
-            # print(f"Flakiness dropping chunk : {i}")
+            r = random.randint(0, 100)
+            if r < FLAKINESS:
+                return
+                # print(f"Flakiness dropping chunk : {i}")
             self.msg_chunks_received[cid].append(i)
             self.msg_parts[cid].append((i, chunkdata))
             return
