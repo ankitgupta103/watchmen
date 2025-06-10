@@ -7,12 +7,6 @@ class DataProcessor(AbsService):
         self.image_in_process = set()
         self.is_running = False
 
-    def start(self):
-        for image in self.image_in_process:
-            if image not in self.image_in_process:
-                self.image_in_process.add(image)
-
-
     def start_image_processing(self):
         while self.is_running:
             for image in self.image_in_process:
