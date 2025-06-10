@@ -12,8 +12,8 @@ from rf_comm import RFComm
 import gps
 import constants
 
-ALLDIR = "/home/ankitgupta/processed"
-CRITICAL_DIR = "/home/ankitgupta/processed/critical"
+ALLDIR = "/home/ankit/processed"
+CRITICAL_DIR = "/home/ankit/processed/critical"
 
 def get_hostname():
     return socket.gethostname()
@@ -41,9 +41,13 @@ def get_next_dest(devid):
     return None
 
 def get_files_in_dir(alldir, criticaldir):
-    allfiles = os.listdir(alldir)
+    allfiles = []
+    for a in os.listdir(alldir):
+        allfiles.append(os.path.join(alldir, a))
     total_images_taken = len(allfiles)
-    criticalfiles = os.listdir(criticaldir)
+    criticalfiles = []
+    for c in os.listdir(criticaldir):
+        criticalfiles.append(os.path.join(criticaldir, c))
     return (total_images_taken, criticalfiles)
 
 def get_time_str():
@@ -78,9 +82,11 @@ class CommandCenter:
         print("Checking for image")
         if "i_d" in orig_msg:
             print("Seems like an image")
+            imf = orig_msg["i_f"]
+            ims = orig_msg["i_s"]
             imstr = orig_msg["i_d"]
             im = image.imstrtoimage(imstr)
-            fname = f"/tmp/commandcenter_{random.randint(1000,2000)}.jpg"
+            fname = f"/tmp/{ims}_{imf}_{random.randint(1000,2000)}.jpg"
             print(f"Saving image to {fname}")
             im.save(fname)
             self.images_saved.append(fname)
@@ -187,19 +193,17 @@ class DevUnit:
         if is_node_src(self.devid):
             print(f"{self.devid}: Src should not be getting any messages")
 
-    def get_images_to_send(critical_images):
+    def get_images_to_send(self, critical_images):
         cropped = None
         full = None
         for f in critical_images:
-            if c not in self.critical_images_processed:
-                self.critical_images_processed.append(c)
-                if f.find("_c.jpg"):
+            if f not in self.critical_images_processed:
+                self.critical_images_processed.append(f)
+                if f.find("_c.jpg") >= 0:
                     cropped = f
-                if f.finf("_f.jpg"):
+                if f.find("_f.jpg") >= 0:
                     full = f
         return (cropped, full)
-
-        return critical_images[0]
 
     def send_img(self, imgfile):
         next_dest = get_next_dest(self.devid)
@@ -207,8 +211,9 @@ class DevUnit:
             print(f"{self.devid} Weird no dest for {self.devid}")
             return
         mst = constants.MESSAGE_TYPE_PHOTO
+        fname = imgfile.split("/").pop()
         # TODO remove dir prefix
-        im = {"i_m" : "{imgfile}",
+        im = {"i_f" : "{fname}",
               "i_s" : self.devid,
               "i_t" : str(int(time.time())),
               "i_d" : image.image2string(imgfile)}
@@ -238,17 +243,19 @@ class DevUnit:
         propogation_thread.start()
 
     def keep_sending_to_cc(self):
-        self.send_gps()
+        # self.send_gps()
         time.sleep(5)
         photos_seen = 0
         events_seen = 0
         while True:
             (photos_seen, critical_images) = get_files_in_dir(ALLDIR, CRITICAL_DIR)
-            printf(f"Taken sofar={self.photos_taken}, now={photos_seen}")
-            printf(f"Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
+            print(f"Taken sofar={self.photos_taken}, now={photos_seen}")
+            print(f"Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
+            self.photos_taken = photos_seen
             if len(critical_images) > 0:
                 (cropped, full) = self.get_images_to_send(critical_images)
                 if cropped or full:
+                    print(f"{cropped}, {full}")
                     events_seen += 1
                     self.send_event()
                     time.sleep(10)
@@ -258,8 +265,7 @@ class DevUnit:
                 if full:
                     self.send_img(full)
 
-            self.send_heartbeat(photos_taken, events_seen)
-            time.sleep(5)
+            self.send_heartbeat(self.photos_taken, events_seen)
             time.sleep(300) # Every 30 mins
 
     # A:1205:100:12
