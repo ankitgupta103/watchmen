@@ -1,8 +1,9 @@
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any, Set
 
 import cv2
 from ultralytics import YOLO
@@ -17,23 +18,21 @@ logging.basicConfig(
 )
 
 YOLO_MODEL_NAME = "yolov8n.pt"
+POLL_INTERVAL_SECONDS = 5  # Time to wait between directory scans
 
-# Predefined detection categories for easy access
-DETECTION_CATEGORIES: Dict[str, List[str]] = {
-    "people": ["person"],
-    "suspicious_items": ["backpack", "handbag", "suitcase", "knife", "scissors", "bottle"],
-    "bags": ["backpack", "handbag", "suitcase"],
-    "potential_weapons": ["knife", "scissors", "baseball bat"], # Removed 'gun' as it is not in yolov8n.pt
-    "vehicles": ["car", "motorcycle", "bicycle", "bus", "truck"],
-    "electronics": ["laptop", "cell phone"],
-    "all": [],  # Empty list means all objects will be detected
-}
+# Severity levels
+SEVERITY_LOW = 0
+SEVERITY_HIGH = 1
+SEVERITY_CRITICAL = 2
+
+# Object lists for severity calculation
+POTENTIAL_WEAPONS = {"knife", "scissors", "baseball bat"}
 
 # --- Main Application Class ---
 
 class EventDetector:
     """
-    A class to detect objects in images using a YOLO model.
+    A class to detect objects in images using a YOLO model and determine event severity.
     """
 
     def __init__(self, model_path: str = YOLO_MODEL_NAME):
@@ -46,39 +45,12 @@ class EventDetector:
         try:
             self.model = YOLO(model_path)
             logging.info(f"Successfully loaded model '{model_path}'")
-            logging.info(f"Available classes: {', '.join(self.get_available_classes())}")
         except Exception as e:
             logging.error(f"Failed to load YOLO model from '{model_path}'. Error: {e}")
             sys.exit(1)
             
-        self.target_objects: List[str] = ["person"]  # Default to detecting persons
-
-    def set_detection_category(self, category: str):
-        """
-        Sets the object detection filter using a predefined category.
-
-        Args:
-            category (str): The name of the category (e.g., 'people', 'vehicles').
-        """
-        if category in DETECTION_CATEGORIES:
-            self.target_objects = DETECTION_CATEGORIES[category]
-            target_str = f"'{category}': {self.target_objects}" if self.target_objects else "'all'"
-            logging.info(f"Detection category set to {target_str}")
-        else:
-            logging.warning(
-                f"Unknown category '{category}'. "
-                f"Available categories: {list(DETECTION_CATEGORIES.keys())}"
-            )
-
-    def set_custom_objects(self, objects: List[str]):
-        """
-        Sets a custom list of objects to detect.
-
-        Args:
-            objects (List[str]): A list of class names to detect.
-        """
-        self.target_objects = objects
-        logging.info(f"Detection set to custom objects: {self.target_objects}")
+        # We want to detect all possible objects for severity analysis
+        self.target_objects: List[str] = [] 
 
     def get_available_classes(self) -> List[str]:
         """
@@ -97,13 +69,10 @@ class EventDetector:
             image_path (Path): The path to the image file.
 
         Returns:
-            List[Dict[str, Any]]: A list of detected objects, where each object is a
-                                 dictionary containing 'box', 'label', and 'confidence'.
-                                 Returns an empty list if no objects are found or the
-                                 image cannot be read.
+            List[Dict[str, Any]]: A list of detected objects.
         """
         if not image_path.is_file():
-            logging.error(f"Image file not found: {image_path}")
+            logging.error(f"Image file not found during detection: {image_path}")
             return []
 
         try:
@@ -121,156 +90,198 @@ class EventDetector:
         for r in results:
             for i, box in enumerate(r.boxes):
                 object_name = self.model.names[int(box.cls)]
-                
-                # Filter by target objects if a filter is set
-                if not self.target_objects or object_name in self.target_objects:
-                    detected_boxes.append({
-                        'box': box.xyxy[0].cpu().numpy(),
-                        'label': object_name,
-                        'confidence': float(box.conf),
-                    })
+                detected_boxes.append({
+                    'box': box.xyxy[0].cpu().numpy(),
+                    'label': object_name,
+                    'confidence': float(box.conf),
+                })
         
         if detected_boxes:
-            labels = [obj['label'] for obj in detected_boxes]
-            logging.info(f"Found objects in {image_path.name}: {labels}")
+            labels = {obj['label'] for obj in detected_boxes}
+            logging.info(f"Found objects in {image_path.name}: {list(labels)}")
         else:
-            logging.info(f"No target objects found in {image_path.name}")
+            logging.info(f"No objects found in {image_path.name}")
             
         return detected_boxes
 
-    def save_cropped_objects(self, image_path: Path, detected_objects: List[Dict[str, Any]]):
+    @staticmethod
+    def determine_severity(detected_objects: List[Dict[str, Any]]) -> int:
         """
-        Crops and saves detected objects from the original image.
+        Determines the severity level based on the detected objects.
 
         Args:
-            image_path (Path): Path to the original image file.
-            detected_objects (List[Dict[str, Any]]): The list of detected objects from `detect_objects`.
+            detected_objects (List[Dict[str, Any]]): A list of detected object data.
+
+        Returns:
+            int: The calculated severity level (0=low, 1=high, 2=critical).
         """
-        try:
-            original_image = cv2.imread(str(image_path))
-            if original_image is None:
-                logging.error(f"Cannot read original image for cropping: {image_path}")
-                return
-        except Exception as e:
-            logging.error(f"Error reading original image {image_path} for cropping: {e}")
+        if not detected_objects:
+            return SEVERITY_LOW
+
+        labels = [obj['label'] for obj in detected_objects]
+        label_set = set(labels)
+        person_count = labels.count("person")
+
+        # Critical: Presence of a potential weapon
+        if not label_set.isdisjoint(POTENTIAL_WEAPONS):
+            return SEVERITY_CRITICAL
+
+        # High: Two or more people, or a person with a backpack
+        if person_count >= 2:
+            return SEVERITY_HIGH
+        if person_count > 0 and "backpack" in label_set:
+            return SEVERITY_HIGH
+
+        # Low: A single person without other high/critical flags
+        if person_count == 1:
+            return SEVERITY_LOW
+        
+        # Default to low if any other object is detected
+        return SEVERITY_LOW
+
+class ProcessingService:
+    """
+    Manages the processing of images from a source directory to a destination.
+    """
+    def __init__(self, detector: EventDetector, source_dir: Path, processed_dir: Path):
+        self.detector = detector
+        self.source_dir = source_dir
+        self.processed_dir = processed_dir
+        self.critical_dir = processed_dir / "critical"
+
+        # Create directories if they don't exist
+        self.processed_dir.mkdir(parents=True, exist_ok=True)
+        self.critical_dir.mkdir(exist_ok=True)
+        logging.info(f"Monitoring source directory: {self.source_dir}")
+        logging.info(f"Processed images will be saved to: {self.processed_dir}")
+
+    def process_and_store_image(self, image_path: Path):
+        """
+        Processes a single image: detects objects, determines severity,
+        saves full and cropped versions, and deletes the original.
+        """
+        logging.info(f"Processing new file: {image_path.name}")
+        
+        detected_objects = self.detector.detect_objects(image_path)
+        
+        # Only proceed if objects were detected
+        if not detected_objects:
+            logging.info(f"No objects to process in {image_path.name}. Deleting original.")
+            try:
+                image_path.unlink()
+            except OSError as e:
+                logging.error(f"Error deleting original file {image_path}: {e}")
+            return
+
+        severity = self.detector.determine_severity(detected_objects)
+        timestamp = int(time.time())
+
+        # 1. Save the full image
+        full_image_name = f"{severity}_{timestamp}_f.jpg"
+        full_save_path = self.processed_dir / full_image_name
+        
+        original_image = cv2.imread(str(image_path))
+        if original_image is None:
+            logging.error(f"Could not re-read image for saving: {image_path}")
             return
             
+        cv2.imwrite(str(full_save_path), original_image)
+        logging.info(f"Saved full image to: {full_save_path}")
+
+        # 2. Save cropped versions of each detected object
         for i, obj_data in enumerate(detected_objects):
-            box = obj_data['box']
-            label = obj_data['label']
-            confidence = obj_data['confidence']
+            cropped_image_name = f"{severity}_{timestamp}_c_{i+1}.jpg"
+            cropped_save_path = self.processed_dir / cropped_image_name
             
+            box = obj_data['box']
             x1, y1, x2, y2 = map(int, box)
             
-            # Ensure coordinates are within image bounds
             h, w = original_image.shape[:2]
             x1, y1 = max(0, x1), max(0, y1)
             x2, y2 = min(w, x2), min(h, y2)
             
-            # Crop the object
             cropped_image = original_image[y1:y2, x1:x2]
-            
-            if cropped_image.size == 0:
-                logging.warning(f"Skipping empty crop for '{label}' at box [{x1},{y1},{x2},{y2}]")
-                continue
 
-            # Save the cropped image
-            base_name = image_path.stem
-            crop_filename = f"{base_name}_{label}_{i+1}_conf{confidence:.2f}.jpg"
-            save_path = image_path.parent / crop_filename
-            
-            try:
-                cv2.imwrite(str(save_path), cropped_image)
-                logging.info(f"Saved cropped object to: {save_path}")
-            except Exception as e:
-                logging.error(f"Failed to save cropped image {save_path}: {e}")
+            if cropped_image.size > 0:
+                cv2.imwrite(str(cropped_save_path), cropped_image)
+                logging.info(f"Saved cropped image to: {cropped_save_path}")
+            else:
+                logging.warning(f"Skipping empty crop for object {i+1} in {image_path.name}")
 
-    def process_directory(self, dir_path: Path, crop: bool = False):
+        # 3. Handle critical severity
+        if severity == SEVERITY_CRITICAL:
+            critical_full_path = self.critical_dir / full_image_name
+            cv2.imwrite(str(critical_full_path), original_image)
+            logging.info(f"CRITICAL event: Copied full image to {critical_full_path}")
+
+        # 4. Delete the original file
+        try:
+            image_path.unlink()
+            logging.info(f"Successfully processed and deleted original: {image_path.name}")
+        except OSError as e:
+            logging.error(f"Error deleting original file {image_path}: {e}")
+
+    def run(self):
         """
-        Processes all images in a directory, optionally cropping detected objects.
-
-        Args:
-            dir_path (Path): The path to the directory of images.
-            crop (bool): If True, crop and save detected objects.
+        Starts the continuous monitoring loop.
         """
-        if not dir_path.is_dir():
-            logging.error(f"Directory not found: {dir_path}")
-            return
-
         image_extensions = {".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif"}
-        image_files = [p for p in dir_path.iterdir() if p.suffix.lower() in image_extensions]
-
-        logging.info(f"Found {len(image_files)} image files in '{dir_path}'.")
         
-        detection_count = 0
-        for image_path in image_files:
-            detected_objects = self.detect_objects(image_path)
-            if detected_objects:
-                detection_count += 1
-                if crop:
-                    self.save_cropped_objects(image_path, detected_objects)
-        
-        logging.info(
-            f"\n--- Processing Summary ---\n"
-            f"Target Objects: {self.target_objects or 'All'}\n"
-            f"Found targets in {detection_count} out of {len(image_files)} images.\n"
-            f"--------------------------"
-        )
+        while True:
+            try:
+                image_files = [
+                    p for p in self.source_dir.iterdir() 
+                    if p.is_file() and p.suffix.lower() in image_extensions
+                ]
+                
+                if not image_files:
+                    logging.info(f"No new images found. Waiting for {POLL_INTERVAL_SECONDS}s...")
+                else:
+                    for image_path in image_files:
+                        self.process_and_store_image(image_path)
+                
+                time.sleep(POLL_INTERVAL_SECONDS)
 
+            except KeyboardInterrupt:
+                logging.info("Service stopped by user.")
+                break
+            except Exception as e:
+                logging.error(f"An unexpected error occurred in the monitoring loop: {e}")
+                time.sleep(POLL_INTERVAL_SECONDS * 2) # Wait longer after an error
 
 def main():
-    """Main function to parse arguments and run the detector."""
+    """Main function to parse arguments and run the service."""
     parser = argparse.ArgumentParser(
-        description="Detect objects in images using a YOLO model.",
-        epilog="Example: python event_detector.py --image my_image.jpg --category people --crop"
+        description="A service to monitor a directory for images, process them, and store the results.",
+        epilog="Example: python image_service.py /path/to/watch --output /path/to/save"
     )
     
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--image", type=Path, help="Path to a single image file.")
-    group.add_argument("--dir", type=Path, help="Path to a directory of images.")
-    group.add_argument("--list-classes", action="store_true", help="List all detectable object classes and exit.")
-    group.add_argument("--list-categories", action="store_true", help="List all predefined detection categories and exit.")
-
-    detection_group = parser.add_mutually_exclusive_group()
-    detection_group.add_argument("--category", help="Use a predefined category of objects to detect.")
-    detection_group.add_argument("--objects", help="Provide a comma-separated list of custom objects to detect.")
-
-    parser.add_argument("--crop", action="store_true", help="Crop and save detected objects.")
-    parser.add_argument("--debug", action="store_true", help="Enable debug level logging.")
-
+    parser.add_argument(
+        "source_directory",
+        type=Path,
+        help="The directory to monitor for new image files."
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path.home() / "Documents" / "processed_images",
+        help="The directory where processed images will be stored. Defaults to ~/Documents/processed_images."
+    )
+    
     args = parser.parse_args()
 
-    if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
+    if not args.source_directory.is_dir():
+        logging.error(f"Source directory does not exist or is not a directory: {args.source_directory}")
+        sys.exit(1)
 
     detector = EventDetector()
-
-    if args.list_classes:
-        print("Available classes:")
-        for cls in detector.get_available_classes():
-            print(f"  - {cls}")
-        return
-
-    if args.list_categories:
-        print("Available categories:")
-        for cat, items in DETECTION_CATEGORIES.items():
-            print(f"  - {cat}: {items}")
-        return
+    service = ProcessingService(
+        detector=detector,
+        source_dir=args.source_directory,
+        processed_dir=args.output
+    )
     
-    # Configure detector based on arguments
-    if args.category:
-        detector.set_detection_category(args.category)
-    elif args.objects:
-        custom_objects = [obj.strip() for obj in args.objects.split(',')]
-        detector.set_custom_objects(custom_objects)
-
-    # Run processing
-    if args.dir:
-        detector.process_directory(args.dir, crop=args.crop)
-    elif args.image:
-        detected_objects = detector.detect_objects(args.image)
-        if args.crop and detected_objects:
-            detector.save_cropped_objects(args.image, detected_objects)
+    service.run()
 
 if __name__ == "__main__":
     main()
