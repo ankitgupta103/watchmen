@@ -102,25 +102,36 @@ class EventDetector:
         Returns:
             int: The calculated severity level (0=low, 1=medium, 2=high, 3=critical).
         """
+
+        # if person is not in label_set return SEVERITY_LOW
+        # person -> SEVERITY_MEDIUM
+        # bag -> SEVERITY_MEDIUM
+        # weapon -> SEVERITY_CRITICAL
+        # default -> SEVERITY_MEDIUM
+
         if not detected_objects:
             return SEVERITY_LOW
 
         label_set = {obj['label'] for obj in detected_objects}
 
-        # Level 3 (Critical): Presence of a potential weapon.
+        # If 'person' is not detected at all, severity is LOW
+        if "person" not in label_set:
+            return SEVERITY_LOW
+
+        # Level 3 (Critical): Presence of a potential weapon (with person)
         if not label_set.isdisjoint(POTENTIAL_WEAPONS):
             return SEVERITY_CRITICAL
 
-        # Level 2 (High): Presence of any person.
+        # Level 2 (High): Presence of any person (no weapon)
         if "person" in label_set:
-            return SEVERITY_HIGH
-
-        # Level 1 (Medium): Presence of a bag without a person.
-        if not label_set.isdisjoint(BAG_OBJECTS):
             return SEVERITY_MEDIUM
 
-        # Level 0 (Low): Default for any other detected object(s).
-        return SEVERITY_LOW
+        # Level 1 (Medium): Presence of a bag (with person, no weapon)
+        if not label_set.isdisjoint(BAG_OBJECTS):
+            return SEVERITY_HIGH
+
+        # Default: Medium
+        return SEVERITY_MEDIUM
 
 class ProcessingService:
     """
@@ -281,4 +292,5 @@ def main():
     service.run()
 
 if __name__ == "__main__":
+    main()
     main()
