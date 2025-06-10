@@ -13,8 +13,8 @@ from vyom_client import VyomClient
 import gps
 import constants
 
-ALLDIR = "../processed"
-CRITICAL_DIR = "../processed/critical"
+ALLDIR = "../processed_images"
+CRITICAL_DIR = "../processed_images/critical"
 
 def get_hostname():
     return socket.gethostname()
