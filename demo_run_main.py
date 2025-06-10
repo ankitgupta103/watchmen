@@ -403,55 +403,61 @@ class CommandCenter:
     def process_images_from_directory(self):
         """Process all images from the directory one by one"""
         print(f"\nStarting image processing from directory: {self.image_directory}")
-        
         image_files = self.get_image_files()
-        
         if not image_files:
             print(f"No images found in {self.image_directory}")
             return
-        
         print(f"Found {len(image_files)} images to process")
-        
+        suspicious_objects = ["person", "bag", "knife", "gun", "scissors", "baseball bat"]
         for image_file in image_files:
             if image_file in self.processed_images:
                 continue  # Skip already processed images
-                
             print(f"\n{'='*60}")
             print(f"Processing image {len(self.processed_images) + 1}/{len(image_files)}")
             print(f"File: {os.path.basename(image_file)}")
             print(f"{'='*60}")
-            
-            # Use same timestamp for all uploads related to this image
             image_timestamp = datetime.now(timezone.utc)
-            
-            # Process with enhanced detector
             detection_result = self.process_image_with_enhanced_detector(image_file)
-            
-            # ALL IMAGES ARE SUSPICIOUS EVENTS - regardless of detection results
-            if detection_result["has_detection"]:
-                print(f"Suspicious event - objects detected!")
-                self.events_detected += 1
-                
-                # Upload and publish cropped images with the new method
+            detected = False
+            detected_objects = []
+            # Check cropped files for suspicious objects
+            if detection_result["has_detection"] and detection_result["cropped_files"]:
                 for cropped_file in detection_result["cropped_files"]:
-                    self.publish_cropped_image_as_suspicious_with_upload(cropped_file, detection_result, image_timestamp)
-                    time.sleep(1)
-                
-                # Upload and publish original image with the new method
+                    filename = os.path.basename(cropped_file)
+                    if "_cropped.jpg" in filename:
+                        parts = filename.replace("_cropped.jpg", "").split("_")
+                        if len(parts) >= 3:
+                            obj_name = parts[-2]
+                            if obj_name in suspicious_objects and obj_name not in detected_objects:
+                                detected_objects.append(obj_name)
+                if detected_objects:
+                    detected = True
+            # Only upload/publish if suspicious object detected
+            if detected:
+                print(f"🚨 SUSPICIOUS OBJECT DETECTED: {detected_objects}")
+                self.events_detected += 1
+                for cropped_file in detection_result["cropped_files"]:
+                    filename = os.path.basename(cropped_file)
+                    if "_cropped.jpg" in filename:
+                        parts = filename.replace("_cropped.jpg", "").split("_")
+                        if len(parts) >= 3:
+                            obj_name = parts[-2]
+                            if obj_name in detected_objects:
+                                self.publish_cropped_image_as_suspicious_with_upload(cropped_file, detection_result, image_timestamp)
+                                time.sleep(1)
                 self.publish_original_image_as_suspicious_with_upload(image_file, detection_result, image_timestamp)
-                
             else:
-                print(f"🚨 SUSPICIOUS EVENT - NO OBJECTS DETECTED (Low Severity)")
-                # Upload and publish original image with the new method
-                self.publish_original_image_as_suspicious_with_upload(image_file, detection_result, image_timestamp)
-            
+                print(f"No suspicious object detected. Skipping upload for {os.path.basename(image_file)}")
             self.processed_images.add(image_file)
             self.images_processed += 1
-            
-            # Wait before processing next image
+            # Delete the image after processing
+            try:
+                os.remove(image_file)
+                print(f"🗑️ Deleted image: {image_file}")
+            except Exception as e:
+                print(f"❌ Error deleting image {image_file}: {e}")
             print(f"⏳ Waiting 5 seconds before next image...")
             time.sleep(5)
-        
         print(f"\nImage processing completed!")
         print(f"Total processed: {self.images_processed}")
         print(f"Events detected: {self.events_detected}")
@@ -996,45 +1002,48 @@ class DevUnit:
     def process_images_from_directory(self):
         """Process all images from the directory one by one - ALL AS SUSPICIOUS EVENTS"""
         image_files = self.get_image_files()
-        
         if not image_files:
             print(f"❗ No images found in {self.image_directory}")
             return
-        
         print(f"📁 Found {len(image_files)} images to process")
-        print(f"🚨 ALL images will be sent as SUSPICIOUS EVENTS with appropriate severity")
-        
+        suspicious_objects = ["person", "bag", "knife", "gun", "scissors", "baseball bat"]
         for image_file in image_files:
             if image_file in self.processed_images:
                 continue  # Skip already processed images
-                
             print(f"\n{'='*50}")
             print(f"📸 Processing image {len(self.processed_images) + 1}/{len(image_files)}: {os.path.basename(image_file)}")
             print(f"{'='*50}")
-            
-            # Process with enhanced detector
             detection_result = self.process_image_with_enhanced_detector(image_file)
-            
-            if detection_result["has_detection"]:
-                print(f"🚨 SUSPICIOUS EVENT - OBJECTS DETECTED!")
+            detected = False
+            detected_objects = []
+            if detection_result["has_detection"] and detection_result["cropped_files"]:
+                for cropped_file in detection_result["cropped_files"]:
+                    filename = os.path.basename(cropped_file)
+                    if "_cropped.jpg" in filename:
+                        parts = filename.replace("_cropped.jpg", "").split("_")
+                        if len(parts) >= 3:
+                            obj_name = parts[-2]
+                            if obj_name in suspicious_objects and obj_name not in detected_objects:
+                                detected_objects.append(obj_name)
+                if detected_objects:
+                    detected = True
+            if detected:
+                print(f"🚨 SUSPICIOUS OBJECT DETECTED: {detected_objects}")
                 self.events_detected += 1
                 self.send_event()  # Send event notification
                 time.sleep(2)
-                
-                # Send processed images (cropped first, then original) - ALL AS SUSPICIOUS
                 self.send_processed_images(detection_result)
             else:
-                print(f"🚨 SUSPICIOUS EVENT - NO OBJECTS DETECTED (Low Severity)")
-                # Still send original image as suspicious event with low severity
-                self.send_img(image_file, is_cropped=False, detection_result=detection_result)
-            
+                print(f"No suspicious object detected. Skipping upload for {os.path.basename(image_file)}")
             self.processed_images.add(image_file)
             self.images_processed += 1
-            
-            # Wait before processing next image
+            try:
+                os.remove(image_file)
+                print(f"🗑️ Deleted image: {image_file}")
+            except Exception as e:
+                print(f"❌ Error deleting image {image_file}: {e}")
             print(f"⏳ Waiting 5 seconds before next image...")
             time.sleep(5)
-        
         print(f"\nImage processing completed!")
         print(f"Total processed: {self.images_processed}")
         print(f"Events detected: {self.events_detected}")
