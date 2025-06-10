@@ -253,7 +253,7 @@ def main():
     """Main function to parse arguments and run the service."""
     parser = argparse.ArgumentParser(
         description="A service to monitor a directory for images, process them, and store the results.",
-        epilog="Example: python image_service.py /path/to/watch --output /path/to/save"
+        epilog="Example: python event_detector.py /path/to/watch --output /path/to/save"
     )
     
     parser.add_argument(
