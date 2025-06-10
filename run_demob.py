@@ -113,15 +113,14 @@ class CommandCenter:
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
 
     def process_gps(self, msgstr):
-        parts = eventstr.split(':')
+        parts = msgstr.split(':')
         if len(parts) != 2:
-            print(f"Error parsing event message : {eventstr}")
+            print(f"Error parsing event message : {msgstr}")
             return
         nodeid = parts[0]
         gpsloc = parts[1]
         if nodeid not in self.node_map:
-            print(f"Wierd that node {nodeid} not in map yet")
-            return
+            self.node_map[nodeid] = (0, "", gpsloc, 0, 0, [])
         (hbcount, hbtime, _, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
 
@@ -212,7 +211,7 @@ class DevUnit:
 
     def keep_sending_to_cc(self, has_camera):
         self.send_gps()
-        # time.sleep(10)
+        time.sleep(5)
         photos_taken = 0
         events_seen = 0
         while True:
