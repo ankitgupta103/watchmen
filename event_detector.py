@@ -183,7 +183,16 @@ class ProcessingService:
         has_bag = not detected_labels.isdisjoint(BAG_OBJECTS)
         has_weapon = not detected_labels.isdisjoint(POTENTIAL_WEAPONS)
         is_critical = severity == SEVERITY_CRITICAL or severity == SEVERITY_HIGH
+        
+        print(f"--------------------------------")
+        print(f"is_critical: {is_critical}")
+        print(f"has_person: {has_person}")
+        print(f"has_bag: {has_bag}")
+        print(f"has_weapon: {has_weapon}")
+        print(f"--------------------------------")
+
         save_dir = self.critical_dir if is_critical else self.processed_dir
+        uid = generate_random_string()
         
         if is_critical:
             critical_reasons = []
@@ -199,14 +208,14 @@ class ProcessingService:
 
 
         # 1. Save the full image to the determined directory.
-        full_image_name = f"{severity}_{timestamp}_{generate_random_string()}_f.jpg"
+        full_image_name = f"{severity}_{timestamp}_{uid}_f.jpg"
         full_save_path = save_dir / full_image_name
         cv2.imwrite(str(full_save_path), original_image)
         logging.info(f"Saved full image to: {full_save_path}")
 
         # 2. Save cropped versions to the SAME directory.
         for i, obj_data in enumerate(detected_objects):
-            cropped_image_name = f"{severity}_{timestamp}_c_{i+1}.jpg"
+            cropped_image_name = f"{severity}_{timestamp}_{uid}_c_{i+1}.jpg"
             cropped_save_path = save_dir / cropped_image_name
 
             box = obj_data['box']
