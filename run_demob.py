@@ -247,7 +247,7 @@ class DevUnit:
         if loc is not None:
             (lat, lng) = loc
             next_dest = get_next_dest(self.devid)
-            msgstr = f"{self.devid}:{lat,lng}"
+            msgstr = f"{self.devid}:{lat},{lng}"
             self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
 
     # A:1205
