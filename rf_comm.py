@@ -108,7 +108,7 @@ class RFComm:
             if msgpyl[0] == constants.MESSAGE_TYPE_CHUNK_END:
                 ackid, remaining = self.sep_part(msgpyl, ':')
                 alldone, cid = self.sep_part(remaining, ':')
-                if remaining == "ad":
+                if alldone == "ad":
                     with self.all_chunks_done_lock:
                         self.all_chunks_done[cid] = True
             with self.msg_unacked_lock:
