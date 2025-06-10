@@ -154,7 +154,7 @@ class CommandCenter:
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
         # SENDING TO VYOM
         try:
-            self.vyom_client.on_event_arrive(node_hn=nodeid, filename=evid)
+            self.vyom_client.on_event_arrive(node_hn=nodeid, event_id=evid)
         except Exception as e:
             print(f"Error sending event to vyom client {e}")
 
