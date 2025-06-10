@@ -3,7 +3,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import random
 import string
 
@@ -108,31 +108,27 @@ class EventDetector:
         Returns:
             int: The calculated severity level (0=low, 1=medium, 2=high, 3=critical).
         """
-
-        # if person is not in label_set return SEVERITY_LOW
-        # person -> SEVERITY_MEDIUM
-        # bag -> SEVERITY_MEDIUM
-        # weapon -> SEVERITY_CRITICAL
-        # default -> SEVERITY_MEDIUM
-
         if not detected_objects:
             return SEVERITY_LOW
 
         label_set = {obj['label'] for obj in detected_objects}
 
-        # If 'person' is not detected at all, severity is LOW
+        # No person detected = LOW severity
         if "person" not in label_set:
             return SEVERITY_LOW
 
-        if not label_set.isdisjoint(POTENTIAL_WEAPONS):
-            return SEVERITY_CRITICAL
+        # Person detected - check for weapons and bags
+        has_weapon = "gun" in label_set or "knife" in label_set or "scissors" in label_set or "baseball bat" in label_set
+        has_bag = "backpack" in label_set or "handbag" in label_set or "suitcase" in label_set
 
-        if not label_set.isdisjoint(BAG_OBJECTS):
+        # Person + weapon = CRITICAL
+        if has_weapon:
+            return SEVERITY_CRITICAL
+        
+        # Person + bag = HIGH
+        if has_bag:
             return SEVERITY_HIGH
         
-        if "person" in label_set:
-            return SEVERITY_MEDIUM
-
         return SEVERITY_MEDIUM
 
 class ProcessingService:
@@ -150,8 +146,29 @@ class ProcessingService:
         self.critical_dir.mkdir(exist_ok=True)
         logging.info(f"Monitoring source directory: {self.source_dir}")
         logging.info(f"Processed images will be saved to: {self.processed_dir}")
-        logging.info(f"Critical images (person/bag/weapon) will be saved to: {self.critical_dir}")
+        logging.info(f"Critical images (person + weapon/bag) will be saved to: {self.critical_dir}")
 
+    def find_priority_object(self, detected_objects: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        Find the priority object to crop (weapon > bag > None).
+        
+        Args:
+            detected_objects: List of detected objects
+            
+        Returns:
+            The highest priority object to crop, or None
+        """
+        # First priority: weapons
+        for obj in detected_objects:
+            if obj['label'] in POTENTIAL_WEAPONS:
+                return obj
+        
+        # Second priority: bags
+        for obj in detected_objects:
+            if obj['label'] in BAG_OBJECTS:
+                return obj
+        
+        return None
 
     def process_and_store_image(self, image_path: Path):
         """
@@ -185,6 +202,7 @@ class ProcessingService:
         is_critical = severity == SEVERITY_CRITICAL or severity == SEVERITY_HIGH
         
         print(f"--------------------------------")
+        print(f"Severity: {severity}")
         print(f"is_critical: {is_critical}")
         print(f"has_person: {has_person}")
         print(f"has_bag: {has_bag}")
@@ -196,16 +214,13 @@ class ProcessingService:
         
         if is_critical:
             critical_reasons = []
-            if has_person:
-                critical_reasons.append("person")
-            if has_bag:
-                critical_reasons.append("bag")
-            if has_weapon:
-                critical_reasons.append("weapon")
-            logging.warning(f"CRITICAL CONTENT DETECTED ({', '.join(critical_reasons)}). Saving to critical folder: {save_dir}")
+            if has_person and has_weapon:
+                critical_reasons.append("person + weapon")
+            elif has_person and has_bag:
+                critical_reasons.append("person + bag")
+            logging.warning(f"CRITICAL/HIGH SEVERITY DETECTED ({', '.join(critical_reasons)}). Saving to critical folder: {save_dir}")
         else:
             logging.info(f"No critical content detected. Saving to standard folder: {save_dir}")
-
 
         # 1. Save the full image to the determined directory.
         full_image_name = f"{severity}_{timestamp}_{uid}_f.jpg"
@@ -213,12 +228,14 @@ class ProcessingService:
         cv2.imwrite(str(full_save_path), original_image)
         logging.info(f"Saved full image to: {full_save_path}")
 
-        # 2. Save cropped versions to the SAME directory.
-        for i, obj_data in enumerate(detected_objects):
-            cropped_image_name = f"{severity}_{timestamp}_{uid}_c_{i+1}.jpg"
+        # 2. Save ONE cropped version if there's a weapon or bag
+        priority_object = self.find_priority_object(detected_objects)
+        
+        if priority_object:
+            cropped_image_name = f"{severity}_{timestamp}_{uid}_c.jpg"
             cropped_save_path = save_dir / cropped_image_name
 
-            box = obj_data['box']
+            box = priority_object['box']
             x1, y1, x2, y2 = map(int, box)
 
             h, w = original_image.shape[:2]
@@ -229,9 +246,9 @@ class ProcessingService:
 
             if cropped_image.size > 0:
                 cv2.imwrite(str(cropped_save_path), cropped_image)
-                logging.info(f"Saved cropped image to: {cropped_save_path}")
+                logging.info(f"Saved cropped {priority_object['label']} to: {cropped_save_path}")
             else:
-                logging.warning(f"Skipping empty crop for object {i+1} in {image_path.name}")
+                logging.warning(f"Skipping empty crop for {priority_object['label']} in {image_path.name}")
 
         # 3. Delete the original file
         try:
@@ -303,5 +320,4 @@ def main():
     service.run()
 
 if __name__ == "__main__":
-    main()
     main()
