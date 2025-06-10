@@ -12,7 +12,7 @@ from pathlib import Path
 # from rf_comm import RFComm
 
 import constants
-from detect_enhanced import Detector  # Using enhanced detector
+from event_detector import EventDetector  # Using enhanced detector
 from vyomcloudbridge.services.queue_writer_json import QueueWriterJson
 from vyomcloudbridge.utils.configs import Configs
 from vyomcloudbridge.utils.common import get_mission_upload_dir
