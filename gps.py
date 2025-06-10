@@ -44,7 +44,7 @@ class Gps:
 
 def main():
     gps = Gps()
-    pring(gps.get_lat_lng())
+    print(gps.get_lat_lng())
 
 if __name__ == "__main__":
     main()
