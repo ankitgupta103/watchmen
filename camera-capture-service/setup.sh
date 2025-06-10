@@ -25,6 +25,28 @@ SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
 # Path for the log file
 LOG_FILE="/var/log/usb-cycle.log"
 
+# Function to validate input with retries
+validate_input() {
+    local prompt="$1"
+    local var_name="$2"
+    local max_retries=3
+    local retry_count=0
+    
+    while [ $retry_count -lt $max_retries ]; do
+        read -p "$prompt" input_value
+        if [ -n "$input_value" ]; then
+            eval "$var_name='$input_value'"
+            return 0
+        fi
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -lt $max_retries ]; then
+            echo "Error: Input cannot be empty. Please try again. ($((max_retries - retry_count)) attempts remaining)"
+        fi
+    done
+    
+    echo "Error: Maximum retries reached. Input cannot be empty."
+    return 1
+}
 
 # --- Script Body ---
 
@@ -55,6 +77,12 @@ echo "Directories created and permissions set."
 # 4. Create the main USB control script
 echo "[3/6] Creating the USB control script at $SCRIPT_PATH..."
 
+# Validate camera images folder input
+if ! validate_input "Enter the complete path to the camera images folder: " "CAMERA_IMAGE_FOLDER"; then
+    echo "Error: Failed to get valid camera images folder path"
+    exit 1
+fi
+
 # Use a heredoc to write the provided script to the file
 cat > "$SCRIPT_PATH" << 'EOF'
 #!/bin/bash
@@ -66,7 +94,7 @@ cat > "$SCRIPT_PATH" << 'EOF'
 USB_HUB="1-1"
 OFF_TIME=60
 MAX_MOUNT_WAIT=10
-DEST_DIR="/home/pi/Documents/images"
+DEST_DIR="$CAMERA_IMAGE_FOLDER" # INPUT
 LOG_FILE="/var/log/usb-cycle.log"
 
 # Image file extensions to move

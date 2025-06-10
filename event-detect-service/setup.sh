@@ -5,6 +5,41 @@
 
 set -e  # Exit on any error
 
+# Function to validate input with retries
+validate_input() {
+    local prompt="$1"
+    local var_name="$2"
+    local max_retries=3
+    local retry_count=0
+    
+    while [ $retry_count -lt $max_retries ]; do
+        read -p "$prompt" input_value
+        if [ -n "$input_value" ]; then
+            eval "$var_name='$input_value'"
+            return 0
+        fi
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -lt $max_retries ]; then
+            echo "Error: Input cannot be empty. Please try again. ($((max_retries - retry_count)) attempts remaining)"
+        fi
+    done
+    
+    echo "Error: Maximum retries reached. Input cannot be empty."
+    return 1
+}
+
+# Validate camera images folder
+if ! validate_input "Enter the complete path to the camera images folder: " "CAMERA_IMAGE_FOLDER"; then
+    echo "Error: Failed to get valid camera images folder path"
+    exit 1
+fi
+
+# Validate events output folder
+if ! validate_input "Enter the complete path to the events output folder: " "EVENT_OUTPUT_FOLDER"; then
+    echo "Error: Failed to get valid events output folder path"
+    exit 1
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,8 +53,8 @@ SERVICE_FILE="${SERVICE_NAME}.service"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_FILE_PATH="${SCRIPT_DIR}/event_detector.py"
 SYSTEMD_DIR="/etc/systemd/system"
-WATCH_FOLDER="/home/pi/Documents/images"
-OUTPUT_FOLDER="/home/pi/Documents/processed_images"
+# CAMERA_IMAGE_FOLDER="/home/pi/Documents/images" # input folder
+# EVENT_OUTPUT_FOLDER="/home/pi/Documents/processed_images"  # output folder
 
 echo -e "${BLUE}=== Event Detector Service Setup ===${NC}"
 
@@ -65,20 +100,27 @@ python3 -c "import cv2, ultralytics" 2>/dev/null || {
 
 # Create necessary directories
 print_status "Creating necessary directories..."
-mkdir -p "$WATCH_FOLDER" "$OUTPUT_FOLDER"
-chown pi:pi "$WATCH_FOLDER" "$OUTPUT_FOLDER" 2>/dev/null || print_warning "Could not change ownership of directories"
+mkdir -p "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER"
+chown pi:pi "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER" 2>/dev/null || print_warning "Could not change ownership of directories"
 
 # Create the service file
 print_status "Creating service file..."
+# Validate environment file path
+if ! validate_input "Enter the complete filepath to source the environment: " "ENV_FILE_PATH"; then
+    print_error "Failed to get valid environment file path"
+    exit 1
+fi
+
 cat > "${SYSTEMD_DIR}/${SERVICE_FILE}" << EOF
 [Unit]
 Description=Event Detection Service - YOLO Object Detection for Image Monitoring
 After=multi-user.target network.target
 Wants=multi-user.target
 
+# 
 [Service]
 Type=simple
-ExecStart=/bin/bash -lic 'source /home/pi/.bashrc && python ${PYTHON_FILE_PATH} ${WATCH_FOLDER} --output ${OUTPUT_FOLDER}'
+ExecStart=/bin/bash -lic 'source ${ENV_FILE_PATH} && python ${PYTHON_FILE_PATH} ${CAMERA_IMAGE_FOLDER} --output ${EVENT_OUTPUT_FOLDER}'
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -132,8 +174,8 @@ fi
 echo
 echo -e "${BLUE}=== Service Setup Complete ===${NC}"
 echo -e "${GREEN}Service Name:${NC} $SERVICE_NAME"
-echo -e "${GREEN}Watch Folder:${NC} $WATCH_FOLDER"
-echo -e "${GREEN}Output Folder:${NC} $OUTPUT_FOLDER"
+echo -e "${GREEN}Camera Images Folder:${NC} $CAMERA_IMAGE_FOLDER"
+echo -e "${GREEN}Output Folder:${NC} $EVENT_OUTPUT_FOLDER"
 echo -e "${GREEN}Service File:${NC} ${SYSTEMD_DIR}/${SERVICE_FILE}"
 echo
 
@@ -153,5 +195,5 @@ systemctl status "$SERVICE_NAME" --no-pager
 
 print_status "Setup completed successfully!"
 print_status "The service will automatically start on system boot."
-print_status "Place images in: $WATCH_FOLDER"
-print_status "Processed images will be saved to: $OUTPUT_FOLDER"
+print_status "Place images in: $CAMERA_IMAGE_FOLDER"
+print_status "Processed images will be saved to: $EVENT_OUTPUT_FOLDER"
