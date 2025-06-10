@@ -209,14 +209,14 @@ class DevUnit:
                     full = f
         return (evid, cropped, full)
 
-    def send_img(self, imgfile):
+    def send_img(self, imgfile, evid):
         next_dest = get_next_dest(self.devid)
         if next_dest == None:
             print(f"{self.devid} Weird no dest for {self.devid}")
             return
         mst = constants.MESSAGE_TYPE_PHOTO
         fname = imgfile.split("/").pop()
-        im = {"i_f" : "{fname}",
+        im = {"i_f" : fname,
               "i_s" : self.devid,
               "i_t" : str(int(time.time())),
               "e_i" : evid,
