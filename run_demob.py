@@ -85,6 +85,7 @@ class CommandCenter:
             imf = orig_msg["i_f"]
             ims = orig_msg["i_s"]
             imstr = orig_msg["i_d"]
+            evid = orig_msg["e_i"]
             im = image.imstrtoimage(imstr)
             fname = f"/tmp/{ims}_{imf}_{random.randint(1000,2000)}.jpg"
             print(f"Saving image to {fname}")
