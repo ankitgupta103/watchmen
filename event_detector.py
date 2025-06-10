@@ -3,7 +3,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Set
+from typing import Dict, List, Any
 
 import cv2
 from ultralytics import YOLO
@@ -20,7 +20,6 @@ logging.basicConfig(
 YOLO_MODEL_NAME = "yolov8n.pt"
 POLL_INTERVAL_SECONDS = 5  # Time to wait between directory scans
 
-# --- Updated Severity Levels ---
 SEVERITY_LOW = 0
 SEVERITY_MEDIUM = 1
 SEVERITY_HIGH = 2
@@ -50,18 +49,6 @@ class EventDetector:
             logging.error(f"Failed to load YOLO model from '{model_path}'. Error: {e}")
             sys.exit(1)
 
-        # We want to detect all possible objects for severity analysis
-        self.target_objects: List[str] = []
-
-    def get_available_classes(self) -> List[str]:
-        """
-        Returns a list of all class names the loaded model can detect.
-
-        Returns:
-            List[str]: A sorted list of class names.
-        """
-        return sorted(list(self.model.names.values()))
-
     def detect_objects(self, image_path: Path) -> List[Dict[str, Any]]:
         """
         Detects target objects in a single image.
@@ -89,7 +76,7 @@ class EventDetector:
 
         detected_boxes = []
         for r in results:
-            for i, box in enumerate(r.boxes):
+            for box in r.boxes:
                 object_name = self.model.names[int(box.cls)]
                 detected_boxes.append({
                     'box': box.xyxy[0].cpu().numpy(),
@@ -108,7 +95,7 @@ class EventDetector:
     @staticmethod
     def determine_severity(detected_objects: List[Dict[str, Any]]) -> int:
         """
-        Determines the severity level based on the detected objects.
+        Determines a severity level for filename classification.
 
         Args:
             detected_objects (List[Dict[str, Any]]): A list of detected object data.
@@ -121,16 +108,14 @@ class EventDetector:
 
         label_set = {obj['label'] for obj in detected_objects}
 
-        # --- Updated Severity Logic ---
-
         # Level 3 (Critical): Presence of a potential weapon.
         if not label_set.isdisjoint(POTENTIAL_WEAPONS):
             return SEVERITY_CRITICAL
 
-        # Level 2 (High): Presence of any person (alone, in a group, or with a bag).
+        # Level 2 (High): Presence of any person.
         if "person" in label_set:
             return SEVERITY_HIGH
-        
+
         # Level 1 (Medium): Presence of a bag without a person.
         if not label_set.isdisjoint(BAG_OBJECTS):
             return SEVERITY_MEDIUM
@@ -153,19 +138,18 @@ class ProcessingService:
         self.critical_dir.mkdir(exist_ok=True)
         logging.info(f"Monitoring source directory: {self.source_dir}")
         logging.info(f"Processed images will be saved to: {self.processed_dir}")
-        logging.info(f"Critical images will be saved to: {self.critical_dir}")
+        logging.info(f"Images with people will be saved to: {self.critical_dir}")
 
 
     def process_and_store_image(self, image_path: Path):
         """
         Processes a single image: detects objects, determines severity,
-        saves full and cropped versions, and deletes the original.
+        saves files, and deletes the original.
         """
         logging.info(f"Processing new file: {image_path.name}")
 
         detected_objects = self.detector.detect_objects(image_path)
 
-        # Only proceed if objects were detected
         if not detected_objects:
             logging.info(f"No objects to process in {image_path.name}. Deleting original.")
             try:
@@ -176,20 +160,22 @@ class ProcessingService:
 
         severity = self.detector.determine_severity(detected_objects)
         timestamp = time.strftime("%H%M%S", time.localtime())
-
+        
         original_image = cv2.imread(str(image_path))
         if original_image is None:
             logging.error(f"Could not re-read image for saving: {image_path}")
             return
-            
-        # --- Updated Save Logic ---
-        # Determine the target directory based on severity.
-        # Levels 2 (High) and 3 (Critical) go to the critical folder.
-        is_critical_event = severity >= SEVERITY_HIGH
-        save_dir = self.critical_dir if is_critical_event else self.processed_dir
+
+        detected_labels = {obj['label'] for obj in detected_objects}
+        is_person_present = "person" in detected_labels
         
-        if is_critical_event:
-            logging.warning(f"CRITICAL/HIGH event detected (Severity: {severity}). Saving to: {save_dir}")
+        save_dir = self.critical_dir if is_person_present else self.processed_dir
+        
+        if is_person_present:
+            logging.warning(f"PERSON DETECTED. Saving to critical folder: {save_dir}")
+        else:
+            logging.info(f"No person detected. Saving to standard folder: {save_dir}")
+
 
         # 1. Save the full image to the determined directory.
         full_image_name = f"{severity}_{timestamp}_f.jpg"
@@ -199,7 +185,7 @@ class ProcessingService:
 
         # 2. Save cropped versions to the SAME directory.
         for i, obj_data in enumerate(detected_objects):
-            cropped_image_name = f"{severity}_{timestamp}_c_{i+1}_{obj_data['label']}.jpg"
+            cropped_image_name = f"{severity}_{timestamp}_c_{i+1}.jpg"
             cropped_save_path = save_dir / cropped_image_name
 
             box = obj_data['box']
