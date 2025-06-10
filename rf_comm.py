@@ -18,7 +18,7 @@ MAX_CHUNK_SIZE = 19
 hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
-ACKING_ENABLED = False
+ACKING_ENABLED = True
 FLAKINESS = 10  # 0-100 %
 
 """
