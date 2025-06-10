@@ -15,13 +15,15 @@ export type SuspiciousEventType =
 export type SuspiciousEventMarked = 'ignored' | 'noted' | 'unreviewed';
 
 export interface HealthEvent {
+  machine_id: number;
   timestamp: string;
   type: HealthEventType;
   severity: HealthEventSeverity;
 }
 export interface SuspiciousEvent {
-  url?: string;
+  machine_id: number;
   timestamp: string;
+  url?: string;
   confidence: number;
   type: SuspiciousEventType;
   marked?: SuspiciousEventMarked;
