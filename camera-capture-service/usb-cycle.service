@@ -1,0 +1,26 @@
+[Unit]
+Description=USB Power Cycle and Image Transfer Service
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/home/pi/Documents/watchmen/usb-controller/usb-camera-power-cycle.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+User=root
+
+# Ensure the service has necessary permissions
+PrivilegeEscalation=yes
+NoNewPrivileges=no
+
+# Environment
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Working Directory
+WorkingDirectory=/home/pi/Documents
+
+[Install]
+WantedBy=multi-user.target

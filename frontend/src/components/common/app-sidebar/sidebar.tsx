@@ -36,11 +36,11 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 
+import { setCookie } from '@/lib/cookies';
+import { Organization } from '@/lib/types/organization';
 import { cn } from '@/lib/utils';
 
 import { Logo } from '../logo';
-import { Organization } from '@/lib/types/organization';
-import { setCookie } from '@/lib/cookies';
 
 const items = [
   {
@@ -126,10 +126,13 @@ export default function AppSidebar() {
                 <DropdownMenuLabel>Organizations</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {organizations?.map((org) => (
-                  <DropdownMenuItem key={org.organization_id} onClick={() => {
-                    console.log('clicked');
-                    handleOrganizationChange(org);
-                  }}>
+                  <DropdownMenuItem
+                    key={org.organization_id}
+                    onClick={() => {
+                      console.log('clicked');
+                      handleOrganizationChange(org);
+                    }}
+                  >
                     <Avatar className="mr-2 h-6 w-6">
                       <AvatarImage
                         src={org?.organization_logo || '/placeholder.svg'}

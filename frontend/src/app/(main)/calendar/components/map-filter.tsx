@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useLiveMachineData } from '@/hooks/use-live-machine-data';
 import L from 'leaflet';
 import {
   Activity,
@@ -24,7 +25,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { Machine, MachineData } from '@/lib/types/machine';
-import { useLiveMachineData } from '@/hooks/use-live-machine-data';
 
 interface MapBounds {
   north: number;
@@ -50,7 +50,11 @@ const getMachineTypeIcon = (type: string, size: number = 16) => {
 };
 
 // Create custom marker icon
-const createMachineIcon = (machine: Machine, machineData: MachineData, isSelected: boolean = false) => {
+const createMachineIcon = (
+  machine: Machine,
+  machineData: MachineData,
+  isSelected: boolean = false,
+) => {
   if (!machineData) return undefined;
 
   const bgColor = isSelected
@@ -90,7 +94,6 @@ const RectangleDrawer = ({
   onBoundsSelected: (bounds: MapBounds | null) => void;
   existingBounds: MapBounds | null;
 }) => {
-  
   const [drawing, setDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<L.LatLng | null>(null);
   const [currentBounds, setCurrentBounds] = useState<L.LatLngBounds | null>(
@@ -172,8 +175,7 @@ const MapFilter = ({
   const machineIds = useMemo(() => machines.map((m) => m.id), [machines]);
 
   // Use the live data hook
-  const { getMachineData } =
-    useLiveMachineData(machineIds, true);
+  const { getMachineData } = useLiveMachineData(machineIds, true);
 
   // Calculate map center and zoom
   const getMapCenter = (): [number, number] => {
@@ -293,23 +295,23 @@ const MapFilter = ({
                   machines.map((machine) => (
                     <Marker
                       key={machine.id}
-                    position={[
-                      machine.last_location.lat,
-                      machine.last_location.lng,
-                    ]}
-                    icon={createMachineIcon(
-                      machine,
-                       getMachineData(machine.id),
-                      isMachineInBounds(machine),
-                    )}
-                  >
-                    <Tooltip>
-                      <div className="text-center text-xs font-medium">
-                        {machine.name}
-                      </div>
-                    </Tooltip>
-                  </Marker>
-                ))}
+                      position={[
+                        machine.last_location.lat,
+                        machine.last_location.lng,
+                      ]}
+                      icon={createMachineIcon(
+                        machine,
+                        getMachineData(machine.id),
+                        isMachineInBounds(machine),
+                      )}
+                    >
+                      <Tooltip>
+                        <div className="text-center text-xs font-medium">
+                          {machine.name}
+                        </div>
+                      </Tooltip>
+                    </Marker>
+                  ))}
 
                 {/* Coverage circles for visualization */}
                 {machines
