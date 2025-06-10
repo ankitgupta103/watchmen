@@ -7,6 +7,7 @@ import json
 import socket
 import random
 from rf_comm import RFComm
+from vyomcloudbridge.services.queue_writer_json import QueueWriterJson
 
 import constants
 
@@ -48,6 +49,7 @@ class CommandCenter:
         self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
         self.images_saved = []
         self.msgids_seen = []
+        self.writer = QueueWriterJson()
 
     def print_status(self):
         while True:
@@ -109,6 +111,31 @@ class CommandCenter:
         (hbcount, hbtime, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
         event_ts_list.append(eventtime)
         self.node_map[nodeid] = (hbcount, hbtime, photos_taken, events_seen, event_ts_list)
+        # Publish event to VyomCloudBridge
+        try:
+            epoch_ms = int(time.time() * 1000)
+            message_data = {
+                "event_type": "event",
+                # TODO: Send machine id here
+                "machine_id": nodeid,
+                "timestamp": datetime.now().isoformat(),
+                "event_time": eventtime,
+                "reported_by": self.devid
+            }
+            filename = f"{epoch_ms}.json"
+            self.writer.write_message(
+                message_data=message_data,
+                filename=filename,
+                data_source="watchmen-event",
+                data_type="json",
+                mission_id="_all_",
+                priority=1,
+                destination_ids=["s3"],
+                merge_chunks=True
+            )
+            print(f"Published event to VyomCloudBridge for {nodeid} at {eventtime}")
+        except Exception as e:
+            print(f"Error publishing event to VyomCloudBridge: {e}")
 
     def process_msg(self, msgid, mst, msgstr):
         if msgid not in self.msgids_seen:
