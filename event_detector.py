@@ -199,7 +199,7 @@ class ProcessingService:
         has_person = "person" in detected_labels
         has_bag = not detected_labels.isdisjoint(BAG_OBJECTS)
         has_weapon = not detected_labels.isdisjoint(POTENTIAL_WEAPONS)
-        is_critical = severity == SEVERITY_CRITICAL or severity == SEVERITY_HIGH
+        is_critical = severity == SEVERITY_CRITICAL or severity == SEVERITY_HIGH or has_person
         
         print(f"--------------------------------")
         print(f"Severity: {severity}")
