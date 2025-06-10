@@ -116,9 +116,9 @@ class CommandCenter:
         self.events_detected = 0
         
         # Health monitoring
-        self.last_health_check = 0
-        self.health_check_interval = 60  # 60 seconds
-        self.system_start_time = time.time()
+        # self.last_health_check = 0
+        # self.health_check_interval = 60  # 60 seconds
+        # self.system_start_time = time.time()
         
         # Check if image directory exists and show available images
         if os.path.exists(self.image_directory):
@@ -284,87 +284,6 @@ class CommandCenter:
             print(f"❌ Error publishing suspicious event for {machine_id}: {e}")
             return False
 
-    def check_system_health(self):
-        """Check system health and publish health events every 60 seconds"""
-        current_time = time.time()
-        
-        if current_time - self.last_health_check >= self.health_check_interval:
-            self.last_health_check = current_time
-            
-            # Check AI detector health
-            try:
-                # Test if detector is working
-                if hasattr(self.detector, 'model') and self.detector.model:
-                    self.publish_health_event(
-                        self.devid,
-                        "camera_failure",  # Camera system includes AI
-                        "low",
-                        "AI detector operational"
-                    )
-                else:
-                    self.publish_health_event(
-                        self.devid,
-                        "camera_failure",
-                        "high",
-                        "AI detector not available"
-                    )
-            except Exception as e:
-                self.publish_health_event(
-                    self.devid,
-                    "camera_failure",
-                    "critical",
-                    f"AI detector error: {str(e)}"
-                )
-            
-            # Check image directory health
-            if os.path.exists(self.image_directory):
-                self.publish_health_event(
-                    self.devid,
-                    "hardware_failure",
-                    "low", 
-                    f"Image directory accessible - {len(self.get_image_files())} images available"
-                )
-            else:
-                self.publish_health_event(
-                    self.devid,
-                    "hardware_failure",
-                    "medium",
-                    "Image directory not accessible"
-                )
-            
-            # Check MQTT writer health
-            try:
-                if self.writer:
-                    self.publish_health_event(
-                        self.devid,
-                        "offline",
-                        "low",
-                        "MQTT connection operational"
-                    )
-                else:
-                    self.publish_health_event(
-                        self.devid,
-                        "offline", 
-                        "high",
-                        "MQTT writer not available"
-                    )
-            except Exception as e:
-                self.publish_health_event(
-                    self.devid,
-                    "offline",
-                    "critical",
-                    f"MQTT connection error: {str(e)}"
-                )
-            
-            # System uptime health check
-            uptime_hours = (current_time - self.system_start_time) / 3600
-            self.publish_health_event(
-                self.devid,
-                "hardware_failure",
-                "low",
-                f"System uptime: {uptime_hours:.1f} hours, Images processed: {self.images_processed}"
-            )
-
     def publish_summary(self):
         """Publish network summary"""
         try:
@@ -528,9 +447,6 @@ class CommandCenter:
             
             self.processed_images.add(image_file)
             self.images_processed += 1
-            
-            # Check system health periodically
-            self.check_system_health()
             
             # Wait before processing next image
             print(f"⏳ Waiting 5 seconds before next image...")
@@ -713,31 +629,21 @@ class CommandCenter:
 
     def print_status(self):
         status_count = 0
-        
-        # Start image processing in background
         processing_thread = self.run_image_processing_cycle()
-        
         while True:
             print("######### Command Center Status ##############")
             print(f"Images processed: {self.images_processed}")
             print(f"Events detected: {self.events_detected}")
             print(f"Connected nodes: {len(self.node_map)}")
             print(f"Uptime: {(time.time() - self.system_start_time) / 3600:.1f} hours")
-            
             for x in self.node_map.keys():
                 print(f" ####### {x} : {self.node_map[x]}")
             for x in self.images_saved:
                 print(f"Saved image : {x}")
             print("#######################################################")
-            
-            # Check system health
-            self.check_system_health()
-            
-            # Publish summary every 10 status updates
             status_count += 1
             if status_count % 10 == 0:
                 self.publish_summary()
-            
             time.sleep(10)
 
     def process_image(self, msgstr):
@@ -884,9 +790,9 @@ class DevUnit:
         self.events_detected = 0
         
         # Health monitoring
-        self.last_health_check = 0
-        self.health_check_interval = 60  # 60 seconds
-        self.system_start_time = time.time()
+        # self.last_health_check = 0
+        # self.health_check_interval = 60  # 60 seconds
+        # self.system_start_time = time.time()
         
         print(f"DevUnit {devid} initialized with AI detector")
        
@@ -1125,72 +1031,48 @@ class DevUnit:
             self.processed_images.add(image_file)
             self.images_processed += 1
             
-            # Send heartbeat after processing each image (health message)
-            time.sleep(5)
-            self.send_heartbeat(self.images_processed, self.events_detected)
-            
-            # Check system health periodically 
-            self.check_system_health()
-            
             # Wait before processing next image
-            time.sleep(10)
+            print(f"⏳ Waiting 5 seconds before next image...")
+            time.sleep(5)
+        
+        print(f"\nImage processing completed!")
+        print(f"Total processed: {self.images_processed}")
+        print(f"Events detected: {self.events_detected}")
 
     def check_system_health(self):
-        """Check system health and send health events every 60 seconds"""
-        current_time = time.time()
-        
-        if current_time - self.last_health_check >= self.health_check_interval:
-            self.last_health_check = current_time
-            
-            print(f"Performing health check for device {self.devid}")
-            
-            # These would be sent as health messages via RF/communication
-            # For now, just log them locally since RF is disabled
-            
-            # AI detector health
-            try:
-                if hasattr(self.detector, 'model') and self.detector.model:
-                    print(f"Health: AI detector operational")
-                else:
-                    print(f"Health: AI detector not available (HIGH severity)")
-            except Exception as e:
-                print(f"Health: AI detector error - {str(e)} (CRITICAL severity)")
-            
-            # Image directory health
-            if os.path.exists(self.image_directory):
-                print(f"Health: Image directory accessible - {len(self.get_image_files())} images")
-            else:
-                print(f"Health: Image directory not accessible (MEDIUM severity)")
-            
-            # System uptime
-            uptime_hours = (current_time - self.system_start_time) / 3600
-            print(f"Health: Uptime {uptime_hours:.1f}h, Processed: {self.images_processed}, Events: {self.events_detected}")
+        # REMOVED: health monitoring now handled in heartbeat
+        pass
 
     def keep_sending_to_cc(self, has_camera):
         photos_taken = 0
         events_seen = 0
-        
-        # Initial heartbeat
         self.send_heartbeat(photos_taken, events_seen)
         time.sleep(5)
-        
         if has_camera:
-            # Process images from directory - ALL AS SUSPICIOUS EVENTS
             self.process_images_from_directory()
         else:
-            # Original behavior for non-camera devices
             while True:
                 self.send_heartbeat(photos_taken, events_seen)
-                self.check_system_health()  # Health checks every 60s
-                time.sleep(1800)  # Every 30 mins
+                # REMOVED: self.check_system_health()
+                time.sleep(1800)
 
     def send_heartbeat(self, photos_taken, events_seen):
-        """Send heartbeat - this is a HEALTH message"""
         t = get_time_str()
         msgstr = f"{self.devid}:{t}:{photos_taken}:{events_seen}"
         next_dest = get_next_dest(self.devid)
         print(f"Sending heartbeat (health message): {msgstr}")
         # self.rf.send_message(msgstr, constants.MESSAGE_TYPE_HEARTBEAT, next_dest)
+        # Health event logic moved here:
+        uptime_hours = (time.time() - getattr(self, 'system_start_time', time.time())) / 3600
+        print(f"Health: Uptime {uptime_hours:.1f}h, Processed: {self.images_processed}, Events: {self.events_detected}")
+        if hasattr(self, 'detector') and getattr(self.detector, 'model', None):
+            print(f"Health: AI detector operational")
+        else:
+            print(f"Health: AI detector not available (HIGH severity)")
+        if os.path.exists(self.image_directory):
+            print(f"Health: Image directory accessible - {len(self.get_image_files())} images")
+        else:
+            print(f"Health: Image directory not accessible (MEDIUM severity)")
 
     def send_gps(self):
         """Send GPS - this is a HEALTH message"""
