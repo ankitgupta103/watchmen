@@ -45,7 +45,9 @@ class RFComm:
     msg_acked = {} # id -> (tries, timetoack)
     msg_unacked_lock = threading.Lock()
     msg_received = [] # Only for testing
-    
+    all_chunks_done = {} # cid -> True
+    all_chunks_done_lock = threading.Lock()
+
     def __init__(self, devid):
         self.devid = devid
         self.msg_chunks_expected = {} # Receiver uses this. cid->num_chunks
@@ -102,6 +104,12 @@ class RFComm:
         if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
             # print(f" ------------- Received Ack for {msgid} at {time.time() }!!!!!")
             ackid = msgpyl
+            if msgpyl[0] == constants.MESSAGE_TYPE_CHUNK_END:
+                ackid, remaining = self.sep_part(msgpyl, ':')
+                alldone, cid = self.sep_part(remaining, ':')
+                if remaining == "ad":
+                    with self.all_chunks_done_lock:
+                        self.all_chunks_done[cid] = True
             with self.msg_unacked_lock:
                 if ackid in self.msg_unacked:
                     unack = self.msg_unacked.pop(ackid, None)
@@ -157,10 +165,11 @@ class RFComm:
             # TODO expect at most 5% missing chunks.
             if len(missing_chunks) == 0:
                 # Hack this has to be the message type in BEGIN
-                self._send_unicast(msgid, constants.MESSAGE_TYPE_ACK, src, False, 0)
+                self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             else:
-                self._send_unicast(msgid, constants.MESSAGE_TYPE_ACK, src, False, 0)
+                # All not done
+                self._send_unicast(f"{msgid}:and:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
                 succ = self._send_missing_chunks(cid, missing_chunks, src)
             return
         
@@ -351,9 +360,14 @@ class RFComm:
         if not sent:
             return False
         for i in range(retry_count):
-            chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
-            print(f"At retry count {i} Receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered}")
-            if len(chunks_undelivered) == 0:
+            cidstr = str(chunk_identifier)
+            chunks_undelivered = self.msg_cunks_missing[cidstr]
+            alldone = False
+            with self.all_chunks_done_lock:
+                    if str(chunk_identifier) in self.all_chunks_done and self.all_chunks_done[cidstr]:
+                        alldone = True
+            print(f"At retry count {i} Receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered} alldone = {alldone}")
+            if alldone:
                 break
             for cid in chunks_undelivered:
                 self._send_chunk_i(msg_chunks, chunk_identifier, cid, dest)

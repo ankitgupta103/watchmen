@@ -138,7 +138,7 @@ class DevUnit:
         self.rf.keep_reading()
         self.keep_propagating()
         self.msgids_seen = []
-       
+
     def process_msg(self, msgid, mst, msgstr):
         if msgid not in self.msgids_seen:
             self.msgids_seen.append(msgid)
