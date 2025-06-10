@@ -8,6 +8,7 @@ import socket
 import random
 from rf_comm import RFComm
 
+import gps
 import constants
 
 def get_hostname():
@@ -193,7 +194,7 @@ class DevUnit:
         propogation_thread.start()
 
     def keep_sending_to_cc(self, has_camera):
-        # self.send_gps()
+        self.send_gps()
         # time.sleep(10)
         photos_taken = 0
         events_seen = 0
@@ -225,9 +226,13 @@ class DevUnit:
     # A:23.1,67.1
     # Name:GPS
     def send_gps(self):
-        next_dest = get_next_dest(self.devid)
-        msgstr = f"{self.devid}:28.4:77.0"
-        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
+        gpsgetter= gps.Gps()
+        loc = gpsgetter.get_lat_lng()
+        if loc is not None:
+            (lat, lng) = loc
+            next_dest = get_next_dest(self.devid)
+            msgstr = f"{self.devid}:{lat}:{lng}"
+            self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
 
     # A:1205
     # Name, time

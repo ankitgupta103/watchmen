@@ -1,6 +1,8 @@
 import serial
 import pynmea2
 
+GPS_ACC = "{:.2f}" # Decimal places
+
 class Gps:
     def __init__(self):
         self.lat = None
@@ -33,8 +35,8 @@ class Gps:
             msg_type = msg.sentence_type
             if msg_type == 'GLL':
                 print("Geographic Position:")
-                lat = print("{:.1f}".format(msg.latitude))
-                lng = print("{:.1f}".format(msg.longitude))
+                lat = print(GPS_ACC.format(msg.latitude))
+                lng = print(GPS_ACC.format(msg.longitude))
                 return (lat, lng)
         except Exception as e:
             print(f"Error parsing: {e}")
