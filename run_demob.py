@@ -8,6 +8,7 @@ import json
 import socket
 import random
 from rf_comm import RFComm
+from vyom_client import VyomClient
 
 import gps
 import constants
@@ -63,6 +64,7 @@ class CommandCenter:
         self.node_map = {} # id->(num HB, last HB, gps, Num photos, Num events, [Event TS])
         self.images_saved = []
         self.msgids_seen = []
+        self.vyom_client = VyomClient()
 
     def print_status(self):
         while True:
@@ -92,6 +94,13 @@ class CommandCenter:
             im.save(fname)
             self.images_saved.append(fname)
             # im.show()
+            # SENDING TO VYOM
+            try:
+                image_bytes = image.imstrtobytes(imstr)
+                self.vyom_client.on_image_arrive(node_hn=ims, image=image_bytes, filename=f"TODO.jpg")
+            except Exception as e:
+                print(f"Error sending image to vyom client {e}")
+
 
     # A:1205:100:12
     def process_hb(self, hbstr):
@@ -113,6 +122,17 @@ class CommandCenter:
             hbcount = hbc + 1
             eventtslist = el
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, eventtslist)
+        # SENDING TO VYOM
+        try:
+            lat = None
+            long = None
+            if gpsloc is not None:
+                lat, long = gpsloc.split(',')
+                lat = float(lat)
+                long = float(long)
+            self.vyom_client.on_hb_arrive(node_hn=nodeid, lat=lat, long=long)
+        except Exception as e:
+            print(f"Error sending hb to vyom client {e}")
     
     # A:1205
     def process_event(self, eventstr):
@@ -129,6 +149,11 @@ class CommandCenter:
         (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
         event_ts_list.append(eventtime)
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
+        # SENDING TO VYOM
+        try:
+            self.vyom_client.on_event_arrive(node_hn=nodeid, filename=f"TODO.jpg")
+        except Exception as e:
+            print(f"Error sending event to vyom client {e}")
 
     def process_gps(self, msgstr):
         parts = msgstr.split(':')
