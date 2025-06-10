@@ -55,7 +55,7 @@ NO_DEST = "X"
 
 # 0 is an error here
 HN_ID = {
-        "central" : "A",
+#        "central" : "A",
         "rpi2" : "B",
         "rpi3" : "C",
         "rpi4" : "D"
