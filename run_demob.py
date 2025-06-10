@@ -6,8 +6,12 @@ import image
 import json
 import socket
 import random
+from pathlib import Path
 from rf_comm import RFComm
 from vyomcloudbridge.services.queue_writer_json import QueueWriterJson
+
+# Import the EventDetector
+from event_detector import EventDetector
 
 import constants
 
@@ -165,6 +169,14 @@ class DevUnit:
         self.rf.keep_reading()
         self.keep_propagating()
         self.msgids_seen = []
+        
+        # Initialize the event detector
+        try:
+            self.event_detector = EventDetector()
+            print(f"EventDetector initialized successfully for device {devid}")
+        except Exception as e:
+            print(f"Failed to initialize EventDetector: {e}")
+            self.event_detector = None
        
     def process_msg(self, msgid, mst, msgstr):
         if msgid not in self.msgids_seen:
@@ -184,6 +196,43 @@ class DevUnit:
         if is_node_src(self.devid):
             print(f"{self.devid}: Src should not be getting any messages")
 
+    def analyze_image_with_detector(self, imgfile):
+        """
+        Analyze an image using the event detector and return detection results and severity.
+        
+        Args:
+            imgfile (str): Path to the image file
+            
+        Returns:
+            tuple: (detected_objects, severity) or (None, None) if detection fails
+        """
+        if not self.event_detector:
+            print(f"EventDetector not available for analysis")
+            return None, None
+            
+        try:
+            image_path = Path(imgfile)
+            detected_objects = self.event_detector.detect_objects(image_path)
+            severity = self.event_detector.determine_severity(detected_objects)
+            
+            print(f"Detection results for {imgfile}:")
+            print(f"  - Detected objects: {len(detected_objects)}")
+            if detected_objects:
+                labels = [obj['label'] for obj in detected_objects]
+                print(f"  - Object labels: {set(labels)}")
+            print(f"  - Severity level: {severity}")
+            
+            return detected_objects, severity
+            
+        except Exception as e:
+            print(f"Error analyzing image {imgfile}: {e}")
+            return None, None
+
+    def should_send_event_based_on_detection(self, severity):
+        # Send events for high and critical severity
+        # Severity levels: 0=low, 1=high, 2=critical
+        return severity >= 1
+
     def send_img(self, imgfile):
         next_dest = get_next_dest(self.devid)
         if next_dest == None:
@@ -196,6 +245,37 @@ class DevUnit:
               "i_d" : image.image2string(imgfile)}
         msgstr = json.dumps(im)
         self.rf.send_message(msgstr, mst, next_dest)
+
+    def send_img_with_analysis(self, imgfile):
+        # Analyze the image first
+        detected_objects, severity = self.analyze_image_with_detector(imgfile)
+        
+        # Always send the image, but log the analysis results
+        next_dest = get_next_dest(self.devid)
+        if next_dest == None:
+            print(f"{self.devid} Weird no dest for {self.devid}")
+            return False, detected_objects, severity
+            
+        mst = constants.MESSAGE_TYPE_PHOTO
+        
+        # Add detection metadata to the image message
+        im = {
+            "i_m": "{imgfile}",
+            "i_s": self.devid,
+            "i_t": str(int(time.time())),
+            "i_d": image.image2string(imgfile),
+            "analysis": {
+                "objects_detected": len(detected_objects) if detected_objects else 0,
+                "severity": severity if severity is not None else -1,
+                "labels": list(set([obj['label'] for obj in detected_objects])) if detected_objects else []
+            }
+        }
+        
+        msgstr = json.dumps(im)
+        self.rf.send_message(msgstr, mst, next_dest)
+        print(f"Sent image {imgfile} with analysis metadata to {next_dest}")
+        
+        return True, detected_objects, severity
 
     def _keep_propagating(self):
         while True:
@@ -229,16 +309,36 @@ class DevUnit:
             time.sleep(5)
             self.send_heartbeat(photos_taken, events_seen)
             time.sleep(5)
+            
             # TODO take photo
             photos_taken += 1
             if has_camera:
-                events_seen += 1
-                time.sleep(5)
-                self.send_event()
+                # Analyze first image
+                sent1, objects1, severity1 = self.send_img_with_analysis("testdata/cropped.jpg")
+                
+                # Determine if we should send an event based on detection
+                if self.should_send_event_based_on_detection(severity1):
+                    events_seen += 1
+                    time.sleep(5)
+                    self.send_event()
+                    print(f"Event sent due to severity level {severity1}")
+                else:
+                    print(f"No event sent - severity level {severity1} below threshold")
+                
                 time.sleep(10)
-                self.send_img("testdata/cropped.jpg")
-                time.sleep(60)
-                self.send_img("testdata/forest_man_2.jpg")
+                
+                # Analyze second image
+                sent2, objects2, severity2 = self.send_img_with_analysis("testdata/forest_man_2.jpg")
+                
+                # Check if second image also warrants an event
+                if self.should_send_event_based_on_detection(severity2):
+                    events_seen += 1
+                    time.sleep(5)
+                    self.send_event()
+                    print(f"Event sent due to severity level {severity2}")
+                else:
+                    print(f"No event sent for second image - severity level {severity2} below threshold")
+                    
             time.sleep(1800) # Every 30 mins
 
     # A:1205:100:12
