@@ -12,8 +12,8 @@ from rf_comm import RFComm
 import gps
 import constants
 
-ALLDIR = "/home/ankit/processed"
-CRITICAL_DIR = "/home/ankit/processed/critical"
+ALLDIR = "../processed"
+CRITICAL_DIR = "../processed/critical"
 
 def get_hostname():
     return socket.gethostname()
