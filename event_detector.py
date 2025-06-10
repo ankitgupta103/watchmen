@@ -128,13 +128,13 @@ class EventDetector:
 
         # High: Two or more people, or a person with a backpack
         if person_count >= 2:
-            return SEVERITY_HIGH
+            return SEVERITY_CRITICAL
         if person_count > 0 and "backpack" in label_set:
-            return SEVERITY_HIGH
+            return SEVERITY_CRITICAL
 
         # Low: A single person without other high/critical flags
         if person_count == 1:
-            return SEVERITY_LOW
+            return SEVERITY_HIGH
         
         # Default to low if any other object is detected
         return SEVERITY_LOW
