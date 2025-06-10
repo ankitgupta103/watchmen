@@ -1,5 +1,6 @@
 import serial
 import pynmea2
+import time
 
 GPS_ACC = "{:.2f}" # Decimal places
 
