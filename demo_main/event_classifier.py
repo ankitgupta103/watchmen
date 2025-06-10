@@ -1,7 +1,3 @@
-"""
-Event classification logic for suspicious and health events
-"""
-
 def get_suspicious_event_details(detected_objects, confidence_scores):
     """
     Determine suspicious event type and severity based on detection results

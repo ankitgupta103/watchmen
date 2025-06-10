@@ -1,6 +1,3 @@
-"""
-Image processing and AI detection functionality
-"""
 import os
 import glob
 from detect_enhanced import Detector

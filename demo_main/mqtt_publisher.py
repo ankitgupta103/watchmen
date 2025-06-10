@@ -1,6 +1,3 @@
-"""
-MQTT publishing system for health and suspicious events
-"""
 import time
 import os
 from datetime import datetime, timezone

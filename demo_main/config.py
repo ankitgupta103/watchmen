@@ -1,6 +1,3 @@
-"""
-Configuration and utility functions for the Watchmen system
-"""
 import socket
 from datetime import datetime
 import constants

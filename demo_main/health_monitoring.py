@@ -1,6 +1,3 @@
-"""
-System health monitoring functionality
-"""
 import time
 import os
 
