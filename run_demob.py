@@ -247,6 +247,7 @@ class DevUnit:
         time.sleep(5)
         photos_seen = 0
         events_seen = 0
+        self.send_heartbeat(self.photos_taken, events_seen)
         while True:
             (photos_seen, critical_images) = get_files_in_dir(ALLDIR, CRITICAL_DIR)
             print(f"Taken sofar={self.photos_taken}, now={photos_seen}")
