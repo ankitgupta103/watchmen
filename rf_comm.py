@@ -360,13 +360,13 @@ class RFComm:
         for i in range(num_chunks):
             self._send_chunk_i(msg_chunks, chunk_identifier, i, dest)
         sent = self._send_chunk_end(chunk_identifier, dest)
+        alldone = False
         # time.sleep(1)
         if not sent:
             return False
         for i in range(retry_count):
             cidstr = str(chunk_identifier)
             chunks_undelivered = self.msg_cunks_missing[cidstr]
-            alldone = False
             with self.all_chunks_done_lock:
                     if str(chunk_identifier) in self.all_chunks_done and self.all_chunks_done[cidstr]:
                         alldone = True
@@ -380,7 +380,7 @@ class RFComm:
             if not sent:
                 return False
         chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
-        if len(chunks_undelivered) == 0:
+        if alldone:
             print(f" ==== Successfully delivered all chunks!!!")
             return True
         else:
