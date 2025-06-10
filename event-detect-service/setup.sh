@@ -18,7 +18,7 @@ SERVICE_FILE="${SERVICE_NAME}.service"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_SCRIPT="${SCRIPT_DIR}/event_detector.py"
 SYSTEMD_DIR="/etc/systemd/system"
-WATCH_FOLDER="/home/pi/Documents/watch_folder"
+WATCH_FOLDER="/home/pi/Documents/images"
 OUTPUT_FOLDER="/home/pi/Documents/processed_images"
 
 echo -e "${BLUE}=== Event Detector Service Setup ===${NC}"
