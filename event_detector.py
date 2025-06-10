@@ -20,15 +20,16 @@ logging.basicConfig(
 YOLO_MODEL_NAME = "yolov8n.pt"
 POLL_INTERVAL_SECONDS = 5  # Time to wait between directory scans
 
-# Severity levels
+# --- Updated Severity Levels ---
 SEVERITY_LOW = 0
-SEVERITY_HIGH = 1
-SEVERITY_CRITICAL = 2
+SEVERITY_MEDIUM = 1
+SEVERITY_HIGH = 2
+SEVERITY_CRITICAL = 3
 
-# Object lists for severity calculation
-POTENTIAL_WEAPONS = {"knife", "scissors", "baseball bat"}
+POTENTIAL_WEAPONS = {"knife", "scissors", "baseball bat", "gun"}
+BAG_OBJECTS = {"backpack", "handbag", "suitcase"}
 
-# --- Main Application Class ---
+
 
 class EventDetector:
     """
@@ -48,14 +49,14 @@ class EventDetector:
         except Exception as e:
             logging.error(f"Failed to load YOLO model from '{model_path}'. Error: {e}")
             sys.exit(1)
-            
+
         # We want to detect all possible objects for severity analysis
-        self.target_objects: List[str] = [] 
+        self.target_objects: List[str] = []
 
     def get_available_classes(self) -> List[str]:
         """
         Returns a list of all class names the loaded model can detect.
-        
+
         Returns:
             List[str]: A sorted list of class names.
         """
@@ -85,7 +86,7 @@ class EventDetector:
             return []
 
         results = self.model(image)
-        
+
         detected_boxes = []
         for r in results:
             for i, box in enumerate(r.boxes):
@@ -95,13 +96,13 @@ class EventDetector:
                     'label': object_name,
                     'confidence': float(box.conf),
                 })
-        
+
         if detected_boxes:
             labels = {obj['label'] for obj in detected_boxes}
             logging.info(f"Found objects in {image_path.name}: {list(labels)}")
         else:
             logging.info(f"No objects found in {image_path.name}")
-            
+
         return detected_boxes
 
     @staticmethod
@@ -113,30 +114,28 @@ class EventDetector:
             detected_objects (List[Dict[str, Any]]): A list of detected object data.
 
         Returns:
-            int: The calculated severity level (0=low, 1=high, 2=critical).
+            int: The calculated severity level (0=low, 1=medium, 2=high, 3=critical).
         """
         if not detected_objects:
             return SEVERITY_LOW
 
-        labels = [obj['label'] for obj in detected_objects]
-        label_set = set(labels)
-        person_count = labels.count("person")
+        label_set = {obj['label'] for obj in detected_objects}
 
-        # Critical: Presence of a potential weapon
+        # --- Updated Severity Logic ---
+
+        # Level 3 (Critical): Presence of a potential weapon.
         if not label_set.isdisjoint(POTENTIAL_WEAPONS):
             return SEVERITY_CRITICAL
 
-        # High: Two or more people, or a person with a backpack
-        if person_count >= 2:
-            return SEVERITY_CRITICAL
-        if person_count > 0 and "backpack" in label_set:
-            return SEVERITY_CRITICAL
-
-        # Low: A single person without other high/critical flags
-        if person_count == 1:
+        # Level 2 (High): Presence of any person (alone, in a group, or with a bag).
+        if "person" in label_set:
             return SEVERITY_HIGH
         
-        # Default to low if any other object is detected
+        # Level 1 (Medium): Presence of a bag without a person.
+        if not label_set.isdisjoint(BAG_OBJECTS):
+            return SEVERITY_MEDIUM
+
+        # Level 0 (Low): Default for any other detected object(s).
         return SEVERITY_LOW
 
 class ProcessingService:
@@ -154,6 +153,8 @@ class ProcessingService:
         self.critical_dir.mkdir(exist_ok=True)
         logging.info(f"Monitoring source directory: {self.source_dir}")
         logging.info(f"Processed images will be saved to: {self.processed_dir}")
+        logging.info(f"Critical images will be saved to: {self.critical_dir}")
+
 
     def process_and_store_image(self, image_path: Path):
         """
@@ -161,9 +162,9 @@ class ProcessingService:
         saves full and cropped versions, and deletes the original.
         """
         logging.info(f"Processing new file: {image_path.name}")
-        
+
         detected_objects = self.detector.detect_objects(image_path)
-        
+
         # Only proceed if objects were detected
         if not detected_objects:
             logging.info(f"No objects to process in {image_path.name}. Deleting original.")
@@ -174,33 +175,40 @@ class ProcessingService:
             return
 
         severity = self.detector.determine_severity(detected_objects)
-        # Use hhmmss format for timestamp
         timestamp = time.strftime("%H%M%S", time.localtime())
 
-        # 1. Save the full image
-        full_image_name = f"{severity}_{timestamp}_f.jpg"
-        full_save_path = self.processed_dir / full_image_name
-        
         original_image = cv2.imread(str(image_path))
         if original_image is None:
             logging.error(f"Could not re-read image for saving: {image_path}")
             return
             
+        # --- Updated Save Logic ---
+        # Determine the target directory based on severity.
+        # Levels 2 (High) and 3 (Critical) go to the critical folder.
+        is_critical_event = severity >= SEVERITY_HIGH
+        save_dir = self.critical_dir if is_critical_event else self.processed_dir
+        
+        if is_critical_event:
+            logging.warning(f"CRITICAL/HIGH event detected (Severity: {severity}). Saving to: {save_dir}")
+
+        # 1. Save the full image to the determined directory.
+        full_image_name = f"{severity}_{timestamp}_f.jpg"
+        full_save_path = save_dir / full_image_name
         cv2.imwrite(str(full_save_path), original_image)
         logging.info(f"Saved full image to: {full_save_path}")
 
-        # 2. Save cropped versions of each detected object
+        # 2. Save cropped versions to the SAME directory.
         for i, obj_data in enumerate(detected_objects):
-            cropped_image_name = f"{severity}_{timestamp}_c_{i+1}.jpg"
-            cropped_save_path = self.processed_dir / cropped_image_name
-            
+            cropped_image_name = f"{severity}_{timestamp}_c_{i+1}_{obj_data['label']}.jpg"
+            cropped_save_path = save_dir / cropped_image_name
+
             box = obj_data['box']
             x1, y1, x2, y2 = map(int, box)
-            
+
             h, w = original_image.shape[:2]
             x1, y1 = max(0, x1), max(0, y1)
             x2, y2 = min(w, x2), min(h, y2)
-            
+
             cropped_image = original_image[y1:y2, x1:x2]
 
             if cropped_image.size > 0:
@@ -209,13 +217,7 @@ class ProcessingService:
             else:
                 logging.warning(f"Skipping empty crop for object {i+1} in {image_path.name}")
 
-        # 3. Handle critical severity
-        if severity == SEVERITY_CRITICAL or severity == SEVERITY_HIGH:
-            critical_full_path = self.critical_dir / full_image_name
-            cv2.imwrite(str(critical_full_path), original_image)
-            logging.info(f"CRITICAL event: Copied full image to {critical_full_path}")
-
-        # 4. Delete the original file
+        # 3. Delete the original file
         try:
             image_path.unlink()
             logging.info(f"Successfully processed and deleted original: {image_path.name}")
@@ -227,27 +229,27 @@ class ProcessingService:
         Starts the continuous monitoring loop.
         """
         image_extensions = {".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif"}
-        
+
         while True:
             try:
                 image_files = [
-                    p for p in self.source_dir.iterdir() 
+                    p for p in self.source_dir.iterdir()
                     if p.is_file() and p.suffix.lower() in image_extensions
                 ]
-                
+
                 if not image_files:
                     logging.info(f"No new images found. Waiting for {POLL_INTERVAL_SECONDS}s...")
                 else:
                     for image_path in image_files:
                         self.process_and_store_image(image_path)
-                
+
                 time.sleep(POLL_INTERVAL_SECONDS)
 
             except KeyboardInterrupt:
                 logging.info("Service stopped by user.")
                 break
             except Exception as e:
-                logging.error(f"An unexpected error occurred in the monitoring loop: {e}")
+                logging.error(f"An unexpected error occurred in the monitoring loop: {e}", exc_info=True)
                 time.sleep(POLL_INTERVAL_SECONDS * 2) # Wait longer after an error
 
 def main():
@@ -256,7 +258,7 @@ def main():
         description="A service to monitor a directory for images, process them, and store the results.",
         epilog="Example: python event_detector.py /path/to/watch --output /path/to/save"
     )
-    
+
     parser.add_argument(
         "source_directory",
         type=Path,
@@ -268,7 +270,7 @@ def main():
         default=Path.home() / "Documents" / "processed_images",
         help="The directory where processed images will be stored. Defaults to ~/Documents/processed_images."
     )
-    
+
     args = parser.parse_args()
 
     if not args.source_directory.is_dir():
@@ -281,7 +283,7 @@ def main():
         source_dir=args.source_directory,
         processed_dir=args.output
     )
-    
+
     service.run()
 
 if __name__ == "__main__":
