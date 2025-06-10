@@ -55,7 +55,7 @@ NO_DEST = "X"
 
 # 0 is an error here
 HN_ID = {
-#        "central" : "A",
+        "central" : "A",
         "rpi2" : "B",
         "rpi3" : "C",
         "rpi4" : "D"
@@ -64,4 +64,4 @@ HN_ID = {
 # First has camera,
 # Last is CC
 # Everything in between is passthrough.
-PATH_DEMOB = ["D", "C", "B", "A"]
+PATH_DEMOB = ["D", "C", "B"]
