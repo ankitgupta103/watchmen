@@ -94,6 +94,7 @@ class CommandCenter:
         self.node_map = {} # id->(num HB, last HB, Num photos, Num events, [Event TS])
         self.images_saved = []
         self.msgids_seen = []
+        self.system_start_time = time.time()
         
         self.writer = QueueWriterJson()
         self.mission_id = "_all_"
