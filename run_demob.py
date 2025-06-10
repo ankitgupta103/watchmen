@@ -129,10 +129,15 @@ class CommandCenter:
         try:
             lat = None
             long = None
-            if gpsloc is not None:
-                lat, long = gpsloc.split(',')
-                lat = float(lat)
-                long = float(long)
+            if gpsloc is not None and gpsloc != "":
+                try:
+                    lat, long = gpsloc.split(',')
+                    lat = float(lat)
+                    long = float(long)
+                except Exception as e:
+                    print(f"Error parsing gpsloc {e}, gpsloc={gpsloc}")
+                    lat = None
+                    long = None
             self.vyom_client.on_hb_arrive(node_hn=nodeid, lat=lat, long=long)
         except Exception as e:
             print(f"Error sending hb to vyom client {e}")
