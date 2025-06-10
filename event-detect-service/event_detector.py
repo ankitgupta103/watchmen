@@ -1,6 +1,8 @@
 import argparse
 import logging
+import signal
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -140,6 +142,7 @@ class ProcessingService:
         self.source_dir = source_dir
         self.processed_dir = processed_dir
         self.critical_dir = processed_dir / "critical"
+        self.is_running = False
 
         # Create directories if they don't exist
         self.processed_dir.mkdir(parents=True, exist_ok=True)
@@ -147,6 +150,16 @@ class ProcessingService:
         logging.info(f"Monitoring source directory: {self.source_dir}")
         logging.info(f"Processed images will be saved to: {self.processed_dir}")
         logging.info(f"Critical images (person + weapon/bag) will be saved to: {self.critical_dir}")
+        self._setup_signal_handlers()
+
+    def _setup_signal_handlers(self):
+        """Setup signal handlers for graceful shutdown."""
+
+        def signal_handler(sig, frame):
+            self.stop()
+            sys.exit(0)
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
 
     def find_priority_object(self, detected_objects: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """
@@ -257,13 +270,9 @@ class ProcessingService:
         except OSError as e:
             logging.error(f"Error deleting original file {image_path}: {e}")
 
-    def run(self):
-        """
-        Starts the continuous monitoring loop.
-        """
+    def start_service_loop(self):
         image_extensions = {".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif"}
-
-        while True:
+        while self.is_running:
             try:
                 image_files = [
                     p for p in self.source_dir.iterdir()
@@ -284,6 +293,24 @@ class ProcessingService:
             except Exception as e:
                 logging.error(f"An unexpected error occurred in the monitoring loop: {e}", exc_info=True)
                 time.sleep(POLL_INTERVAL_SECONDS * 2) # Wait longer after an error
+    
+    def start(self):
+        """
+        Starts the continuous monitoring loop.
+        """
+        try:
+            self.is_running = True
+            thread = threading.Thread(target=self.start_service_loop)
+            thread.start()
+        except Exception as e:
+            logging.error(f"An unexpected error occurred in the monitoring loop: {e}", exc_info=True)
+            sys.exit(1)
+    
+    def stop(self):
+        """
+        Stops the continuous monitoring loop.
+        """
+        self.is_running = False
 
 def main():
     """Main function to parse arguments and run the service."""
@@ -317,7 +344,10 @@ def main():
         processed_dir=args.output
     )
 
-    service.run()
+    service.start()
+    print("Service started")
+    while service.is_running:
+        time.sleep(1)
 
 if __name__ == "__main__":
     main()
