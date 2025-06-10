@@ -22,3 +22,6 @@ def imstrtoimage(string: str) -> Image.Image:
     image = Image.open(io.BytesIO(img_bytes_arr_encoded))
     return image
 
+def imstrtobytes(string: str) -> bytes:
+    """Convert base64 string to image bytes."""
+    return base64.b64decode(string.encode('utf-8'))
