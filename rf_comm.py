@@ -18,8 +18,8 @@ MAX_CHUNK_SIZE = 19
 hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
-ACKING_ENABLED = True
-FLAKINESS = 10  # 0-100 %
+ACKING_ENABLED = False
+FLAKINESS = 0  # 0-100 %
 
 """
 MessageID = MSDIII where
