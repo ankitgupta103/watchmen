@@ -176,7 +176,7 @@ class ProcessingService:
         has_person = "person" in detected_labels
         has_bag = not detected_labels.isdisjoint(BAG_OBJECTS)
         has_weapon = not detected_labels.isdisjoint(POTENTIAL_WEAPONS)
-        is_critical = has_person or has_bag or has_weapon
+        is_critical = severity == SEVERITY_CRITICAL or severity == SEVERITY_HIGH
         save_dir = self.critical_dir if is_critical else self.processed_dir
         
         if is_critical:
