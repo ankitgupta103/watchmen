@@ -118,19 +118,15 @@ class EventDetector:
         if "person" not in label_set:
             return SEVERITY_LOW
 
-        # Level 3 (Critical): Presence of a potential weapon (with person)
         if not label_set.isdisjoint(POTENTIAL_WEAPONS):
             return SEVERITY_CRITICAL
 
-        # Level 2 (High): Presence of any person (no weapon)
+        if not label_set.isdisjoint(BAG_OBJECTS):
+            return SEVERITY_HIGH
+        
         if "person" in label_set:
             return SEVERITY_MEDIUM
 
-        # Level 1 (Medium): Presence of a bag (with person, no weapon)
-        if not label_set.isdisjoint(BAG_OBJECTS):
-            return SEVERITY_HIGH
-
-        # Default: Medium
         return SEVERITY_MEDIUM
 
 class ProcessingService:
