@@ -30,7 +30,7 @@ class VyomClient:
         self,
         node_hn: str,
         image: bytes,
-        event_id: str = None,
+        filename: str = None,
         timestamp: str = None,
     ):
         """_summary_
@@ -38,7 +38,7 @@ class VyomClient:
             node_hn (str): hostname of device
             image (bytes): image in bytes format
             timestamp (str, optional): timestamp string in iso format, in UTC timezone
-            event_id (str, optional): event_id of the image which will saved to s3 and fetch with that na,e
+            filename (str, optional): filename of the image which will saved to s3 and fetch with that na,e
         """
         try:
             if not node_hn in self.HN_TO_VYOM_ID:
@@ -46,12 +46,13 @@ class VyomClient:
                 return
             vyom_machine_id = self.HN_TO_VYOM_ID[node_hn]
 
-            if event_id is None:
+            if filename is None:
                 epoch_ms = int(time.time() * 1000)
                 filename = f"{epoch_ms}.jpg"
-            elif not event_id.endswith(".jpg"):
-                filename = event_id.split(".")[0]
-                filename = f"{event_id}.jpg"
+            else:
+                if not filename.endswith(".jpg") and not filename.endswith(".jpeg"):
+                    filename = filename.split(".")[0]
+                    filename = f"{filename}.jpg"
 
             self.writer.write_message(
                 message_data=image,
@@ -125,7 +126,7 @@ class VyomClient:
             print(f"Error setting location in VyomClient: {e}")
 
     def on_hb_arrive(
-        self, node_hn: str, lat: int = None, long: int = None, timestamp: str = None
+        self, node_hn: str, lat: Union[int, float] = None, long: Union[int, float] = None, timestamp: str = None
     ):
         """
         timestamp: str = None, lat: int=None, long: int=None
@@ -191,7 +192,7 @@ if __name__ == "__main__":
             binary_data = response.content
             time.sleep(1)
             client.on_image_arrive(
-                node_hn="central", image=binary_data, event_id="test_full.jpg"
+                node_hn="central", image=binary_data, filename="test_full.jpg"
             )
         else:
             print(
