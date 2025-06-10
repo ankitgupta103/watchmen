@@ -226,6 +226,7 @@ class DevUnit:
     def get_images_to_send(self, critical_images):
         cropped = None
         full = None
+        evid = None
         for f in critical_images:
             if f not in self.critical_images_processed:
                 self.critical_images_processed.append(f)
@@ -305,7 +306,7 @@ class DevUnit:
                     time.sleep(60)
                 if full:
                     self.send_img(full, evid)
-                time.sleep(10)
+            time.sleep(10)
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
