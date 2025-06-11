@@ -108,7 +108,7 @@ echo -e "${CYAN}Please provide the following configuration details:${NC}"
 echo
 
 # Basic Configuration
-prompt_input "Username who will own the services and files" "pi" "OWNER_USER"
+prompt_input "Username who will own the services and files" "ankit" "OWNER_USER"
 prompt_input "Virtual environment directory name" "venv" "VENV_NAME"
 prompt_input "Demo service name" "demo-service" "DEMO_SERVICE_NAME"
 
@@ -264,7 +264,7 @@ for py_file in "$PROJECT_DIR"/*.py; do
         # Update common directory paths in Python files
         sed -i "s|../processed|$PROCESSED_DIR|g" "$py_file" 2>/dev/null || true
         sed -i "s|../processed/critical|$CRITICAL_DIR|g" "$py_file" 2>/dev/null || true
-        sed -i "s|/home/pi/Documents/images|$IMAGE_DIR|g" "$py_file" 2>/dev/null || true
+        sed -i "s|/home/ankit/Documents/images|$IMAGE_DIR|g" "$py_file" 2>/dev/null || true
         print_status "Updated paths in $(basename "$py_file")"
     fi
 done

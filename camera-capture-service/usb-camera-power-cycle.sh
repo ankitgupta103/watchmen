@@ -7,7 +7,7 @@
 USB_HUB="1-1"
 OFF_TIME=60
 MAX_MOUNT_WAIT=10
-DEST_DIR="/home/pi/Documents/images"
+DEST_DIR="/home/ankit/Documents/images"
 LOG_FILE="/var/log/usb-cycle.log"
 
 # Image file extensions to move
@@ -96,9 +96,9 @@ check_destination() {
         return 1
     fi
 
-    # Ensure the destination directory is owned by the 'pi' user
+    # Ensure the destination directory is owned by the 'ankit' user
     # This is crucial for allowing the user to manage the directory and its contents
-    if ! chown pi:pi "$DEST_DIR" 2>>"$LOG_FILE"; then
+    if ! chown ankit:ankit "$DEST_DIR" 2>>"$LOG_FILE"; then
         log_message "WARNING: Could not change ownership of $DEST_DIR"
     fi
 
@@ -127,7 +127,7 @@ move_images() {
         return 1
     fi
 
-    # Find all mounted USB devices (typically under /media/pi/ or /mnt/)
+    # Find all mounted USB devices (typically under /media/ankit/ or /mnt/)
     # Check common mount points
     MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^(/media/|/mnt/)" | grep -v "^/$")
 
@@ -194,8 +194,8 @@ move_images() {
 
                 # Try to copy first, then remove original if copy succeeds
                 if cp "$image_file" "$dest_file" 2>>"$LOG_FILE"; then
-                    # Change ownership to the 'pi' user so they can manage the file
-                    chown pi:pi "$dest_file"
+                    # Change ownership to the 'ankit' user so they can manage the file
+                    chown ankit:ankit "$dest_file"
                     
                     # Set safer permissions (owner/group can read/write, others can read)
                     chmod 664 "$dest_file"
