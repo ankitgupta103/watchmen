@@ -175,8 +175,13 @@ class ProcessingService:
         for obj in detected_objects:
             if obj['label'] in POTENTIAL_WEAPONS:
                 return obj
+
+        # Second priority: guns
+        for obj in detected_objects:
+            if obj['label'] == "person":
+                return obj
         
-        # Second priority: bags
+        # Last priority: bags
         for obj in detected_objects:
             if obj['label'] in BAG_OBJECTS:
                 return obj
