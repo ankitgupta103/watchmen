@@ -6,39 +6,43 @@
 set -e  # Exit on any error
 
 # Function to validate input with retries
-validate_input() {
-    local prompt="$1"
-    local var_name="$2"
-    local max_retries=3
-    local retry_count=0
+# validate_input() {
+#     local prompt="$1"
+#     local var_name="$2"
+#     local max_retries=3
+#     local retry_count=0
     
-    while [ $retry_count -lt $max_retries ]; do
-        read -p "$prompt" input_value
-        if [ -n "$input_value" ]; then
-            eval "$var_name='$input_value'"
-            return 0
-        fi
-        retry_count=$((retry_count + 1))
-        if [ $retry_count -lt $max_retries ]; then
-            echo "Error: Input cannot be empty. Please try again. ($((max_retries - retry_count)) attempts remaining)"
-        fi
-    done
+#     while [ $retry_count -lt $max_retries ]; do
+#         read -p "$prompt" input_value
+#         if [ -n "$input_value" ]; then
+#             eval "$var_name='$input_value'"
+#             return 0
+#         fi
+#         retry_count=$((retry_count + 1))
+#         if [ $retry_count -lt $max_retries ]; then
+#             echo "Error: Input cannot be empty. Please try again. ($((max_retries - retry_count)) attempts remaining)"
+#         fi
+#     done
     
-    echo "Error: Maximum retries reached. Input cannot be empty."
-    return 1
-}
+#     echo "Error: Maximum retries reached. Input cannot be empty."
+#     return 1
+# }
 
 # Validate camera images folder
-if ! validate_input "Enter the complete path to the camera images folder: " "CAMERA_IMAGE_FOLDER"; then
-    echo "Error: Failed to get valid camera images folder path"
-    exit 1
-fi
+# if ! validate_input "Enter the complete path to the camera images folder: " "CAMERA_IMAGE_FOLDER"; then
+#     echo "Error: Failed to get valid camera images folder path"
+#     exit 1
+# fi
+CAMERA_IMAGE_FOLDER="/home/ankit/Documents/images"
 
 # Validate events output folder
-if ! validate_input "Enter the complete path to the events output folder: " "EVENT_OUTPUT_FOLDER"; then
-    echo "Error: Failed to get valid events output folder path"
-    exit 1
-fi
+# if ! validate_input "Enter the complete path to the events output folder: " "EVENT_OUTPUT_FOLDER"; then
+#     echo "Error: Failed to get valid events output folder path"
+#     exit 1
+# fi
+EVENT_OUTPUT_FOLDER="/home/ankit/Documents/processed_images"
+
+ENV_FILE_PATH="/home/ankit/.bashrc"
 
 # Colors for output
 RED='\033[0;31m'
@@ -106,10 +110,10 @@ chown ankit:ankit "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER" 2>/dev/null || p
 # Create the service file
 print_status "Creating service file..."
 # Validate environment file path
-if ! validate_input "Enter the complete filepath to source the environment: " "ENV_FILE_PATH"; then
-    print_error "Failed to get valid environment file path"
-    exit 1
-fi
+# if ! validate_input "Enter the complete filepath to source the environment: " "ENV_FILE_PATH"; then
+#     print_error "Failed to get valid environment file path"
+#     exit 1
+# fi
 
 cat > "${SYSTEMD_DIR}/${SERVICE_FILE}" << EOF
 [Unit]
