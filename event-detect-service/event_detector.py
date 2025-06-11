@@ -162,30 +162,20 @@ class ProcessingService:
         signal.signal(signal.SIGTERM, signal_handler)
 
     def find_priority_object(self, detected_objects: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """
-        Find the priority object to crop (weapon > bag > None).
-        
-        Args:
-            detected_objects: List of detected objects
-            
-        Returns:
-            The highest priority object to crop, or None
-        """
-        # First priority: weapons
-        for obj in detected_objects:
-            if obj['label'] in POTENTIAL_WEAPONS:
-                return obj
-
-        # Second priority: guns
+        # First priority: person
         for obj in detected_objects:
             if obj['label'] == "person":
                 return obj
-        
+            
+        # Second priority: weapons
+        for obj in detected_objects:
+            if obj['label'] in POTENTIAL_WEAPONS:
+                return obj
+            
         # Last priority: bags
         for obj in detected_objects:
             if obj['label'] in BAG_OBJECTS:
                 return obj
-        
         return None
 
     def process_and_store_image(self, image_path: Path):
