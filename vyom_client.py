@@ -23,7 +23,16 @@ class VyomClient:
         self.machine_config = Configs.get_machine_config()
         self.machine_id = self.machine_config.get("machine_id", "-") or "-"
         self.organization_id = self.machine_config.get("organization_id", "-") or "-"
-        self.HN_TO_VYOM_ID = {"central": 197, "rpi2": 198, "rpi3": 200, "rpi4": 199}
+        self.HN_TO_VYOM_ID = {
+            "central": 197,
+            "rpi2": 198,
+            "rpi3": 200,
+            "rpi4": 199,
+            "A": 197,
+            "B": 198,
+            "C": 200,
+            "D": 199,
+        }
         self.expiration_time = 2000  # milisecond
 
     def on_image_arrive(
@@ -42,7 +51,9 @@ class VyomClient:
         """
         try:
             if not node_hn in self.HN_TO_VYOM_ID:
-                self.logger.error(f"Node {node_hn} not found in HN_TO_VYOM_ID")
+                self.logger.error(
+                    f"error in on_image_arrive, Node {node_hn} not found in HN_TO_VYOM_ID"
+                )
                 return
             vyom_machine_id = self.HN_TO_VYOM_ID[node_hn]
 
@@ -82,7 +93,9 @@ class VyomClient:
         """
         try:
             if not node_hn in self.HN_TO_VYOM_ID:
-                self.logger.error(f"Node {node_hn} not found in HN_TO_VYOM_ID")
+                self.logger.error(
+                    f"error in on_event_arrive, Node {node_hn} not found in HN_TO_VYOM_ID"
+                )
                 return
             vyom_machine_id = self.HN_TO_VYOM_ID[node_hn]
             file_s3_dir: str = get_mission_dir_for_s3(
@@ -126,14 +139,20 @@ class VyomClient:
             print(f"Error setting location in VyomClient: {e}")
 
     def on_hb_arrive(
-        self, node_hn: str, lat: Union[int, float] = None, long: Union[int, float] = None, timestamp: str = None
+        self,
+        node_hn: str,
+        lat: Union[int, float] = None,
+        long: Union[int, float] = None,
+        timestamp: str = None,
     ):
         """
         timestamp: str = None, lat: int=None, long: int=None
         """
         try:
             if not node_hn in self.HN_TO_VYOM_ID:
-                self.logger.error(f"Node {node_hn} not found in HN_TO_VYOM_ID")
+                self.logger.error(
+                    f"error in on_event_arrive, node {node_hn} not found in HN_TO_VYOM_ID"
+                )
                 return
             vyom_machine_id = self.HN_TO_VYOM_ID[node_hn]
 
