@@ -14,6 +14,7 @@ import gps
 import constants
 
 ALLDIR = "../processed_images"
+CCDIR = "../command_images"
 CRITICAL_DIR = "../processed_images/critical"
 
 def get_hostname():
@@ -89,7 +90,7 @@ class CommandCenter:
             imstr = orig_msg["i_d"]
             evid = orig_msg["e_i"]
             im = image.imstrtoimage(imstr)
-            fname = f"/tmp/{ims}_{imf}_{random.randint(1000,2000)}.jpg"
+            fname = f"{CCDIR}/{ims}_{random.randint(1000,2000)}_{imf}"
             print(f"Saving image to {fname}")
             im.save(fname)
             self.images_saved.append(fname)
