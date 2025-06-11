@@ -1,315 +1,206 @@
 #!/bin/bash
 
-# USB Power Cycle and Image Transfer Script
-# This script cycles USB power and moves images when device is connected
+# GPIO Power Cycle and File Transfer Script
+# This script uses GPIO to cycle power to a device, waits for it to mount,
+# copies all files, and then unmounts and powers it off.
 
-# Configuration
-USB_HUB="1-1"
+# --- Configuration ---
+# GPIO pin for power control
+GPIO_PIN=17
+
+# Time in seconds to keep the device powered OFF between cycles
 OFF_TIME=60
-MAX_MOUNT_WAIT=10
-DEST_DIR="/home/ankit/Documents/images"
-LOG_FILE="/var/log/usb-cycle.log"
 
-# Image file extensions to move
-IMAGE_EXTENSIONS="jpg jpeg png gif bmp tiff tif webp raw cr2 nef dng"
+# Destination directory for copied files
+DEST_DIR="/home/ankit/Documents/images"
+
+# Log file path
+LOG_FILE="/var/log/gpio-cycle.log"
+
+# Time to wait for the device to stabilize after power on before checking for mount
+POWER_ON_STABILIZATION_TIME=5
+
+# Maximum time to wait for the device to be mounted by the system
+MAX_MOUNT_WAIT=10
+
+# --- Script Logic ---
 
 # Logging function
 log_message() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
-# Create destination directory if it doesn't exist
-mkdir -p "$DEST_DIR"
+# Cleanup function to run on script exit (e.g., Ctrl+C)
+cleanup() {
+    log_message "Stopping script and powering OFF device..."
+    pinctrl set ${GPIO_PIN} op dl
+    log_message "GPIO pin ${GPIO_PIN} set to LOW (OFF). Script terminated."
+    exit 0
+}
 
-# Function to safely eject all USB devices
+# Set up signal trap for graceful shutdown
+trap cleanup SIGINT SIGTERM
+
+# Function to power on the device via GPIO
+device_power_on() {
+    log_message "Powering ON device via GPIO pin ${GPIO_PIN}"
+    pinctrl set ${GPIO_PIN} op dh # Set pin to HIGH
+}
+
+# Function to power off the device via GPIO
+device_power_off() {
+    log_message "Powering OFF device via GPIO pin ${GPIO_PIN}"
+    pinctrl set ${GPIO_PIN} op dl # Set pin to LOW
+}
+
+# Function to safely eject all mounted USB/external media
 eject_usb_devices() {
-    log_message "Ejecting all USB devices..."
+    log_message "Unmounting all external media..."
+    sync # Ensure all pending writes are completed
 
-    # Find all mounted USB devices
-    MOUNT_POINTS=$(findmnt -lo TARGET,SOURCE -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/" | grep -v "^/$")
+    MOUNT_POINTS=$(findmnt -lo TARGET,SOURCE -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
 
     if [ -z "$MOUNT_POINTS" ]; then
-        log_message "No USB devices found to eject"
+        log_message "No mounted devices found to unmount."
         return 0
     fi
 
-    local eject_success=true
-
-    # Process each mount point
+    local unmount_success=true
     while IFS= read -r line; do
-        # Extract mount point (first field) and device (second field)
         mount_point=$(echo "$line" | awk '{print $1}')
-        device=$(echo "$line" | awk '{print $2}')
-
         if [ -n "$mount_point" ] && [ -d "$mount_point" ]; then
-            log_message "Ejecting: $mount_point ($device)"
-
-            # First try to sync any pending writes
-            sync
-
-            # Attempt to unmount the device
-            if umount "$mount_point" 2>>"$LOG_FILE"; then
-                log_message "Successfully ejected: $mount_point"
-
-                # If it's a removable device, try to eject it as well
-                if [ -n "$device" ] && [ -b "$device" ]; then
-                    # Extract the base device (remove partition numbers)
-                    base_device=$(echo "$device" | sed 's/[0-9]*$//')
-                    if [ "$base_device" != "$device" ] && [ -b "$base_device" ]; then
-                        eject "$base_device" 2>/dev/null || true
-                        log_message "Sent eject command to: $base_device"
-                    fi
+            log_message "Unmounting: $mount_point"
+            if ! umount "$mount_point" 2>>"$LOG_FILE"; then
+                log_message "WARNING: Failed to unmount $mount_point. Attempting force unmount..."
+                if ! umount -f "$mount_point" 2>>"$LOG_FILE"; then
+                    log_message "ERROR: Force unmount also failed for $mount_point."
+                    unmount_success=false
+                else
+                    log_message "Force unmount successful for $mount_point."
                 fi
             else
-                log_message "WARNING: Failed to eject $mount_point"
-
-                # Try to force unmount as a last resort
-                log_message "Attempting force unmount of $mount_point"
-                if umount -f "$mount_point" 2>>"$LOG_FILE"; then
-                    log_message "Force unmount successful: $mount_point"
-                else
-                    log_message "ERROR: Force unmount failed: $mount_point"
-                    eject_success=false
-                fi
+                log_message "Successfully unmounted: $mount_point"
             fi
         fi
-
     done <<< "$MOUNT_POINTS"
 
-    # Give a moment for the system to process the unmounts
-    sleep 1
+    sleep 1 # Give the system a moment to process unmounts
 
-    if [ "$eject_success" = true ]; then
-        log_message "All USB devices ejected successfully"
+    if [ "$unmount_success" = true ]; then
+        log_message "All detected media unmounted successfully."
     else
-        log_message "WARNING: Some USB devices could not be ejected properly"
+        log_message "WARNING: Some media could not be unmounted."
     fi
-
-    return 0
 }
 
-# Function to check and fix destination directory permissions
+# Function to check and prepare the destination directory
 check_destination() {
-    # Create destination directory if it doesn't exist
     if ! mkdir -p "$DEST_DIR" 2>>"$LOG_FILE"; then
         log_message "ERROR: Cannot create destination directory $DEST_DIR"
         return 1
     fi
-
-    # Ensure the destination directory is owned by the 'ankit' user
-    # This is crucial for allowing the user to manage the directory and its contents
     if ! chown ankit:ankit "$DEST_DIR" 2>>"$LOG_FILE"; then
         log_message "WARNING: Could not change ownership of $DEST_DIR"
     fi
-
-    # Check if destination is writable
     if [ ! -w "$DEST_DIR" ]; then
-        log_message "ERROR: Destination directory $DEST_DIR is not writable"
-        log_message "Attempting to fix permissions..."
-        chmod 755 "$DEST_DIR" 2>>"$LOG_FILE"
-        if [ ! -w "$DEST_DIR" ]; then
-            log_message "ERROR: Could not fix permissions for $DEST_DIR"
-            return 1
-        fi
+        log_message "ERROR: Destination directory $DEST_DIR is not writable."
+        return 1
     fi
-
-    log_message "Destination directory $DEST_DIR is ready"
     return 0
 }
 
-# Function to find and move images from USB devices
-move_images() {
-    log_message "Looking for mounted USB devices..."
-
-    # Check destination directory first
+# Function to find and copy all files from mounted devices
+copy_files() {
+    log_message "Looking for mounted devices to copy files from..."
     if ! check_destination; then
-        log_message "ERROR: Destination directory check failed, skipping image transfer"
+        log_message "ERROR: Destination check failed. Aborting file copy."
         return 1
     fi
 
-    # Find all mounted USB devices (typically under /media/ankit/ or /mnt/)
-    # Check common mount points
-    MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^(/media/|/mnt/)" | grep -v "^/$")
-
+    MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
     if [ -z "$MOUNT_POINTS" ]; then
-        log_message "No USB devices found mounted"
+        log_message "No mounted devices found for file transfer."
         return
     fi
 
-    # Process each mount point
     while IFS= read -r mount_point; do
-        log_message "Checking USB device at: $mount_point"
+        log_message "Checking device at: $mount_point"
+        local copy_count=0
+        local fail_count=0
 
-        # Check mount point accessibility
-        if [ ! -r "$mount_point" ]; then
-            log_message "ERROR: Cannot read from $mount_point - permission denied"
-            continue
-        fi
+        # Find all files and copy them
+        find "$mount_point" -type f -print0 | while IFS= read -r -d '' source_file; do
+            local filename=$(basename "$source_file")
+            local dest_file="$DEST_DIR/$filename"
 
-        # Check if mount point is read-only
-        mount_info=$(mount | grep " $mount_point ")
-        if echo "$mount_info" | grep -q "ro,"; then
-            log_message "WARNING: $mount_point is mounted read-only"
-        fi
-        log_message "Mount info: $mount_info"
+            if [ -f "$dest_file" ]; then
+                log_message "SKIP: $filename already exists in destination."
+                continue
+            fi
 
-        # Count images before moving
-        image_count=0
-        failed_count=0
-
-        # Build find command for all image extensions
-        find_cmd="find \"$mount_point\" -type f \( "
-        first=true
-        for ext in $IMAGE_EXTENSIONS; do
-            if [ "$first" = true ]; then
-                find_cmd="$find_cmd -iname \"*.$ext\""
-                first=false
+            if cp -p "$source_file" "$dest_file" 2>>"$LOG_FILE"; then
+                log_message "COPIED: $filename"
+                chown ankit:ankit "$dest_file"
+                copy_count=$((copy_count + 1))
             else
-                find_cmd="$find_cmd -o -iname \"*.$ext\""
+                log_message "ERROR: Failed to copy $filename."
+                fail_count=$((fail_count + 1))
             fi
         done
-        find_cmd="$find_cmd \)"
-
-        # Find and copy/move images (use a more robust approach)
-        eval "$find_cmd" -print0 | while IFS= read -r -d '' image_file; do
-            if [ -f "$image_file" ]; then
-                # Get original filename for logging
-                original_filename=$(basename "$image_file")
-
-                # Use original filename in destination
-                dest_file="$DEST_DIR/$original_filename"
-
-                # Skip if file already exists in destination
-                if [ -f "$dest_file" ]; then
-                    log_message "SKIP: $original_filename (already exists)"
-                    continue
-                fi
-
-                # Check if file is readable
-                if [ ! -r "$image_file" ]; then
-                    log_message "ERROR: Cannot read $original_filename - permission denied"
-                    failed_count=$((failed_count + 1))
-                    continue
-                fi
-
-                # Try to copy first, then remove original if copy succeeds
-                if cp "$image_file" "$dest_file" 2>>"$LOG_FILE"; then
-                    # Change ownership to the 'ankit' user so they can manage the file
-                    chown ankit:ankit "$dest_file"
-                    
-                    # Set safer permissions (owner/group can read/write, others can read)
-                    chmod 664 "$dest_file"
-                    
-                    # Copy successful, now remove original
-                    if rm "$image_file" 2>>"$LOG_FILE"; then
-                        log_message "Moved: $original_filename"
-                        image_count=$((image_count + 1))
-                    else
-                        log_message "WARNING: Copied but could not remove original: $original_filename"
-                        image_count=$((image_count + 1))
-                    fi
-                else
-                    # Log detailed error information
-                    error_msg=$(cp "$image_file" "$dest_file" 2>&1)
-                    log_message "ERROR: Failed to copy $original_filename"
-                    log_message "Copy error: $error_msg"
-                    log_message "Source: $image_file"
-                    log_message "Dest: $dest_file"
-
-                    # Check available space
-                    df_output=$(df -h "$DEST_DIR" 2>/dev/null)
-                    log_message "Destination space: $df_output"
-
-                    failed_count=$((failed_count + 1))
-                fi
-            fi
-        done
-
-        log_message "Transfer complete: $image_count moved, $failed_count failed from $mount_point"
-
+        log_message "Transfer complete for $mount_point: $copy_count files copied, $fail_count failed."
     done <<< "$MOUNT_POINTS"
 }
 
-# Function to power on USB hub
-usb_power_on() {
-    log_message "Powering ON USB hub $USB_HUB"
-    uhubctl -a off -l "$USB_HUB" >/dev/null 2>&1
-    sleep 3
-    uhubctl -a on -l "$USB_HUB" >/dev/null 2>&1
-}
-
-# Function to power off USB hub (with safe ejection)
-usb_power_off() {
-    # First eject all USB devices safely
-    eject_usb_devices
-
-    # Ensure all file operations are completed
-    sync
-    sleep 2
-
-    log_message "Powering OFF USB hub $USB_HUB"
-    uhubctl -a off -l "$USB_HUB" >/dev/null 2>&1
-    sleep 1
-    uhubctl -a off -l "$USB_HUB" >/dev/null 2>&1
-}
-
-# Function to wait for USB devices to mount
+# Function to wait for a device to mount
 wait_for_usb_mount() {
     local attempts=0
-    local max_attempts=20  # 20 attempts x 0.5s = 10s max
-    local devices_found=false
+    local max_attempts=$((MAX_MOUNT_WAIT * 2)) # Poll every 0.5s
 
-    log_message "Waiting for USB devices to mount..."
-
+    log_message "Waiting for device to mount (max ${MAX_MOUNT_WAIT}s)..."
     while [ $attempts -lt $max_attempts ]; do
-        # Check for mounted USB devices
-        MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^(/media/|/mnt/)" | grep -v "^/$")
-
-        if [ -n "$MOUNT_POINTS" ]; then
-            devices_found=true
-            local wait_time=$((attempts / 2))
-            local wait_ms=$((attempts % 2 * 5))
-            log_message "USB device(s) detected after ${wait_time}.${wait_ms}s"
-            # Give a tiny bit more time for filesystem to stabilize
-            sleep 0.5
-            break
+        if [ -n "$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E '^/media/|^/mnt/')" ]; then
+            log_message "Device detected as mounted. Proceeding with file transfer."
+            sleep 1 # Allow filesystem to stabilize
+            return 0
         fi
-
         sleep 0.5
         attempts=$((attempts + 1))
     done
 
-    if [ "$devices_found" = false ]; then
-        log_message "No USB devices detected after ${MAX_MOUNT_WAIT}s timeout"
-    fi
+    log_message "Timeout: No device mounted after ${MAX_MOUNT_WAIT} seconds."
+    return 1
 }
 
-# Main loop
-log_message "Starting USB cycle service"
-log_message "Configuration: OFF=${OFF_TIME}s, Destination=$DEST_DIR"
+# --- Main Loop ---
+log_message "Starting device power cycle and copy service."
+log_message "Destination: $DEST_DIR, OFF Time: ${OFF_TIME}s"
+
+# Set GPIO pin as output and initialize to LOW (OFF)
+pinctrl set ${GPIO_PIN} op dl
 
 while true; do
-    # Power on USB
-    usb_power_on
+    # 1. Power ON
+    device_power_on
+    log_message "Device powered on. Waiting ${POWER_ON_STABILIZATION_TIME}s for it to initialize..."
+    sleep $POWER_ON_STABILIZATION_TIME
 
-    # Wait for devices to mount (smart polling)
-    wait_for_usb_mount
+    # 2. Wait for Mount
+    if wait_for_usb_mount; then
+        # 3. Copy files if mount was successful
+        start_time=$(date +%s)
+        copy_files
+        end_time=$(date +%s)
+        transfer_time=$((end_time - start_time))
+        log_message "File copy process finished in ${transfer_time}s."
+    fi
 
-    # Move images
-    log_message "Starting image transfer..."
-    start_time=$(date +%s)
-    move_images
-    end_time=$(date +%s)
-    transfer_time=$((end_time - start_time))
-    log_message "Image transfer completed in ${transfer_time}s"
+    # 4. Unmount Media
+    eject_usb_devices
 
-    # Brief delay to ensure all operations complete
-    sleep 1
+    # 5. Power OFF
+    device_power_off
 
-    # Power off USB with safe ejection
-    usb_power_off
-
-    # Wait for OFF period
-    log_message "USB will remain OFF for $OFF_TIME seconds"
+    # 6. Wait for the specified OFF duration
+    log_message "Device powered off. Waiting for $OFF_TIME seconds..."
     sleep $OFF_TIME
 done
