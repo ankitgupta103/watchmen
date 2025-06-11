@@ -9,7 +9,7 @@
 
 # --- Configuration ---
 # The user who will own the created directories (not the user running the service)
-OWNER_USER="pi"
+OWNER_USER="ankit"
 
 # Directory where the main script will be stored
 SCRIPT_DIR="/home/$OWNER_USER/Documents/watchmen/usb-controller"
@@ -208,7 +208,7 @@ move_images() {
         return 1
     fi
     
-    # Find all mounted USB devices (typically under /media/pi/ or /mnt/)
+    # Find all mounted USB devices (typically under /media/ankit/ or /mnt/)
     # Check common mount points
     MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^(/media/|/mnt/)" | grep -v "^/$")
     
@@ -418,7 +418,7 @@ NoNewPrivileges=no
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # Working Directory
-WorkingDirectory=/home/pi/Documents
+WorkingDirectory=/home/ankit/Documents
 
 [Install]
 WantedBy=multi-user.target
