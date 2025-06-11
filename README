@@ -83,4 +83,17 @@ sudo systemctl status cron
    sudo tail -f /var/log/syslog | grep CRON
    ```
 
-`
+### To check the status of the service:
+```bash
+sudo systemctl status $SERVICE_NAME
+```
+
+### To view the service logs:
+```bash
+sudo journalctl -u $SERVICE_NAME -f
+```
+
+### Services we are running:
+ - camera-capture.service
+ - event-detector.service
+ - run-demob.service
