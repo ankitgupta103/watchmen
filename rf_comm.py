@@ -141,7 +141,7 @@ class RFComm:
             self.msg_chunks_expected[cid] = numchunks
             self.msg_chunks_received[cid] = []
             self.msg_parts[cid] = []
-            print(f"at cb : self.msg_chunks_received = {self.msg_chunks_received}")
+            print(f"at cb : self.msg_chunks_received = {len(self.msg_chunks_received[cid])}")
             print(f"{self.devid} : Sending ack for {msgid} to {src}")
             payload_to_send = msgid
             self._send_unicast(payload_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
