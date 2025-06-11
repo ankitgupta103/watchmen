@@ -108,41 +108,56 @@ echo -e "${CYAN}Please provide the following configuration details:${NC}"
 echo
 
 # Basic Configuration
-prompt_input "Username who will own the services and files" "ankit" "OWNER_USER"
-prompt_input "Virtual environment directory name" "venv" "VENV_NAME"
-prompt_input "Demo service name" "demo-service" "DEMO_SERVICE_NAME"
+# prompt_input "Username who will own the services and files" "ankit" "OWNER_USER"
+OWNER_USER="ankit"
+# prompt_input "Virtual environment directory name" "venv" "VENV_NAME"
+VENV_NAME="venv"
+# prompt_input "Demo service name" "demo-service" "DEMO_SERVICE_NAME"
+DEMO_SERVICE_NAME="run_demob"
 
 echo
 echo -e "${CYAN}Camera and Image Configuration:${NC}"
-prompt_input "Images directory (relative to $PROJECT_DIR)" "images" "IMAGE_DIR_REL"
-prompt_input "Processed images directory (relative to $PROJECT_DIR)" "processed" "PROCESSED_DIR_REL"
-prompt_input "Critical images subdirectory name" "critical" "CRITICAL_DIR_NAME"
+# prompt_input "Images directory (relative to $PROJECT_DIR)" "images" "IMAGE_DIR_REL"
+IMAGE_DIR_REL="images"
+# prompt_input "Processed images directory (relative to $PROJECT_DIR)" "processed" "PROCESSED_DIR_REL"
+PROCESSED_DIR_REL="processed"
+# prompt_input "Critical images subdirectory name" "critical" "CRITICAL_DIR_NAME"
+CRITICAL_DIR_NAME="critical"
 
 echo
 echo -e "${CYAN}USB and Hardware Configuration:${NC}"
-prompt_input "USB hub identifier for power cycling" "1-1" "USB_HUB"
-prompt_input "USB power off time (seconds)" "60" "OFF_TIME"
-prompt_input "Maximum mount wait time (seconds)" "10" "MAX_MOUNT_WAIT"
+# prompt_input "USB hub identifier for power cycling" "1-1" "USB_HUB"
+USB_HUB="1-1"
+# prompt_input "USB power off time (seconds)" "60" "OFF_TIME"
+OFF_TIME=60
+# prompt_input "Maximum mount wait time (seconds)" "10" "MAX_MOUNT_WAIT"
+MAX_MOUNT_WAIT=10
 
 echo
 echo -e "${CYAN}Service Configuration:${NC}"
-prompt_input "Camera capture service name" "camera-capture" "CAMERA_SERVICE_NAME"
-prompt_input "Event detector service name" "event-detector" "EVENT_SERVICE_NAME"
+# prompt_input "Camera capture service name" "camera-capture" "CAMERA_SERVICE_NAME"
+CAMERA_SERVICE_NAME="camera-capture"
+# prompt_input "Event detector service name" "event-detector" "EVENT_SERVICE_NAME"
+EVENT_SERVICE_NAME="event-detector"
 
 echo
 echo -e "${CYAN}Python Dependencies:${NC}"
-if confirm_input "Install vyomcloudbridge from test.pypi.org?" "y"; then
-    INSTALL_VYOM="y"
-    prompt_input "VyomCloudBridge version" "0.2.39" "VYOM_VERSION"
-else
-    INSTALL_VYOM="n"
-fi
+# if confirm_input "Install vyomcloudbridge from test.pypi.org?" "y"; then
+#     INSTALL_VYOM="y"
+#     # prompt_input "VyomCloudBridge version" "0.2.39" "VYOM_VERSION"
+#     VYOM_VERSION="0.2.39"
+# else
+#     INSTALL_VYOM="n"
+# fi
+INSTALL_VYOM="y"
+VYOM_VERSION="0.2.39"
 
-if confirm_input "Install dependencies from requirements.txt?" "y"; then
-    INSTALL_REQUIREMENTS="y"
-else
-    INSTALL_REQUIREMENTS="n"
-fi
+# if confirm_input "Install dependencies from requirements.txt?" "y"; then
+#     INSTALL_REQUIREMENTS="y"
+# else
+#     INSTALL_REQUIREMENTS="n"
+# fi
+INSTALL_REQUIREMENTS="y"
 
 if confirm_input "Install common packages (opencv-python, ultralytics, numpy)?" "y"; then
     INSTALL_COMMON="y"
@@ -432,7 +447,7 @@ Wants=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=$VENV_DIR/bin/python $PROJECT_DIR/run_demob.py
+ExecStart=/bin/bash -lic 'source ${ENV_FILE_PATH} && python $PROJECT_DIR/run_demob.py'
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -444,11 +459,6 @@ Group=$OWNER_USER
 
 # Working Directory
 WorkingDirectory=$PROJECT_DIR
-
-# Environment variables
-Environment="PATH=$VENV_DIR/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Environment="VIRTUAL_ENV=$VENV_DIR"
-Environment="PYTHONPATH=$PROJECT_DIR"
 
 [Install]
 WantedBy=multi-user.target
