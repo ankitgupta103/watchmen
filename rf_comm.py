@@ -342,7 +342,7 @@ class RFComm:
 
     def _send_chunk_end(self, chunk_identifier, dest):
         payload = f"{chunk_identifier}"
-        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 3)
+        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 10)
         return sent 
 
     # Note retry here is separate retry per chunk.
@@ -353,7 +353,7 @@ class RFComm:
         chunk_identifier = random.randint(10,20) # TODO better.
         self.msg_cunks_missing[str(chunk_identifier)] = []
         payload = f"{mst}{chunk_identifier};{num_chunks}"
-        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 3)
+        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 10)
         if not sent:
             print(f"Failed to send chunk begin")
             return False
@@ -403,8 +403,8 @@ class RFComm:
                     return True # Hopefully lock is received
             time.sleep(0.5)
             ts = time.time_ns()
-            # Allow 15 secs for an ack
-            if (ts - time_ack_start) > 15000000000:
+            # Allow 5 secs for an ack
+            if (ts - time_ack_start) > 5000000000:
                 print(f" Timed out received for {msgid}")
                 break
         return False
