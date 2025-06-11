@@ -12,7 +12,7 @@
 OWNER_USER="ankit"
 
 # Directory where the main script will be stored
-SCRIPT_DIR="/home/$OWNER_USER/Documents/watchmen/usb-controller"
+SCRIPT_DIR="/home/$OWNER_USER/Documents/watchmen/camera-capture-service"
 SCRIPT_PATH="$SCRIPT_DIR/usb-camera-power-cycle.sh"
 
 # Directory where images will be saved
