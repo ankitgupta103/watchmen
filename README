@@ -19,6 +19,68 @@ https://futuristiciox.blogspot.com/2025/05/raspberry-pi-to-raspberry-pi-lora.htm
 gitcheck
 
 
+Open your crontab for editing:
+```bash
+crontab -e
+```
 
-// How to chunk an image so that partial image can be presented.
-// Radio module
+### Every 5 minutes:
+```bash
+*/5 * * * * /path/to/your/copy_image.sh >/dev/null 2>&1
+```
+
+### Every hour:
+```bash
+0 * * * * /path/to/your/copy_image.sh >/dev/null 2>&1
+```
+
+### Every day at 2:30 AM:
+```bash
+30 2 * * * /path/to/your/copy_image.sh >/dev/null 2>&1
+```
+
+### Every Monday at 9:00 AM:
+```bash
+0 9 * * 1 /path/to/your/copy_image.sh >/dev/null 2>&1
+```
+
+### With logging (recommended):
+```bash
+*/10 * * * * /path/to/your/copy_image.sh >> /var/log/image_copy_cron.log 2>&1
+```
+
+## Cron Time Format
+
+```
+* * * * * command
+│ │ │ │ │
+│ │ │ │ └── Day of week (0-7, Sunday = 0 or 7)
+│ │ │ └──── Month (1-12)
+│ │ └────── Day of month (1-31)
+│ └──────── Hour (0-23)
+└────────── Minute (0-59)
+```
+
+### View current cron jobs:
+```bash
+crontab -l
+```
+
+### Remove the cron job:
+```bash
+crontab -e
+# Delete the line, save and exit
+```
+
+### Check if cron is running:
+```bash
+sudo systemctl status cron
+```
+
+### If the cron job isn't working:
+**Check cron logs:**
+   ```bash
+   sudo tail -f /var/log/syslog | grep CRON
+   ```
+
+`
