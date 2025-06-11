@@ -7,6 +7,7 @@
 # =============================================================================
 
 # --- CONFIGURATION (Edit these paths) ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_IMAGE="${SCRIPT_DIR}/testdata/forest_man_2.jpg"      
 DESTINATION_FOLDER="/home/ankit/Documents/images"     
 NUM_COPIES=10                                 # Number of copies to make
