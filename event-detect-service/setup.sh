@@ -53,8 +53,8 @@ SERVICE_FILE="${SERVICE_NAME}.service"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_FILE_PATH="${SCRIPT_DIR}/event_detector.py"
 SYSTEMD_DIR="/etc/systemd/system"
-# CAMERA_IMAGE_FOLDER="/home/pi/Documents/images" # input folder
-# EVENT_OUTPUT_FOLDER="/home/pi/Documents/processed_images"  # output folder
+# CAMERA_IMAGE_FOLDER="/home/ankit/Documents/images" # input folder
+# EVENT_OUTPUT_FOLDER="/home/ankit/Documents/processed_images"  # output folder
 
 echo -e "${BLUE}=== Event Detector Service Setup ===${NC}"
 
@@ -101,7 +101,7 @@ python3 -c "import cv2, ultralytics" 2>/dev/null || {
 # Create necessary directories
 print_status "Creating necessary directories..."
 mkdir -p "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER"
-chown pi:pi "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER" 2>/dev/null || print_warning "Could not change ownership of directories"
+chown ankit:ankit "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER" 2>/dev/null || print_warning "Could not change ownership of directories"
 
 # Create the service file
 print_status "Creating service file..."
@@ -127,8 +127,8 @@ StandardOutput=journal
 StandardError=journal
 
 # User and Group
-User=pi
-Group=pi
+User=ankit
+Group=ankit
 
 # Working Directory
 WorkingDirectory=${SCRIPT_DIR}
