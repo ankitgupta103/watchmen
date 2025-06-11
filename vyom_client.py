@@ -180,7 +180,7 @@ class VyomClient:
             self.writer.write_message(
                 message_data=payload,
                 data_type="json",
-                data_source="machine_state",
+                data_source="machine_stats",
                 destination_ids=["s3"],
                 source_id=vyom_machine_id,
                 filename=filename,
