@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { API_BASE_URL, TOKEN_KEY } from '@/lib/constants';
 import { setCookie } from '@/lib/cookies';
 import { loginSchema, type LoginFormData } from '@/lib/schemas/auth';
+import { Organization } from '@/lib/types/organization';
 
 export default function Login() {
   const router = useRouter();
@@ -59,9 +60,21 @@ export default function Login() {
         setCookie('sessionId', data.sessionId);
         setCookie('expiry', data.expires_in);
       }
-      setCookie('user', JSON.stringify(data.user));
-      setCookie('organization', JSON.stringify(data.user.roles[0]));
-
+      const user = {
+        ...data.user,
+        roles: data.user.roles.map((role: Organization) => {
+          return {
+            role: role.role,
+            permissions: role.permissions,
+            organization_id: role.organization_id,
+            organization_uid: role.organization_uid,
+            organization_name: role.organization_name,
+          };
+        }),
+      };
+      setCookie('user', JSON.stringify(user));
+      setCookie('organization', JSON.stringify(user.roles[0]));
+      
       router.push('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
