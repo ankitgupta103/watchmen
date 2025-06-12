@@ -14,8 +14,10 @@ export default async function DashboardPage() {
   const { data: machines } = await fetcher<{
     status: string;
     data: Machine[];
-  }>(`${API_BASE_URL}/machine?organization_uid=${organization_uid}`);
-  
+  }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`);
+
+  console.log('machines', machines);
+
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader />

@@ -74,7 +74,7 @@ export default function Login() {
       };
       setCookie('user', JSON.stringify(user));
       setCookie('organization', JSON.stringify(user.roles[0]));
-      
+
       router.push('/dashboard');
     } catch (error) {
       console.error('Login error:', error);

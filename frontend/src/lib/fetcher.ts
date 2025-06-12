@@ -54,7 +54,7 @@ export async function fetcher<TResponse = unknown, TRequest = unknown>(
     return {
       status: res.status,
       data: null,
-    } as TResponse
+    } as TResponse;
   } catch (error: unknown) {
     if (error instanceof Error) {
       console.error('Error fetching data:', error.message);
