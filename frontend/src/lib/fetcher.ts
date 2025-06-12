@@ -32,7 +32,7 @@ export interface FetchOptions<T = unknown> {
 export async function fetcher<TResponse = unknown, TRequest = unknown>(
   url: string,
   options?: FetchOptions<TRequest>,
-): Promise<TResponse | undefined> {
+): Promise<TResponse> {
   const token = await getToken();
   const { method = 'GET', body, headers } = options || {};
 
@@ -50,12 +50,21 @@ export async function fetcher<TResponse = unknown, TRequest = unknown>(
     if (res.ok) {
       return res.json() as Promise<TResponse>;
     }
+
+    return {
+      status: res.status,
+      data: null,
+    } as TResponse
   } catch (error: unknown) {
     if (error instanceof Error) {
       console.error('Error fetching data:', error.message);
     } else {
       console.error('Error fetching data:', error);
     }
-    throw error;
+
+    return {
+      status: 500,
+      data: null,
+    } as TResponse;
   }
 }
