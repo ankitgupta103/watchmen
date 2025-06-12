@@ -55,10 +55,15 @@ NO_DEST = "X"
 
 # 0 is an error here
 HN_ID = {
+        # BLR
         "central" : "A",
         "rpi2" : "B",
         "rpi3" : "C",
-        "rpi4" : "D"
+        "rpi4" : "D",
+        # GUR
+        "rpi6" : "A",
+        "rpi7" : "C",
+        "rpi8" : "D",
         }
 
 # First has camera,
