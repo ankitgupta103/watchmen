@@ -178,8 +178,6 @@ export default function HeatMapCalendar({
           });
         }
 
-        console.log('ssssssssss',params)
-
         const response = await fetch(
           `${API_BASE_URL}/calendar/date-range-events/?${params}`,
         );
@@ -374,7 +372,7 @@ export default function HeatMapCalendar({
 
   return (
     <>
-      <div className="relative flex xl:flex-row flex-col gap-4 overflow-y-auto">
+      <div className="relative flex flex-col gap-4 overflow-y-auto xl:flex-row">
         {/* Calendar */}
         <div className="mb-4 flex-1">
           <Card className="h-fit">
@@ -532,7 +530,7 @@ export default function HeatMapCalendar({
         </div>
 
         {/* Details Panel */}
-        <div className="sticky top-0 mb-4 h-fit w-full xl:w-96 space-y-4">
+        <div className="sticky top-0 mb-4 h-fit w-full space-y-4 xl:w-96">
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">

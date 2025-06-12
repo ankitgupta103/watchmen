@@ -45,20 +45,20 @@ export default function DeviceDetailsClient({ device }: { device: Machine }) {
               </Badge>
               <Badge
                 variant={
-                  device.data.status === 'online'
+                  device?.data?.status === 'online'
                     ? 'default'
-                    : device.data.status === 'offline'
+                    : device?.data?.status === 'offline'
                       ? 'destructive'
                       : 'secondary'
                 }
                 className="capitalize"
               >
-                {device.data.status}
+                {device?.data?.status}
               </Badge>
             </div>
             <div className="text-muted-foreground text-sm">
               Last seen:{' '}
-              {new Date(device.data.lastSeen).toLocaleString('en-US', {
+              {new Date(device?.data?.lastSeen).toLocaleString('en-US', {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric',
@@ -76,8 +76,8 @@ export default function DeviceDetailsClient({ device }: { device: Machine }) {
       {/* Suspicious Events */}
       <div className="bg-background rounded-lg border p-6 shadow-sm">
         <h2 className="mb-4 text-xl font-semibold">Suspicious Events</h2>
-        {device.data.suspiciousEvents &&
-        device.data.suspiciousEvents.length > 0 ? (
+        {device?.data?.suspiciousEvents &&
+        device?.data?.suspiciousEvents.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -201,7 +201,7 @@ export default function DeviceDetailsClient({ device }: { device: Machine }) {
       {/* Health Events */}
       <div className="bg-background rounded-lg border p-6 shadow-sm">
         <h2 className="mb-4 text-xl font-semibold">Health Events</h2>
-        {device.data.healthEvents && device.data.healthEvents.length > 0 ? (
+        {device?.data?.healthEvents && device?.data?.healthEvents.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -211,7 +211,7 @@ export default function DeviceDetailsClient({ device }: { device: Machine }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {device.data.healthEvents.map((event, idx) => (
+              {device?.data?.healthEvents.map((event, idx) => (
                 <TableRow key={idx}>
                   <TableCell className="capitalize">
                     {event.type.replace(/_/g, ' ')}
