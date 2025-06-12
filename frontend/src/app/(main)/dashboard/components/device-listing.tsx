@@ -1,7 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
 
-import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -13,6 +12,8 @@ import {
 
 import { Machine } from '@/lib/types/machine';
 
+import DeviceStatusBufferLocation from './device-status-buffer-location';
+
 export default function DeviceListing({ machines }: { machines: Machine[] }) {
   return (
     <Table>
@@ -21,7 +22,7 @@ export default function DeviceListing({ machines }: { machines: Machine[] }) {
           <TableHead>Name</TableHead>
           <TableHead>Type</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Last Seen</TableHead>
+          <TableHead>Buffer</TableHead>
           <TableHead>Location</TableHead>
         </TableRow>
       </TableHeader>
@@ -34,33 +35,7 @@ export default function DeviceListing({ machines }: { machines: Machine[] }) {
               </Link>
             </TableCell>
             <TableCell>{machine.type.replace(/_/g, ' ')}</TableCell>
-            <TableCell>
-              <Badge
-                variant={
-                  machine.data.status === 'online'
-                    ? 'default'
-                    : machine.data.status === 'offline'
-                      ? 'destructive'
-                      : 'secondary'
-                }
-                className="capitalize"
-              >
-                {machine.data.status}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              {new Date(machine.data.lastSeen).toLocaleString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </TableCell>
-            <TableCell>
-              {machine.last_location.lat.toFixed(4)},{' '}
-              {machine.last_location.lng.toFixed(4)}
-            </TableCell>
+            <DeviceStatusBufferLocation machineId={machine.id} />
           </TableRow>
         ))}
       </TableBody>
