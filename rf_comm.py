@@ -62,6 +62,7 @@ class RFComm:
     def setup_rf(self):
         if not radio.begin():
             raise RuntimeError("nRF24L01+ not responding")
+        radio.printDetails()
         radio.setPALevel(RF24_PA_HIGH)
         radio.setDataRate(RF24_250KBPS)
         radio.setChannel(76)
@@ -165,16 +166,18 @@ class RFComm:
             for i in range(expected_chunks):
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
+            if len(missing_chunks) == 0:
+                self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             print(f"At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             # TODO expect at most 5% missing chunks.
-            if len(missing_chunks) == 0:
-                # Hack this has to be the message type in BEGIN
-                self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
-                self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
-            else:
-                # All not done
-                self._send_unicast(f"{msgid}:and:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
-                succ = self._send_missing_chunks(cid, missing_chunks, src)
+            # if len(missing_chunks) == 0:
+            #    # Hack this has to be the message type in BEGIN
+            #    self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
+            #    self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
+            #else:
+            #    # All not done
+            #    self._send_unicast(f"{msgid}:and:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
+            #    succ = self._send_missing_chunks(cid, missing_chunks, src)
             return
         
         self.process_message(msgid, msgtype, msgpyl)
@@ -340,9 +343,12 @@ class RFComm:
         msgstr = f"{msgid};{payload}"
         self._actual_send(msgstr)
 
-    def _send_chunk_end(self, chunk_identifier, dest):
+    def _send_chunk_end(self, chunk_identifier, dest, alldone):
         payload = f"{chunk_identifier}"
-        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 10)
+        if alldone:
+            sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 3)
+        else
+            sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, False, 0)
         return sent 
 
     # Note retry here is separate retry per chunk.
@@ -359,9 +365,8 @@ class RFComm:
             return False
         for i in range(num_chunks):
             self._send_chunk_i(msg_chunks, chunk_identifier, i, dest)
-        sent = self._send_chunk_end(chunk_identifier, dest)
+        sent = self._send_chunk_end(chunk_identifier, dest, False)
         alldone = False
-        # time.sleep(1)
         if not sent:
             return False
         for i in range(retry_count):
@@ -372,13 +377,13 @@ class RFComm:
                         alldone = True
             print(f"At retry count {i} Receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered} alldone = {alldone}")
             if alldone:
+                # sent = self._send_chunk_end(chunk_identifier, dest, alldone)
                 break
             for cid in chunks_undelivered:
                 self._send_chunk_i(msg_chunks, chunk_identifier, cid, dest)
             self.msg_cunks_missing[str(chunk_identifier)] = [] # Reset missing chunks after sending these chunks
-            sent = self._send_chunk_end(chunk_identifier, dest)
-            if not sent:
-                return False
+            sent = self._send_chunk_end(chunk_identifier, dest, False)
+            time.sleep(2)
         chunks_undelivered = self.msg_cunks_missing[str(chunk_identifier)]
         if alldone:
             print(f" ==== Successfully delivered all chunks!!!")
