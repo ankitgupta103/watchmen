@@ -347,7 +347,7 @@ class RFComm:
         payload = f"{chunk_identifier}"
         if alldone:
             sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 3)
-        else
+        else:
             sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, False, 0)
         return sent 
 
