@@ -69,4 +69,6 @@ HN_ID = {
 # First has camera,
 # Last is CC
 # Everything in between is passthrough.
-PATH_DEMOB = ["D", "C", "A"]
+# PATH_DEMOB = ["D", "C", "A"]
+
+PATH_DEMOB = ["C", "D", "A"]
