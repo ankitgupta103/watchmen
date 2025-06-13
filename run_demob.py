@@ -221,6 +221,7 @@ class DevUnit:
             return
         if is_node_passthrough(self.devid):
             next_dest = get_next_dest(self.devid)
+            print(f"Next dest for {self.devid} is {next_dest}")
             if next_dest == None:
                 print(f"{self.devid} Weird no dest for {self.devid}")
                 return
