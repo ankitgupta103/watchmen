@@ -350,6 +350,7 @@ def run_unit():
     if hname not in constants.HN_ID:
         return None
     devid = constants.HN_ID[hname]
+    print(f"### Running as host {hname} and devid {devid}")
     if is_node_dest(devid):
         cc = CommandCenter(devid)
         cc.print_status()
