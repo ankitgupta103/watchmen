@@ -167,6 +167,7 @@ class RFComm:
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
             if len(missing_chunks) == 0:
+                self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             print(f"At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             # TODO expect at most 5% missing chunks.
@@ -359,7 +360,7 @@ class RFComm:
         chunk_identifier = random.randint(10,20) # TODO better.
         self.msg_cunks_missing[str(chunk_identifier)] = []
         payload = f"{mst}{chunk_identifier};{num_chunks}"
-        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 10)
+        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 5)
         if not sent:
             print(f"Failed to send chunk begin")
             return False
@@ -406,7 +407,7 @@ class RFComm:
                 if msgid not in self.msg_unacked:
                     print(f" =========== Looks like ack received for {msgid}")
                     return True # Hopefully lock is received
-            time.sleep(0.5)
+            time.sleep(2)
             ts = time.time_ns()
             # Allow 5 secs for an ack
             if (ts - time_ack_start) > 5000000000:
