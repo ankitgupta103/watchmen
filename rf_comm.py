@@ -171,6 +171,9 @@ class RFComm:
                 time.sleep(0.5)
                 self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
+            else:
+                time.sleep(0.5)
+                self._send_missing_chunks(cid, missing_chunks, src)
             print(f"At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             # TODO expect at most 5% missing chunks.
             # if len(missing_chunks) == 0:
