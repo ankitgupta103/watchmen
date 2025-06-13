@@ -145,6 +145,7 @@ class RFComm:
             print(f"at cb : self.msg_chunks_received = {len(self.msg_chunks_received[cid])}")
             print(f"{self.devid} : Sending ack for {msgid} to {src}")
             payload_to_send = msgid
+            time.sleep(0.5)
             self._send_unicast(payload_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
@@ -167,6 +168,7 @@ class RFComm:
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
             if len(missing_chunks) == 0:
+                time.sleep(0.5)
                 self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             print(f"At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
