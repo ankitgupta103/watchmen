@@ -10,8 +10,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_IMAGE="${SCRIPT_DIR}/testdata/forest_man_2.jpg"      
 DESTINATION_FOLDER="/home/ankit/Documents/images"     
-NUM_COPIES=10                                 # Number of copies to make
-INTERVAL=2                                    # Interval between copies (in seconds)
+NUM_COPIES=1                                  # Number of copies to make
+INTERVAL=1                                    # Interval between copies (in seconds)
 LOG_FILE="/var/log/image_copy.log"            # Log file for cron output (optional)
 # ----------------------------------------
 
