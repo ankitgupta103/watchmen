@@ -33,6 +33,7 @@ def is_node_passthrough(devid):
 
 def get_next_dest(devid):
     idx = -1
+    print(f"Getting next dest for {devid}")
     num_nodes = len(constants.PATH_DEMOB)
     for i in range(num_nodes):
         if devid == constants.PATH_DEMOB[i]:
@@ -247,6 +248,7 @@ class DevUnit:
 
     def send_img(self, imgfile, evid):
         next_dest = get_next_dest(self.devid)
+        print(f"Sending image {imgfile} to {next_dest}")
         if next_dest == None:
             print(f"{self.devid} Weird no dest for {self.devid}")
             return
