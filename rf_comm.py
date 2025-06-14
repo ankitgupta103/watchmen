@@ -378,8 +378,8 @@ class RFComm:
     # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
     def _send_chunks(self, msg_chunks, mst, dest, retry_count = 50):
         num_chunks = len(msg_chunks)
-        print(f"Getting ready to push {num_chunks} chunks")
         cidstr = str(random.randint(10,20)) # TODO better.
+        print(f"Getting ready to push {num_chunks} chunks with chunkID = {cidstr}")
         self.msg_cunks_missing[cidstr] = []
         payload = f"{mst}{cidstr};{num_chunks}"
         sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 5)
