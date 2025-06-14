@@ -5,6 +5,7 @@ import json
 import socket
 import time
 import threading
+import string
 
 # Local
 import constants
@@ -40,6 +41,9 @@ Protocol:
     Chunk End Ack: same as acknowledgement
     Chunk Nack : MSGID;CID;Missing chunks
 """
+
+def get_random_str(n):
+    return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))
 
 class RFComm:
     msg_unacked = {} # id -> list of ts
@@ -257,7 +261,8 @@ class RFComm:
                 print("Seems like an image")
                 imstr = orig_msg["i_d"]
                 im = image.imstrtoimage(imstr)
-                fname = f"/tmp/recompiled_{random.randint(1000,2000)}.jpg"
+                r = get_random_str(3)
+                fname = f"/tmp/recompiled_{r}.jpg"
                 print(f"Saving image to {fname}")
                 im.save(fname)
                 # im.show()
@@ -294,7 +299,7 @@ class RFComm:
             # No ack needed so no need of ID
             id = f"{msgtype}{self.devid}{dest}"
         else:
-            r = str(random.randint(900,999))
+            r = get_random_str(3)
             if override_idstr is not None:
                 r = override_idstr
             id = f"{msgtype}{self.devid}{dest}{r}"
@@ -378,7 +383,7 @@ class RFComm:
     # We will send 100 chunks, with/without retries, but then the receiver will tell at the end whats missing.
     def _send_chunks(self, msg_chunks, mst, dest, retry_count = 50):
         num_chunks = len(msg_chunks)
-        cidstr = str(random.randint(10,20)) # TODO better.
+        cidstr = get_random_str(3)
         print(f"Getting ready to push {num_chunks} chunks with chunkID = {cidstr}")
         self.msg_cunks_missing[cidstr] = []
         payload = f"{mst}{cidstr};{num_chunks}"
