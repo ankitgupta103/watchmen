@@ -74,7 +74,7 @@ class RFComm:
         if not radio.begin():
             raise RuntimeError("nRF24L01+ not responding")
         radio.printDetails()
-        radio.setPALevel(RF24_PA_LOW)
+        radio.setPALevel(RF24_PA_HIGH)
         radio.setDataRate(RF24_250KBPS)
         radio.setChannel(76)
         radio.stop_listening(b"n1")
