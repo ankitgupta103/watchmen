@@ -310,7 +310,7 @@ class DevUnit:
                     print(f"{cropped}, {full}")
                     events_seen += 1
                     self.send_event(evid)
-                    time.sleep(30)
+                    time.sleep(2)
                 if cropped:
                     self.send_img(cropped, evid)
                     time.sleep(20)
