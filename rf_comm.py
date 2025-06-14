@@ -6,6 +6,7 @@ import socket
 import time
 import threading
 import string
+import logging
 
 # Local
 import constants
@@ -21,6 +22,16 @@ hname = socket.gethostname()
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = False
 FLAKINESS = 10  # 0-100 %
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler('rf_comm.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 """
 MessageID = MSDIII where
@@ -89,20 +100,20 @@ class RFComm:
             return
         self.msg_processed.append(msgid)
         if len(msgstr) > 100:
-            print(f"Processing incoming message : {msgstr[0:100]}...")
+            logger.info(f"Processing incoming message : {msgstr[0:100]}...")
         else:
-            print(f"Processing incoming message : {msgstr}")
+            logger.info(f"Processing incoming message : {msgstr}")
         self.msg_received.append(msgstr)
         if self.node is not None:
             self.node.process_msg(msgid, mst, msgstr)
 
     def print_status(self):
         with self.msg_unacked_lock:
-            print(f"Acked messages = {len(self.msg_acked)}, unacked messages = {len(self.msg_unacked)}")
-            print(self.msg_acked)
-            print(self.msg_unacked)
+            logger.info(f"Acked messages = {len(self.msg_acked)}, unacked messages = {len(self.msg_unacked)}")
+            logger.info(self.msg_acked)
+            logger.info(self.msg_unacked)
             for mi in self.msg_received:
-                print(f"Message received at receiver = {mi}")
+                logger.info(f"Message received at receiver = {mi}")
 
     # Four kinds of messages:
     # 1. Has a dest, but not for me, ignore
@@ -114,7 +125,7 @@ class RFComm:
         msgid, msgpyl = self.sep_part(msgstr, ';')
         (msgtype, src, dest, rid) = self._parse_msg_id(msgid)
         if dest is None or dest == "None":
-            print(f"{msgstr} is a broadcast")
+            logger.info(f"{msgstr} is a broadcast")
             self.process_message(msgid, msgtype, msgpyl)
             return
         if msgtype == constants.MESSAGE_TYPE_ACK and dest == self.devid:
@@ -124,7 +135,7 @@ class RFComm:
                 ackid, remaining = self.sep_part(msgpyl, ':')
                 alldone, cid = self.sep_part(remaining, ':')
                 if alldone == "ad":
-                    print(f" =========== Received ack for {cid} saying receiver got all messages {msgstr}")
+                    logger.info(f" =========== Received ack for {cid} saying receiver got all messages {msgstr}")
                     with self.all_chunks_done_lock:
                         self.all_chunks_done[cid] = True
             with self.msg_unacked_lock:
@@ -134,7 +145,7 @@ class RFComm:
                     self.msg_acked[ackid] = (len(unack), time_to_ack)
                     # print(f"{ackid} --- Cleared ack, time for ack = {time_to_ack}")
                 else:
-                    print(f"Ack {ackid} no matching unacked message")
+                    logger.info(f"Ack {ackid} no matching unacked message")
             return
         if dest != self.devid:
             # print(f"{self.devid} : {msgid} is a unicast but not for me but for {dest}")
@@ -143,7 +154,7 @@ class RFComm:
         if msgtype == constants.MESSAGE_TYPE_NACK_CHUNK and dest == self.devid:
             cid, cliststr = self.sep_part(msgpyl, ';')
             missing_chunks = [int(x) for x in cliststr.split(",")]
-            print(f"Receiver did not get chunks for {cid} : {missing_chunks}")
+            logger.info(f"Receiver did not get chunks for {cid} : {missing_chunks}")
             with self.all_chunks_done_lock:
                 for m in missing_chunks:
                     if m not in self.msg_cunks_missing[cid]:
@@ -158,7 +169,7 @@ class RFComm:
             self.msg_chunks_expected[cid] = numchunks
             self.msg_chunks_received[cid] = []
             self.msg_parts[cid] = []
-            print(f"{self.devid} : Sending ack for {msgid} to {src}")
+            logger.info(f"{self.devid} : Sending ack for {msgid} to {src}")
             payload_to_send = msgid
             time.sleep(0.5)
             self._send_unicast(payload_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
@@ -182,13 +193,13 @@ class RFComm:
             for i in range(expected_chunks):
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
-            print(msgstr)
-            print(f" @@@@@@@ At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
+            logger.info(msgstr)
+            logger.info(f" @@@@@@@ At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             if len(missing_chunks) == 0:
                 time.sleep(0.5)
-                print(f"Sending ack saying I got all chunks for {cid}")
+                logger.info(f"Sending ack saying I got all chunks for {cid}")
                 self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
-                print(f"Processing message because of all chunks veing done")
+                logger.info(f"Processing message because of all chunks veing done")
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             else:
                 time.sleep(0.5)
@@ -204,11 +215,11 @@ class RFComm:
             #    succ = self._send_missing_chunks(cid, missing_chunks, src)
             return
        
-        print(f"Processing message because of {msgstr}")
+        logger.info(f"Processing message because of {msgstr}")
         self.process_message(msgid, msgtype, msgpyl)
         # Disable acking except on chunks
         if ACKING_ENABLED:
-            print(f"{self.devid} : Sending ack for {msgid} to {src}")
+            logger.info(f"{self.devid} : Sending ack for {msgid} to {src}")
             msg_to_send = msgid
             time.sleep(0.5)
             self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
@@ -254,28 +265,28 @@ class RFComm:
         # TODO fill missing chunks with 0s
         return orig_payload
         try:
-            print("Checking for json")
+            logger.info("Checking for json")
             orig_msg = json.loads(orig_payload)
-            print("Checking for image")
+            logger.info("Checking for image")
             if "i_d" in orig_msg:
-                print("Seems like an image")
+                logger.info("Seems like an image")
                 imstr = orig_msg["i_d"]
                 im = image.imstrtoimage(imstr)
                 r = get_random_str(3)
                 fname = f"/tmp/recompiled_{r}.jpg"
-                print(f"Saving image to {fname}")
+                logger.info(f"Saving image to {fname}")
                 im.save(fname)
                 # im.show()
         except:
             if len(orig_payload) > 100:
-                print(f"Recompiled message =\n{orig_payload[0:100]}")
+                logger.info(f"Recompiled message =\n{orig_payload[0:100]}")
             else:
-                print(f"Recompiled message =\n{orig_payload}")
+                logger.info(f"Recompiled message =\n{orig_payload}")
         return orig_payload
 
     def _read_from_rf(self):
         radio.listen = True
-        print("Starting to receive")
+        logger.info("Starting to receive")
         while True:
             has_payload, pipe = radio.available_pipe()
             if has_payload:
@@ -283,7 +294,7 @@ class RFComm:
                 try:
                     datastr = data.rstrip(b'\x00').decode("utf-8")
                 except Exception as e:
-                    print(f"Error reading data : {data} with error {e}")
+                    logger.error(f"Error reading data : {data} with error {e}")
                 self._process_read_message(datastr)
                 # print(f"=============== Received data : {datastr}")
 
@@ -316,7 +327,7 @@ class RFComm:
 
     def _parse_msg_id(self, msgid):
         if len(msgid) < 3:
-            print(f"Failed Parsing Key : {msgid}")
+            logger.error(f"Failed Parsing Key : {msgid}")
             return None
         msgtype = msgid[0]
         src = msgid[1]
@@ -330,7 +341,7 @@ class RFComm:
 
     def _actual_send(self, msgstr):
         if len(msgstr) > MAX_DATA_SIZE:
-            print(f"Message is exceeding length {len(msgstr)} : {msgstr}")
+            logger.error(f"Message is exceeding length {len(msgstr)} : {msgstr}")
             return False
         # print(f"Sending message : {msgstr}")
         data_bytes = msgstr.encode('utf-8')
@@ -359,7 +370,7 @@ class RFComm:
         for i in range(retry_count):
             if sent_succ:
                 break
-            print(f"Sending {msgid} for the {i}th time")
+            logger.info(f"Sending {msgid} for the {i}th time")
             sent_succ = self._send_with_retries(msgstr, msgid)
         return sent_succ
 
@@ -384,12 +395,12 @@ class RFComm:
     def _send_chunks(self, msg_chunks, mst, dest, retry_count = 50):
         num_chunks = len(msg_chunks)
         cidstr = get_random_str(3)
-        print(f"Getting ready to push {num_chunks} chunks with chunkID = {cidstr}")
+        logger.info(f"Getting ready to push {num_chunks} chunks with chunkID = {cidstr}")
         self.msg_cunks_missing[cidstr] = []
         payload = f"{mst}{cidstr};{num_chunks}"
         sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 5)
         if not sent:
-            print(f"Failed to send chunk begin")
+            logger.error(f"Failed to send chunk begin")
             return False
         chunks_undelivered = [i for i in range(len(msg_chunks))]
         alldone = False
@@ -402,17 +413,17 @@ class RFComm:
                 chunks_undelivered = self.msg_cunks_missing[cidstr]
                 if cidstr in self.all_chunks_done and self.all_chunks_done[cidstr]:
                     alldone = True
-            print(f"After retry count {r} receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered} alldone = {alldone}")
+            logger.info(f"After retry count {r} receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered} alldone = {alldone}")
             if alldone:
                 sent = self._send_chunk_end(cidstr, dest, alldone)
                 break
             self.msg_cunks_missing[cidstr] = [] # Reset missing chunks after sending these chunks
             time.sleep(2)
         if alldone:
-            print(f" ==== Successfully delivered all chunks!!!")
+            logger.info(f" ==== Successfully delivered all chunks!!!")
             return True
         else:
-            print(f" **** Finally even after all attempts, Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+            logger.info(f" **** Finally even after all attempts, Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
             return False
 
     def _send_with_retries(self, msgstr, msgid):
@@ -427,13 +438,13 @@ class RFComm:
         while not ack_received:
             with self.msg_unacked_lock:
                 if msgid not in self.msg_unacked:
-                    print(f" =========== Looks like ack received for {msgid}")
+                    logger.info(f" =========== Looks like ack received for {msgid}")
                     return True # Hopefully lock is received
             time.sleep(2)
             ts = time.time_ns()
             # Allow 5 secs for an ack
             if (ts - time_ack_start) > 5000000000:
-                print(f" Timed out received for {msgid}")
+                logger.info(f" Timed out received for {msgid}")
                 break
         return False
 
@@ -445,11 +456,11 @@ class RFComm:
             msg = msgstr[0:MAX_CHUNK_SIZE]
             msg_chunks.append(msg)
             msgstr = msgstr[MAX_CHUNK_SIZE:]
-        print(f"chunking {len(long_msg)} long message into {len(msg_chunks)} chunks")
+        logger.info(f"chunking {len(long_msg)} long message into {len(msg_chunks)} chunks")
         t1 = time.time()
         sent = self._send_chunks(msg_chunks, mst, dest, 50)
         t2 = time.time()
-        print(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
+        logger.info(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
         return sent
 
     def send_message(self, payload, mst, dest):
@@ -459,7 +470,7 @@ class RFComm:
                 self._send_broadcast(msg, mst)
                 return True
             else:
-                print(f"Please dont broadcast big messages, this one is of size {len(payload)}")
+                logger.warning(f"Please dont broadcast big messages, this one is of size {len(payload)}")
                 return False
         if len(payload) < 30:
             msg = payload
@@ -469,7 +480,7 @@ class RFComm:
                 sent = self._send_unicast(msg, mst, dest, False, 1)
             return sent
         else:
-            print("Too big, will chunk msg {len(payload)}")
+            logger.warning("Too big, will chunk msg {len(payload)}")
             sent = self._send_long_msg(payload, mst, dest)
             return sent
 
@@ -503,7 +514,7 @@ def test_send_time_to_ack(rf, dest, msgsize):
 
 def main():
     if hname not in constants.HN_ID:
-        print(f"Unknown hostname ({hname}) not in {constants.HN_ID}")
+        logger.error(f"Unknown hostname ({hname}) not in {constants.HN_ID}")
         return
     devid = constants.HN_ID[hname]
     rf = RFComm(devid)
