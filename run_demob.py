@@ -65,7 +65,6 @@ class CommandCenter:
         self.rf.keep_reading()
         self.node_map = {} # id->(num HB, last HB, gps, Num photos, Num events, [Event TS])
         self.images_saved = []
-        self.images_received = []
         self.msgids_seen = []
         self.vyom_client = VyomClient()
 
@@ -88,10 +87,6 @@ class CommandCenter:
         if "i_d" in orig_msg:
             print("Seems like an image")
             imf = orig_msg["i_f"]
-            if imf in self.images_received:
-                print(f"Already processed {imf}, this is caused by multiple chunkends with diff msgid")
-                return
-            self.images_received.append(imf)
             ims = orig_msg["i_s"]
             imstr = orig_msg["i_d"]
             evid = orig_msg["e_i"]
