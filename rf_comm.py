@@ -53,9 +53,12 @@ class RFComm:
 
     def __init__(self, devid):
         self.devid = devid
+
+        # Receiver
         self.msg_chunks_expected = {} # Receiver uses this. cid->num_chunks
         self.msg_chunks_received = {} # Receiver uses this. cid->list of ids got
         self.msg_parts = {} # Receiver uses this. cid->data
+        self.msg_processed = []
 
         # Sender
         self.msg_cunks_missing = {} # Sender gets this from ack.
@@ -78,6 +81,9 @@ class RFComm:
         self.node = node
 
     def process_message(self, msgid, mst, msgstr):
+        if msgid in self.msg_processed:
+            return
+        self.msg_processed.append(msgid)
         if len(msgstr) > 100:
             print(f"Processing incoming message : {msgstr[0:100]}...")
         else:
@@ -171,14 +177,16 @@ class RFComm:
             for i in range(expected_chunks):
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
+            print(msgstr)
+            print(f"At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             if len(missing_chunks) == 0:
                 time.sleep(0.5)
                 self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
+                print(f"Processing message because of all chunks veing done")
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             else:
                 time.sleep(0.5)
                 self._send_missing_chunks(cid, missing_chunks, src)
-            print(f"At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             # TODO expect at most 5% missing chunks.
             # if len(missing_chunks) == 0:
             #    # Hack this has to be the message type in BEGIN
@@ -189,7 +197,8 @@ class RFComm:
             #    self._send_unicast(f"{msgid}:and:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
             #    succ = self._send_missing_chunks(cid, missing_chunks, src)
             return
-        
+       
+        print(f"Processing message because of {msgstr}")
         self.process_message(msgid, msgtype, msgpyl)
         # Disable acking except on chunks
         if ACKING_ENABLED:
@@ -278,12 +287,14 @@ class RFComm:
         # TODO fix and make it a clean exit on self deletion
         reader_thread.start()
 
-    def _get_msg_id(self, msgtype, dest):
+    def _get_msg_id(self, msgtype, dest, override_idstr = None):
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
             # No ack needed so no need of ID
             id = f"{msgtype}{self.devid}{dest}"
         else:
-            r = random.randint(900,999)
+            r = str(random.randint(900,999))
+            if override_idstr is not None:
+                r = override_idstr
             id = f"{msgtype}{self.devid}{dest}{r}"
         return id
 
@@ -331,8 +342,8 @@ class RFComm:
 
     # dest = None = broadcast, no ack waited, assumed success.
     # dest = IF = unicast, ack awaited with retry_count retries and a 2 sec sleep
-    def _send_unicast(self, payload, mst, dest, wait_for_ack = True, retry_count = 3):
-        msgid = self._get_msg_id(mst, dest) # Message type has to improve
+    def _send_unicast(self, payload, mst, dest, wait_for_ack = True, retry_count = 3, override_idstr = None):
+        msgid = self._get_msg_id(mst, dest, override_idstr) # Message type has to improve
         msgstr = f"{msgid};{payload}"
         if not wait_for_ack:
             return self._actual_send(msgstr)
@@ -356,9 +367,9 @@ class RFComm:
     def _send_chunk_end(self, cidstr, dest, alldone):
         payload = cidstr
         if alldone:
-            sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 3)
+            sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, True, 3, cidstr)
         else:
-            sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, False, 0)
+            sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, False, 0, cidstr)
         return sent
 
     # Note retry here is separate retry per chunk.
