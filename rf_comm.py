@@ -183,11 +183,17 @@ class RFComm:
             if r < FLAKINESS:
                 return
                 # print(f"Flakiness dropping chunk : {i}")
+            if cid not in self.msg_chunks_received:
+                # We missed chunk begin it seems, ignore this message
+                return
             self.msg_chunks_received[cid].append(i)
             self.msg_parts[cid].append((i, chunkdata))
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_END:
             cid = msgpyl
+            if cid not in self.msg_chunks_expected:
+                # We missed chunk begin it seems, ignore this message
+                return
             expected_chunks = self.msg_chunks_expected[cid]
             missing_chunks = []
             for i in range(expected_chunks):
