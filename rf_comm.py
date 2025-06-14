@@ -120,6 +120,7 @@ class RFComm:
                 ackid, remaining = self.sep_part(msgpyl, ':')
                 alldone, cid = self.sep_part(remaining, ':')
                 if alldone == "ad":
+                    print(f" =========== Received ack for {cid} saying receiver got all messages {msgstr}")
                     with self.all_chunks_done_lock:
                         self.all_chunks_done[cid] = True
             with self.msg_unacked_lock:
@@ -178,9 +179,10 @@ class RFComm:
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
             print(msgstr)
-            print(f"At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
+            print(f" @@@@@@@ At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             if len(missing_chunks) == 0:
                 time.sleep(0.5)
+                print(f"Sending ack saying I got all chunks for {cid}")
                 self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
                 print(f"Processing message because of all chunks veing done")
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
