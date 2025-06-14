@@ -407,7 +407,7 @@ class RFComm:
                 sent = self._send_chunk_end(cidstr, dest, alldone)
                 break
             self.msg_cunks_missing[cidstr] = [] # Reset missing chunks after sending these chunks
-            time.sleep(0.5)
+            time.sleep(2)
         if alldone:
             print(f" ==== Successfully delivered all chunks!!!")
             return True
