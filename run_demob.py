@@ -94,7 +94,7 @@ class CommandCenter:
         try:
             orig_msg = json.loads(msgstr)
         except Exception as e:
-            self.logger.error(f"Error loadig json {e}")
+            self.logger.error(f"Error loading json {e}")
         self.logger.info("Checking for image")
         if "i_d" in orig_msg:
             self.logger.info("Seems like an image")
@@ -114,10 +114,11 @@ class CommandCenter:
                 file_name_suffix = imf.split("_")[-1].split(".")[0]
                 filename = f"{evid}_{file_name_suffix}.jpg"
                 image_bytes = image.imstrtobytes(imstr)
+                self.logger.info(f"Calling vyom_client.on_image_arrive(node_hn={ims}, filename={filename})")
                 self.vyom_client.on_image_arrive(node_hn=ims, image=image_bytes, filename=filename)
+                self.logger.info(f"Successfully sent image to vyom client: node_hn={ims}, filename={filename}")
             except Exception as e:
-                self.logger.error(f"Error sending image to vyom client {e}")
-
+                self.logger.error(f"Error sending image to vyom client: node_hn={ims}, filename={filename}, error={e}", exc_info=True)
 
     # A:1205:100:12
     def process_hb(self, hbstr):
@@ -152,9 +153,11 @@ class CommandCenter:
                     self.logger.error(f"Error parsing gpsloc {e}, gpsloc={gpsloc}")
                     lat = None
                     long = None
+            self.logger.info(f"Calling vyom_client.on_hb_arrive(node_hn={nodeid}, lat={lat}, long={long})")
             self.vyom_client.on_hb_arrive(node_hn=nodeid, lat=lat, long=long)
+            self.logger.info(f"Successfully sent heartbeat to vyom client: node_hn={nodeid}, lat={lat}, long={long}")
         except Exception as e:
-            self.logger.error(f"Error sending hb to vyom client {e}")
+            self.logger.error(f"Error sending hb to vyom client: node_hn={nodeid}, lat={lat}, long={long}, error={e}", exc_info=True)
     
     # A:1205
     def process_event(self, eventstr):
@@ -174,9 +177,11 @@ class CommandCenter:
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
         # SENDING TO VYOM
         try:
+            self.logger.info(f"Calling vyom_client.on_event_arrive(node_hn={nodeid}, event_id={evid})")
             self.vyom_client.on_event_arrive(node_hn=nodeid, event_id=evid)
+            self.logger.info(f"Successfully sent event to vyom client: node_hn={nodeid}, event_id={evid}")
         except Exception as e:
-            self.logger.error(f"Error sending event to vyom client {e}")
+            self.logger.error(f"Error sending event to vyom client: node_hn={nodeid}, event_id={evid}, error={e}", exc_info=True)
 
     def process_gps(self, msgstr):
         parts = msgstr.split(':')
