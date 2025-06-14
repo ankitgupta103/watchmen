@@ -313,7 +313,7 @@ class DevUnit:
                     time.sleep(2)
                 if cropped:
                     self.send_img(cropped, evid)
-                    time.sleep(40)
+                    time.sleep(60)
                 if full:
                     self.send_img(full, evid)
             time.sleep(10)
