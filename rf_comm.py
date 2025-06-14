@@ -376,7 +376,7 @@ class RFComm:
         chunks_undelivered = msg_chunks
         alldone = False
         for i in range(retry_count):
-            for cid in chunks_undelivered:
+            for i in chunks_undelivered:
                 self._send_chunk_i(msg_chunks, cidstr, i, dest)
             sent = self._send_chunk_end(cidstr, dest, alldone)
             time.sleep(0.5)
