@@ -373,9 +373,9 @@ class RFComm:
         if not sent:
             print(f"Failed to send chunk begin")
             return False
-        chunks_undelivered = msg_chunks
+        chunks_undelivered = [i for i in range(len(msg_chunks))]
         alldone = False
-        for i in range(retry_count):
+        for r in range(retry_count):
             for i in chunks_undelivered:
                 self._send_chunk_i(msg_chunks, cidstr, i, dest)
             sent = self._send_chunk_end(cidstr, dest, alldone)
@@ -384,7 +384,7 @@ class RFComm:
                 chunks_undelivered = self.msg_cunks_missing[cidstr]
                 if cidstr in self.all_chunks_done and self.all_chunks_done[cidstr]:
                     alldone = True
-            print(f"After retry count {i} receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered} alldone = {alldone}")
+            print(f"After retry count {r} receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered} alldone = {alldone}")
             if alldone:
                 sent = self._send_chunk_end(cidstr, dest, alldone)
                 break
