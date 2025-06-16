@@ -84,11 +84,11 @@ Wants=multi-user.target
 #
 [Service]
 Type=simple
-ExecStart=/bin/bash -lic 'source ${ENV_FILE_PATH} && python ${PYTHON_FILE_PATH}'
+ExecStart=/bin/bash -lic 'source ${ENV_FILE_PATH} && python ${PYTHON_FILE_PATH} 2>&1 | tee -a ${USER_HOME}/run_demob_service.log'
 Restart=always
 RestartSec=10
-StandardOutput=append:$USER_HOME/run_demob_service.log
-StandardError=append:$USER_HOME/run_demob_service_error.log
+StandardOutput=journal
+StandardError=journal
 
 # User and Group
 User=$ACTUAL_USER
