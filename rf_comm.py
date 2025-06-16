@@ -22,7 +22,7 @@ hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = False
-FLAKINESS = 10  # 0-100 %
+FLAKINESS = 0  # 0-100 %
 
 logging.basicConfig(
     level=logging.INFO,
@@ -440,7 +440,7 @@ class RFComm:
                 break
             logger.info(f" {cidstr} to {dest} : After retry count {r} receiver did not receive {nummissing} chunks : and we got a list of {len(chunks_undelivered)} which is {chunks_undelivered[0:10]} alldone = {alldone}")
             self.msg_cunks_missing[cidstr] = [] # Reset missing chunks after sending these chunks
-            time.sleep(3)
+            time.sleep(2)
         if alldone:
             logger.info(f" ==== {cidstr} to {dest}: Successfully delivered all chunks !!!")
             return True
