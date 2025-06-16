@@ -18,8 +18,6 @@ radio = RF24(22, 0)
 MAX_DATA_SIZE = 32
 MAX_CHUNK_SIZE = 19
 
-MAX_IMAGE_SECS = 45
-
 hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
@@ -73,11 +71,6 @@ class RFComm:
         self.devid = devid
 
         # Receiver
-        self.images_done = [] # (CID, TS_BEGIN, TS_END)
-        self.images_in_progress = [] # (CID, TS_BEGIN), will either be timed out and removed after MAX_IMAGE_SECS or removed when transmission is complete
-        self.sending_image = False
-
-        # Receiver
         self.msg_chunks_expected = {} # Receiver uses this. cid->num_chunks
         self.msg_chunks_received = {} # Receiver uses this. cid->list of ids got
         self.msg_parts = {} # Receiver uses this. cid->data
@@ -104,25 +97,6 @@ class RFComm:
     def add_node(self, node):
         self.node = node
     
-    # Do not ack if currently sending an image or receiving an image
-    def i_am_free(self):
-        print("Checking if I am free to receive or send")
-        if self.sending_image:
-            logger.error(f"Currently too busy sending an image myself")
-            return False
-        newlist = []
-        print(f"Images in progress = {self.images_in_progress}")
-        for (cid, tsbegin) in self.images_in_progress:
-            tsnow = time.time()
-            if tsnow - tsbegin < MAX_IMAGE_SECS:
-                newlist.append((cid, tsbegin))
-        self.images_in_progress = newlist
-        print(f"Images in progress = {self.images_in_progress}")
-        if len(self.images_in_progress) > 0:
-            logger.error(f"Currently too busy receiving another image")
-            return False
-        return True
-
     def process_message(self, msgid, mst, msgstr):
         if msgid in self.msg_processed:
             return
@@ -213,9 +187,6 @@ class RFComm:
             else:
                 time.sleep(0.5)
                 self._send_unicast(payload_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
-                print(f"Images in progress = {self.images_in_progress}")
-                self.images_in_progress.append((cid, time.time()))
-                print(f"Images in progress = {self.images_in_progress}")
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
             # TODO aggregate by original message id of begin.
@@ -247,16 +218,6 @@ class RFComm:
                 time.sleep(0.5)
                 logger.info(f"{cid} from {src} : Sending ack saying I got all chunks for {cid}")
                 self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
-                print(f"Images in progress = {self.images_in_progress}")
-                for imi in range(len(self.images_in_progress)):
-                    (c,tb) = self.images_in_progress[imi]
-                    if cid == c:
-                        print(f"Clearing {c} because done")
-                        self.images_in_progress.pop(imi)
-                    elif time.time() - tb > MAX_IMAGE_SECS:
-                        print(f"Expiring {c}")
-                        self.images_in_progress.pop(imi)
-                print(f"Images in progress = {self.images_in_progress}")
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             else:
                 logger.info(f" @@@@@@@ {cid} from {src} At Chunk End missing {len(missing_chunks)} out of {expected_chunks}")
@@ -450,13 +411,7 @@ class RFComm:
 
     def _send_chunk_begin(self, mst, cidstr, num_chunks, dest):
         payload = f"{mst}{cidstr};{num_chunks}"
-        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 3)
-        if not sent:
-            time.sleep(MAX_IMAGE_SECS)
-            sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 3)
-        if not sent:
-            time.sleep(MAX_IMAGE_SECS)
-            sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 3)
+        sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 5)
         return sent
 
     # Note retry here is separate retry per chunk.
@@ -551,13 +506,8 @@ class RFComm:
                 sent = self._send_unicast(msg, mst, dest, False, 1)
             return sent
         else:
-            logger.warning("Too big, will chunk msg {len(payload)}")
-            if not self.i_am_free():
-                logger.error(f" ************** Not sending image because I am busy")
-                time.sleep(MAX_IMAGE_SECS)
-            self.sending_image = True
+            logger.warning(f"Too big, will chunk msg {len(payload)}")
             sent = self._send_long_msg(payload, mst, dest)
-            self.sending_image = False
             return sent
 
 def test_send_img(rf, imgfile, dest):
