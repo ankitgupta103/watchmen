@@ -7,22 +7,32 @@
 # transfer service for a camera. It must be run with root privileges.
 # ==============================================================================
 
+# Get the actual user (not root when using sudo)
+if [[ -n "$SUDO_USER" ]]; then
+    ACTUAL_USER="$SUDO_USER"
+else
+    ACTUAL_USER="$USER"
+fi
+
+# Set user-specific paths
+USER_HOME="/home/$ACTUAL_USER"
+
 # --- Configuration ---
 # The user who will own the created directories (not the user running the service)
-OWNER_USER="ankit"
+OWNER_USER="$ACTUAL_USER"
 
 # Directory where the main script will be stored
-SCRIPT_DIR="/home/$OWNER_USER/Documents/watchmen/camera-capture-service"
+SCRIPT_DIR="$USER_HOME/watchmen/camera-capture-service"
 SCRIPT_PATH="$SCRIPT_DIR/usb-camera-power-cycle.sh"
 
 # Directory where images will be saved
-IMAGE_DIR="/home/$OWNER_USER/Documents/images"
+IMAGE_DIR="$USER_HOME/images"
 
 # Path for the systemd service file
 SERVICE_NAME="camera-capture.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
 
-CAMERA_IMAGE_FOLDER="/home/$OWNER_USER/Documents/images"
+CAMERA_IMAGE_FOLDER="$USER_HOME/images"
 
 # Path for the log file
 LOG_FILE="/var/log/usb-cycle.log"
@@ -59,6 +69,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 echo "--- Starting Camera Capture Service Setup ---"
+echo "Setting up service for user: $ACTUAL_USER"
+echo "User home directory: $USER_HOME"
 
 # 2. Install Dependencies
 echo "[1/6] Installing dependencies (uhubctl)..."
@@ -73,7 +85,7 @@ echo "Dependencies installed successfully."
 echo "[2/6] Creating required directories..."
 mkdir -p "$SCRIPT_DIR"
 mkdir -p "$IMAGE_DIR"
-chown -R "$OWNER_USER:$OWNER_USER" "/home/$OWNER_USER/Documents"
+chown -R "$OWNER_USER:$OWNER_USER" "$USER_HOME"
 echo "Directories created and permissions set."
 
 # 4. Create the main USB control script
@@ -86,7 +98,7 @@ echo "[3/6] Creating the USB control script at $SCRIPT_PATH..."
 # fi
 
 # Use a heredoc to write the provided script to the file
-cat > "$SCRIPT_PATH" << 'EOF'
+cat > "$SCRIPT_PATH" << EOF
 #!/bin/bash
 
 # GPIO Power Cycle and File Transfer Script
@@ -101,7 +113,7 @@ GPIO_PIN=17
 OFF_TIME=60
 
 # Destination directory for copied files
-DEST_DIR="/home/ankit/Documents/images"
+DEST_DIR="$USER_HOME/images"
 
 # Log file path
 LOG_FILE="/var/log/gpio-cycle.log"
@@ -116,14 +128,14 @@ MAX_MOUNT_WAIT=10
 
 # Logging function
 log_message() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    echo "[\$(date '+%Y-%m-%d %H:%M:%S')] \$1" | tee -a "\$LOG_FILE"
 }
 
 # Cleanup function to run on script exit (e.g., Ctrl+C)
 cleanup() {
     log_message "Stopping script and powering OFF device..."
-    pinctrl set ${GPIO_PIN} op dl
-    log_message "GPIO pin ${GPIO_PIN} set to LOW (OFF). Script terminated."
+    pinctrl set \${GPIO_PIN} op dl
+    log_message "GPIO pin \${GPIO_PIN} set to LOW (OFF). Script terminated."
     exit 0
 }
 
@@ -132,14 +144,14 @@ trap cleanup SIGINT SIGTERM
 
 # Function to power on the device via GPIO
 device_power_on() {
-    log_message "Powering ON device via GPIO pin ${GPIO_PIN}"
-    pinctrl set ${GPIO_PIN} op dh # Set pin to HIGH
+    log_message "Powering ON device via GPIO pin \${GPIO_PIN}"
+    pinctrl set \${GPIO_PIN} op dh # Set pin to HIGH
 }
 
 # Function to power off the device via GPIO
 device_power_off() {
-    log_message "Powering OFF device via GPIO pin ${GPIO_PIN}"
-    pinctrl set ${GPIO_PIN} op dl # Set pin to LOW
+    log_message "Powering OFF device via GPIO pin \${GPIO_PIN}"
+    pinctrl set \${GPIO_PIN} op dl # Set pin to LOW
 }
 
 # Function to safely eject all mounted USB/external media
@@ -147,35 +159,35 @@ eject_usb_devices() {
     log_message "Unmounting all external media..."
     sync # Ensure all pending writes are completed
 
-    MOUNT_POINTS=$(findmnt -lo TARGET,SOURCE -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
+    MOUNT_POINTS=\$(findmnt -lo TARGET,SOURCE -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
 
-    if [ -z "$MOUNT_POINTS" ]; then
+    if [ -z "\$MOUNT_POINTS" ]; then
         log_message "No mounted devices found to unmount."
         return 0
     fi
 
     local unmount_success=true
     while IFS= read -r line; do
-        mount_point=$(echo "$line" | awk '{print $1}')
-        if [ -n "$mount_point" ] && [ -d "$mount_point" ]; then
-            log_message "Unmounting: $mount_point"
-            if ! umount "$mount_point" 2>>"$LOG_FILE"; then
-                log_message "WARNING: Failed to unmount $mount_point. Attempting force unmount..."
-                if ! umount -f "$mount_point" 2>>"$LOG_FILE"; then
-                    log_message "ERROR: Force unmount also failed for $mount_point."
+        mount_point=\$(echo "\$line" | awk '{print \$1}')
+        if [ -n "\$mount_point" ] && [ -d "\$mount_point" ]; then
+            log_message "Unmounting: \$mount_point"
+            if ! umount "\$mount_point" 2>>"\$LOG_FILE"; then
+                log_message "WARNING: Failed to unmount \$mount_point. Attempting force unmount..."
+                if ! umount -f "\$mount_point" 2>>"\$LOG_FILE"; then
+                    log_message "ERROR: Force unmount also failed for \$mount_point."
                     unmount_success=false
                 else
-                    log_message "Force unmount successful for $mount_point."
+                    log_message "Force unmount successful for \$mount_point."
                 fi
             else
-                log_message "Successfully unmounted: $mount_point"
+                log_message "Successfully unmounted: \$mount_point"
             fi
         fi
-    done <<< "$MOUNT_POINTS"
+    done <<< "\$MOUNT_POINTS"
 
     sleep 1 # Give the system a moment to process unmounts
 
-    if [ "$unmount_success" = true ]; then
+    if [ "\$unmount_success" = true ]; then
         log_message "All detected media unmounted successfully."
     else
         log_message "WARNING: Some media could not be unmounted."
@@ -184,15 +196,15 @@ eject_usb_devices() {
 
 # Function to check and prepare the destination directory
 check_destination() {
-    if ! mkdir -p "$DEST_DIR" 2>>"$LOG_FILE"; then
-        log_message "ERROR: Cannot create destination directory $DEST_DIR"
+    if ! mkdir -p "\$DEST_DIR" 2>>"\$LOG_FILE"; then
+        log_message "ERROR: Cannot create destination directory \$DEST_DIR"
         return 1
     fi
-    if ! chown ankit:ankit "$DEST_DIR" 2>>"$LOG_FILE"; then
-        log_message "WARNING: Could not change ownership of $DEST_DIR"
+    if ! chown $ACTUAL_USER:$ACTUAL_USER "\$DEST_DIR" 2>>"\$LOG_FILE"; then
+        log_message "WARNING: Could not change ownership of \$DEST_DIR"
     fi
-    if [ ! -w "$DEST_DIR" ]; then
-        log_message "ERROR: Destination directory $DEST_DIR is not writable."
+    if [ ! -w "\$DEST_DIR" ]; then
+        log_message "ERROR: Destination directory \$DEST_DIR is not writable."
         return 1
     fi
     return 0
@@ -206,81 +218,81 @@ copy_files() {
         return 1
     fi
 
-    MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
-    if [ -z "$MOUNT_POINTS" ]; then
+    MOUNT_POINTS=\$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
+    if [ -z "\$MOUNT_POINTS" ]; then
         log_message "No mounted devices found for file transfer."
         return
     fi
 
     while IFS= read -r mount_point; do
-        log_message "Checking device at: $mount_point"
+        log_message "Checking device at: \$mount_point"
         local copy_count=0
         local fail_count=0
 
         # Find all files and copy them
-        find "$mount_point" -type f -print0 | while IFS= read -r -d '' source_file; do
-            local filename=$(basename "$source_file")
-            local dest_file="$DEST_DIR/$filename"
+        find "\$mount_point" -type f -print0 | while IFS= read -r -d '' source_file; do
+            local filename=\$(basename "\$source_file")
+            local dest_file="\$DEST_DIR/\$filename"
 
-            if [ -f "$dest_file" ]; then
-                log_message "SKIP: $filename already exists in destination."
+            if [ -f "\$dest_file" ]; then
+                log_message "SKIP: \$filename already exists in destination."
                 continue
             fi
 
-            if cp -p "$source_file" "$dest_file" 2>>"$LOG_FILE"; then
-                log_message "COPIED: $filename"
-                chown ankit:ankit "$dest_file"
-                copy_count=$((copy_count + 1))
+            if cp -p "\$source_file" "\$dest_file" 2>>"\$LOG_FILE"; then
+                log_message "COPIED: \$filename"
+                chown $ACTUAL_USER:$ACTUAL_USER "\$dest_file"
+                copy_count=\$((copy_count + 1))
             else
-                log_message "ERROR: Failed to copy $filename."
-                fail_count=$((fail_count + 1))
+                log_message "ERROR: Failed to copy \$filename."
+                fail_count=\$((fail_count + 1))
             fi
         done
-        log_message "Transfer complete for $mount_point: $copy_count files copied, $fail_count failed."
-    done <<< "$MOUNT_POINTS"
+        log_message "Transfer complete for \$mount_point: \$copy_count files copied, \$fail_count failed."
+    done <<< "\$MOUNT_POINTS"
 }
 
 # Function to wait for a device to mount
 wait_for_usb_mount() {
     local attempts=0
-    local max_attempts=$((MAX_MOUNT_WAIT * 2)) # Poll every 0.5s
+    local max_attempts=\$((MAX_MOUNT_WAIT * 2)) # Poll every 0.5s
 
-    log_message "Waiting for device to mount (max ${MAX_MOUNT_WAIT}s)..."
-    while [ $attempts -lt $max_attempts ]; do
-        if [ -n "$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E '^/media/|^/mnt/')" ]; then
+    log_message "Waiting for device to mount (max \${MAX_MOUNT_WAIT}s)..."
+    while [ \$attempts -lt \$max_attempts ]; do
+        if [ -n "\$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E '^/media/|^/mnt/')" ]; then
             log_message "Device detected as mounted. Proceeding with file transfer."
             sleep 1 # Allow filesystem to stabilize
             return 0
         fi
         sleep 0.5
-        attempts=$((attempts + 1))
+        attempts=\$((attempts + 1))
     done
 
-    log_message "Timeout: No device mounted after ${MAX_MOUNT_WAIT} seconds."
+    log_message "Timeout: No device mounted after \${MAX_MOUNT_WAIT} seconds."
     return 1
 }
 
 # --- Main Loop ---
 log_message "Starting device power cycle and copy service."
-log_message "Destination: $DEST_DIR, OFF Time: ${OFF_TIME}s"
+log_message "Destination: \$DEST_DIR, OFF Time: \${OFF_TIME}s"
 
 # Set GPIO pin as output and initialize to LOW (OFF)
-pinctrl set ${GPIO_PIN} op dl
+pinctrl set \${GPIO_PIN} op dl
 
 while true; do
     # 1. Power ON
     device_power_on
-    log_message "Device powered on. Waiting ${POWER_ON_STABILIZATION_TIME}s for it to initialize..."
-    sleep $POWER_ON_STABILIZATION_TIME
+    log_message "Device powered on. Waiting \${POWER_ON_STABILIZATION_TIME}s for it to initialize..."
+    sleep \$POWER_ON_STABILIZATION_TIME
 
     # 2. Wait for Mount
     if wait_for_usb_mount; then
         # 3. Copy files if mount was successful
-        start_time=$(date +%s)
+        start_time=\$(date +%s)
         copy_files
-        end_time=$(date +%s)
-        transfer_time=$((end_time - start_time))
-        log_message "File copy process finished in ${transfer_time}s."
+        end_time=\$(date +%s)
+        transfer_time=\$((end_time - start_time))
+        log_message "File copy process finished in \${transfer_time}s."
     fi
 
     # 4. Unmount Media
@@ -290,8 +302,8 @@ while true; do
     device_power_off
 
     # 6. Wait for the specified OFF duration
-    log_message "Device powered off. Waiting for $OFF_TIME seconds..."
-    sleep $OFF_TIME
+    log_message "Device powered off. Waiting for \$OFF_TIME seconds..."
+    sleep \$OFF_TIME
 done
 EOF
 
@@ -327,7 +339,7 @@ NoNewPrivileges=no
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # Working Directory
-WorkingDirectory=/home/ankit/Documents
+WorkingDirectory=$USER_HOME
 
 [Install]
 WantedBy=multi-user.target
@@ -345,6 +357,9 @@ echo
 echo "--- Setup Complete ---"
 echo
 echo "The camera capture service has been installed and started."
+echo "User: $ACTUAL_USER"
+echo "Images directory: $IMAGE_DIR"
+echo "Script location: $SCRIPT_PATH"
 echo "To check the status of the service, run: sudo systemctl status $SERVICE_NAME"
 echo "To view the service logs, run: sudo journalctl -u $SERVICE_NAME -f"
 echo "To view the script's specific log file, run: tail -f $LOG_FILE"

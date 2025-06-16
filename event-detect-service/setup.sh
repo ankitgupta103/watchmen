@@ -5,45 +5,6 @@
 
 set -e  # Exit on any error
 
-# Function to validate input with retries
-# validate_input() {
-#     local prompt="$1"
-#     local var_name="$2"
-#     local max_retries=3
-#     local retry_count=0
-    
-#     while [ $retry_count -lt $max_retries ]; do
-#         read -p "$prompt" input_value
-#         if [ -n "$input_value" ]; then
-#             eval "$var_name='$input_value'"
-#             return 0
-#         fi
-#         retry_count=$((retry_count + 1))
-#         if [ $retry_count -lt $max_retries ]; then
-#             echo "Error: Input cannot be empty. Please try again. ($((max_retries - retry_count)) attempts remaining)"
-#         fi
-#     done
-    
-#     echo "Error: Maximum retries reached. Input cannot be empty."
-#     return 1
-# }
-
-# Validate camera images folder
-# if ! validate_input "Enter the complete path to the camera images folder: " "CAMERA_IMAGE_FOLDER"; then
-#     echo "Error: Failed to get valid camera images folder path"
-#     exit 1
-# fi
-CAMERA_IMAGE_FOLDER="/home/ankit/Documents/images"
-
-# Validate events output folder
-# if ! validate_input "Enter the complete path to the events output folder: " "EVENT_OUTPUT_FOLDER"; then
-#     echo "Error: Failed to get valid events output folder path"
-#     exit 1
-# fi
-EVENT_OUTPUT_FOLDER="/home/ankit/Documents/processed_images"
-
-ENV_FILE_PATH="/home/ankit/.bashrc"
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -51,14 +12,25 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Get the actual user (not root when using sudo)
+if [[ -n "$SUDO_USER" ]]; then
+    ACTUAL_USER="$SUDO_USER"
+else
+    ACTUAL_USER="$USER"
+fi
+
+# Set user-specific paths
+USER_HOME="/home/$ACTUAL_USER"
+CAMERA_IMAGE_FOLDER="$USER_HOME/images"
+EVENT_OUTPUT_FOLDER="$USER_HOME/processed_images"
+ENV_FILE_PATH="$USER_HOME/.bashrc"
+
 # Configuration
 SERVICE_NAME="event-detector"
 SERVICE_FILE="${SERVICE_NAME}.service"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_FILE_PATH="${SCRIPT_DIR}/event_detector.py"
 SYSTEMD_DIR="/etc/systemd/system"
-# CAMERA_IMAGE_FOLDER="/home/ankit/Documents/images" # input folder
-# EVENT_OUTPUT_FOLDER="/home/ankit/Documents/processed_images"  # output folder
 
 echo -e "${BLUE}=== Event Detector Service Setup ===${NC}"
 
@@ -80,6 +52,10 @@ if [[ $EUID -ne 0 ]]; then
    print_error "This script must be run as root (use sudo)"
    exit 1
 fi
+
+# Display user information
+print_status "Setting up service for user: $ACTUAL_USER"
+print_status "User home directory: $USER_HOME"
 
 # Check if Python script exists
 if [[ ! -f "$PYTHON_FILE_PATH" ]]; then
@@ -105,15 +81,10 @@ python3 -c "import cv2, ultralytics" 2>/dev/null || {
 # Create necessary directories
 print_status "Creating necessary directories..."
 mkdir -p "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER"
-chown ankit:ankit "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER" 2>/dev/null || print_warning "Could not change ownership of directories"
+chown $ACTUAL_USER:$ACTUAL_USER "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER" 2>/dev/null || print_warning "Could not change ownership of directories"
 
 # Create the service file
 print_status "Creating service file..."
-# Validate environment file path
-# if ! validate_input "Enter the complete filepath to source the environment: " "ENV_FILE_PATH"; then
-#     print_error "Failed to get valid environment file path"
-#     exit 1
-# fi
 
 cat > "${SYSTEMD_DIR}/${SERVICE_FILE}" << EOF
 [Unit]
@@ -131,8 +102,8 @@ StandardOutput=journal
 StandardError=journal
 
 # User and Group
-User=ankit
-Group=ankit
+User=$ACTUAL_USER
+Group=$ACTUAL_USER
 
 # Working Directory
 WorkingDirectory=${SCRIPT_DIR}
@@ -178,6 +149,7 @@ fi
 echo
 echo -e "${BLUE}=== Service Setup Complete ===${NC}"
 echo -e "${GREEN}Service Name:${NC} $SERVICE_NAME"
+echo -e "${GREEN}User:${NC} $ACTUAL_USER"
 echo -e "${GREEN}Camera Images Folder:${NC} $CAMERA_IMAGE_FOLDER"
 echo -e "${GREEN}Output Folder:${NC} $EVENT_OUTPUT_FOLDER"
 echo -e "${GREEN}Service File:${NC} ${SYSTEMD_DIR}/${SERVICE_FILE}"
