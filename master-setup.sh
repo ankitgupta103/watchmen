@@ -63,6 +63,14 @@ fi
 
 print_header "MASTER SETUP - COMPLETE SYSTEM CONFIGURATION"
 
+# Ask if the device is central or dev unit
+DEVICE_TYPE=""
+while [[ "$DEVICE_TYPE" != "central" && "$DEVICE_TYPE" != "dev" ]]; do
+    read -p "Is this device a 'central' or 'dev' unit? [central/dev]: " DEVICE_TYPE
+    DEVICE_TYPE=$(echo "$DEVICE_TYPE" | tr '[:upper:]' '[:lower:]')
+done
+print_status "Device type selected: $DEVICE_TYPE"
+
 # Get current directory as project directory
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 print_status "Project directory: $PROJECT_DIR"
@@ -163,32 +171,36 @@ fi
 # =============================================================================
 print_step "[4/5] Running setup scripts in subdirectories..."
 
-# Run camera-capture-service setup
-CAMERA_SETUP_DIR="$PROJECT_DIR/camera-capture-service"
-if [ -d "$CAMERA_SETUP_DIR" ] && [ -f "$CAMERA_SETUP_DIR/setup.sh" ]; then
-    print_status "Running camera-capture-service setup..."
-    cd "$CAMERA_SETUP_DIR"
-    chmod +x setup.sh
-    ./setup.sh
-    cd "$PROJECT_DIR"
-    print_status "Camera capture service setup completed"
+if [ "$DEVICE_TYPE" = "central" ]; then
+    print_status "Central unit selected: Skipping Camera capture and Event detector service setup."
 else
-    print_error "Camera capture service setup not found at $CAMERA_SETUP_DIR/setup.sh"
-    exit 1
-fi
+    # Run camera-capture-service setup
+    CAMERA_SETUP_DIR="$PROJECT_DIR/camera-capture-service"
+    if [ -d "$CAMERA_SETUP_DIR" ] && [ -f "$CAMERA_SETUP_DIR/setup.sh" ]; then
+        print_status "Running camera-capture-service setup..."
+        cd "$CAMERA_SETUP_DIR"
+        chmod +x setup.sh
+        ./setup.sh
+        cd "$PROJECT_DIR"
+        print_status "Camera capture service setup completed"
+    else
+        print_error "Camera capture service setup not found at $CAMERA_SETUP_DIR/setup.sh"
+        exit 1
+    fi
 
-# Run event-detect-service setup
-EVENT_SETUP_DIR="$PROJECT_DIR/event-detect-service"
-if [ -d "$EVENT_SETUP_DIR" ] && [ -f "$EVENT_SETUP_DIR/setup.sh" ]; then
-    print_status "Running event-detect-service setup..."
-    cd "$EVENT_SETUP_DIR"
-    chmod +x setup.sh
-    ./setup.sh
-    cd "$PROJECT_DIR"
-    print_status "Event detect service setup completed"
-else
-    print_error "Event detect service setup not found at $EVENT_SETUP_DIR/setup.sh"
-    exit 1
+    # Run event-detect-service setup
+    EVENT_SETUP_DIR="$PROJECT_DIR/event-detect-service"
+    if [ -d "$EVENT_SETUP_DIR" ] && [ -f "$EVENT_SETUP_DIR/setup.sh" ]; then
+        print_status "Running event-detect-service setup..."
+        cd "$EVENT_SETUP_DIR"
+        chmod +x setup.sh
+        ./setup.sh
+        cd "$PROJECT_DIR"
+        print_status "Event detect service setup completed"
+    else
+        print_error "Event detect service setup not found at $EVENT_SETUP_DIR/setup.sh"
+        exit 1
+    fi
 fi
 
 # =============================================================================
