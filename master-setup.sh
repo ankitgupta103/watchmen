@@ -200,12 +200,24 @@ DEMO_SCRIPT="$PROJECT_DIR/create-demo-service.sh"
 if [ -f "$DEMO_SCRIPT" ]; then
     print_status "Running create-demo-service.sh..."
     chmod +x "$DEMO_SCRIPT"
-    "$DEMO_SCRIPT"
-    print_status "Demo service setup completed"
+    if "$DEMO_SCRIPT"; then
+        print_status "Demo service setup completed"
+    else
+        print_warning "Demo service setup failed, but continuing with the rest of the setup. You can rerun it manually later."
+    fi
 else
-    print_error "create-demo-service.sh not found at $DEMO_SCRIPT"
-    exit 1
+    print_warning "create-demo-service.sh not found at $DEMO_SCRIPT. Continuing with the rest of the setup."
 fi
+
+# =============================================================================
+# POST-SETUP: Manual Steps for the User
+# =============================================================================
+print_header "MANUAL STEPS TO COMPLETE SETUP"
+echo -e "${YELLOW}1.${NC} Switch to root shell: ${CYAN}sudo su${NC}"
+echo -e "${YELLOW}2.${NC} Source your bashrc: ${CYAN}source /home/$ACTUAL_USER/.bashrc${NC}"
+echo -e "${YELLOW}3.${NC} Run vyomcloudbridge setup: ${CYAN}vyomcloudbridge setup${NC}"
+echo -e "${YELLOW}4.${NC} Reboot the system: ${CYAN}sudo reboot${NC}"
+echo
 
 # =============================================================================
 # SETUP COMPLETE - SUMMARY
