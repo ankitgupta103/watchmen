@@ -323,7 +323,7 @@ def main():
         "--output",
         type=Path,
         default=Path.home() / "Documents" / "processed_images",
-        help="The directory where processed images will be stored. Defaults to ~/Documents/processed_images."
+        help="The directory where processed images will be stored. Defaults to ~/processed_images."
     )
 
     args = parser.parse_args()

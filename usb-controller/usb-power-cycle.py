@@ -18,7 +18,7 @@ import RPi.GPIO as GPIO
 POWER_PIN = 11  # GPIO pin connected to MOSFET trigger (GPIO 17)
 OFF_TIME = 60  # Seconds to keep USB power off
 MAX_MOUNT_WAIT = 10  # Maximum seconds to wait for device mount
-DEST_DIR = "/home/pi/Documents/images"
+DEST_DIR = os.path.expanduser("~/images")
 LOG_FILE = "/var/log/usb-cycle.log"
 
 # Image file extensions to move

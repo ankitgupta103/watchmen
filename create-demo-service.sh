@@ -1,21 +1,26 @@
 #!/bin/bash
-
 # Run Demo Service Script
+set -e # Exit on any error
 
-set -e  # Exit on any error
+# Get the actual user (not root when using sudo)
+if [[ -n "$SUDO_USER" ]]; then
+    ACTUAL_USER="$SUDO_USER"
+else
+    ACTUAL_USER="$USER"
+fi
 
-CAMERA_IMAGE_FOLDER="/home/ankit/Documents/images"
-
-EVENT_OUTPUT_FOLDER="/home/ankit/Documents/processed_images"
-
-ENV_FILE_PATH="/home/ankit/.bashrc"
+# Set user-specific paths
+USER_HOME="/home/$ACTUAL_USER"
+CAMERA_IMAGE_FOLDER="$USER_HOME/images"
+EVENT_OUTPUT_FOLDER="$USER_HOME/processed_images"
+ENV_FILE_PATH="$USER_HOME/.bashrc"
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' 
+NC='\033[0m'
 
 # Configuration
 SERVICE_NAME="run-demob"
@@ -41,9 +46,13 @@ print_error() {
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
-   print_error "This script must be run as root (use sudo)"
-   exit 1
+    print_error "This script must be run as root (use sudo)"
+    exit 1
 fi
+
+# Display user information
+print_status "Setting up service for user: $ACTUAL_USER"
+print_status "User home directory: $USER_HOME"
 
 # Check if Python script exists
 if [[ ! -f "$PYTHON_FILE_PATH" ]]; then
@@ -59,27 +68,31 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+# Create necessary directories
+print_status "Creating necessary directories..."
+mkdir -p "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER"
+chown $ACTUAL_USER:$ACTUAL_USER "$CAMERA_IMAGE_FOLDER" "$EVENT_OUTPUT_FOLDER" 2>/dev/null || print_warning "Could not change ownership of directories"
+
 # Create the service file
 print_status "Creating service file..."
-
 cat > "${SYSTEMD_DIR}/${SERVICE_FILE}" << EOF
 [Unit]
 Description=Run Demo Service
 After=multi-user.target network.target
 Wants=multi-user.target
 
-# 
+#
 [Service]
 Type=simple
 ExecStart=/bin/bash -lic 'source ${ENV_FILE_PATH} && python ${PYTHON_FILE_PATH}'
 Restart=always
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
+StandardOutput=append:$USER_HOME/run_demob_service.log
+StandardError=append:$USER_HOME/run_demob_service_error.log
 
 # User and Group
-User=ankit
-Group=ankit
+User=$ACTUAL_USER
+Group=$ACTUAL_USER
 
 # Working Directory
 WorkingDirectory=${SCRIPT_DIR}
@@ -87,7 +100,11 @@ WorkingDirectory=${SCRIPT_DIR}
 [Install]
 WantedBy=multi-user.target
 EOF
-  
+
+# Set proper permissions for the service file
+chmod 644 "${SYSTEMD_DIR}/${SERVICE_FILE}"
+print_status "Service file created: ${SYSTEMD_DIR}/${SERVICE_FILE}"
+
 # Reload systemd to recognize the new service
 print_status "Reloading systemd daemon..."
 systemctl daemon-reload
@@ -117,13 +134,18 @@ fi
 echo
 echo -e "${BLUE}=== Service Setup Complete ===${NC}"
 echo -e "${GREEN}Service Name:${NC} $SERVICE_NAME"
+echo -e "${GREEN}User:${NC} $ACTUAL_USER"
+echo -e "${GREEN}Camera Images Folder:${NC} $CAMERA_IMAGE_FOLDER"
+echo -e "${GREEN}Event Output Folder:${NC} $EVENT_OUTPUT_FOLDER"
 echo -e "${GREEN}Service File:${NC} ${SYSTEMD_DIR}/${SERVICE_FILE}"
+echo -e "${GREEN}Log Files:${NC} $USER_HOME/run_demob_service.log and $USER_HOME/run_demob_service_error.log"
 echo
 
 # Useful commands
 echo -e "${BLUE}=== Useful Commands ===${NC}"
 echo -e "${YELLOW}Check service status:${NC} sudo systemctl status $SERVICE_NAME"
 echo -e "${YELLOW}View service logs:${NC} sudo journalctl -u $SERVICE_NAME -f"
+echo -e "${YELLOW}View file logs:${NC} tail -f $USER_HOME/run_demob_service.log"
 echo -e "${YELLOW}Stop service:${NC} sudo systemctl stop $SERVICE_NAME"
 echo -e "${YELLOW}Start service:${NC} sudo systemctl start $SERVICE_NAME"
 echo -e "${YELLOW}Restart service:${NC} sudo systemctl restart $SERVICE_NAME"
@@ -136,3 +158,4 @@ systemctl status "$SERVICE_NAME" --no-pager
 
 print_status "Setup completed successfully!"
 print_status "The service will automatically start on system boot."
+print_status "Logs will be saved to both journalctl and $USER_HOME/run_demob_service.log"

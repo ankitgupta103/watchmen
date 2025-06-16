@@ -1,18 +1,30 @@
 #!/bin/bash
-
 # =============================================================================
 # Image Copy Script - Cron Compatible
 # This script copies an image file multiple times to a specified folder
 # Designed to work with cron jobs
 # =============================================================================
 
+# Get the current user (works with both direct execution and cron)
+if [[ -n "$SUDO_USER" ]]; then
+    ACTUAL_USER="$SUDO_USER"
+elif [[ -n "$USER" ]]; then
+    ACTUAL_USER="$USER"
+else
+    # Fallback for cron jobs where USER might not be set
+    ACTUAL_USER=$(whoami)
+fi
+
+# Set user-specific paths
+USER_HOME="/home/$ACTUAL_USER"
+
 # --- CONFIGURATION (Edit these paths) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_IMAGE="${SCRIPT_DIR}/testdata/forest_man_2.jpg"      
-DESTINATION_FOLDER="/home/ankit/Documents/images"     
-NUM_COPIES=1                                  # Number of copies to make
-INTERVAL=1                                    # Interval between copies (in seconds)
-LOG_FILE="/var/log/image_copy.log"            # Log file for cron output (optional)
+SOURCE_IMAGE="${SCRIPT_DIR}/testdata/forest_man_2.jpg"
+DESTINATION_FOLDER="$USER_HOME/images"
+NUM_COPIES=1                            # Number of copies to make
+INTERVAL=1                              # Interval between copies (in seconds)
+LOG_FILE="/var/log/image_copy.log"
 # ----------------------------------------
 
 # Set PATH for cron compatibility
@@ -50,6 +62,10 @@ print_error() {
     [ -n "$LOG_FILE" ] && echo "$message" >> "$LOG_FILE"
 }
 
+# Display user information
+print_status "Running image copy script for user: $ACTUAL_USER"
+print_status "Destination folder: $DESTINATION_FOLDER"
+
 # Check if source image exists
 if [ ! -f "$SOURCE_IMAGE" ]; then
     print_error "Source image '$SOURCE_IMAGE' does not exist!"
@@ -61,6 +77,10 @@ if [ ! -d "$DESTINATION_FOLDER" ]; then
     print_warning "Destination folder '$DESTINATION_FOLDER' does not exist. Creating it..."
     mkdir -p "$DESTINATION_FOLDER"
     if [ $? -eq 0 ]; then
+        # Set proper ownership if running as root
+        if [ "$EUID" -eq 0 ] && [ "$ACTUAL_USER" != "root" ]; then
+            chown "$ACTUAL_USER:$ACTUAL_USER" "$DESTINATION_FOLDER"
+        fi
         print_status "Destination folder created successfully."
     else
         print_error "Failed to create destination folder!"
@@ -89,6 +109,12 @@ for i in $(seq 1 $NUM_COPIES); do
     if [ $? -eq 0 ]; then
         # Ensure the copied file is deletable by setting proper permissions
         chmod 644 "$DEST_PATH"
+        
+        # Set proper ownership if running as root
+        if [ "$EUID" -eq 0 ] && [ "$ACTUAL_USER" != "root" ]; then
+            chown "$ACTUAL_USER:$ACTUAL_USER" "$DEST_PATH"
+        fi
+        
         print_status "Copy $i/$NUM_COPIES: Created '$NEW_NAME' (deletable)"
     else
         print_error "Failed to copy image (attempt $i/$NUM_COPIES)"

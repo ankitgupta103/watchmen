@@ -12,7 +12,7 @@ GPIO_PIN=17
 OFF_TIME=60
 
 # Destination directory for copied files
-DEST_DIR="/home/ankit/Documents/images"
+DEST_DIR="/home/ankit/images"
 
 # Log file path
 LOG_FILE="/var/log/gpio-cycle.log"

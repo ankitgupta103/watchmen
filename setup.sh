@@ -279,7 +279,7 @@ for py_file in "$PROJECT_DIR"/*.py; do
         # Update common directory paths in Python files
         sed -i "s|../processed|$PROCESSED_DIR|g" "$py_file" 2>/dev/null || true
         sed -i "s|../processed/critical|$CRITICAL_DIR|g" "$py_file" 2>/dev/null || true
-        sed -i "s|/home/ankit/Documents/images|$IMAGE_DIR|g" "$py_file" 2>/dev/null || true
+        sed -i "s|/home/ankit/images|$IMAGE_DIR|g" "$py_file" 2>/dev/null || true
         print_status "Updated paths in $(basename "$py_file")"
     fi
 done
