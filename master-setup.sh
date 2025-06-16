@@ -124,7 +124,9 @@ chown "$ACTUAL_USER:$ACTUAL_USER" "$BASHRC_FILE"
 print_step "[2/5] Installing vyomcloudbridge..."
 
 # Source .bashrc and install vyomcloudbridge
-sudo -u "$ACTUAL_USER" bash -c "source $BASHRC_FILE && pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ vyomcloudbridge==0.2.39"
+# sudo -u "$ACTUAL_USER" bash -c "source $BASHRC_FILE && pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ vyomcloudbridge==0.2.39"
+source $BASHRC_FILE 
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ vyomcloudbridge==0.2.39
 
 print_status "vyomcloudbridge v0.2.39 installed successfully"
 
