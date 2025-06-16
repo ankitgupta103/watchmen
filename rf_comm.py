@@ -181,12 +181,8 @@ class RFComm:
             self.msg_parts[cid] = []
             logger.info(f"{cid} from {src} : Sending ack for {msgid} for {numchunks} chunks")
             payload_to_send = msgid
-            # Do not ack if currently sending an image or receiving an image
-            if not self.i_am_free():
-                logger.error(f" ************** Not accepting image {cid} from {src} because I am busy")
-            else:
-                time.sleep(0.5)
-                self._send_unicast(payload_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
+            time.sleep(0.5)
+            self._send_unicast(payload_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
             return
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
             # TODO aggregate by original message id of begin.
