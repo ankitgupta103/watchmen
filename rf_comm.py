@@ -448,7 +448,7 @@ class RFComm:
             sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_END, dest, False, 0, cidstr)
         return sent
 
-    def _send_chunk_begin(self, cidstr, num_chunks, dest):
+    def _send_chunk_begin(self, mst, cidstr, num_chunks, dest):
         payload = f"{mst}{cidstr};{num_chunks}"
         sent = self._send_unicast(payload, constants.MESSAGE_TYPE_CHUNK_BEGIN, dest, True, 3)
         if not sent:
