@@ -14,9 +14,6 @@ export default function DeviceStatusBufferLocation({
 }) {
   const { data, buffer } = useMachineStats(machineId);
 
-  console.log('data', data);
-  console.log('buffer', buffer);
-
   return (
     <>
       <TableCell>

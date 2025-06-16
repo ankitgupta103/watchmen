@@ -129,7 +129,6 @@ export default function AppSidebar() {
                   <DropdownMenuItem
                     key={org.organization_id}
                     onClick={() => {
-                      console.log('clicked');
                       handleOrganizationChange(org);
                     }}
                   >

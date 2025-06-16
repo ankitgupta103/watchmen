@@ -93,12 +93,6 @@ export default function HeatMapCalendar({
         machine.last_location.lng <= areaFilter.east,
     );
 
-    console.log('Area filter applied:', {
-      totalMachines: machines.length,
-      filteredMachines: filtered.length,
-      bounds: areaFilter,
-    });
-
     return filtered;
   }, [machines, areaFilter]);
 
