@@ -212,6 +212,29 @@ fi
 # =============================================================================
 print_header "SETUP COMPLETE!"
 
+# Function to print a spider web ASCII art
+print_spider_web() {
+    echo -e "${CYAN}"
+    echo "              \\       |       /"
+    echo "               \\      |      /"
+    echo "                \\     |     /"
+    echo "          _______\\____|____/_______"
+    echo "         /        \\   |   /        \\"
+    echo "        /          \\  |  /          \\"
+    echo "       /         .-(\\-+-/)-. watchmen \\"
+    echo "      |         /   \\ | /   \\         |"
+    echo "      |        |    (   )    |        |"
+    echo "      |         \\   / | \\   /         |"
+    echo "       \\         '-(/-+-\\)-'         /"
+    echo "        \\          /  |  \\          /"
+    echo "         \\________/   |   \\________/"
+    echo "                 /    |    \\"
+    echo "                /     |     \\"
+    echo "               /      |      \\"
+    echo -e "${NC}"
+}
+print_spider_web
+
 echo
 echo -e "${GREEN}✓ User:${NC} $ACTUAL_USER"
 echo -e "${GREEN}✓ Virtual Environment:${NC} $VENV_DIR"
