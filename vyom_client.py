@@ -78,11 +78,13 @@ class VyomClient:
         except Exception as e:
             print(f"Error setting location in VyomClient: {e}")
 
+    # TODO: Add event severity to the payload
     def on_event_arrive(
         self,
         node_hn: str,
         event_id: str = None,
         timestamp: str = None,
+        eventstr: str = None,
     ):
         """_summary_
 
@@ -120,6 +122,7 @@ class VyomClient:
             payload = {
                 "image_c_key": f"{file_s3_dir}/{filename1}",
                 "image_f_key": f"{file_s3_dir}/{filename2}",
+                "eventstr": eventstr,
             }
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
