@@ -22,7 +22,7 @@ hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = False
-FLAKINESS = 10  # 0-100 %
+FLAKINESS = 0  # 0-100 %
 
 logging.basicConfig(
     level=logging.INFO,
