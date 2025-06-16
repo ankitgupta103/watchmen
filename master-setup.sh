@@ -117,16 +117,14 @@ fi
 
 # Ensure .bashrc is owned by the user
 chown "$ACTUAL_USER:$ACTUAL_USER" "$BASHRC_FILE"
-sudo -u "$ACTUAL_USER" bash -c "source $BASHRC_FILE"
-sleep 5
 
 # =============================================================================
-# STEP 2: Source .bashrc and install vyomcloudbridge
+# STEP 2: Install vyomcloudbridge
 # =============================================================================
 print_step "[2/5] Installing vyomcloudbridge..."
 
 # Install vyomcloudbridge
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ vyomcloudbridge==0.2.39
+sudo -u "$ACTUAL_USER" "$VENV_DIR/bin/pip" install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ vyomcloudbridge==0.2.39
 
 print_status "vyomcloudbridge v0.2.39 installed successfully"
 
@@ -137,7 +135,7 @@ print_step "[3/5] Installing requirements from requirements.txt..."
 
 if [ -f "$PROJECT_DIR/requirements.txt" ]; then
     print_status "Found requirements.txt, installing packages..."
-    sudo -u "$ACTUAL_USER" bash -c "source $BASHRC_FILE && pip install -r $PROJECT_DIR/requirements.txt"
+    sudo -u "$ACTUAL_USER" bash -c "source $BASHRC_FILE && $VENV_DIR/bin/pip install -r $PROJECT_DIR/requirements.txt"
     print_status "Requirements installed successfully"
 else
     print_warning "requirements.txt not found in $PROJECT_DIR"
