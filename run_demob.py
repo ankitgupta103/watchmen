@@ -31,27 +31,17 @@ logger = logging.getLogger(__name__)
 def get_hostname():
     return socket.gethostname()
 
-def is_node_src(devid):
-    return constants.PATH_DEMOB[0] == devid
-
-def is_node_dest(devid):
-    return constants.PATH_DEMOB[-1] == devid
-
-def is_node_passthrough(devid):
-    if is_node_src(devid) or is_node_dest(devid):
+def is_node_cc(devid):
+    if devid in constants.NEXT_DEST_MAP.keys():
         return False
     return True
 
 def get_next_dest(devid):
-    idx = -1
-    logger.info(f"Getting next dest for {devid}")
-    num_nodes = len(constants.PATH_DEMOB)
-    for i in range(num_nodes):
-        if devid == constants.PATH_DEMOB[i]:
-            if i + 1 >= num_nodes:
-                return None
-            else:
-                return constants.PATH_DEMOB[i+1]
+    if devid in constants.NEXT_DEST_MAP:
+        dest = constants.NEXT_DEST_MAP[devid]
+        logger.info(f"{devid} -- next dest -- {dest}")
+        return dest
+    logger.error(f"Error getting next dest for {devid}")
     return None
 
 def get_files_in_dir(alldir, criticaldir):
@@ -238,8 +228,8 @@ class DevUnit:
         else:
             self.logger.info(f"Skipping message id : {msgid}")
             return
-        if is_node_passthrough(self.devid):
-            next_dest = get_next_dest(self.devid)
+        next_dest = get_next_dest(self.devid)
+        if next_dest:
             self.logger.info(f"Next dest for {self.devid} is {next_dest}")
             if next_dest == None:
                 self.logger.warning(f"{self.devid} Weird no dest for {self.devid}")
@@ -248,8 +238,8 @@ class DevUnit:
             with self.msg_queue_lock:
                 self.logger.info(f"{self.devid} Adding message to send queue for {next_dest}")
                 self.msg_queue.append((msgstr, mst, next_dest))
-        if is_node_src(self.devid):
-            self.logger.warning(f"{self.devid}: Src should not be getting any messages")
+        else:
+            self.logger.warning(f"{self.devid}: Has no Dest, this should never happen")
 
     def get_images_to_send(self, critical_images):
         cropped = None
@@ -370,7 +360,7 @@ def run_unit():
         return None
     devid = constants.HN_ID[hname]
     logger.info(f"### Running as host {hname} and devid {devid}")
-    if is_node_dest(devid):
+    if is_node_cc(devid):
         cc = CommandCenter(devid)
         cc.print_status()
     else:

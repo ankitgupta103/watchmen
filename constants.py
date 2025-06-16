@@ -69,6 +69,9 @@ HN_ID = {
 # First has camera,
 # Last is CC
 # Everything in between is passthrough.
-PATH_DEMOB = ["D", "C", "A"]
+NEXT_DEST_MAP = {
+        "D" : "C",
+        "C" : "A"
+        }
 
 # PATH_DEMOB = ["C", "D", "A"]
