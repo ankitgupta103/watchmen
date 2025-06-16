@@ -178,7 +178,7 @@ class RFComm:
             self.msg_chunks_expected[cid] = numchunks
             self.msg_chunks_received[cid] = []
             self.msg_parts[cid] = []
-            logger.info(f"{self.devid} : Sending ack for {msgid} to {src}")
+            logger.info(f"{cid} from {src} : Sending ack for {msgid} for {num_chunks} chunks")
             payload_to_send = msgid
             time.sleep(0.5)
             self._send_unicast(payload_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
@@ -211,11 +211,11 @@ class RFComm:
             logger.info(msgstr)
             if len(missing_chunks) == 0:
                 time.sleep(0.5)
-                logger.info(f"Sending ack saying I got all chunks for {cid}")
+                logger.info(f"{cid} from {src} : Sending ack saying I got all chunks for {cid}")
                 self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             else:
-                logger.info(f" @@@@@@@ At Chunk End {len(missing_chunks)} out of {expected_chunks}")
+                logger.info(f" @@@@@@@ {cid} from {src} At Chunk End missing {len(missing_chunks)} out of {expected_chunks}")
                 time.sleep(0.5)
                 self._send_missing_chunks(cid, missing_chunks, src)
             # TODO expect at most 5% missing chunks.
@@ -430,17 +430,17 @@ class RFComm:
                 chunks_undelivered = self.msg_cunks_missing[cidstr]
                 if cidstr in self.all_chunks_done and self.all_chunks_done[cidstr]:
                     alldone = True
-            logger.info(f"After retry count {r} receiver did not receive {nummissing} chunks : and we got a list of {len(chunks_undelivered)} which is  {chunks_undelivered[0:10]} alldone = {alldone}")
             if alldone:
                 sent = self._send_chunk_end(cidstr, dest, alldone)
                 break
+            logger.info(f" {cidstr} to {dest} : After retry count {r} receiver did not receive {nummissing} chunks : and we got a list of {len(chunks_undelivered)} which is {chunks_undelivered[0:10]} alldone = {alldone}")
             self.msg_cunks_missing[cidstr] = [] # Reset missing chunks after sending these chunks
             time.sleep(2)
         if alldone:
-            logger.info(f" ==== Successfully delivered all chunks!!!")
+            logger.info(f" ==== {cidstr} to {dest}: Successfully delivered all chunks !!!")
             return True
         else:
-            logger.info(f" **** Finally even after all attempts, Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
+            logger.info(f" **** {cidstr} to {dest} Finally even after all attempts, Could not deliver {len(chunks_undelivered)} chunks : {chunks_undelivered}")
             return False
 
     def _send_with_retries(self, msgstr, msgid):
