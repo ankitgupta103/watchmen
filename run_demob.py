@@ -205,13 +205,13 @@ class CommandCenter:
             self.logger.info(f"########## Image receive at command center")
             self.process_image(msgstr)
         elif mst == constants.MESSAGE_TYPE_HEARTBEAT:
-            self.logger.info(f"########## Messsage receive at command center : {mst} : {msgstr}")
+            self.logger.info(f"########## Heartbeat messsage receive at command center : {mst} : {msgstr}")
             self.process_hb(msgstr)
         elif mst == constants.MESSAGE_TYPE_EVENT:
-            self.logger.info(f"########## Messsage receive at command center : {mst} : {msgstr}")
+            self.logger.info(f"########## Event messsage receive at command center : {mst} : {msgstr}")
             self.process_event(msgstr)
         elif mst == constants.MESSAGE_TYPE_GPS:
-            self.logger.info(f"########## Messsage receive at command center : {mst} : {msgstr}")
+            self.logger.info(f"########## GPS messsage receive at command center : {mst} : {msgstr}")
             self.process_gps(msgstr)
         return True
 

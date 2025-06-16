@@ -148,6 +148,8 @@ class VyomClient:
         """
         timestamp: str = None, lat: int=None, long: int=None
         """
+        health_status = 0 # 0: Offline, 1: Healthy, 2: Maintenance 
+
         try:
             if not node_hn in self.HN_TO_VYOM_ID:
                 self.logger.error(
@@ -160,8 +162,10 @@ class VyomClient:
                 timestamp = datetime.now(timezone.utc).isoformat()
             if lat is None or long is None:
                 location = None
+                health_status = 2 # Maintenance
             else:
                 location = {"lat": lat, "long": long, "timestamp": timestamp}
+                health_status = 1 # Healthy
 
             payload = {
                 "machine_id": vyom_machine_id,
@@ -170,8 +174,7 @@ class VyomClient:
                 "data_size_uploaded": 0,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
                 "location": location,
-                # "health": {"status": 1, "message": ""},
-                "health": None,
+                "health": health_status,
             }
 
             epoch_ms = int(time.time() * 1000)
