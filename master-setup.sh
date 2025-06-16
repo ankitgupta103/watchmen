@@ -1,4 +1,4 @@
--#!/bin/bash
+#!/bin/bash
 
 # ==============================================================================
 # Master Setup Script for Complete System Configuration
@@ -82,9 +82,9 @@ echo -e "${CYAN}Bashrc File:${NC} $BASHRC_FILE"
 echo
 
 # =============================================================================
-# STEP 1: Add lines to .bashrc
+# STEP 1: Create virtual environment and add lines to .bashrc
 # =============================================================================
-print_step "[1/5] Adding virtual environment configuration to .bashrc..."
+print_step "[1/5] Creating and adding virtual environment configuration to .bashrc..."
 
 # Create the watchmen directory if it doesn't exist
 mkdir -p "$USER_HOME/watchmen"
