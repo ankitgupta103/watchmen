@@ -82,6 +82,23 @@ echo -e "${CYAN}Bashrc File:${NC} $BASHRC_FILE"
 echo
 
 # =============================================================================
+# STEP 0: Install system dependencies
+# =============================================================================
+print_step "[0/5] Installing system dependencies..."
+
+print_status "Updating package lists..."
+apt update
+
+print_status "Installing development headers and build tools..."
+apt install -y \
+    libcap-dev \
+    python3-dev \
+    build-essential \
+    pkg-config
+
+print_status "System dependencies installed successfully"
+
+# =============================================================================
 # STEP 1: Create virtual environment and add lines to .bashrc
 # =============================================================================
 print_step "[1/5] Creating and adding virtual environment configuration to .bashrc..."
