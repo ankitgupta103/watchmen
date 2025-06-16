@@ -105,8 +105,8 @@ class RFComm:
         self.node = node
     
     # Do not ack if currently sending an image or receiving an image
-    def i_am_able_to_receive(self):
-        print("Checking if I am free to receive")
+    def i_am_free(self):
+        print("Checking if I am free to receive or send")
         if self.sending_image:
             logger.error(f"Currently too busy sending an image myself")
             return False
@@ -208,7 +208,7 @@ class RFComm:
             logger.info(f"{cid} from {src} : Sending ack for {msgid} for {numchunks} chunks")
             payload_to_send = msgid
             # Do not ack if currently sending an image or receiving an image
-            if not self.i_am_able_to_receive():
+            if not self.i_am_free():
                 logger.error(f" ************** Not accepting image {cid} from {src} because I am busy")
             else:
                 time.sleep(0.5)
@@ -253,7 +253,7 @@ class RFComm:
                     if cid == c:
                         print(f"Clearing {c} because done")
                         self.images_in_progress.pop(imi)
-                    if time.time() - tb > MAX_IMAGE_SECS:
+                    elif time.time() - tb > MAX_IMAGE_SECS:
                         print(f"Expiring {c}")
                         self.images_in_progress.pop(imi)
                 print(f"Images in progress = {self.images_in_progress}")
@@ -552,6 +552,9 @@ class RFComm:
             return sent
         else:
             logger.warning("Too big, will chunk msg {len(payload)}")
+            if not self.i_am_free():
+                logger.error(f" ************** Not sending image because I am busy")
+                time.sleep(MAX_IMAGE_SECS)
             self.sending_image = True
             sent = self._send_long_msg(payload, mst, dest)
             self.sending_image = False
