@@ -164,7 +164,7 @@ class RFComm:
             # TODO remember how many missing at sender
             # logger.info(f"Receiver did not get chunks for {cid} : {missing_chunks[0:10]}")
             with self.all_chunks_done_lock:
-                seld.chunks_missing_count[cid] = nummissing
+                self.chunks_missing_count[cid] = nummissing
                 for m in missing_chunks:
                     if m not in self.msg_cunks_missing[cid]:
                         self.msg_cunks_missing[cid].append(m)
