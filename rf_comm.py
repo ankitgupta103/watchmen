@@ -163,7 +163,7 @@ class RFComm:
             cliststr = parts[2]
             missing_chunks = [int(x) for x in cliststr.split(",")]
             # TODO remember how many missing at sender
-            # logger.info(f"Receiver did not get chunks for {cid} : {missing_chunks[0:10]}")
+            logger.info(f"Receiver did not get chunks for {cid} : {missing_chunks[0:10]}")
             with self.all_chunks_done_lock:
                 self.chunks_missing_count[cid] = nummissing
                 for m in missing_chunks:
@@ -440,7 +440,7 @@ class RFComm:
                 break
             logger.info(f" {cidstr} to {dest} : After retry count {r} receiver did not receive {nummissing} chunks : and we got a list of {len(chunks_undelivered)} which is {chunks_undelivered[0:10]} alldone = {alldone}")
             self.msg_cunks_missing[cidstr] = [] # Reset missing chunks after sending these chunks
-            time.sleep(2)
+            time.sleep(3)
         if alldone:
             logger.info(f" ==== {cidstr} to {dest}: Successfully delivered all chunks !!!")
             return True
