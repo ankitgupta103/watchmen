@@ -21,7 +21,7 @@ hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = False
-FLAKINESS = 0  # 0-100 %
+FLAKINESS = 10  # 0-100 %
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,6 +68,11 @@ class RFComm:
 
     def __init__(self, devid):
         self.devid = devid
+
+        # Receiver
+        self.images_done = [] # (CID, TS_BEGIN, TS_END)
+        self.images_in_progress = [] # (CID, TS_BEGIN), will either be timed out and removed after MAX_IMAGE_SECS or removed when transmission is complete
+        self.sending_image = False
 
         # Receiver
         self.msg_chunks_expected = {} # Receiver uses this. cid->num_chunks
@@ -178,7 +183,7 @@ class RFComm:
             self.msg_chunks_expected[cid] = numchunks
             self.msg_chunks_received[cid] = []
             self.msg_parts[cid] = []
-            logger.info(f"{cid} from {src} : Sending ack for {msgid} for {num_chunks} chunks")
+            logger.info(f"{cid} from {src} : Sending ack for {msgid} for {numchunks} chunks")
             payload_to_send = msgid
             time.sleep(0.5)
             self._send_unicast(payload_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
@@ -257,7 +262,7 @@ class RFComm:
     def _send_missing_chunks(self, cid, missing_chunks, dest):
         # 7 for id, 3 for chunk id, 2 for backup :-)
         # TODO this is the place to do error rate
-        list_chunks = self._missing_chunk_helper(missing_chunks, 18)
+        list_chunks = self._missing_chunk_helper(missing_chunks, 17)
         for chunks_to_send in list_chunks:
             msgstr = f"{cid};{len(missing_chunks)};{chunks_to_send}"
             succ = self._send_unicast(msgstr, constants.MESSAGE_TYPE_NACK_CHUNK, dest, False, 0)
