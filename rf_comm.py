@@ -21,7 +21,7 @@ hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = False
-FLAKINESS = 1  # 0-100 %
+FLAKINESS = 0  # 0-100 %
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,7 +50,7 @@ Protocol:
     Chunk Item : MSGID;ChunkIdentifier;ChunkNum;Data
     Chunk End : ChunkIdentifier
     Chunk End Ack: same as acknowledgement
-    Chunk Nack : MSGID;CID;Missing chunks
+    Chunk Nack : MSGID;CID;NumMissingChunks:Some of the Missing chunks
 """
 
 def get_random_str(n):
@@ -76,7 +76,8 @@ class RFComm:
         self.msg_processed = []
 
         # Sender
-        self.msg_cunks_missing = {} # Sender gets this from ack.
+        self.chunks_missing_count = {} # CID -> Number of missing chunks
+        self.msg_cunks_missing = {} # CID -> List of ChunkIDs : Sender gets this from ack.
         self.node = None
         self.setup_rf()
         time.sleep(0.5)
@@ -152,10 +153,18 @@ class RFComm:
             return
 
         if msgtype == constants.MESSAGE_TYPE_NACK_CHUNK and dest == self.devid:
-            cid, cliststr = self.sep_part(msgpyl, ';')
+            parts = msgpyl.split(';')
+            if len(parts) != 3:
+                logger.error(f"Cant parse {msgpyl}")
+                return
+            cid = parts[0]
+            nummissing = int(parts[1])
+            cliststr = parts[2]
             missing_chunks = [int(x) for x in cliststr.split(",")]
-            logger.info(f"Receiver did not get chunks for {cid} : {missing_chunks}")
+            # TODO remember how many missing at sender
+            # logger.info(f"Receiver did not get chunks for {cid} : {missing_chunks[0:10]}")
             with self.all_chunks_done_lock:
+                seld.chunks_missing_count[cid] = nummissing
                 for m in missing_chunks:
                     if m not in self.msg_cunks_missing[cid]:
                         self.msg_cunks_missing[cid].append(m)
@@ -200,14 +209,13 @@ class RFComm:
                 if i not in self.msg_chunks_received[cid]:
                     missing_chunks.append(i)
             logger.info(msgstr)
-            logger.info(f" @@@@@@@ At Chunk End I am missing {len(missing_chunks)} chunks, namely : {missing_chunks}")
             if len(missing_chunks) == 0:
                 time.sleep(0.5)
                 logger.info(f"Sending ack saying I got all chunks for {cid}")
                 self._send_unicast(f"{msgid}:ad:{cid}", constants.MESSAGE_TYPE_ACK, src, False, 0)
-                logger.info(f"Processing message because of all chunks veing done")
                 self.process_message(msgid, constants.MESSAGE_TYPE_PHOTO, self._recompile_msg(cid))
             else:
+                logger.info(f" @@@@@@@ At Chunk End {len(missing_chunks)} out of {expected_chunks}")
                 time.sleep(0.5)
                 self._send_missing_chunks(cid, missing_chunks, src)
             # TODO expect at most 5% missing chunks.
@@ -221,7 +229,6 @@ class RFComm:
             #    succ = self._send_missing_chunks(cid, missing_chunks, src)
             return
        
-        logger.info(f"Processing message because of {msgstr}")
         self.process_message(msgid, msgtype, msgpyl)
         # Disable acking except on chunks
         if ACKING_ENABLED:
@@ -249,9 +256,10 @@ class RFComm:
 
     def _send_missing_chunks(self, cid, missing_chunks, dest):
         # 7 for id, 3 for chunk id, 2 for backup :-)
-        list_chunks = self._missing_chunk_helper(missing_chunks, 20)
+        # TODO this is the place to do error rate
+        list_chunks = self._missing_chunk_helper(missing_chunks, 18)
         for chunks_to_send in list_chunks:
-            msgstr = f"{cid};{chunks_to_send}"
+            msgstr = f"{cid};{len(missing_chunks)};{chunks_to_send}"
             succ = self._send_unicast(msgstr, constants.MESSAGE_TYPE_NACK_CHUNK, dest, False, 0)
             if not succ:
                 return False
@@ -267,8 +275,8 @@ class RFComm:
                 ids.append(cn)
                 parts.append(d)
         orig_payload = "".join(parts)
-        # Note no saving intermediate.
-        # TODO fill missing chunks with 0s
+        # TODO save intermediate file.
+        # TODO image resilience in rebuilding
         return orig_payload
         try:
             logger.info("Checking for json")
@@ -415,11 +423,14 @@ class RFComm:
                 self._send_chunk_i(msg_chunks, cidstr, i, dest)
             sent = self._send_chunk_end(cidstr, dest, alldone)
             time.sleep(0.5)
+            nummissing = 0
             with self.all_chunks_done_lock:
+                if cidstr in self.chunks_missing_count:
+                    nummissing = self.chunks_missing_count[cidstr]
                 chunks_undelivered = self.msg_cunks_missing[cidstr]
                 if cidstr in self.all_chunks_done and self.all_chunks_done[cidstr]:
                     alldone = True
-            logger.info(f"After retry count {r} receiver did not receive {len(chunks_undelivered)} chunks : {chunks_undelivered} alldone = {alldone}")
+            logger.info(f"After retry count {r} receiver did not receive {nummissing} chunks : and we got a list of {len(chunks_undelivered)} which is  {chunks_undelivered[0:10]} alldone = {alldone}")
             if alldone:
                 sent = self._send_chunk_end(cidstr, dest, alldone)
                 break
