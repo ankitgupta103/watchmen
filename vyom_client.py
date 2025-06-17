@@ -206,7 +206,6 @@ class VyomClient:
             else:
                 self.logger.info(f"[on_hb_arrive] No location data available for {node_hn}, setting to Maintenance.")
                 health_status = 2 # Maintenance
-                return
 
             payload = {
                 "machine_id": vyom_machine_id,
