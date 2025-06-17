@@ -67,7 +67,7 @@ class CommandCenter:
         self.node_map = {} # id->(num HB, last HB, gps, Num photos, Num events, [Event TS])
         self.images_saved = []
         self.msgids_seen = []
-        self.vyom_client = VyomClient()
+        self.vyom_client = VyomClient(logger=logger)
         self.logger = logger
 
     def print_status(self):
@@ -144,7 +144,7 @@ class CommandCenter:
                     lat = None
                     long = None
             self.logger.info(f"Calling vyom_client.on_hb_arrive(node_hn={nodeid}, lat={lat}, long={long})")
-            self.vyom_client.on_hb_arrive(node_hn=nodeid, lat=lat, long=long)
+            self.vyom_client.on_hb_arrive(node_hn=nodeid, lat=lat, long=long, timestamp=hbtime)
             self.logger.info(f"Successfully sent heartbeat to vyom client: node_hn={nodeid}, lat={lat}, long={long}")
         except Exception as e:
             self.logger.error(f"Error sending hb to vyom client: node_hn={nodeid}, lat={lat}, long={long}, error={e}", exc_info=True)

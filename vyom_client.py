@@ -12,14 +12,22 @@ from vyomcloudbridge.utils.common import (
 )
 from vyomcloudbridge.constants.constants import default_mission_id
 import json
+import logging
 
 
 class VyomClient:
-    def __init__(self):
-        self.logger = setup_logger(
-            name=self.__class__.__module__ + "." + self.__class__.__name__,
-            show_terminal=False,
-        )
+    def __init__(self, logger=None):
+        if logger is not None:
+            self.logger = logger
+        else:
+            try:
+                self.logger = setup_logger(
+                    name=self.__class__.__module__ + "." + self.__class__.__name__,
+                    show_terminal=True,
+                )
+            except Exception:
+                # Fallback to main logger if setup_logger is not available
+                self.logger = logging.getLogger("main")
         self.writer = QueueWriterJson()
         self.machine_config = Configs.get_machine_config()
         self.machine_id = self.machine_config.get("machine_id", "-") or "-"
@@ -152,6 +160,7 @@ class VyomClient:
         """
         health_status = 0 # 0: Offline, 1: Healthy, 2: Maintenance 
 
+        self.logger.info(f"[on_hb_arrive] Called with node_hn={node_hn}, lat={lat}, long={long}, timestamp={timestamp}")
         try:
             if not node_hn in self.HN_TO_VYOM_ID:
                 self.logger.error(
@@ -162,11 +171,14 @@ class VyomClient:
 
             if timestamp is None:
                 timestamp = datetime.now(timezone.utc).isoformat()
+            self.logger.debug(f"[on_hb_arrive] Using timestamp: {timestamp}")
 
             cached_location = self.location_cache.get(node_hn)
+            self.logger.debug(f"[on_hb_arrive] Cached location for {node_hn}: {cached_location}")
             new_location = None
             if lat is not None and long is not None:
                 new_location = {"lat": lat, "long": long, "timestamp": timestamp}
+                self.logger.debug(f"[on_hb_arrive] New location provided: {new_location}")
 
             # Logic:
             # 1. If new_location is provided and different from cached, update cache and send
@@ -174,22 +186,25 @@ class VyomClient:
             # 3. If no new_location, but cached exists, send cached
             # 4. If no new_location and no cached, do not send
             if new_location:
-                # Remove timestamp for comparison, only compare lat/long
                 compare_cached = None
                 if cached_location:
                     compare_cached = {k: cached_location[k] for k in ("lat", "long")}
                 compare_new = {k: new_location[k] for k in ("lat", "long")}
+                self.logger.debug(f"[on_hb_arrive] Comparing cached: {compare_cached} with new: {compare_new}")
                 if compare_cached == compare_new:
-                    # Location unchanged, do not send
+                    self.logger.info(f"[on_hb_arrive] Location unchanged for {node_hn}, skipping send.")
                     return
                 # Update cache and send
+                self.logger.info(f"[on_hb_arrive] Location changed for {node_hn}, updating cache and sending.")
                 self.location_cache[node_hn] = new_location
                 location = new_location
                 health_status = 1 # Healthy
             elif cached_location:
+                self.logger.info(f"[on_hb_arrive] No new location, using cached for {node_hn}.")
                 location = cached_location
                 health_status = 1
             else:
+                self.logger.info(f"[on_hb_arrive] No location data available for {node_hn}, setting to Maintenance.")
                 health_status = 2 # Maintenance
                 return
 
@@ -206,7 +221,7 @@ class VyomClient:
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
 
-            self.logger.info(f"Sending machine stats: {payload}")
+            self.logger.info(f"[on_hb_arrive] Sending machine stats payload: {payload}")
 
             self.writer.write_message(
                 message_data=json.dumps(payload),
@@ -218,6 +233,8 @@ class VyomClient:
                 priority=3,
                 expiry_time=self.expiration_time,
             )
+
+            self.logger.info(f"[on_hb_arrive] Sending MACHINE_INFO payload: {payload}")
 
             self.writer.write_message(
                 message_data=payload,
@@ -231,6 +248,8 @@ class VyomClient:
                 merge_chunks=True,
                 send_live=True,
             )
+
+            self.logger.debug(f"[on_hb_arrive] Finished sending payloads for {node_hn}.")
 
         except Exception as e:
             self.logger.error(f"Error setting location in VyomClient: {e}")
