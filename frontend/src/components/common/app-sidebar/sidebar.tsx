@@ -8,6 +8,7 @@ import {
   ChevronDown,
   HomeIcon,
   LogOut,
+  NetworkIcon,
   User,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -57,6 +58,11 @@ const items = [
     title: 'Calendar',
     url: '/calendar',
     icon: Calendar,
+  },
+  {
+    title: 'Network Simulation',
+    url: '/network-simulation',
+    icon: NetworkIcon,
   },
 ];
 
