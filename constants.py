@@ -56,10 +56,10 @@ NO_DEST = "X"
 # 0 is an error here
 HN_ID = {
         # BLR
-        "central" : "A",
+        "rpi1" : "A",
         "rpi2" : "B",
         "rpi3" : "C",
-        "rpi4" : "D",
+        "rpi4" : "E",
         # GUR
         "rpi6" : "A",
         "rpi7" : "C",
