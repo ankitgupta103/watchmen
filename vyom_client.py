@@ -32,7 +32,7 @@ class VyomClient:
             "B": 206,
             "C": 207,
         }
-        self.expiration_time = 2000  # milisecond
+        self.expiration_time = 5000  # milisecond
         self.location_cache = {}  # Cache for last known location per node
 
     def on_image_arrive(
@@ -76,7 +76,7 @@ class VyomClient:
                 merge_chunks=True,
             )
         except Exception as e:
-            print(f"Error setting location in VyomClient: {e}")
+            self.logger.error(f"Error setting location in VyomClient: {e}")
 
     # TODO: Add event severity to the payload
     def on_event_arrive(
@@ -138,7 +138,7 @@ class VyomClient:
                 send_live=True,
             )
         except Exception as e:
-            print(f"Error setting location in VyomClient: {e}")
+            self.logger.error(f"Error setting location in VyomClient: {e}")
 
     def on_hb_arrive(
         self,
@@ -206,6 +206,8 @@ class VyomClient:
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
 
+            self.logger.info(f"Sending machine stats: {payload}")
+
             self.writer.write_message(
                 message_data=json.dumps(payload),
                 data_type="json",
@@ -229,23 +231,24 @@ class VyomClient:
                 merge_chunks=True,
                 send_live=True,
             )
+
         except Exception as e:
-            print(f"Error setting location in VyomClient: {e}")
+            self.logger.error(f"Error setting location in VyomClient: {e}")
 
     def cleanup(self):
         try:
             self.writer.cleanup()
         except Exception as e:
-            print(f"Error cleaning up VyomClient: {e}")
+            self.logger.error(f"Error cleaning up VyomClient: {e}")
 
 
 if __name__ == "__main__":
-    client = VyomClient()
-    import requests
-    import time
-
     try:
-        print("Starting examples")
+        client = VyomClient()
+        import requests
+        import time
+
+        client.logger.info("Starting examples")
         # test on_image_arrive
         image_url = "https://sample-videos.com/img/Sample-jpg-image-50kb.jpg"
         response = requests.get(image_url)
@@ -256,7 +259,7 @@ if __name__ == "__main__":
                 node_hn="central", image=binary_data, filename="test_full.jpg"
             )
         else:
-            print(
+            client.logger.error(
                 f"[Error] Failed to download {image_url} (Status: {response.status_code})"
             )
 
@@ -266,7 +269,7 @@ if __name__ == "__main__":
         # test on_hb_arrive
         client.on_hb_arrive(node_hn="rpi4", lat=75.66666, long=73.0589455)
     except Exception as e:
-        print("Getting Error in running examples", {str(e)})
+        client.logger.error(f"Getting Error in running examples: {str(e)}")
     finally:
         client.cleanup()
-    print("Starting examples")
+    client.logger.info("Starting examples")
