@@ -21,7 +21,14 @@ export default async function LiveFeed() {
       <div className="h-full w-full overflow-hidden rounded-lg border">
         <LiveFeedWrapper machines={machines ?? []} />
       </div>
-      <CriticalAlertSystem enableSound={true} mockAlerts={false} />
+      <CriticalAlertSystem
+        organizationId="20"
+        machines={machines}
+        enableSound={true}
+        // onAlertReceived={(alert) => {
+        //   console.log('alert received', alert);
+        // }}
+      />
     </section>
   );
 }

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useLiveMachineData } from '@/hooks/use-live-machine-data';
 import L from 'leaflet';
 import {
   Activity,
@@ -8,6 +7,8 @@ import {
   Map as MapIcon,
   MapPin,
   Shield,
+  Wifi,
+  WifiOff,
   X,
 } from 'lucide-react';
 import { renderToString } from 'react-dom/server';
@@ -21,10 +22,11 @@ import {
   useMapEvents,
 } from 'react-leaflet';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-import { Machine, MachineData } from '@/lib/types/machine';
+import { Machine } from '@/lib/types/machine';
 
 interface MapBounds {
   north: number;
@@ -33,7 +35,7 @@ interface MapBounds {
   west: number;
 }
 
-// Get machine type icon (matching your existing implementation)
+// Get machine type icon
 const getMachineTypeIcon = (type: string, size: number = 16) => {
   switch (type) {
     case 'perimeter_guard':
@@ -49,32 +51,43 @@ const getMachineTypeIcon = (type: string, size: number = 16) => {
   }
 };
 
-// Create custom marker icon
-const createMachineIcon = (
+// Get machine status color
+const getMachineStatusColor = (
   machine: Machine,
-  machineData: MachineData,
   isSelected: boolean = false,
 ) => {
-  if (!machineData) return undefined;
+  if (isSelected) return 'bg-blue-500';
 
-  const bgColor = isSelected
-    ? 'bg-blue-500'
-    : machineData?.status === 'offline'
-      ? 'bg-gray-500'
-      : machineData?.status === 'maintenance'
-        ? 'bg-yellow-500'
-        : 'bg-green-500';
+  // You can add status logic here based on your Machine type
+  // For now, using a simple approach based on machine ID or other properties
+  const daysSinceLastUpdate = machine.last_location?.lat ? 0 : 7; // Assume online if location exists
+
+  if (daysSinceLastUpdate > 1) return 'bg-gray-500'; // Offline
+  return 'bg-green-500'; // Online
+};
+
+// Create custom marker icon
+const createMachineIcon = (machine: Machine, isSelected: boolean = false) => {
+  const bgColor = getMachineStatusColor(machine, isSelected);
 
   const iconHtml = renderToString(
     <div className="relative">
+      {/* Main marker */}
       <div
         className={`relative h-10 w-10 ${bgColor} flex items-center justify-center rounded-full border-2 border-white shadow-lg`}
       >
         <MapPin size={20} className="text-white" />
       </div>
+
+      {/* Machine type indicator */}
       <div className="absolute -top-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-blue-500">
         {getMachineTypeIcon(machine.type, 8)}
       </div>
+
+      {/* Selection indicator */}
+      {isSelected && (
+        <div className="absolute inset-0 animate-pulse rounded-full border-2 border-blue-600" />
+      )}
     </div>,
   );
 
@@ -125,6 +138,7 @@ const RectangleDrawer = ({
         const bounds = L.latLngBounds(startPoint, e.latlng);
         setCurrentBounds(bounds);
         setDrawing(false);
+        setStartPoint(null);
         map.dragging.enable();
 
         // Convert to our bounds format
@@ -171,12 +185,6 @@ const MapFilter = ({
     selectedBounds,
   );
 
-  // Get machine IDs for the hook
-  const machineIds = useMemo(() => machines.map((m) => m.id), [machines]);
-
-  // Use the live data hook
-  const { getMachineData } = useLiveMachineData(machineIds, true);
-
   // Calculate map center and zoom
   const getMapCenter = (): [number, number] => {
     if (!machines.length) return [12.9716, 77.5946]; // Default to Bangalore
@@ -189,10 +197,10 @@ const MapFilter = ({
         maxLng: Math.max(acc.maxLng, m.last_location.lng),
       }),
       {
-        minLat: machines[0]?.last_location?.lat ?? 0,
-        maxLat: machines[0]?.last_location?.lat ?? 0,
-        minLng: machines[0]?.last_location?.lng ?? 0,
-        maxLng: machines[0]?.last_location?.lng ?? 0,
+        minLat: machines[0]?.last_location?.lat ?? 12.9716,
+        maxLat: machines[0]?.last_location?.lat ?? 12.9716,
+        minLng: machines[0]?.last_location?.lng ?? 77.5946,
+        maxLng: machines[0]?.last_location?.lng ?? 77.5946,
       },
     );
 
@@ -213,10 +221,10 @@ const MapFilter = ({
         maxLng: Math.max(acc.maxLng, m.last_location.lng),
       }),
       {
-        minLat: machines[0]?.last_location?.lat ?? 0,
-        maxLat: machines[0]?.last_location?.lat ?? 0,
-        minLng: machines[0]?.last_location?.lng ?? 0,
-        maxLng: machines[0]?.last_location?.lng ?? 0,
+        minLat: machines[0]?.last_location?.lat ?? 12.9716,
+        maxLat: machines[0]?.last_location?.lat ?? 12.9716,
+        minLng: machines[0]?.last_location?.lng ?? 77.5946,
+        maxLng: machines[0]?.last_location?.lng ?? 77.5946,
       },
     );
 
@@ -254,9 +262,24 @@ const MapFilter = ({
     ? machines.filter((m) => isMachineInBounds(m)).length
     : 0;
 
+  // Get machine status counts
+  const machineStats = useMemo(() => {
+    const selected = machines.filter((m) => isMachineInBounds(m));
+    const all = tempBounds ? selected : machines;
+
+    const online = all.filter(
+      (m) => getMachineStatusColor(m) === 'bg-green-500',
+    ).length;
+    const offline = all.filter(
+      (m) => getMachineStatusColor(m) === 'bg-gray-500',
+    ).length;
+
+    return { total: all.length, online, offline };
+  }, [machines, tempBounds]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <Card className="max-h-[90vh] w-[900px] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="max-h-[90vh] w-full max-w-4xl overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <MapIcon className="h-5 w-5" />
@@ -270,10 +293,39 @@ const MapFilter = ({
           <div className="space-y-4">
             <div className="text-sm text-gray-600">
               Click and drag to select an area on the map. Only events from
-              machines within the selected area will be shown.
+              machines within the selected area will be shown in the calendar.
             </div>
 
-            <div className="h-[400px] rounded-lg border bg-gray-50">
+            {/* Machine Statistics */}
+            {tempBounds && (
+              <div className="flex items-center gap-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">
+                    Selected Area
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <Badge
+                    variant="outline"
+                    className="border-green-300 text-green-700"
+                  >
+                    <Wifi className="mr-1 h-3 w-3" />
+                    {machineStats.online} Online
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="border-gray-300 text-gray-700"
+                  >
+                    <WifiOff className="mr-1 h-3 w-3" />
+                    {machineStats.offline} Offline
+                  </Badge>
+                  <Badge variant="outline">{machineStats.total} Total</Badge>
+                </div>
+              </div>
+            )}
+
+            <div className="h-[500px] rounded-lg border bg-gray-50">
               <MapContainer
                 center={getMapCenter()}
                 zoom={getOptimalZoom()}
@@ -291,29 +343,47 @@ const MapFilter = ({
                 />
 
                 {/* Machine markers */}
-                {machines.length > 0 &&
-                  machines.map((machine) => (
-                    <Marker
-                      key={machine.id}
-                      position={[
-                        machine.last_location.lat,
-                        machine.last_location.lng,
-                      ]}
-                      icon={createMachineIcon(
-                        machine,
-                        getMachineData(machine.id),
-                        isMachineInBounds(machine),
-                      )}
-                    >
-                      <Tooltip>
-                        <div className="text-center text-xs font-medium">
+                {machines.map((machine) => (
+                  <Marker
+                    key={machine.id}
+                    position={[
+                      machine.last_location.lat,
+                      machine.last_location.lng,
+                    ]}
+                    icon={createMachineIcon(
+                      machine,
+                      isMachineInBounds(machine),
+                    )}
+                  >
+                    <Tooltip>
+                      <div className="text-center">
+                        <div className="text-xs font-medium">
                           {machine.name}
                         </div>
-                      </Tooltip>
-                    </Marker>
-                  ))}
+                        <div className="text-xs text-gray-500">
+                          ID: {machine.id}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Type: {machine.type.replace('_', ' ')}
+                        </div>
+                        <Badge
+                          variant={
+                            getMachineStatusColor(machine) === 'bg-green-500'
+                              ? 'default'
+                              : 'secondary'
+                          }
+                          className="mt-1 text-xs"
+                        >
+                          {getMachineStatusColor(machine) === 'bg-green-500'
+                            ? 'Online'
+                            : 'Offline'}
+                        </Badge>
+                      </div>
+                    </Tooltip>
+                  </Marker>
+                ))}
 
-                {/* Coverage circles for visualization */}
+                {/* Coverage circles for selected machines */}
                 {machines
                   .filter((m) => isMachineInBounds(m))
                   .map((machine) => (
@@ -323,11 +393,11 @@ const MapFilter = ({
                         machine.last_location.lat,
                         machine.last_location.lng,
                       ]}
-                      radius={300}
+                      radius={200}
                       pathOptions={{
                         color: '#3b82f6',
                         weight: 1,
-                        opacity: 0.3,
+                        opacity: 0.4,
                         fillOpacity: 0.1,
                         fillColor: '#3b82f6',
                       }}
@@ -340,7 +410,7 @@ const MapFilter = ({
               <div className="text-sm text-gray-600">
                 {tempBounds
                   ? `${selectedMachinesCount} machine${selectedMachinesCount !== 1 ? 's' : ''} selected`
-                  : 'No area selected'}
+                  : 'Click and drag to select an area'}
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={handleClear}>

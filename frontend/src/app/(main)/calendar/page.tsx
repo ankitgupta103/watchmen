@@ -9,20 +9,19 @@ import HeatMapCalendar from './components/heat-map-calendar';
 import PageHeader from './components/page-header';
 
 export default async function CalendarPage() {
-  const { organization_id } = await getOrg();
-  const machines = await fetcher<{
+  const { organization_uid, organization_id } = await getOrg();
+  const { data: machines } = await fetcher<{
     status: string;
     data: Machine[];
-  }>(`${API_BASE_URL}/machines?organization_uid=${organization_id}`);
+  }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`);
+
+  console.log(machines);
 
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader />
       <div className="h-full w-full">
-        <HeatMapCalendar
-          machines={machines?.data ?? []}
-          orgId={organization_id}
-        />
+        <HeatMapCalendar machines={machines ?? []} orgId={organization_id} />
       </div>
     </section>
   );
