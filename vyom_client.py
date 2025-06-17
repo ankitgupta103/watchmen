@@ -24,14 +24,12 @@ class VyomClient:
         self.machine_id = self.machine_config.get("machine_id", "-") or "-"
         self.organization_id = self.machine_config.get("organization_id", "-") or "-"
         self.HN_TO_VYOM_ID = {
-            "central": 197,
-            "rpi2": 198,
-            "rpi3": 200,
-            "rpi4": 199,
-            "A": 197,
-            "B": 198,
-            "C": 200,
-            "D": 199,
+            "rpi1": 208,
+            "rpi2": 206,
+            "rpi3": 207,
+            "A": 208,
+            "B": 206,
+            "C": 207,
         }
         self.expiration_time = 2000  # milisecond
 
