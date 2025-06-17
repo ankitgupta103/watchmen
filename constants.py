@@ -59,19 +59,18 @@ HN_ID = {
         "rpi1" : "A",
         "rpi2" : "B",
         "rpi3" : "C",
-        "rpi4" : "E",
         # GUR
         "rpi6" : "A",
-        "rpi7" : "C",
-        "rpi8" : "D",
+        "rpi7" : "B",
+        "rpi8" : "C",
         }
 
 # First has camera,
 # Last is CC
 # Everything in between is passthrough.
 NEXT_DEST_MAP = {
-        "D" : "C",
-        "C" : "A"
+        "C" : "B",
+        "B" : "A"
         }
 
 # PATH_DEMOB = ["C", "D", "A"]
