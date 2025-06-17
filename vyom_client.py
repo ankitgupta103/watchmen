@@ -162,24 +162,35 @@ class VyomClient:
             if timestamp is None:
                 timestamp = datetime.now(timezone.utc).isoformat()
 
+            cached_location = self.location_cache.get(node_hn)
             new_location = None
             if lat is not None and long is not None:
                 new_location = {"lat": lat, "long": long, "timestamp": timestamp}
 
-            cached_location = self.location_cache.get(node_hn)
-
+            # Logic:
+            # 1. If new_location is provided and different from cached, update cache and send
+            # 2. If new_location is provided and same as cached, do not send
+            # 3. If no new_location, but cached exists, send cached
+            # 4. If no new_location and no cached, do not send
             if new_location:
-                if cached_location == new_location:
+                # Remove timestamp for comparison, only compare lat/long
+                compare_cached = None
+                if cached_location:
+                    compare_cached = {k: cached_location[k] for k in ("lat", "long")}
+                compare_new = {k: new_location[k] for k in ("lat", "long")}
+                if compare_cached == compare_new:
+                    # Location unchanged, do not send
                     return
+                # Update cache and send
                 self.location_cache[node_hn] = new_location
                 location = new_location
                 health_status = 1 # Healthy
+            elif cached_location:
+                location = cached_location
+                health_status = 2 # Maintenance
             else:
-                if cached_location is not None:
-                    location = cached_location
-                else:
-                    health_status = 2 # Maintenance
-                    return
+                # No location to send
+                return
 
             payload = {
                 "machine_id": vyom_machine_id,

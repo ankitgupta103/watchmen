@@ -149,6 +149,11 @@ export default function MachineDetailModal({
                 {unreviewed} Alert{unreviewed > 1 ? 's' : ''}
               </Badge>
             )}
+            {Number(machineData?.event_count ?? 0) > 0 && (
+              <Badge variant="outline" className="border-orange-300 text-orange-700">
+                {Number(machineData?.event_count ?? 0)} Event{Number(machineData?.event_count ?? 0) > 1 ? 's' : ''}
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -156,10 +161,10 @@ export default function MachineDetailModal({
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="suspicious" className="relative">
-              Suspicious Events
-              {unreviewed > 0 && (
+              Events
+              {(unreviewed > 0 || Number(machineData?.event_count ?? 0) > 0) && (
                 <div className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                  {unreviewed > 9 ? '9+' : unreviewed}
+                  {Math.max(unreviewed, Number(machineData?.event_count ?? 0)) > 9 ? '9+' : Math.max(unreviewed, Number(machineData?.event_count ?? 0))}
                 </div>
               )}
             </TabsTrigger>
@@ -199,7 +204,7 @@ export default function MachineDetailModal({
                     <span className="text-sm font-medium">Last Seen</span>
                   </div>
                   <div className="text-sm">
-                    {getLastSeenText(machineData.lastSeen)}
+                    {getLastSeenText(machineData.lastSeen || machineData.last_updated)}
                   </div>
                 </CardContent>
               </Card>
@@ -266,6 +271,34 @@ export default function MachineDetailModal({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {/* MQTT Events */}
+                  {machineData.events && machineData.events.length > 0 && (
+                    <>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">
+                          Recent MQTT Events:
+                        </span>
+                        <div className="text-sm font-medium text-orange-600">
+                          {machineData.events.length} live event{machineData.events.length > 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">
+                          Last Event:
+                        </span>
+                        <div className="text-sm">
+                          {machineData.last_event?.eventstr || 'None'} 
+                          {machineData.last_event && (
+                            <span className="ml-2 text-xs text-gray-500">
+                              ({new Date(machineData.last_event.timestamp).toLocaleTimeString()})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Legacy suspicious events */}
                   <div>
                     <span className="text-sm font-medium text-gray-500">
                       Total Suspicious Events:
@@ -319,21 +352,50 @@ export default function MachineDetailModal({
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {(() => {
-                    const images = (machineData.suspiciousEvents || []).filter(
+                    // Combine MQTT event images and legacy suspicious event images
+                    const mqttImages = (machineData.events || []).filter(
+                      (e) => e.cropped_image_url || e.full_image_url,
+                    );
+                    const legacyImages = (machineData.suspiciousEvents || []).filter(
                       (e) => !!e.url,
                     );
-                    if (images.length > 0) {
-                      return images.map((event) => (
-                        <div key={event.timestamp}>
-                          <Image
-                            src={event.url!}
-                            alt={`Image captured at ${event.timestamp}`}
-                            width={100}
-                            height={100}
-                            className="h-full w-full"
-                          />
+                    const allImages = [...mqttImages, ...legacyImages];
+
+                    if (allImages.length > 0) {
+                      return (
+                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                          {mqttImages.map((event) => (
+                            <div key={event.id} className="space-y-2">
+                              <div className="text-xs text-gray-500">
+                                MQTT: {event.eventstr}
+                              </div>
+                              {event.cropped_image_url && (
+                                <Image
+                                  src={event.cropped_image_url}
+                                  alt={`MQTT event image: ${event.eventstr}`}
+                                  width={150}
+                                  height={100}
+                                  className="rounded border"
+                                />
+                              )}
+                            </div>
+                          ))}
+                          {legacyImages.map((event, index) => (
+                            <div key={`legacy-${index}`} className="space-y-2">
+                              <div className="text-xs text-gray-500">
+                                Legacy: {new Date(event.timestamp).toLocaleDateString()}
+                              </div>
+                              <Image
+                                src={event.url!}
+                                alt={`Legacy image captured at ${event.timestamp}`}
+                                width={150}
+                                height={100}
+                                className="rounded border"
+                              />
+                            </div>
+                          ))}
                         </div>
-                      ));
+                      );
                     } else {
                       return (
                         <div className="text-center text-gray-500">
@@ -349,8 +411,101 @@ export default function MachineDetailModal({
 
           {/* Suspicious Events Tab */}
           <TabsContent value="suspicious" className="space-y-4">
+            {/* MQTT Events Section */}
+            {machineData.events && machineData.events.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">Recent MQTT Events</h3>
+                  <Badge variant="outline">
+                    {machineData.events.length} event{machineData.events.length > 1 ? 's' : ''}
+                  </Badge>
+                </div>
+                
+                <div className="space-y-3">
+                  {machineData.events
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                    .map((event) => (
+                      <Card key={event.id} className="border-l-4 border-l-orange-500 bg-orange-50/30">
+                        <CardContent className="space-y-3 p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <Badge variant="secondary">
+                                MQTT Event
+                              </Badge>
+                              <div className="text-sm">
+                                <span className="font-medium">
+                                  {event.eventstr}
+                                </span>
+                              </div>
+                              <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700">
+                                Live Event
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              {new Date(event.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+
+                          {/* Image Display */}
+                          {event.images_loaded && (event.cropped_image_url || event.full_image_url) && (
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                              {event.cropped_image_url && (
+                                <div className="space-y-2">
+                                  <div className="text-sm font-medium text-gray-700">Cropped Image:</div>
+                                  <Image
+                                    src={event.cropped_image_url}
+                                    alt={`Cropped image for event ${event.eventstr}`}
+                                    width={200}
+                                    height={150}
+                                    className="rounded-lg border shadow-sm"
+                                  />
+                                </div>
+                              )}
+                              {event.full_image_url && (
+                                <div className="space-y-2">
+                                  <div className="text-sm font-medium text-gray-700">Full Image:</div>
+                                  <Image
+                                    src={event.full_image_url}
+                                    alt={`Full image for event ${event.eventstr}`}
+                                    width={200}
+                                    height={150}
+                                    className="rounded-lg border shadow-sm"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Loading state for images */}
+                          {!event.images_loaded && (event.image_c_key || event.image_f_key) && (
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              Loading images...
+                            </div>
+                          )}
+
+                          {/* Raw event data for debugging */}
+                          {process.env.NODE_ENV === 'development' && (
+                            <details className="text-xs">
+                              <summary className="cursor-pointer text-gray-500">Debug Info</summary>
+                              <pre className="mt-2 whitespace-pre-wrap bg-gray-100 p-2 rounded text-xs">
+                                {JSON.stringify(event, null, 2)}
+                              </pre>
+                            </details>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+                
+                <Separator />
+              </div>
+            )}
+
+            {/* Legacy Suspicious Events */}
             {machineData.suspiciousEvents?.length ? (
               <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Historical Suspicious Events</h3>
                 {machineData.suspiciousEvents
                   .sort(
                     (a, b) =>
@@ -448,16 +603,16 @@ export default function MachineDetailModal({
                           <Image
                             src={event.url}
                             alt={`Image captured at ${event.timestamp}`}
-                            width={100}
-                            height={100}
-                            className="h-full w-full"
+                            width={200}
+                            height={150}
+                            className="rounded-lg border shadow-sm"
                           />
                         )}
                       </CardContent>
                     </Card>
                   ))}
               </div>
-            ) : (
+            ) : !machineData.events?.length ? (
               <div className="py-12 text-center">
                 <Shield className="mx-auto mb-4 h-16 w-16 text-gray-300" />
                 <h3 className="mb-2 text-lg font-medium text-gray-600">
@@ -467,7 +622,7 @@ export default function MachineDetailModal({
                   No suspicious events recorded for this device
                 </p>
               </div>
-            )}
+            ) : null}
           </TabsContent>
 
           {/* Health & Status Tab */}
