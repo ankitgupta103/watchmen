@@ -16,12 +16,10 @@ export default async function DashboardPage() {
     data: Machine[];
   }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`);
 
-  console.log('machines', machines);
-
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader />
-      <div className="bg-background h-full w-full overflow-hidden rounded-lg border">
+      <div className="bg-background h-full w-full overflow-y-auto rounded-lg border">
         <DeviceListing machines={machines ?? []} />
       </div>
     </section>
