@@ -158,6 +158,7 @@ class VyomClient:
         """
         timestamp: str = None, lat: int=None, long: int=None
         """
+        location = None
         health_status = 0 # 0: Offline, 1: Healthy, 2: Maintenance 
 
         self.logger.info(f"[on_hb_arrive] Called with node_hn={node_hn}, lat={lat}, long={long}, timestamp={timestamp}")
@@ -180,22 +181,7 @@ class VyomClient:
                 new_location = {"lat": lat, "long": long, "timestamp": timestamp}
                 self.logger.debug(f"[on_hb_arrive] New location provided: {new_location}")
 
-            # Logic:
-            # 1. If new_location is provided and different from cached, update cache and send
-            # 2. If new_location is provided and same as cached, do not send
-            # 3. If no new_location, but cached exists, send cached
-            # 4. If no new_location and no cached, do not send
             if new_location:
-                compare_cached = None
-                if cached_location:
-                    compare_cached = {k: cached_location[k] for k in ("lat", "long")}
-                compare_new = {k: new_location[k] for k in ("lat", "long")}
-                self.logger.debug(f"[on_hb_arrive] Comparing cached: {compare_cached} with new: {compare_new}")
-                if compare_cached == compare_new:
-                    self.logger.info(f"[on_hb_arrive] Location unchanged for {node_hn}, skipping send.")
-                    return
-                # Update cache and send
-                self.logger.info(f"[on_hb_arrive] Location changed for {node_hn}, updating cache and sending.")
                 self.location_cache[node_hn] = new_location
                 location = new_location
                 health_status = 1 # Healthy
