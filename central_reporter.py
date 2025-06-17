@@ -1,3 +1,6 @@
+from typing import Dict
+from datetime import datetime
+
 class CenrtralReporter:
     def _publish_health_event(self, health_event: Dict, device_id: str):
         """Publish health event via MQTT"""

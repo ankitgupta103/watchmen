@@ -2,7 +2,10 @@
 
 import 'leaflet/dist/leaflet.css';
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMachineStats } from '@/hooks/use-machine-stats';
+import useOrganization from '@/hooks/use-organization';
+import { usePubSub } from '@/hooks/use-pub-sub';
 import { Calendar, RefreshCw, Shield } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -20,9 +23,6 @@ import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
 
 import MachineDetailModal from './machine-detail-model';
-import { useMachineStats } from '@/hooks/use-machine-stats';
-import { usePubSub } from '@/hooks/use-pub-sub';
-import useOrganization from '@/hooks/use-organization';
 
 interface LiveFeedWrapperProps {
   machines: Machine[];
@@ -43,7 +43,7 @@ const HEALTH_STATUS = {
 // Custom hook to collect all machine stats by calling useMachineStats for each machine at the top level
 function useAllMachineStats(machines: Machine[]) {
   // This will force all useMachineStats hooks to be called in the same order every render
-  // eslint-disable-next-line 
+  // eslint-disable-next-line
   const stats: Record<number, { buffer: number; data: any | null }> = {};
   for (let i = 0; i < machines.length; i++) {
     const machine = machines[i];
@@ -70,13 +70,11 @@ export default function LiveFeedWrapper({
 
   // Create MQTT topic for live data
   const mqttTopics = useMemo(() => {
-    const currentDate = selectedDate 
-      ? selectedDate.toISOString().split('T')[0] 
+    const currentDate = selectedDate
+      ? selectedDate.toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-    
-    return [
-      `${organizationId}/_all_/${currentDate}/machine_id/_all_/EVENT/#`
-    ];
+
+    return [`${organizationId}/_all_/${currentDate}/machine_id/_all_/EVENT/#`];
   }, [organizationId, selectedDate]);
 
   // MQTT message handler
@@ -86,20 +84,21 @@ export default function LiveFeedWrapper({
       // Extract machine ID from topic path
       // Topic format: organization_id/_all_/2025-06-15/machine_id/_all_/EVENT/#
       const topicParts = topic.split('/');
-      const machineIdIndex = topicParts.findIndex(part => part === 'machine_id') + 1;
+      const machineIdIndex =
+        topicParts.findIndex((part) => part === 'machine_id') + 1;
       const machineIdPart = topicParts[machineIdIndex];
-      
+
       if (machineIdPart && machineIdPart !== '_all_') {
         const machineId = parseInt(machineIdPart);
-        
+
         if (!isNaN(machineId)) {
-          setLiveData(prev => ({
+          setLiveData((prev) => ({
             ...prev,
             [machineId]: {
               ...data,
               timestamp: new Date().toISOString(),
               topic: topic,
-            }
+            },
           }));
         }
       } else {
@@ -107,13 +106,13 @@ export default function LiveFeedWrapper({
         if (data.machine_id) {
           const machineId = parseInt(data.machine_id);
           if (!isNaN(machineId)) {
-            setLiveData(prev => ({
+            setLiveData((prev) => ({
               ...prev,
               [machineId]: {
                 ...data,
                 timestamp: new Date().toISOString(),
                 topic: topic,
-              }
+              },
             }));
           }
         }
@@ -128,7 +127,7 @@ export default function LiveFeedWrapper({
     isConnected,
     error: mqttError,
     getCurrentMessage,
-    subscriptionStats
+    subscriptionStats,
   } = usePubSub(mqttTopics, handleMqttMessage, {
     autoReconnect: true,
     parseJson: true,
@@ -147,21 +146,24 @@ export default function LiveFeedWrapper({
   const getHealthStatus = (machineId: number): number => {
     const stats = machineStats[machineId];
     const live = liveData[machineId];
-    
+
     // Priority: live data > stats data
     if (live?.health_status && typeof live.health_status === 'number') {
       return live.health_status;
     }
-    
-    if (stats?.data?.message?.health_status && typeof stats.data.message.health_status === 'number') {
+
+    if (
+      stats?.data?.message?.health_status &&
+      typeof stats.data.message.health_status === 'number'
+    ) {
       return stats.data.message.health_status;
     }
-    
+
     // Fallback: if no data at all, consider offline
     if (!stats?.data && !live) {
       return HEALTH_STATUS.OFFLINE;
     }
-    
+
     // If we have data but no explicit health status, assume healthy
     return HEALTH_STATUS.HEALTHY;
   };
@@ -169,7 +171,7 @@ export default function LiveFeedWrapper({
   // Helper to get status string from health status
   const getStatus = (machineId: number): string => {
     const healthStatus = getHealthStatus(machineId);
-    
+
     switch (healthStatus) {
       case HEALTH_STATUS.HEALTHY:
         return 'online';
@@ -186,10 +188,10 @@ export default function LiveFeedWrapper({
   const getLatLng = (machineId: number) => {
     const stats = machineStats[machineId];
     const live = liveData[machineId];
-    
+
     // Priority: live data > stats data
     let lat, lng;
-    
+
     if (live?.location) {
       lat = live.location.lat;
       lng = live.location.lng;
@@ -201,7 +203,7 @@ export default function LiveFeedWrapper({
       lat = stats.data.message.location.lat;
       lng = stats.data.message.location.lng;
     }
-    
+
     return {
       lat: typeof lat === 'number' ? lat : 0,
       lng: typeof lng === 'number' ? lng : 0,
@@ -213,11 +215,11 @@ export default function LiveFeedWrapper({
   const getMachineData = (machineId: number): any => {
     const stats = machineStats[machineId];
     const live = liveData[machineId];
-    
+
     // Merge stats and live data, with live data taking priority
     const baseData = stats?.data?.message || {};
     const liveUpdate = live || {};
-    
+
     return {
       ...baseData,
       ...liveUpdate,
@@ -225,7 +227,8 @@ export default function LiveFeedWrapper({
       health_status: getHealthStatus(machineId),
       status: getStatus(machineId),
       location: getLatLng(machineId),
-      last_updated: live?.timestamp || baseData.timestamp || new Date().toISOString(),
+      last_updated:
+        live?.timestamp || baseData.timestamp || new Date().toISOString(),
       is_live: !!live,
     };
   };
@@ -237,17 +240,18 @@ export default function LiveFeedWrapper({
       if (statusFilter !== 'all' && status !== statusFilter) {
         return false;
       }
-      
+
       // Activity filter logic based on live data
       if (activityFilter !== 'all') {
         const live = liveData[machine.id];
-        
+
         if (activityFilter === 'high') {
           // High activity: received live data in last 5 minutes
           if (live?.timestamp) {
             const lastUpdate = new Date(live.timestamp);
             const now = new Date();
-            const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
+            const diffMinutes =
+              (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
             return diffMinutes <= 5;
           }
           return false;
@@ -256,7 +260,8 @@ export default function LiveFeedWrapper({
           if (live?.timestamp) {
             const lastUpdate = new Date(live.timestamp);
             const now = new Date();
-            const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
+            const diffMinutes =
+              (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
             return diffMinutes <= 30 && diffMinutes > 5;
           }
           return false;
@@ -265,49 +270,56 @@ export default function LiveFeedWrapper({
           if (live?.timestamp) {
             const lastUpdate = new Date(live.timestamp);
             const now = new Date();
-            const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
+            const diffMinutes =
+              (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
             return diffMinutes > 30;
           }
           return true; // No live data = low activity
         }
       }
-      
+
       return true;
     });
   }, [machines, statusFilter, activityFilter, machineStats, liveData]);
 
   // Calculate counts using current health status
-  const onlineCount = machines.filter((machine) => getStatus(machine.id) === 'online').length;
-  const offlineCount = machines.filter((machine) => getStatus(machine.id) === 'offline').length;
-  const maintenanceCount = machines.filter((machine) => getStatus(machine.id) === 'maintenance').length;
-  
+  const onlineCount = machines.filter(
+    (machine) => getStatus(machine.id) === 'online',
+  ).length;
+  const offlineCount = machines.filter(
+    (machine) => getStatus(machine.id) === 'offline',
+  ).length;
+  const maintenanceCount = machines.filter(
+    (machine) => getStatus(machine.id) === 'maintenance',
+  ).length;
+
   // Calculate alerts based on machine data
   const totalAlerts = machines.filter((machine) => {
     const machineData = getMachineData(machine.id);
     // Add your alert logic here based on your requirements
     return (
-      machineData.alert_status === true || 
+      machineData.alert_status === true ||
       machineData.error_count > 0 ||
       machineData.warning_count > 0 ||
-      (machineData.health_status === HEALTH_STATUS.MAINTENANCE)
+      machineData.health_status === HEALTH_STATUS.MAINTENANCE
     );
   }).length;
 
   // Refresh function
   const handleRefresh = () => {
     setIsRefreshing(true);
-    
+
     // Clear live data to force refresh from current topic data
     setLiveData({});
-    
+
     // Process any current messages from PubSub
-    mqttTopics.forEach(topic => {
+    mqttTopics.forEach((topic) => {
       const currentMessage = getCurrentMessage(topic);
       if (currentMessage) {
         handleMqttMessage(topic, currentMessage.data);
       }
     });
-    
+
     setTimeout(() => setIsRefreshing(false), 1500);
   };
 
@@ -319,23 +331,25 @@ export default function LiveFeedWrapper({
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-blue-600" />
             <span className="font-semibold">Network Overview</span>
-            
+
             {/* MQTT Connection Status */}
             <div className="flex items-center gap-1 text-xs">
-              <div className={cn(
-                "h-2 w-2 rounded-full",
-                isConnected ? 'bg-green-500' : 'bg-red-500'
-              )}></div>
+              <div
+                className={cn(
+                  'h-2 w-2 rounded-full',
+                  isConnected ? 'bg-green-500' : 'bg-red-500',
+                )}
+              ></div>
               <span className="text-gray-500">
                 {isConnected ? 'Live' : 'Offline'}
               </span>
               {Object.keys(liveData).length > 0 && (
-                <span className="text-gray-400 ml-1">
+                <span className="ml-1 text-gray-400">
                   ({Object.keys(liveData).length} active)
                 </span>
               )}
             </div>
-            
+
             {/* Show MQTT error if any */}
             {mqttError && (
               <div className="text-xs text-red-500" title={mqttError.message}>
@@ -449,13 +463,14 @@ export default function LiveFeedWrapper({
         )}
 
         {/* Live Data Debug Info (remove in production) */}
-        {process.env.NODE_ENV === 'development' && Object.keys(liveData).length > 0 && (
-          <div className="absolute bottom-4 left-4 rounded-lg border bg-white px-3 py-2 shadow-lg text-xs">
-            <div className="font-medium">Live Data Debug:</div>
-            <div>{Object.keys(liveData).length} machines with live data</div>
-            <div>Topics: {Object.keys(subscriptionStats).length}</div>
-          </div>
-        )}
+        {process.env.NODE_ENV === 'development' &&
+          Object.keys(liveData).length > 0 && (
+            <div className="absolute bottom-4 left-4 rounded-lg border bg-white px-3 py-2 text-xs shadow-lg">
+              <div className="font-medium">Live Data Debug:</div>
+              <div>{Object.keys(liveData).length} machines with live data</div>
+              <div>Topics: {Object.keys(subscriptionStats).length}</div>
+            </div>
+          )}
       </div>
 
       {/* Enhanced Machine Detail Modal */}
