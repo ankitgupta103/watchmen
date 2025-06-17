@@ -216,6 +216,19 @@ class VyomClient:
                 priority=3,
                 expiry_time=self.expiration_time,
             )
+
+            self.writer.write_message(
+                message_data=payload,
+                data_type="json",
+                data_source="MACHINE_INFO",
+                destination_ids=["s3"],
+                source_id=vyom_machine_id,
+                filename=filename,
+                priority=3,
+                expiry_time=self.expiration_time,
+                merge_chunks=True,
+                send_live=True,
+            )
         except Exception as e:
             print(f"Error setting location in VyomClient: {e}")
 
