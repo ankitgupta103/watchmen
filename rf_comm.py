@@ -435,7 +435,7 @@ class RFComm:
                 break
             logger.info(f" {cidstr} to {dest} : After retry count {r} receiver didnt get {len(chunks_undelivered)} which is {chunks_undelivered[0:10]} alldone = {alldone}")
             self.msg_cunks_missing[cidstr] = [] # Reset missing chunks after sending these chunks
-            time.sleep(2)
+            time.sleep(1)
         if alldone:
             logger.info(f" ==== {cidstr} to {dest}: Successfully delivered all chunks !!!")
             return True
