@@ -310,19 +310,19 @@ class DevUnit:
         events_seen = 0
         while True:
             (photos_seen, critical_images) = get_files_in_dir(ALLDIR, CRITICAL_DIR)
-            self.logger.info(f"Taken sofar={self.photos_taken}, now={photos_seen}")
-            self.logger.info(f"Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
+            #self.logger.info(f"Taken sofar={self.photos_taken}, now={photos_seen}")
+            #self.logger.info(f"Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
             self.photos_taken = photos_seen
             if len(critical_images) > 0:
                 (evid, cropped, full) = self.get_images_to_send(critical_images)
                 if cropped or full:
-                    self.logger.info(f"{cropped}, {full}")
+                    self.logger.info(f"Found new critical images, sending : {cropped}, {full}")
                     events_seen += 1
                     self.send_event(evid)
                     time.sleep(2)
                 if cropped:
                     self.send_img(cropped, evid)
-                    time.sleep(75)
+                    time.sleep(40)
                 if full:
                     self.send_img(full, evid)
             time.sleep(10)
