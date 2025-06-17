@@ -2,10 +2,8 @@
 
 import { useRef } from 'react';
 import L from 'leaflet';
-// import { Activity, AlertTriangle, Eye, MapPin, Shield } from 'lucide-react';
 import { renderToString } from 'react-dom/server';
 import {
-  Circle,
   LayersControl,
   MapContainer,
   Marker,
@@ -20,100 +18,90 @@ import { Badge } from '@/components/ui/badge';
 import 'leaflet/dist/leaflet.css';
 
 import { MAPS_API_KEY } from '@/lib/constants';
-import { Machine, MachineData } from '@/lib/types/machine';
+import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
+
+interface MachineEvent {
+  id: string;
+  timestamp: Date;
+  eventstr: string;
+  image_c_key?: string;
+  image_f_key?: string;
+  cropped_image_url?: string;
+  full_image_url?: string;
+  images_loaded?: boolean;
+}
+
+interface SimpleMachineData {
+  machine_id: number;
+  events: MachineEvent[];
+  event_count: number;
+  last_event?: MachineEvent;
+  last_updated: string;
+  // Status and location from useMachineStats
+  is_online: boolean;
+  location: { lat: number; lng: number };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  stats_data: any;
+  buffer_size: number;
+}
 
 interface MapProps {
   machines: Machine[];
   onMarkerClick: (machine: Machine) => void;
-  selectedDate?: Date;
-  getMachineData: (machineId: number) => MachineData;
+  getMachineData: (machineId: number) => SimpleMachineData;
 }
 
-// Calculate machine activity level
-const getMachineActivityLevel = (data: MachineData) => {
-  const recentEvents =
-    data.suspiciousEvents?.filter((event) => {
-      const eventDate = new Date(event.timestamp);
-      const daysDiff =
-        (Date.now() - eventDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff <= 7;
-    }) || [];
-
-  const healthIssues =
-    data.healthEvents?.filter(
-      (event) => event.severity === 'high' || event.severity === 'critical',
-    ) || [];
-
-  if (recentEvents.length > 5 || healthIssues.length > 0) return 'critical';
-  if (recentEvents.length > 2) return 'high';
-  if (recentEvents.length > 0) return 'medium';
-  return 'low';
+// Get color based on event count
+const getEventColor = (eventCount: number) => {
+  if (eventCount === 0)
+    return {
+      bg: 'bg-blue-500',
+      border: 'border-blue-600',
+      text: 'text-blue-100',
+    };
+  if (eventCount <= 3)
+    return {
+      bg: 'bg-yellow-500',
+      border: 'border-yellow-600',
+      text: 'text-yellow-100',
+    };
+  if (eventCount <= 7)
+    return {
+      bg: 'bg-orange-500',
+      border: 'border-orange-600',
+      text: 'text-orange-100',
+    };
+  if (eventCount <= 12)
+    return { bg: 'bg-red-500', border: 'border-red-600', text: 'text-red-100' };
+  return { bg: 'bg-red-700', border: 'border-red-800', text: 'text-red-100' };
 };
 
-// Get unreviewed events count
-const getUnreviewedCount = (data: MachineData) => {
-  return (
-    data.suspiciousEvents?.filter(
-      (event) => event.marked === 'unreviewed' || !event.marked,
-    ).length || 0
-  );
-};
+// Create enhanced custom icon with event-based coloring
+const createEventIcon = (machine: Machine, machineData: SimpleMachineData) => {
+  const eventCount = machineData.event_count;
+  const colors = getEventColor(eventCount);
+  const isOffline = !machineData.is_online; // Use the correct status from useMachineStats
 
-// Create enhanced custom icon with activity indicators
-const createEnhancedIcon = (machine: Machine, machineData: MachineData) => {
-  const activityLevel = getMachineActivityLevel(machineData);
-  const unreviewed = getUnreviewedCount(machineData);
-  const eventCount = machineData.event_count || 0;
-  const isOffline = machineData.status === 'offline';
-  const isMaintenance = machineData.status === 'maintenance';
-
-  // Determine colors based on status and activity
-  let bgColor = 'bg-green-500';
-  let eventBgColor = 'bg-yellow-200';
-  let eventTextColor = 'text-yellow-800';
-
-  if (isOffline) {
-    bgColor = 'bg-gray-500';
-  } else if (isMaintenance) {
-    bgColor = 'bg-yellow-500';
-  } else if (activityLevel === 'critical') {
-    bgColor = 'bg-red-500';
-  } else if (activityLevel === 'high') {
-    bgColor = 'bg-orange-500';
-  } else if (activityLevel === 'medium') {
-    bgColor = 'bg-yellow-500';
-  }
-
-  // Event count color coding
-  if (eventCount >= 9) {
-    eventBgColor = 'bg-red-600';
-    eventTextColor = 'text-white';
-  } else if (eventCount >= 5) {
-    eventBgColor = 'bg-red-400';
-    eventTextColor = 'text-white';
-  } else if (eventCount >= 3) {
-    eventBgColor = 'bg-orange-400';
-    eventTextColor = 'text-white';
-  } else if (eventCount >= 1) {
-    eventBgColor = 'bg-yellow-300';
-    eventTextColor = 'text-yellow-900';
-  }
+  // Override colors if machine is offline
+  const finalColors = isOffline
+    ? { bg: 'bg-gray-500', border: 'border-gray-600', text: 'text-gray-100' }
+    : colors;
 
   const iconHtml = renderToString(
     <div className="relative">
-      {/* Pulse animation for critical/active machines */}
-      {machineData.status !== 'offline' && (activityLevel !== 'low' || eventCount > 0) && (
+      {/* Pulse animation for machines with events */}
+      {!isOffline && eventCount > 0 && (
         <div
-          className={`absolute inset-0 rounded-full ${eventCount > 0 ? eventBgColor : bgColor} animate-ping opacity-75`}
+          className={`absolute inset-0 rounded-full ${finalColors.bg} animate-ping opacity-75`}
         ></div>
       )}
 
       {/* Main marker */}
       <div
         className={cn(
-          `relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-white shadow-lg`,
-          bgColor
+          `relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-white shadow-lg`,
+          finalColors.bg,
         )}
       >
         <div className="h-2 w-2 rounded-full bg-white"></div>
@@ -123,19 +111,24 @@ const createEnhancedIcon = (machine: Machine, machineData: MachineData) => {
       {eventCount > 0 && (
         <div
           className={cn(
-            'absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-white text-xs font-bold shadow-sm',
-            eventBgColor,
-            eventTextColor
+            'absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white text-xs font-bold shadow-sm',
+            eventCount <= 3
+              ? 'bg-yellow-600 text-white'
+              : eventCount <= 7
+                ? 'bg-orange-600 text-white'
+                : eventCount <= 12
+                  ? 'bg-red-600 text-white'
+                  : 'bg-red-800 text-white',
           )}
         >
-          {eventCount > 9 ? '9+' : eventCount}
+          {eventCount > 99 ? '99+' : eventCount}
         </div>
       )}
 
-      {/* Unreviewed alerts indicator (if different from events) */}
-      {unreviewed > 0 && eventCount === 0 && (
-        <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-red-500 text-xs font-bold text-white shadow-sm">
-          {unreviewed > 9 ? '9+' : unreviewed}
+      {/* Offline indicator */}
+      {isOffline && (
+        <div className="absolute -right-1 -bottom-1 flex h-3 w-3 items-center justify-center rounded-full border border-white bg-gray-700">
+          <div className="h-1 w-1 rounded-full bg-white"></div>
         </div>
       )}
     </div>,
@@ -143,28 +136,34 @@ const createEnhancedIcon = (machine: Machine, machineData: MachineData) => {
 
   return L.divIcon({
     html: iconHtml,
-    iconSize: [24, 24],
-    popupAnchor: [0, -12],
-    className: 'custom-enhanced-marker',
+    iconSize: [32, 32],
+    popupAnchor: [0, -16],
+    className: 'custom-event-marker',
   });
 };
 
-// Calculate map center with better positioning
-function getMapCenter(machines: Machine[]): [number, number] {
-  if (machines.length! > 0) return [12.9716, 77.5946]; // Default to Bangalore
+// Calculate map center
+function getMapCenter(
+  machines: Machine[],
+  getMachineData: (id: number) => SimpleMachineData,
+): [number, number] {
+  if (machines.length === 0) return [12.9716, 77.5946]; // Default to Bangalore
 
   const bounds = machines.reduce(
-    (acc, m) => ({
-      minLat: Math.min(acc.minLat, m.last_location?.lat ?? 0),
-      maxLat: Math.max(acc.maxLat, m.last_location?.lat ?? 0),
-      minLng: Math.min(acc.minLng, m.last_location?.lng ?? 0),
-      maxLng: Math.max(acc.maxLng, m.last_location?.lng ?? 0),
-    }),
+    (acc, m) => {
+      const machineData = getMachineData(m.id);
+      return {
+        minLat: Math.min(acc.minLat, machineData.location.lat),
+        maxLat: Math.max(acc.maxLat, machineData.location.lat),
+        minLng: Math.min(acc.minLng, machineData.location.lng),
+        maxLng: Math.max(acc.maxLng, machineData.location.lng),
+      };
+    },
     {
-      minLat: machines[0]?.last_location?.lat ?? 0,
-      maxLat: machines[0]?.last_location?.lat ?? 0,
-      minLng: machines[0]?.last_location?.lng ?? 0,
-      maxLng: machines[0]?.last_location?.lng ?? 0,
+      minLat: getMachineData(machines[0].id).location.lat,
+      maxLat: getMachineData(machines[0].id).location.lat,
+      minLng: getMachineData(machines[0].id).location.lng,
+      maxLng: getMachineData(machines[0].id).location.lng,
     },
   );
 
@@ -175,21 +174,27 @@ function getMapCenter(machines: Machine[]): [number, number] {
 }
 
 // Calculate optimal zoom level
-function getOptimalZoom(machines: Machine[]): number {
+function getOptimalZoom(
+  machines: Machine[],
+  getMachineData: (id: number) => SimpleMachineData,
+): number {
   if (machines.length <= 1) return 12;
 
   const bounds = machines.reduce(
-    (acc, m) => ({
-      minLat: Math.min(acc.minLat, m.last_location?.lat ?? 0),
-      maxLat: Math.max(acc.maxLat, m.last_location?.lat ?? 0),
-      minLng: Math.min(acc.minLng, m.last_location?.lng ?? 0),
-      maxLng: Math.max(acc.maxLng, m.last_location?.lng ?? 0),
-    }),
+    (acc, m) => {
+      const machineData = getMachineData(m.id);
+      return {
+        minLat: Math.min(acc.minLat, machineData.location.lat),
+        maxLat: Math.max(acc.maxLat, machineData.location.lat),
+        minLng: Math.min(acc.minLng, machineData.location.lng),
+        maxLng: Math.max(acc.maxLng, machineData.location.lng),
+      };
+    },
     {
-      minLat: machines[0]?.last_location?.lat ?? 0,
-      maxLat: machines[0]?.last_location?.lat ?? 0,
-      minLng: machines[0]?.last_location?.lng ?? 0,
-      maxLng: machines[0]?.last_location?.lng ?? 0,
+      minLat: getMachineData(machines[0].id).location.lat,
+      maxLat: getMachineData(machines[0].id).location.lat,
+      minLng: getMachineData(machines[0].id).location.lng,
+      maxLng: getMachineData(machines[0].id).location.lng,
     },
   );
 
@@ -203,10 +208,10 @@ function getOptimalZoom(machines: Machine[]): number {
   return 14;
 }
 
-// Enhanced Marker Component with hover popup functionality
+// Enhanced Marker Component
 interface EnhancedMarkerProps {
   machine: Machine;
-  machineData: MachineData;
+  machineData: SimpleMachineData;
   onMarkerClick: (machine: Machine) => void;
 }
 
@@ -219,19 +224,16 @@ function EnhancedMarker({
   let hoverTimeout: NodeJS.Timeout;
 
   const handleMouseOver = () => {
-    // Clear any existing timeout
     if (hoverTimeout) {
       clearTimeout(hoverTimeout);
     }
 
-    // Open popup immediately on hover
     if (markerRef.current) {
       markerRef.current.openPopup();
     }
   };
 
   const handleMouseOut = () => {
-    // Close popup with a slight delay to prevent flickering
     hoverTimeout = setTimeout(() => {
       if (markerRef.current) {
         markerRef.current.closePopup();
@@ -240,28 +242,39 @@ function EnhancedMarker({
   };
 
   const handleClick = () => {
-    // Close popup and open modal
     if (markerRef.current) {
       markerRef.current.closePopup();
     }
     onMarkerClick(machine);
   };
 
+  const getEventLevelText = (count: number) => {
+    if (count === 0) return 'No events';
+    if (count <= 3) return 'Low activity';
+    if (count <= 7) return 'Medium activity';
+    if (count <= 12) return 'High activity';
+    return 'Critical activity';
+  };
+
+  const getEventLevelColor = (count: number) => {
+    if (count === 0) return 'text-blue-600';
+    if (count <= 3) return 'text-yellow-600';
+    if (count <= 7) return 'text-orange-600';
+    if (count <= 12) return 'text-red-600';
+    return 'text-red-800';
+  };
+
   return (
     <Marker
       ref={markerRef}
-      icon={createEnhancedIcon(machine, machineData)}
-      position={[
-        machine.last_location?.lat ?? 0,
-        machine.last_location?.lng ?? 0,
-      ]}
+      icon={createEventIcon(machine, machineData)}
+      position={[machineData.location.lat ?? 0, machineData.location.lng ?? 0]}
       eventHandlers={{
         click: handleClick,
         mouseover: handleMouseOver,
         mouseout: handleMouseOut,
       }}
     >
-      {/* Enhanced Popup with quick info */}
       <Popup
         className="custom-popup"
         closeButton={false}
@@ -274,83 +287,65 @@ function EnhancedMarker({
             {machine.name.toUpperCase()}
           </h3>
           <Badge
-            variant={
-              machineData.status === 'online'
-                ? 'default'
-                : machineData.status === 'offline'
-                  ? 'destructive'
-                  : 'secondary'
-            }
+            variant={machineData.is_online ? 'default' : 'destructive'}
             className="text-xs"
           >
-            {machineData.status}
+            {machineData.is_online ? 'Online' : 'Offline'}
           </Badge>
         </div>
 
         <div className="space-y-1 text-xs">
           <div>
+            <strong>Machine ID:</strong> {machine.id}
+          </div>
+
+          <div>
             <strong>Type:</strong> {machine.type.replace('_', ' ')}
           </div>
-          <div>
-            <strong>Activity:</strong> {getMachineActivityLevel(machineData)}
+
+          {/* Event information */}
+          <div
+            className={cn(
+              'font-medium',
+              getEventLevelColor(machineData.event_count),
+            )}
+          >
+            <strong>Events:</strong> {machineData.event_count} (
+            {getEventLevelText(machineData.event_count)})
           </div>
-          
-          {/* Event count display */}
-          {Number(machineData?.event_count ?? 0) > 0 && (
-            <div className="font-medium text-orange-600">
-              <strong>Events:</strong> {Number(machineData?.event_count ?? 0)} recent event{Number(machineData?.event_count ?? 0) > 1 ? 's' : ''}
-            </div>
-          )}
-          
+
           {/* Last event info */}
           {machineData.last_event && (
-            <div className="text-xs text-blue-600">
+            <div className="mt-1 border-t pt-1 text-xs text-blue-600">
               <strong>Last Event:</strong> {machineData.last_event.eventstr}
               <br />
               <span className="text-gray-500">
-                {new Date(machineData.last_event.timestamp).toLocaleTimeString()}
+                {new Date(
+                  machineData.last_event.timestamp,
+                ).toLocaleTimeString()}
               </span>
             </div>
           )}
-          
-          {machineData.suspiciousEvents &&
-            machineData.suspiciousEvents.length > 0 && (
-              <div>
-                <strong>Suspicious Events:</strong>{' '}
-                {
-                  machineData.suspiciousEvents.filter((e) => {
-                    const days =
-                      (Date.now() - new Date(e.timestamp).getTime()) /
-                      (1000 * 60 * 60 * 24);
-                    return days <= 7;
-                  }).length
-                }{' '}
-                (last 7 days)
-              </div>
-            )}
-          {getUnreviewedCount(machineData) > 0 && (
-            <div className="font-medium text-red-600">
-              {getUnreviewedCount(machineData)} unreviewed alert
-              {getUnreviewedCount(machineData) > 1 ? 's' : ''}
-            </div>
-          )}
-          <div className="text-xs text-gray-500">
-            <strong>Last seen:</strong>{' '}
-            {new Date(machineData.lastSeen || machineData.last_updated).toLocaleString()}
+
+          <div className="mt-1 border-t pt-1 text-xs text-gray-500">
+            <strong>Location:</strong> {machineData.location.lat.toFixed(4)},{' '}
+            {machineData.location.lng.toFixed(4)}
           </div>
+
+          <div className="text-xs text-gray-400">Click to view details</div>
         </div>
       </Popup>
     </Marker>
   );
 }
 
-export default function EnhancedReactLeafletMap({
+export default function SimplifiedReactLeafletMap({
   machines,
   onMarkerClick,
   getMachineData,
 }: MapProps) {
-  const center = getMapCenter(machines);
-  const zoom = getOptimalZoom(machines);
+  const center = getMapCenter(machines, getMachineData);
+  const zoom = getOptimalZoom(machines, getMachineData);
 
   return (
     <MapContainer
@@ -382,7 +377,7 @@ export default function EnhancedReactLeafletMap({
         </LayersControl.BaseLayer>
       </LayersControl>
 
-      {/* Enhanced Machine Markers with hover popups */}
+      {/* Machine Markers with Event-based Coloring */}
       {machines.map((machine) => (
         <EnhancedMarker
           key={machine.id}
@@ -391,28 +386,6 @@ export default function EnhancedReactLeafletMap({
           onMarkerClick={onMarkerClick}
         />
       ))}
-
-      {/* Coverage Areas for Offline Machines (Dark Spots) */}
-      {machines
-        .filter((m) => getMachineData(m.id).status === 'offline')
-        .map((machine) => (
-          <Circle
-            key={`dark-${machine.id}`}
-            center={[
-              machine.last_location?.lat ?? 0,
-              machine.last_location?.lng ?? 0,
-            ]}
-            radius={800}
-            pathOptions={{
-              fillColor: '#1f2937',
-              fillOpacity: 0.15,
-              color: '#374151',
-              weight: 1,
-              opacity: 0.6,
-              dashArray: '5, 5',
-            }}
-          />
-        ))}
     </MapContainer>
   );
 }

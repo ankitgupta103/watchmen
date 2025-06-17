@@ -3,12 +3,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
+  Camera,
   ChevronLeft,
   ChevronRight,
   Filter,
   Loader2,
-  MapPin,
+  X,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,11 +18,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import 'leaflet/dist/leaflet.css';
 
+import useToken from '@/hooks/use-token';
 import dynamic from 'next/dynamic';
 
 import { API_BASE_URL } from '@/lib/constants';
-import { DayActivity } from '@/lib/types/activity';
-import { HealthEvent, Machine, SuspiciousEvent } from '@/lib/types/machine';
+import { fetcherClient } from '@/lib/fetcher-client';
+import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
 
 const MapFilter = dynamic(() => import('./map-filter'), {
@@ -29,7 +32,7 @@ const MapFilter = dynamic(() => import('./map-filter'), {
 
 interface HeatMapCalendarProps {
   machines: Machine[];
-  orgId: number; // Add orgId prop
+  orgId: number;
 }
 
 interface MapBounds {
@@ -39,15 +42,28 @@ interface MapBounds {
   west: number;
 }
 
+// S3 Event data structure
 interface S3EventData {
-  health: HealthEvent[];
-  suspicious: SuspiciousEvent[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  generic: any[]; // You can define this type based on your generic events
+  image_c_key: string;
+  image_f_key: string;
+  eventstr: string;
+  timestamp?: string | Date;
+  machineId?: number;
 }
 
-interface DateEventData {
-  [date: string]: S3EventData; // YYYY-MM-DD format
+interface ProcessedEvent extends S3EventData {
+  id: string;
+  machineId: number;
+  machineName: string;
+  timestamp: string | Date;
+  croppedImageUrl?: string;
+  fullImageUrl?: string;
+  imagesFetched: boolean;
+  fetchingImages: boolean;
+}
+
+interface DayEventData {
+  [date: string]: ProcessedEvent[]; // YYYY-MM-DD format
 }
 
 const MONTHS = [
@@ -71,15 +87,17 @@ export default function HeatMapCalendar({
   machines,
   orgId,
 }: HeatMapCalendarProps) {
+  const { token } = useToken();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date(),
   );
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showMapFilter, setShowMapFilter] = useState(false);
   const [areaFilter, setAreaFilter] = useState<MapBounds | null>(null);
-  const [eventData, setEventData] = useState<DateEventData>({});
+  const [eventData, setEventData] = useState<DayEventData>({});
   const [loading, setLoading] = useState(false);
   const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
   // Filter machines based on selected area
   const filteredMachines = useMemo(() => {
@@ -96,222 +114,373 @@ export default function HeatMapCalendar({
     return filtered;
   }, [machines, areaFilter]);
 
-  // Create a map of machine IDs to machine objects for quick lookup
-  const machineMap = useMemo(() => {
-    const map = new Map<number, Machine>();
-    filteredMachines.forEach((machine) => {
-      map.set(machine.id, machine);
-    });
-    return map;
-  }, [filteredMachines]);
+  // Fetch images from Django backend using your EventImageStatusView
+  const fetchEventImages = useCallback(
+    async (imageKeys: { image_c_key: string; image_f_key: string }) => {
+      if (!token) {
+        console.error('No authentication token available');
+        return null;
+      }
 
-  // Function to fetch events for a specific date
-  // const fetchEventsForDate = useCallback(
-  //   async (date: Date): Promise<S3EventData | null> => {
-  //     const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      try {
+        const data = await fetcherClient<{
+          success: boolean;
+          cropped_image_url?: string;
+          full_image_url?: string;
+          error?: string;
+        }>(`${API_BASE_URL}/event-images/`, token, {
+          method: 'POST',
+          body: imageKeys,
+        });
 
-  //     try {
-  //       const params = new URLSearchParams({
-  //         org_id: String(orgId),
-  //         date: dateStr,
-  //       });
+        if (data?.success) {
+          return {
+            croppedImageUrl: data.cropped_image_url,
+            fullImageUrl: data.full_image_url,
+          };
+        } else {
+          throw new Error(data?.error || 'Failed to fetch images');
+        }
+      } catch (error) {
+        console.error('Error fetching images:', error);
+        return null;
+      }
+    },
+    [token],
+  );
 
-  //       // Add machine filter if area filter is active
-  //       if (areaFilter) {
-  //         filteredMachines.forEach((machine) => {
-  //           params.append('machine_ids', machine.id.toString());
-  //         });
-  //       }
+  // Function to fetch events from S3 for a specific date
+  const fetchS3EventsForDate = useCallback(
+    async (date: Date): Promise<ProcessedEvent[]> => {
+      if (!token) {
+        console.error('No authentication token available');
+        return [];
+      }
 
-  //       const response = await fetch(
-  //         `${API_BASE_URL}/calendar/day-events/?${params}`,
-  //       );
+      const dateStr = date.toISOString().split('T')[0];
+      const events: ProcessedEvent[] = [];
 
-  //       if (!response.ok) {
-  //         if (response.status === 404) {
-  //           // No events for this date
-  //           return { health: [], suspicious: [], generic: [] };
-  //         }
-  //         throw new Error(`Failed to fetch events: ${response.statusText}`);
-  //       }
+      try {
+        const machinesToCheck = areaFilter ? filteredMachines : machines;
 
-  //       const result = await response.json();
-  //       return result.data.events; // Extract events from API response
-  //     } catch (error) {
-  //       console.error('Error fetching events for date:', date, error);
-  //       return null;
-  //     }
-  //   },
-  //   [orgId, areaFilter, filteredMachines],
-  // );
+        const fetchPromises = machinesToCheck.map(async (machine) => {
+          try {
+            const result = await fetcherClient<{
+              success: boolean;
+              events?: S3EventData[];
+              error?: string;
+            }>(`${API_BASE_URL}/s3-events/fetch-events/`, token, {
+              method: 'POST',
+              body: {
+                org_id: orgId,
+                date: dateStr,
+                machine_id: machine.id,
+              },
+            });
 
-  // Function to fetch events for entire month (optimized)
+            if (!result?.success) {
+              if (result?.error && !result.error.includes('404')) {
+                console.error(`Error for machine ${machine.id}:`, result.error);
+              }
+              return [];
+            }
+
+            const s3Events: S3EventData[] = result.events || [];
+
+            const processedEvents: ProcessedEvent[] = s3Events.map(
+              (s3Event, index) => ({
+                ...s3Event,
+                id: `${machine.id}-${dateStr}-${index}`,
+                machineId: machine.id,
+                machineName: machine.name,
+                timestamp: s3Event.timestamp
+                  ? new Date(s3Event.timestamp)
+                  : new Date(dateStr + 'T12:00:00'),
+                imagesFetched: false,
+                fetchingImages: false,
+              }),
+            );
+
+            return processedEvents;
+          } catch (error) {
+            console.error(
+              `Error fetching events for machine ${machine.id}:`,
+              error,
+            );
+            return [];
+          }
+        });
+
+        const allMachineEvents = await Promise.all(fetchPromises);
+        events.push(...allMachineEvents.flat());
+      } catch (error) {
+        console.error('Error fetching S3 events for date:', date, error);
+        setError(
+          `Failed to fetch events: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+
+      return events;
+    },
+    [token, orgId, areaFilter, filteredMachines, machines],
+  );
+
+  // Function to fetch events for entire month (optimized using date range API)
   const fetchMonthEvents = useCallback(
     async (year: number, month: number) => {
+      if (!token) {
+        console.error('No authentication token available');
+        return;
+      }
+
       const monthKey = `${year}-${month}`;
       if (loadedMonths.has(monthKey)) return;
 
       setLoading(true);
+      setError(null);
 
       try {
-        // Calculate start and end dates for the month
         const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0); // Last day of month
+        const endDate = new Date(year, month, 0);
 
-        const params = new URLSearchParams({
-          org_id: String(orgId),
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0],
-          summary_only: 'false', // Get full data for calendar
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+
+        const machinesToCheck = areaFilter ? filteredMachines : machines;
+        const machineIds = machinesToCheck.map((m) => m.id);
+
+        if (machineIds.length === 0) {
+          setLoadedMonths((prev) => new Set([...prev, monthKey]));
+          setLoading(false);
+          return;
+        }
+
+        const result = await fetcherClient<{
+          success: boolean;
+          date_events?: { [date: string]: S3EventData[] };
+          error?: string;
+        }>(`${API_BASE_URL}/s3-events/fetch-events/`, token, {
+          method: 'PUT',
+          body: {
+            org_id: orgId,
+            start_date: startDateStr,
+            end_date: endDateStr,
+            machine_ids: machineIds,
+          },
         });
 
-        // Add machine filter if area filter is active
-        if (areaFilter) {
-          filteredMachines.forEach((machine) => {
-            params.append('machine_ids', machine.id.toString());
-          });
-        }
-
-        const response = await fetch(
-          `${API_BASE_URL}/calendar/date-range-events/?${params}`,
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch month events: ${response.statusText}`,
+        if (!result?.success) {
+          console.warn(
+            'Month range API failed, falling back to individual dates',
           );
+          await fetchMonthEventsIndividually(year, month);
+          return;
         }
 
-        const result = await response.json();
-        const monthData = result.data.date_events;
+        const dateEvents = result.date_events || {};
+
+        const monthEventData: DayEventData = {};
+
+        Object.entries(dateEvents).forEach(([dateStr, dayEvents]) => {
+          const processedEvents: ProcessedEvent[] = (
+            dayEvents as S3EventData[]
+          ).map((s3Event, index) => {
+            const machine = machinesToCheck.find(
+              (m) => m.id === s3Event.machineId,
+            );
+            return {
+              ...s3Event,
+              id: `${s3Event.machineId}-${dateStr}-${index}`,
+              machineId: s3Event.machineId || 0,
+              machineName: machine?.name || `Machine ${s3Event.machineId}`,
+              timestamp: s3Event.timestamp
+                ? new Date(s3Event.timestamp)
+                : new Date(dateStr + 'T12:00:00'),
+              imagesFetched: false,
+              fetchingImages: false,
+            };
+          });
+
+          if (processedEvents.length > 0) {
+            monthEventData[dateStr] = processedEvents;
+          }
+        });
 
         setEventData((prev) => ({
           ...prev,
-          ...monthData,
+          ...monthEventData,
         }));
 
         setLoadedMonths((prev) => new Set([...prev, monthKey]));
       } catch (error) {
         console.error('Error fetching month events:', error);
+        setError(
+          `Failed to fetch month events: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        await fetchMonthEventsIndividually(year, month);
       } finally {
         setLoading(false);
       }
     },
-    [orgId, areaFilter, filteredMachines, loadedMonths],
+    [token, orgId, areaFilter, filteredMachines, machines, loadedMonths],
   );
 
-  // Clear loaded months when area filter changes to refetch with new filter
+  // Fallback method for individual date fetching
+  const fetchMonthEventsIndividually = useCallback(
+    async (year: number, month: number) => {
+      try {
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
+
+        const dates: Date[] = [];
+        const current = new Date(startDate);
+
+        while (current <= endDate) {
+          dates.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+
+        const fetchPromises = dates.map(async (date) => {
+          const events = await fetchS3EventsForDate(date);
+          const dateStr = date.toISOString().split('T')[0];
+          return { dateStr, events };
+        });
+
+        const results = await Promise.all(fetchPromises);
+
+        const monthEventData: DayEventData = {};
+        results.forEach(({ dateStr, events }) => {
+          if (events.length > 0) {
+            monthEventData[dateStr] = events;
+          }
+        });
+
+        setEventData((prev) => ({
+          ...prev,
+          ...monthEventData,
+        }));
+
+        const monthKey = `${year}-${month}`;
+        setLoadedMonths((prev) => new Set([...prev, monthKey]));
+      } catch (error) {
+        console.error('Error in fallback month fetching:', error);
+        setError(
+          `Failed to fetch events: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    },
+    [fetchS3EventsForDate],
+  );
+
+  // Fetch images for events
+  const fetchImagesForEvents = useCallback(
+    async (events: ProcessedEvent[]) => {
+      const fetchPromises = events.map(async (event) => {
+        if (event.imagesFetched || event.fetchingImages) return event;
+
+        const updatedEvent = { ...event, fetchingImages: true };
+
+        try {
+          const imageUrls = await fetchEventImages({
+            image_c_key: event.image_c_key,
+            image_f_key: event.image_f_key,
+          });
+
+          return {
+            ...updatedEvent,
+            croppedImageUrl: imageUrls?.croppedImageUrl,
+            fullImageUrl: imageUrls?.fullImageUrl,
+            imagesFetched: true,
+            fetchingImages: false,
+          };
+        } catch (error) {
+          console.error('Error fetching images for event:', event.id, error);
+          return {
+            ...updatedEvent,
+            fetchingImages: false,
+          };
+        }
+      });
+
+      return Promise.all(fetchPromises);
+    },
+    [fetchEventImages],
+  );
+
+  // Clear loaded months when area filter changes
   useEffect(() => {
     setLoadedMonths(new Set());
     setEventData({});
+    setError(null);
   }, [areaFilter]);
 
   // Load events when month changes
   useEffect(() => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth() + 1;
-    fetchMonthEvents(year, month);
-  }, [currentMonth, fetchMonthEvents]);
+    if (token) {
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth() + 1;
+      fetchMonthEvents(year, month);
+    }
+  }, [currentMonth, fetchMonthEvents, token]);
+
+  // Fetch images when selectedDate changes
+  useEffect(() => {
+    if (selectedDate && token) {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dayEvents = eventData[dateStr];
+
+      if (dayEvents && dayEvents.length > 0) {
+        fetchImagesForEvents(dayEvents).then((updatedEvents) => {
+          setEventData((prev) => ({
+            ...prev,
+            [dateStr]: updatedEvents,
+          }));
+        });
+      }
+    }
+  }, [selectedDate, fetchImagesForEvents, token, eventData]);
 
   // Process event data to create heat map data
   const heatMapData = useMemo(() => {
-    const activityMap = new Map<string, DayActivity>();
+    const activityMap = new Map<
+      string,
+      {
+        date: Date;
+        eventCount: number;
+        events: ProcessedEvent[];
+        intensity: 'none' | 'low' | 'medium' | 'high' | 'critical';
+      }
+    >();
 
     Object.entries(eventData).forEach(([dateStr, dayEvents]) => {
-      const date = new Date(dateStr + 'T00:00:00'); // Parse YYYY-MM-DD
+      const date = new Date(dateStr + 'T00:00:00');
       const dateKey = date.toDateString();
 
-      const dayActivity: DayActivity = {
-        date,
-        suspiciousCount: 0,
-        healthIssues: 0,
-        offlineCount: 0,
-        unknownCount: 0,
-        intensity: 'none',
-        events: [],
-      };
+      const eventCount = dayEvents.length;
+      let intensity: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
 
-      // Process suspicious events
-      dayEvents.suspicious?.forEach((event) => {
-        // Get machine info from machine map
-        const machineId = event.machine_id;
-        const machine = machineMap.get(machineId);
-
-        // If area filter is active and machine not in filtered list, skip
-        if (areaFilter && !machine) return;
-
-        dayActivity.suspiciousCount++;
-        dayActivity.events.push({
-          machineId: machineId,
-          machineName: machine?.name || `Machine ${event.machine_id}`,
-          type: 'suspicious',
-          details: event,
-        });
-      });
-
-      // Process health events
-      dayEvents.health?.forEach((event) => {
-        // Get machine info from machine map
-        const machineId = event.machine_id;
-        const machine = machineMap.get(machineId);
-
-        // If area filter is active and machine not in filtered list, skip
-        if (areaFilter && !machine) return;
-
-        dayActivity.healthIssues++;
-        if (event.type === 'offline') dayActivity.offlineCount++;
-
-        dayActivity.events.push({
-          machineId: machineId,
-          machineName: machine?.name || `Machine ${event.machine_id}`,
-          type: 'health',
-          details: event,
-        });
-      });
-
-      // Process generic events (if you have them)
-      dayEvents.generic?.forEach((event) => {
-        const machineId = parseInt(event.machine_id);
-        const machine = machineMap.get(machineId);
-
-        if (areaFilter && !machine) return;
-
-        dayActivity.unknownCount++;
-        dayActivity.events.push({
-          machineId: machineId,
-          machineName: machine?.name || `Machine ${event.machine_id}`,
-          type: 'unknown',
-          details: event,
-        });
-      });
-
-      // Calculate intensity for each day
-      const totalEvents =
-        dayActivity.suspiciousCount +
-        dayActivity.healthIssues +
-        dayActivity.unknownCount;
-      const hasOffline = dayActivity.offlineCount > 0;
-      const hasCriticalHealth = dayActivity.events.some(
-        (e) => e.type === 'health' && e.details.severity === 'critical',
-      );
-
-      if (hasCriticalHealth || dayActivity.suspiciousCount > 5) {
-        dayActivity.intensity = 'critical';
-      } else if (totalEvents > 3 || hasOffline) {
-        dayActivity.intensity = 'high';
-      } else if (totalEvents > 1) {
-        dayActivity.intensity = 'medium';
-      } else if (totalEvents > 0) {
-        dayActivity.intensity = 'low';
+      if (eventCount > 10) {
+        intensity = 'critical';
+      } else if (eventCount > 5) {
+        intensity = 'high';
+      } else if (eventCount > 2) {
+        intensity = 'medium';
+      } else if (eventCount > 0) {
+        intensity = 'low';
       }
 
-      if (totalEvents > 0) {
-        activityMap.set(dateKey, dayActivity);
+      if (eventCount > 0) {
+        activityMap.set(dateKey, {
+          date,
+          eventCount,
+          events: dayEvents,
+          intensity,
+        });
       }
     });
 
     return activityMap;
-  }, [eventData, areaFilter, machineMap]);
+  }, [eventData]);
 
   // Get calendar days for current month
   const getCalendarDays = () => {
@@ -326,7 +495,6 @@ export default function HeatMapCalendar({
     const current = new Date(startDate);
 
     for (let i = 0; i < 42; i++) {
-      // 6 weeks × 7 days
       days.push(new Date(current));
       current.setDate(current.getDate() + 1);
     }
@@ -367,6 +535,25 @@ export default function HeatMapCalendar({
   return (
     <>
       <div className="relative flex flex-col gap-4 overflow-y-auto xl:flex-row">
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-red-800">
+                <strong>Error:</strong> {error}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setError(null)}
+                className="text-red-600 hover:text-red-800"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Calendar */}
         <div className="mb-4 flex-1">
           <Card className="h-fit">
@@ -464,6 +651,18 @@ export default function HeatMapCalendar({
                           'ring-2 ring-blue-500 ring-offset-2',
                         !isCurrentMonth(date) && 'opacity-40',
                         isToday(date) && 'ring-1 ring-blue-400',
+                        activity &&
+                          activity.intensity === 'critical' &&
+                          'border-red-300 bg-red-50',
+                        activity &&
+                          activity.intensity === 'high' &&
+                          'border-orange-300 bg-orange-50',
+                        activity &&
+                          activity.intensity === 'medium' &&
+                          'border-yellow-300 bg-yellow-50',
+                        activity &&
+                          activity.intensity === 'low' &&
+                          'border-green-300 bg-green-50',
                       )}
                     >
                       <span
@@ -476,33 +675,24 @@ export default function HeatMapCalendar({
                         {date.getDate()}
                       </span>
 
-                      {/* Activity Badges */}
+                      {/* Activity Badge */}
                       {activity && (
                         <div className="mt-1 flex w-full flex-col items-start gap-1">
-                          {activity.suspiciousCount > 0 && (
-                            <Badge
-                              variant="destructive"
-                              className="h-auto w-full px-1 py-0.5 text-[10px]"
-                            >
-                              Suspicious: {activity.suspiciousCount}
-                            </Badge>
-                          )}
-                          {activity.healthIssues > 0 && (
-                            <Badge
-                              variant="secondary"
-                              className="h-auto w-full px-1 py-0.5 text-[10px]"
-                            >
-                              Health: {activity.healthIssues}
-                            </Badge>
-                          )}
-                          {activity.unknownCount > 0 && (
-                            <Badge
-                              variant="outline"
-                              className="h-auto w-full px-1 py-0.5 text-[10px]"
-                            >
-                              Other: {activity.unknownCount}
-                            </Badge>
-                          )}
+                          <Badge
+                            variant={
+                              activity.intensity === 'critical'
+                                ? 'destructive'
+                                : activity.intensity === 'high'
+                                  ? 'secondary'
+                                  : activity.intensity === 'medium'
+                                    ? 'outline'
+                                    : 'default'
+                            }
+                            className="h-auto w-full px-1 py-0.5 text-[10px]"
+                          >
+                            {activity.eventCount} Event
+                            {activity.eventCount > 1 ? 's' : ''}
+                          </Badge>
                         </div>
                       )}
 
@@ -553,30 +743,12 @@ export default function HeatMapCalendar({
                   )}
 
                   {/* Summary Stats */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
-                      <div className="text-2xl font-bold text-red-600">
-                        {selectedDateActivity.suspiciousCount}
-                      </div>
-                      <div className="text-xs font-medium text-red-500">
-                        Suspicious
-                      </div>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {selectedDateActivity.eventCount}
                     </div>
-                    <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {selectedDateActivity.healthIssues}
-                      </div>
-                      <div className="text-xs font-medium text-orange-500">
-                        Health
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
-                      <div className="text-2xl font-bold text-gray-600">
-                        {selectedDateActivity.unknownCount}
-                      </div>
-                      <div className="text-xs font-medium text-gray-500">
-                        Other
-                      </div>
+                    <div className="text-xs font-medium text-blue-500">
+                      Total Events
                     </div>
                   </div>
 
@@ -584,126 +756,83 @@ export default function HeatMapCalendar({
                   <div className="max-h-80 space-y-3 overflow-y-auto">
                     <div className="flex items-center justify-between">
                       <h4 className="text-lg font-semibold">Event Timeline</h4>
-                      {areaFilter && (
-                        <span className="text-xs text-gray-500">
-                          {selectedDateActivity.events.length} events
-                        </span>
-                      )}
+                      <span className="text-xs text-gray-500">
+                        {selectedDateActivity.events.length} events
+                      </span>
                     </div>
                     {selectedDateActivity.events
                       .sort(
                         (a, b) =>
-                          new Date(b.details.timestamp).getTime() -
-                          new Date(a.details.timestamp).getTime(),
+                          new Date(b.timestamp).getTime() -
+                          new Date(a.timestamp).getTime(),
                       )
-                      .map((event, index) => (
+                      .map((event) => (
                         <div
-                          key={index}
+                          key={event.id}
                           className="rounded-lg border p-3 transition-colors hover:bg-gray-50"
                         >
                           <div className="mb-2 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-gray-500" />
+                              <Camera className="h-4 w-4 text-blue-500" />
                               <span className="text-sm font-medium">
                                 {event.machineName}
                               </span>
                             </div>
-                            <Badge
-                              variant={
-                                event.type === 'suspicious'
-                                  ? 'destructive'
-                                  : event.type === 'health'
-                                    ? 'secondary'
-                                    : 'outline'
-                              }
-                              className="text-xs"
-                            >
-                              {event.type}
+                            <Badge variant="outline" className="text-xs">
+                              Event
                             </Badge>
                           </div>
 
-                          {event.type === 'suspicious' && (
-                            <div className="space-y-1 text-xs text-gray-600">
-                              <div>
-                                Type:{' '}
-                                <span className="font-medium">
-                                  {event.details.type.replace(/_/g, ' ')}
-                                </span>
-                              </div>
-                              <div>
-                                Confidence:{' '}
-                                <span className="font-medium">
-                                  {(event.details.confidence * 100).toFixed(0)}%
-                                </span>
-                              </div>
-                              <div>
-                                Time:{' '}
-                                <span className="font-medium">
-                                  {new Date(
-                                    event.details.timestamp,
-                                  ).toLocaleTimeString()}
-                                </span>
-                              </div>
-                              {event.details.marked && (
-                                <Badge variant="outline" className="mt-2">
-                                  {event.details.marked}
-                                </Badge>
-                              )}
+                          <div className="space-y-2 text-xs text-gray-600">
+                            <div>
+                              Event:{' '}
+                              <span className="font-medium">
+                                {event.eventstr}
+                              </span>
                             </div>
-                          )}
+                            <div>
+                              Time:{' '}
+                              <span className="font-medium">
+                                {new Date(event.timestamp).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <div>
+                              Machine ID:{' '}
+                              <span className="font-medium">
+                                {event.machineId}
+                              </span>
+                            </div>
+                          </div>
 
-                          {event.type === 'health' && (
-                            <div className="space-y-1 text-xs text-gray-600">
-                              <div>
-                                Issue:{' '}
-                                <span className="font-medium">
-                                  {event.details.type.replace(/_/g, ' ')}
-                                </span>
+                          {/* Image Display */}
+                          <div className="h-full w-full">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="h-full w-full space-y-2">
+                                <p className="text-xs text-gray-500">
+                                  Cropped
+                                </p>
+                                <Image
+                                  width={100}
+                                  height={100}
+                                  src={event?.croppedImageUrl ?? ''}
+                                  alt="Cropped event image"
+                                  className="h-full w-full rounded border object-contain"
+                                />
                               </div>
-                              <div>
-                                Time:{' '}
-                                <span className="font-medium">
-                                  {new Date(
-                                    event.details.timestamp,
-                                  ).toLocaleTimeString()}
-                                </span>
+                              <div className="h-full w-full">
+                                <p className="mb-1 text-xs text-gray-500">
+                                  Full
+                                </p>
+                                <Image
+                                  width={100}
+                                  height={100}
+                                  src={event?.fullImageUrl ?? ''}
+                                  alt="Full event image"
+                                  className="h-full w-full rounded border object-contain"
+                                />
                               </div>
-                              <Badge
-                                variant={
-                                  event.details.severity === 'critical'
-                                    ? 'destructive'
-                                    : 'secondary'
-                                }
-                                className="mt-2"
-                              >
-                                {event.details.severity}
-                              </Badge>
                             </div>
-                          )}
-
-                          {event.type === 'unknown' && (
-                            <div className="space-y-1 text-xs text-gray-600">
-                              <div>
-                                Type:{' '}
-                                <span className="font-medium">
-                                  {event.details.event_type || 'Generic Event'}
-                                </span>
-                              </div>
-                              <div>
-                                Time:{' '}
-                                <span className="font-medium">
-                                  {new Date(
-                                    event.details.timestamp,
-                                  ).toLocaleTimeString()}
-                                </span>
-                              </div>
-                              {event.details.description && (
-                                <div className="mt-1 text-xs text-gray-500">
-                                  {event.details.description}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          </div>
                         </div>
                       ))}
                   </div>
@@ -711,7 +840,7 @@ export default function HeatMapCalendar({
               ) : (
                 <div className="py-12 text-center text-gray-500">
                   <Activity className="mx-auto mb-4 h-16 w-16 opacity-30" />
-                  <p className="text-lg font-medium">No activity recorded</p>
+                  <p className="text-lg font-medium">No events recorded</p>
                   <p className="text-sm">
                     {areaFilter
                       ? 'No events found in the selected area for this date'

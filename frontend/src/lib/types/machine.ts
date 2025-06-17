@@ -1,4 +1,3 @@
-
 export interface Machine {
   id: number;
   name: string;
@@ -31,7 +30,12 @@ export interface SuspiciousEvent {
 
 export interface HealthEvent {
   timestamp: string;
-  type: 'offline' | 'hardware_failure' | 'low_battery' | 'gps_failure' | 'camera_failure';
+  type:
+    | 'offline'
+    | 'hardware_failure'
+    | 'low_battery'
+    | 'gps_failure'
+    | 'camera_failure';
   severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
