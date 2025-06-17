@@ -209,7 +209,7 @@ class VyomClient:
             self.logger.info(f"[on_hb_arrive] Sending machine stats payload: {payload}")
 
             self.writer.write_message(
-                message_data=json.dumps(payload),
+                message_data=payload,
                 data_type="json",
                 data_source="machine_stats",
                 destination_ids=["s3"],
@@ -219,22 +219,7 @@ class VyomClient:
                 expiry_time=self.expiration_time,
             )
 
-            self.logger.info(f"[on_hb_arrive] Sending MACHINE_INFO payload: {payload}")
-
-            self.writer.write_message(
-                message_data=payload,
-                data_type="json",
-                data_source="MACHINE_INFO",
-                destination_ids=["s3"],
-                source_id=vyom_machine_id,
-                filename=filename,
-                priority=3,
-                expiry_time=self.expiration_time,
-                merge_chunks=True,
-                send_live=True,
-            )
-
-            self.logger.debug(f"[on_hb_arrive] Finished sending payloads for {node_hn}.")
+            self.logger.debug(f"[on_hb_arrive] Finished sending payload for {node_hn}.")
 
         except Exception as e:
             self.logger.error(f"Error setting location in VyomClient: {e}")
