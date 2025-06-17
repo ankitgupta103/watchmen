@@ -32,6 +32,7 @@ class VyomClient:
             "C": 207,
         }
         self.expiration_time = 2000  # milisecond
+        self.location_cache = {}  # Cache for last known location per node
 
     def on_image_arrive(
         self,
@@ -160,12 +161,25 @@ class VyomClient:
 
             if timestamp is None:
                 timestamp = datetime.now(timezone.utc).isoformat()
-            if lat is None or long is None:
-                location = None
-                health_status = 2 # Maintenance
-            else:
-                location = {"lat": lat, "long": long, "timestamp": timestamp}
+
+            new_location = None
+            if lat is not None and long is not None:
+                new_location = {"lat": lat, "long": long, "timestamp": timestamp}
+
+            cached_location = self.location_cache.get(node_hn)
+
+            if new_location:
+                if cached_location == new_location:
+                    return
+                self.location_cache[node_hn] = new_location
+                location = new_location
                 health_status = 1 # Healthy
+            else:
+                if cached_location is not None:
+                    location = cached_location
+                else:
+                    health_status = 2 # Maintenance
+                    return
 
             payload = {
                 "machine_id": vyom_machine_id,
