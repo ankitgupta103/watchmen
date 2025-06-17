@@ -64,6 +64,21 @@ export default function LiveFeedWrapper({
   const [isRefreshing, setIsRefreshing] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [liveData, setLiveData] = useState<Record<number, any>>({});
+  
+  // New state for tracking MQTT events per machine
+  const [machineEvents, setMachineEvents] = useState<Record<number, Array<{
+    id: string;
+    timestamp: Date;
+    eventstr: string;
+    image_c_key?: string;
+    image_f_key?: string;
+    cropped_image_url?: string;
+    full_image_url?: string;
+    images_loaded?: boolean;
+  }>>>({});
+  
+  // Track event counts for visual indicators
+  const [machineEventCounts, setMachineEventCounts] = useState<Record<number, number>>({});
 
   // Use the custom hook to get all machine stats
   const machineStats = useAllMachineStats(machines);
@@ -74,46 +89,103 @@ export default function LiveFeedWrapper({
       ? selectedDate.toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
 
-    return [`${organizationId}/_all_/${currentDate}/machine_id/_all_/EVENT/#`];
+    return [`${organizationId}/_all_/${currentDate}/+/_all_/EVENT/#`];
   }, [organizationId, selectedDate]);
 
   // MQTT message handler
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleMqttMessage = useCallback((topic: string, data: any) => {
+  const handleMqttMessage = useCallback(async (topic: string, data: any) => {
     try {
       // Extract machine ID from topic path
-      // Topic format: organization_id/_all_/2025-06-15/machine_id/_all_/EVENT/#
+      // Topic format: organization_id/_all_/2025-06-17/machine_id/_all_/EVENT/#
       const topicParts = topic.split('/');
-      const machineIdIndex =
-        topicParts.findIndex((part) => part === 'machine_id') + 1;
-      const machineIdPart = topicParts[machineIdIndex];
+      const dateIndex = topicParts.findIndex((part) => part.match(/\d{4}-\d{2}-\d{2}/));
+      const machineIdPart = topicParts[dateIndex + 1];
 
       if (machineIdPart && machineIdPart !== '_all_') {
         const machineId = parseInt(machineIdPart);
 
         if (!isNaN(machineId)) {
+          // Create event object
+          const eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const newEvent = {
+            id: eventId,
+            timestamp: new Date(),
+            eventstr: data.eventstr || '',
+            image_c_key: data.image_c_key,
+            image_f_key: data.image_f_key,
+            images_loaded: false,
+          };
+
+          // Add event to machine events
+          setMachineEvents((prev) => ({
+            ...prev,
+            [machineId]: [...(prev[machineId] || []), newEvent].slice(-50), // Keep last 50 events
+          }));
+
+          // Update event count
+          setMachineEventCounts((prev) => ({
+            ...prev,
+            [machineId]: Math.min((prev[machineId] || 0) + 1, 9), // Cap at 9 for display
+          }));
+
+          // Update live data
           setLiveData((prev) => ({
             ...prev,
             [machineId]: {
               ...data,
               timestamp: new Date().toISOString(),
               topic: topic,
+              last_event: newEvent,
             },
           }));
-        }
-      } else {
-        // Handle _all_ case - might contain machine_id in the data payload
-        if (data.machine_id) {
-          const machineId = parseInt(data.machine_id);
-          if (!isNaN(machineId)) {
-            setLiveData((prev) => ({
-              ...prev,
-              [machineId]: {
-                ...data,
-                timestamp: new Date().toISOString(),
-                topic: topic,
-              },
+
+          // Trigger alert sound
+          if (window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('mqtt-event-received', {
+              detail: {
+                machineId,
+                event: newEvent,
+                topic,
+              }
             }));
+          }
+
+          // Fetch images from Django API
+          if (data.image_c_key && data.image_f_key) {
+            try {
+              const response = await fetch('/api/event-images/', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  image_c_key: data.image_c_key,
+                  image_f_key: data.image_f_key,
+                }),
+              });
+
+              if (response.ok) {
+                const imageData = await response.json();
+                
+                // Update the event with image URLs
+                setMachineEvents((prev) => ({
+                  ...prev,
+                  [machineId]: (prev[machineId] || []).map(event => 
+                    event.id === eventId 
+                      ? {
+                          ...event,
+                          cropped_image_url: imageData.cropped_image_url,
+                          full_image_url: imageData.full_image_url,
+                          images_loaded: true,
+                        }
+                      : event
+                  ),
+                }));
+              }
+            } catch (error) {
+              console.error('Error fetching images:', error);
+            }
           }
         }
       }
@@ -141,6 +213,16 @@ export default function LiveFeedWrapper({
       console.error('MQTT Error:', mqttError);
     }
   }, [isConnected, mqttError, mqttTopics]);
+
+  // Helper to get event count for a machine
+  const getEventCount = (machineId: number): number => {
+    return machineEventCounts[machineId] || 0;
+  };
+
+  // Helper to get events for a machine
+  const getMachineEvents = (machineId: number) => {
+    return machineEvents[machineId] || [];
+  };
 
   // Helper to get health status from stats and live data
   const getHealthStatus = (machineId: number): number => {
@@ -215,6 +297,8 @@ export default function LiveFeedWrapper({
   const getMachineData = (machineId: number): any => {
     const stats = machineStats[machineId];
     const live = liveData[machineId];
+    const events = getMachineEvents(machineId);
+    const eventCount = getEventCount(machineId);
 
     // Merge stats and live data, with live data taking priority
     const baseData = stats?.data?.message || {};
@@ -230,6 +314,9 @@ export default function LiveFeedWrapper({
       last_updated:
         live?.timestamp || baseData.timestamp || new Date().toISOString(),
       is_live: !!live,
+      events: events,
+      event_count: eventCount,
+      last_event: live?.last_event,
     };
   };
 
@@ -309,8 +396,10 @@ export default function LiveFeedWrapper({
   const handleRefresh = () => {
     setIsRefreshing(true);
 
-    // Clear live data to force refresh from current topic data
+    // Clear live data and events to force refresh from current topic data
     setLiveData({});
+    setMachineEvents({});
+    setMachineEventCounts({});
 
     // Process any current messages from PubSub
     mqttTopics.forEach((topic) => {
@@ -375,6 +464,11 @@ export default function LiveFeedWrapper({
             {totalAlerts > 0 && (
               <Badge variant="destructive" className="text-xs">
                 {totalAlerts} Alert{totalAlerts > 1 ? 's' : ''}
+              </Badge>
+            )}
+            {Object.values(machineEventCounts).reduce((sum, count) => sum + count, 0) > 0 && (
+              <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
+                {Object.values(machineEventCounts).reduce((sum, count) => sum + count, 0)} Event{Object.values(machineEventCounts).reduce((sum, count) => sum + count, 0) > 1 ? 's' : ''}
               </Badge>
             )}
           </div>
@@ -464,10 +558,12 @@ export default function LiveFeedWrapper({
 
         {/* Live Data Debug Info (remove in production) */}
         {process.env.NODE_ENV === 'development' &&
-          Object.keys(liveData).length > 0 && (
+          (Object.keys(liveData).length > 0 || Object.keys(machineEvents).length > 0) && (
             <div className="absolute bottom-4 left-4 rounded-lg border bg-white px-3 py-2 text-xs shadow-lg">
               <div className="font-medium">Live Data Debug:</div>
               <div>{Object.keys(liveData).length} machines with live data</div>
+              <div>{Object.keys(machineEvents).length} machines with events</div>
+              <div>Total events: {Object.values(machineEventCounts).reduce((sum, count) => sum + count, 0)}</div>
               <div>Topics: {Object.keys(subscriptionStats).length}</div>
             </div>
           )}
