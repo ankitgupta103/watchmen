@@ -120,7 +120,6 @@ class VyomClient:
             payload = {
                 "image_c_key": f"{file_s3_dir}/{filename1}",
                 "image_f_key": f"{file_s3_dir}/{filename2}",
-                "eventstr": eventstr,
             }
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
