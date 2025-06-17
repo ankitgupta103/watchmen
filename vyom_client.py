@@ -11,6 +11,7 @@ from vyomcloudbridge.utils.common import (
     get_data_dir_for_s3,
 )
 from vyomcloudbridge.constants.constants import default_mission_id
+import json
 
 
 class VyomClient:
@@ -187,9 +188,9 @@ class VyomClient:
                 health_status = 1 # Healthy
             elif cached_location:
                 location = cached_location
-                health_status = 2 # Maintenance
+                health_status = 1
             else:
-                # No location to send
+                health_status = 2 # Maintenance
                 return
 
             payload = {
@@ -206,7 +207,7 @@ class VyomClient:
             filename = f"{epoch_ms}.json"
 
             self.writer.write_message(
-                message_data=payload,
+                message_data=json.dumps(payload),
                 data_type="json",
                 data_source="machine_stats",
                 destination_ids=["s3"],
