@@ -7,6 +7,7 @@ import time
 import threading
 import string
 import logging
+import numpy as np
 
 # Local
 import constants
@@ -528,6 +529,23 @@ def test_send_time_to_ack(rf, dest, msgsize):
     x = "x"*msgsize
     rf.send_message(x, mst, dest)
 
+def transmission_stats(rf, dest, num_messages):
+    succ_count = 0
+    times = []
+    for i in range(num_messages):
+        t1 = time.time()
+        succ = rf.send_message(f"Hello {i}", constants.MESSAGE_TYPE_HEARTBEAT, dest)
+        if i % 100 == 0:
+            print(f"Done {i}")
+        if succ:
+            succ_count += 1
+            t2 = time.time()
+            times.append(t2-t1)
+    print(f"Sent {num_messages} messages and got an ack for {succ_count}")
+    print(f"10%ile = {np.percentile(times, 10)}")
+    print(f"50%ile = {np.percentile(times, 50)}")
+    print(f"90%ile = {np.percentile(times, 90)}")
+
 def main():
     if hname not in constants.HN_ID:
         logger.error(f"Unknown hostname ({hname}) not in {constants.HN_ID}")
@@ -540,8 +558,9 @@ def main():
         dest = sys.argv[1]
         # test_send_time_to_ack(rf, dest, 10)
         # test_send_types(rf, devid, dest)
-        test_send_long_msg(rf, dest) # Assumes its an image
-        test_send_img(rf, "pencil.jpg", dest)
+        #test_send_long_msg(rf, dest) # Assumes its an image
+        #test_send_img(rf, "pencil.jpg", dest)
+        transmission_stats(rf, dest, 1000)
         time.sleep(20)
     else:
         # Keep receiving
