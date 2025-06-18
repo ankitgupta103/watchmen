@@ -194,31 +194,30 @@ move_image_files() {
         
         # Find image files and process them
         while IFS= read -r -d '' source_file; do
+            # Generate a unique filename based on the current epoch timestamp
+            local ext="${source_file##*.}"
+            local base_epoch=$(date +%s)
+            local epoch=$base_epoch
+            local dest_file="$DEST_DIR/$epoch.$ext"
+            # Ensure uniqueness by incrementing epoch if file exists
+            while [ -f "$dest_file" ]; do
+                epoch=$((epoch + 1))
+                dest_file="$DEST_DIR/$epoch.$ext"
+            done
             local filename=$(basename "$source_file")
-            local dest_file="$DEST_DIR/$filename"
-            
-            # Skip if file already exists in destination
-            if [ -f "$dest_file" ]; then
-                log_message "SKIP: $filename already exists in destination."
-                continue
-            fi
-            
-            # Check source file permissions
+            # Skip if source file is not readable
             if [ ! -r "$source_file" ]; then
                 log_message "ERROR: Cannot read source file $filename"
                 device_failed=$((device_failed + 1))
                 continue
             fi
-            
             # Check file size and available space
             local file_size=$(get_file_size "$source_file")
-            
             # Ensure we have valid numbers (no scientific notation)
             if ! [[ "$file_size" =~ ^[0-9]+$ ]]; then
                 log_message "WARNING: Invalid file size for $filename, skipping space check"
                 file_size=0
             fi
-            
             if ! [[ "$available_space" =~ ^[0-9]+$ ]]; then
                 log_message "WARNING: Invalid available space value, refreshing..."
                 available_space=$(check_available_space "$DEST_DIR")
@@ -227,29 +226,26 @@ move_image_files() {
                     available_space=999999999999  # Large fallback value
                 fi
             fi
-            
             if [ "$file_size" -gt 0 ] && [ "$file_size" -gt "$available_space" ]; then
                 log_message "ERROR: Not enough space to move $filename (${file_size} bytes needed, ${available_space} available)"
                 device_failed=$((device_failed + 1))
                 continue
             fi
-            
-            # Move the file (atomic operation)
-            log_message "Moving: $filename (${file_size} bytes)"
+            # Move the file (atomic operation) with new name
+            log_message "Moving: $filename (${file_size} bytes) to $(basename "$dest_file")"
             if mv "$source_file" "$dest_file" 2>>"$LOG_FILE"; then
-                log_message "SUCCESS: Moved $filename"
+                log_message "SUCCESS: Moved $filename to $(basename "$dest_file")"
                 # Update ownership
-                chown vyom:vyom "$dest_file" 2>/dev/null || log_message "WARNING: Could not change ownership of $filename"
+                chown vyom:vyom "$dest_file" 2>/dev/null || log_message "WARNING: Could not change ownership of $(basename "$dest_file")"
                 device_moved=$((device_moved + 1))
                 # Update available space (only if we have valid numbers)
                 if [[ "$available_space" =~ ^[0-9]+$ ]] && [[ "$file_size" =~ ^[0-9]+$ ]] && [ "$file_size" -gt 0 ]; then
                     available_space=$((available_space - file_size))
                 fi
             else
-                log_message "ERROR: Failed to move $filename"
+                log_message "ERROR: Failed to move $filename to $(basename "$dest_file")"
                 device_failed=$((device_failed + 1))
             fi
-            
         done < <(eval "find \"$mount_point\" -type f $find_expr -print0" 2>/dev/null)
         
         log_message "Transfer complete for $mount_point: $device_moved files moved, $device_failed failed."
