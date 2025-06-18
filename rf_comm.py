@@ -229,8 +229,8 @@ class RFComm:
             return
        
         self.process_message(msgid, msgtype, msgpyl)
-        # Disable acking except on chunks
-        if ACKING_ENABLED:
+        # Disable acking except on chunks and events
+        if ACKING_ENABLED or msgtype == constants.MESSAGE_TYPE_EVENT:
             logger.info(f"{self.devid} : Sending ack for {msgid} to {src}")
             msg_to_send = msgid
             time.sleep(0.5)
