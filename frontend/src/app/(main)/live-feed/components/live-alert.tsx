@@ -331,8 +331,8 @@ export default function CriticalAlertSystem({
         setAlerts((prev) => [alert, ...prev.slice(0, 49)]); // Keep last 50 alerts
         setUnacknowledgedCount((prev) => prev + 1);
 
-        // Play alarm sound
-        if (isAudioEnabled) {
+        // Play alarm sound only for severity 2 or higher
+        if (isAudioEnabled && parseInt(eventMessage.event_severity) >= 2) {
           try {
             await audioManagerRef.current.playAlarm(volume);
             // Play alarm 3 times with intervals
@@ -343,8 +343,10 @@ export default function CriticalAlertSystem({
           }
         }
 
-        // Flash screen
-        startFlashing();
+        // Flash screen only for severity 2 or higher
+        if (parseInt(eventMessage.event_severity) >= 2) {
+          startFlashing();
+        }
 
         // Show toast notification
         toast.custom(
@@ -604,7 +606,11 @@ export default function CriticalAlertSystem({
                           'rounded-lg border p-4 transition-all',
                           alert.acknowledged
                             ? 'border-gray-200 bg-gray-50'
-                            : 'border-red-200 bg-red-50 shadow-md',
+                            : alert.message.event_severity === '1'
+                              ? 'border-yellow-200 bg-orange-50'
+                              : parseInt(alert.message.event_severity) >= 2
+                                ? 'border-red-200 bg-red-50 shadow-md'
+                                : '',
                         )}
                       >
                         <div className="mb-3 flex items-start justify-between">
