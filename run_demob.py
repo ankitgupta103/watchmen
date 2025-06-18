@@ -64,7 +64,7 @@ class CommandCenter:
         self.rf = RFComm(devid)
         self.rf.add_node(self)
         self.rf.keep_reading()
-        self.node_map = {} # id->(num HB, last HB, gps, Num photos, Num events, [Event TS])
+        self.node_map = {} # id->(num HB, last HB, gps, Num photos, Num events, [(Event TS, EventID)])
         self.images_saved = []
         self.msgids_seen = []
         self.vyom_client = VyomClient(logger=logger)
@@ -159,11 +159,11 @@ class CommandCenter:
         eventtime = parts[1]
         evid = parts[2]
         if nodeid not in self.node_map:
-            self.node_map[nodeid] = (0, "", "", 1, 1, [eventtime])
+            self.node_map[nodeid] = (0, "", "", 1, 1, [(eventtime, evid)])
             self.logger.warning(f"Wierd that node {nodeid} not in map yet")
             return
         (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
-        event_ts_list.append(eventtime)
+        event_ts_list.append((eventtime, evid))
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
         # SENDING TO VYOM
         try:
