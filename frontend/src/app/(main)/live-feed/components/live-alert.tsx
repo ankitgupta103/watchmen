@@ -493,7 +493,7 @@ export default function CriticalAlertSystem({
       {isModalOpen && (
         <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4">
           <Card
-            className="max-h-[90vh] w-full max-w-4xl overflow-hidden"
+            className="h-full w-full max-w-4xl overflow-hidden"
             ref={modalRef}
           >
             <CardHeader className="pb-3">
@@ -597,7 +597,7 @@ export default function CriticalAlertSystem({
               <Separator />
 
               {/* Alerts List */}
-              <div className="max-h-96 overflow-y-auto">
+              <div className="max-h-[90vh] overflow-y-auto">
                 {alerts.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     <Camera className="mx-auto mb-2 h-12 w-12 opacity-30" />
