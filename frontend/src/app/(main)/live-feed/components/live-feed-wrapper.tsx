@@ -508,7 +508,10 @@ export default function LiveFeedWrapper({
             <div>Active machines: {Object.keys(machineEventCounts).length}</div>
             <div>Total events: {totalEvents}</div>
             <div>Topics: {mqttTopics.length}</div>
-            <div>Pulsating: {Object.values(pulsatingMachines).filter(Boolean).length}</div>
+            <div>
+              Pulsating:{' '}
+              {Object.values(pulsatingMachines).filter(Boolean).length}
+            </div>
           </div>
         )}
       </div>

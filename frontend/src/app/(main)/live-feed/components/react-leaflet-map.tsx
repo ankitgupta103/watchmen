@@ -97,9 +97,7 @@ const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
         <div
           className={cn(
             'absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white text-xs font-bold shadow-sm',
-            isOnline
-              ? 'bg-orange-500 text-white'
-              : 'bg-gray-700 text-white',
+            isOnline ? 'bg-orange-500 text-white' : 'bg-gray-700 text-white',
           )}
         >
           {eventCount > 99 ? '99+' : eventCount}
@@ -107,16 +105,16 @@ const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
       )}
 
       {/* Status indicator dot */}
-      <div 
+      <div
         className={cn(
-          "absolute -right-1 -bottom-1 flex h-3 w-3 items-center justify-center rounded-full border border-white",
-          isOnline ? "bg-green-400" : "bg-gray-600"
+          'absolute -right-1 -bottom-1 flex h-3 w-3 items-center justify-center rounded-full border border-white',
+          isOnline ? 'bg-green-400' : 'bg-gray-600',
         )}
       >
-        <div 
+        <div
           className={cn(
-            "h-1 w-1 rounded-full",
-            isOnline ? "bg-green-800" : "bg-gray-300"
+            'h-1 w-1 rounded-full',
+            isOnline ? 'bg-green-800' : 'bg-gray-300',
           )}
         ></div>
       </div>
@@ -293,12 +291,10 @@ function EnhancedMarker({
 
           {/* Status information */}
           <div
-            className={cn(
-              'font-medium',
-              getStatusColor(machineData.is_online),
-            )}
+            className={cn('font-medium', getStatusColor(machineData.is_online))}
           >
-            <strong>Status:</strong> {getStatusText(machineData.is_online, machineData.event_count)}
+            <strong>Status:</strong>{' '}
+            {getStatusText(machineData.is_online, machineData.event_count)}
           </div>
 
           {/* Recent event activity indicator */}

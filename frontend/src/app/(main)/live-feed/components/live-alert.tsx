@@ -367,31 +367,12 @@ export default function CriticalAlertSystem({
                     EVENT DETECTED
                   </p>
                   <p className="text-sm text-gray-700">
-                    {machineName}: {
-                      eventMessage?.event_severity === "1"
-                        ? "High"
-                        : eventMessage?.event_severity === "2"
-                          ? "Critical"
-                          : "Medium"
-                    }
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    {eventMessage?.meta?.node_id}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    {eventMessage?.meta?.hb_count}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    {eventMessage?.meta?.last_hb_time}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    {eventMessage?.meta?.photos_taken}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    {eventMessage?.meta?.events_seen}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    {eventMessage?.meta?.event_ts_list}
+                    {machineName}:{' '}
+                    {eventMessage?.event_severity === '1'
+                      ? 'High'
+                      : eventMessage?.event_severity === '2'
+                        ? 'Critical'
+                        : 'Medium'}
                   </p>
                 </div>
               </div>
@@ -669,14 +650,31 @@ export default function CriticalAlertSystem({
                             {alert.machineName}
                           </div>
                           <div className="text-sm text-gray-600">
-                            Severity: {
-                              alert.message.event_severity === "1"
-                                ? "High"
-                                : alert.message.event_severity === "2"
-                                  ? "Critical"
-                                  : "Medium"
-                            }
+                            Severity:{' '}
+                            {alert.message.event_severity === '1'
+                              ? 'High'
+                              : alert.message.event_severity === '2'
+                                ? 'Critical'
+                                : 'Medium'}
                           </div>
+                          <p className="text-sm text-gray-700">
+                            {alert.message?.meta?.node_id}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            {alert.message?.meta?.hb_count}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            {alert.message?.meta?.last_hb_time}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            {alert.message?.meta?.photos_taken}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            {alert.message?.meta?.events_seen}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            {alert.message?.meta?.event_ts_list}
+                          </p>
                         </div>
 
                         {/* Image Display */}

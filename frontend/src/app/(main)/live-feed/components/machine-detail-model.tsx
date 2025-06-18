@@ -1,5 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Calendar, Camera, Clock, Loader2, MapPin, X, Image as ImageIcon } from 'lucide-react';
+import useOrganization from '@/hooks/use-organization';
+import useToken from '@/hooks/use-token';
+import {
+  Calendar,
+  Camera,
+  Clock,
+  Image as ImageIcon,
+  Loader2,
+  MapPin,
+  X,
+} from 'lucide-react';
 import Image from 'next/image';
 
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +24,6 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import useOrganization from '@/hooks/use-organization';
-import useToken from '@/hooks/use-token';
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
@@ -74,9 +82,13 @@ export default function MachineDetailModal({
   const { token } = useToken();
   const { organizationId } = useOrganization();
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  const [historicalEvents, setHistoricalEvents] = useState<HistoricalEvent[]>([]);
+  const [historicalEvents, setHistoricalEvents] = useState<HistoricalEvent[]>(
+    [],
+  );
   const [loadingHistorical, setLoadingHistorical] = useState(false);
-  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
+  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>(
+    {},
+  );
 
   // Function to fetch images for events
   const fetchEventImages = useCallback(
@@ -124,7 +136,7 @@ export default function MachineDetailModal({
       try {
         const allEvents: HistoricalEvent[] = [];
         const today = new Date();
-        
+
         // Fetch events for the past 7 days
         for (let i = 0; i < 7; i++) {
           const date = new Date(today);
@@ -183,8 +195,10 @@ export default function MachineDetailModal({
         setLoadingHistorical(false);
 
         // Start fetching images concurrently for all events that have image keys
-        const eventsWithImages = allEvents.filter(event => event.image_c_key && event.image_f_key);
-        
+        const eventsWithImages = allEvents.filter(
+          (event) => event.image_c_key && event.image_f_key,
+        );
+
         // Fetch images concurrently (not sequentially) for better performance
         eventsWithImages.forEach(async (event) => {
           setLoadingImages((prev) => ({ ...prev, [event.id]: true }));
@@ -210,7 +224,10 @@ export default function MachineDetailModal({
               );
             }
           } catch (error) {
-            console.warn(`Failed to fetch images for event ${event.id}:`, error);
+            console.warn(
+              `Failed to fetch images for event ${event.id}:`,
+              error,
+            );
             // Mark as loaded even if failed so loading indicator disappears
             setHistoricalEvents((prev) =>
               prev.map((e) =>
@@ -221,7 +238,6 @@ export default function MachineDetailModal({
             setLoadingImages((prev) => ({ ...prev, [event.id]: false }));
           }
         });
-
       } catch (error) {
         console.error('Error fetching historical events:', error);
         setLoadingHistorical(false);
@@ -264,14 +280,17 @@ export default function MachineDetailModal({
   };
 
   // Group historical events by date
-  const groupedHistoricalEvents = historicalEvents.reduce((acc, event) => {
-    const date = event.date;
-    if (!acc[date]) {
-      acc[date] = [];
-    }
-    acc[date].push(event);
-    return acc;
-  }, {} as Record<string, HistoricalEvent[]>);
+  const groupedHistoricalEvents = historicalEvents.reduce(
+    (acc, event) => {
+      const date = event.date;
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(event);
+      return acc;
+    },
+    {} as Record<string, HistoricalEvent[]>,
+  );
 
   return (
     <>
@@ -394,7 +413,10 @@ export default function MachineDetailModal({
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="historical" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="historical"
+                  className="flex items-center gap-2"
+                >
                   <ImageIcon className="h-4 w-4" />
                   Images Captured (7 days)
                   {historicalEvents.length > 0 && (
@@ -461,7 +483,8 @@ export default function MachineDetailModal({
 
                               {/* Image Display */}
                               {event.images_loaded &&
-                              (event.cropped_image_url || event.full_image_url) ? (
+                              (event.cropped_image_url ||
+                                event.full_image_url) ? (
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                   {event.cropped_image_url && (
                                     <div className="space-y-2">
@@ -494,7 +517,9 @@ export default function MachineDetailModal({
                                         height={150}
                                         className="cursor-pointer rounded-lg border shadow-sm transition-transform hover:scale-105"
                                         onClick={() =>
-                                          setSelectedImageUrl(event.full_image_url!)
+                                          setSelectedImageUrl(
+                                            event.full_image_url!,
+                                          )
                                         }
                                       />
                                     </div>
@@ -529,7 +554,9 @@ export default function MachineDetailModal({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">Historical Events</h3>
+                      <h3 className="text-lg font-semibold">
+                        Historical Events
+                      </h3>
                       {historicalEvents.length > 0 && (
                         <Badge variant="outline">
                           {historicalEvents.length} events (7 days)
@@ -584,83 +611,110 @@ export default function MachineDetailModal({
                                 {events.length} events
                               </Badge>
                             </div>
-                            
+
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                               {events.map((event) => (
-                                <Card key={event.id} className="border bg-gray-50/50">
+                                <Card
+                                  key={event.id}
+                                  className="border bg-gray-50/50"
+                                >
                                   <CardContent className="p-3">
                                     <div className="space-y-2">
                                       <div className="flex items-center justify-between">
-                                        <Badge variant="outline" className="text-xs">
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
                                           {event.eventstr}
                                         </Badge>
                                         <span className="text-xs text-gray-500">
-                                          {new Date(event.timestamp).toLocaleTimeString()}
+                                          {new Date(
+                                            event.timestamp,
+                                          ).toLocaleTimeString()}
                                         </span>
                                       </div>
 
                                       {/* Image Display */}
-                                      {event.image_c_key && event.image_f_key ? (
+                                      {event.image_c_key &&
+                                      event.image_f_key ? (
                                         loadingImages[event.id] ? (
-                                          <div className="flex items-center justify-center py-8 bg-gray-50 rounded border">
+                                          <div className="flex items-center justify-center rounded border bg-gray-50 py-8">
                                             <div className="text-center">
-                                              <Loader2 className="h-6 w-6 animate-spin text-gray-400 mx-auto mb-2" />
-                                              <p className="text-xs text-gray-500">Loading images...</p>
+                                              <Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin text-gray-400" />
+                                              <p className="text-xs text-gray-500">
+                                                Loading images...
+                                              </p>
                                             </div>
                                           </div>
-                                        ) : event.images_loaded && (event.cropped_image_url || event.full_image_url) ? (
+                                        ) : event.images_loaded &&
+                                          (event.cropped_image_url ||
+                                            event.full_image_url) ? (
                                           <div className="space-y-2">
                                             {event.cropped_image_url && (
                                               <div>
-                                                <p className="text-xs text-gray-500 mb-1">Cropped</p>
+                                                <p className="mb-1 text-xs text-gray-500">
+                                                  Cropped
+                                                </p>
                                                 <Image
                                                   src={event.cropped_image_url}
                                                   alt={`Historical event ${event.eventstr}`}
                                                   width={150}
                                                   height={100}
-                                                  className="w-full h-24 object-cover rounded border cursor-pointer transition-transform hover:scale-105"
+                                                  className="h-24 w-full cursor-pointer rounded border object-cover transition-transform hover:scale-105"
                                                   onClick={() =>
-                                                    setSelectedImageUrl(event.cropped_image_url!)
+                                                    setSelectedImageUrl(
+                                                      event.cropped_image_url!,
+                                                    )
                                                   }
                                                 />
                                               </div>
                                             )}
                                             {event.full_image_url && (
                                               <div>
-                                                <p className="text-xs text-gray-500 mb-1">Full</p>
+                                                <p className="mb-1 text-xs text-gray-500">
+                                                  Full
+                                                </p>
                                                 <Image
                                                   src={event.full_image_url}
                                                   alt={`Historical event ${event.eventstr}`}
                                                   width={150}
                                                   height={100}
-                                                  className="w-full h-24 object-cover rounded border cursor-pointer transition-transform hover:scale-105"
+                                                  className="h-24 w-full cursor-pointer rounded border object-cover transition-transform hover:scale-105"
                                                   onClick={() =>
-                                                    setSelectedImageUrl(event.full_image_url!)
+                                                    setSelectedImageUrl(
+                                                      event.full_image_url!,
+                                                    )
                                                   }
                                                 />
                                               </div>
                                             )}
                                           </div>
                                         ) : event.images_loaded ? (
-                                          <div className="flex items-center justify-center py-8 text-gray-400 bg-gray-50 rounded border">
+                                          <div className="flex items-center justify-center rounded border bg-gray-50 py-8 text-gray-400">
                                             <div className="text-center">
-                                              <ImageIcon className="h-8 w-8 mx-auto mb-2" />
-                                              <p className="text-xs">Images not available</p>
+                                              <ImageIcon className="mx-auto mb-2 h-8 w-8" />
+                                              <p className="text-xs">
+                                                Images not available
+                                              </p>
                                             </div>
                                           </div>
                                         ) : (
-                                          <div className="flex items-center justify-center py-8 bg-gray-100 rounded border animate-pulse">
+                                          <div className="flex animate-pulse items-center justify-center rounded border bg-gray-100 py-8">
                                             <div className="text-center">
-                                              <div className="w-8 h-8 bg-gray-300 rounded mx-auto mb-2"></div>
-                                              <p className="text-xs text-gray-500">Preparing to load...</p>
+                                              <div className="mx-auto mb-2 h-8 w-8 rounded bg-gray-300"></div>
+                                              <p className="text-xs text-gray-500">
+                                                Preparing to load...
+                                              </p>
                                             </div>
                                           </div>
                                         )
                                       ) : (
-                                        <div className="flex items-center justify-center py-8 text-gray-400 bg-gray-50 rounded border">
+                                        <div className="flex items-center justify-center rounded border bg-gray-50 py-8 text-gray-400">
                                           <div className="text-center">
-                                            <ImageIcon className="h-8 w-8 mx-auto mb-2" />
-                                            <p className="text-xs">No images for this event</p>
+                                            <ImageIcon className="mx-auto mb-2 h-8 w-8" />
+                                            <p className="text-xs">
+                                              No images for this event
+                                            </p>
                                           </div>
                                         </div>
                                       )}
@@ -698,14 +752,14 @@ export default function MachineDetailModal({
               </Button>
             </DialogTitle>
           </DialogHeader>
-          <DialogContent className="max-h-[90vh] max-w-4xl p-2 flex flex-col items-center justify-center">
-            <div className="flex items-center justify-center w-full h-full">
+          <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col items-center justify-center p-2">
+            <div className="flex h-full w-full items-center justify-center">
               <Image
                 src={selectedImageUrl}
                 alt="Event image full view"
                 width={1000}
                 height={1000}
-                className="max-h-[75vh] h-full w-auto rounded-lg shadow-lg object-contain bg-white"
+                className="h-full max-h-[75vh] w-auto rounded-lg bg-white object-contain shadow-lg"
                 style={{ background: 'white' }}
               />
             </div>
