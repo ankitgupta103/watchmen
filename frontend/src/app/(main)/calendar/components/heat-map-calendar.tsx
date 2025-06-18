@@ -86,7 +86,10 @@ export default function HeatMapCalendar({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showMapFilter, setShowMapFilter] = useState(false);
   const [areaFilter, setAreaFilter] = useState<MapBounds | null>(null);
-  const [modalImage, setModalImage] = useState<{ url: string; label: string } | null>(null);
+  const [modalImage, setModalImage] = useState<{
+    url: string;
+    label: string;
+  } | null>(null);
 
   // Simplified state - just store events by date string
   const [events, setEvents] = useState<Record<string, ProcessedEvent[]>>({});
@@ -113,7 +116,7 @@ export default function HeatMapCalendar({
     async (date: Date) => {
       if (!token) return;
 
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = date.toLocaleDateString('en-CA');
 
       // Skip if already loading or loaded
       if (loading[dateStr] || events[dateStr]) return;
@@ -279,7 +282,7 @@ export default function HeatMapCalendar({
 
   // Fetch images for selected date events
   useEffect(() => {
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = selectedDate.toLocaleDateString('en-CA');
     const dayEvents = events[dateStr];
 
     if (
@@ -292,7 +295,7 @@ export default function HeatMapCalendar({
   }, [selectedDate, events, fetchImagesForEvents]);
 
   const calendarDays = getCalendarDays();
-  const selectedDateStr = selectedDate.toISOString().split('T')[0];
+  const selectedDateStr = selectedDate.toLocaleDateString('en-CA');
   const selectedDateEvents = events[selectedDateStr] || [];
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -311,7 +314,7 @@ export default function HeatMapCalendar({
     date.toDateString() === selectedDate.toDateString();
 
   const getDateIntensity = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = date.toLocaleDateString('en-CA');
     const dayEvents = events[dateStr] || [];
     const count = dayEvents.length;
 
@@ -332,8 +335,14 @@ export default function HeatMapCalendar({
     <>
       {/* Modal for image preview */}
       {modalImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70" onClick={() => setModalImage(null)}>
-          <div className="relative max-w-3xl w-full mx-4" onClick={e => e.stopPropagation()}>
+        <div
+          className="bg-opacity-70 fixed inset-0 z-50 flex items-center justify-center bg-black"
+          onClick={() => setModalImage(null)}
+        >
+          <div
+            className="relative mx-4 w-full max-w-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               className="absolute top-2 right-2 z-10 rounded-full bg-white p-1 shadow hover:bg-gray-100"
               onClick={() => setModalImage(null)}
@@ -341,15 +350,17 @@ export default function HeatMapCalendar({
             >
               <X className="h-6 w-6 text-gray-700" />
             </button>
-            <div className="flex flex-col items-center justify-center bg-white rounded-lg p-4">
+            <div className="flex flex-col items-center justify-center rounded-lg bg-white p-4">
               <Image
                 src={modalImage.url}
                 alt={modalImage.label}
                 width={800}
                 height={600}
-                className="max-h-[80vh] w-auto object-contain rounded"
+                className="max-h-[80vh] w-auto rounded object-contain"
               />
-              <div className="mt-2 text-sm text-gray-700">{modalImage.label}</div>
+              <div className="mt-2 text-sm text-gray-700">
+                {modalImage.label}
+              </div>
             </div>
           </div>
         </div>
@@ -459,7 +470,7 @@ export default function HeatMapCalendar({
               {/* Calendar Grid */}
               <div className="grid grid-cols-7 gap-2">
                 {calendarDays.map((date, index) => {
-                  const dateStr = date.toLocaleDateString('en-CA');   
+                  const dateStr = date.toLocaleDateString('en-CA');
                   const dayEvents = events[dateStr] || [];
                   const intensity = getDateIntensity(date);
                   const isLoadingDate = loading[dateStr];
@@ -625,35 +636,44 @@ export default function HeatMapCalendar({
                           </div>
 
                           {/* Image Display */}
-                          {event.imagesLoaded &&
-                            (event.croppedImageUrl || event.fullImageUrl) && (
-                              <div className="mt-3 grid grid-cols-2 gap-2">
-                                {event.croppedImageUrl && (
-                                  <div className="space-y-1 cursor-pointer" onClick={() => setModalImage({ url: event.croppedImageUrl!, label: 'Cropped' })}>
-                                    <p className="text-xs text-gray-500">Cropped</p>
-                                    <Image
-                                      width={100}
-                                      height={100}
-                                      src={event.croppedImageUrl}
-                                      alt="Cropped event image"
-                                      className="h-20 w-full rounded border object-cover"
-                                    />
-                                  </div>
-                                )}
-                                {event.fullImageUrl && (
-                                  <div className="space-y-1 cursor-pointer" onClick={() => setModalImage({ url: event.fullImageUrl!, label: 'Full' })}>
-                                    <p className="text-xs text-gray-500">Full</p>
-                                    <Image
-                                      width={100}
-                                      height={100}
-                                      src={event.fullImageUrl}
-                                      alt="Full event image"
-                                      className="h-20 w-full rounded border object-cover"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <div
+                              className="cursor-pointer space-y-1"
+                              onClick={() =>
+                                setModalImage({
+                                  url: event.croppedImageUrl!,
+                                  label: 'Cropped',
+                                })
+                              }
+                            >
+                              <p className="text-xs text-gray-500">Cropped</p>
+                              <Image
+                                width={100}
+                                height={100}
+                                src={event?.croppedImageUrl ?? ''}
+                                alt="Cropped event image"
+                                className="h-full w-full rounded border object-cover"
+                              />
+                            </div>
+                            <div
+                              className="cursor-pointer space-y-1"
+                              onClick={() =>
+                                setModalImage({
+                                  url: event.fullImageUrl!,
+                                  label: 'Full',
+                                })
+                              }
+                            >
+                              <p className="text-xs text-gray-500">Full</p>
+                              <Image
+                                width={100}
+                                height={100}
+                                src={event?.fullImageUrl ?? ''}
+                                alt="Full event image"
+                                className="h-full w-full rounded border object-cover"
+                              />
+                            </div>
+                          </div>
                         </div>
                       ))}
                   </div>
