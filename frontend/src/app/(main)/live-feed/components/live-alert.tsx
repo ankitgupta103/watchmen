@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 interface EventMessage {
   image_c_key: string;
   image_f_key: string;
-  eventstr: string;
+  event_severity: string;
 }
 
 interface EventAlert {
@@ -357,7 +357,13 @@ export default function CriticalAlertSystem({
                     EVENT DETECTED
                   </p>
                   <p className="text-sm text-gray-700">
-                    {machineName}: {eventMessage.eventstr}
+                    {machineName}: {
+                      eventMessage.event_severity === "1"
+                        ? "High"
+                        : eventMessage.event_severity === "2"
+                          ? "Critical"
+                          : "Medium"
+                    }
                   </p>
                 </div>
               </div>
@@ -631,7 +637,13 @@ export default function CriticalAlertSystem({
                             {alert.machineName}
                           </div>
                           <div className="text-sm text-gray-600">
-                            Event: {alert.message.eventstr}
+                            Severity: {
+                              alert.message.event_severity === "1"
+                                ? "High"
+                                : alert.message.event_severity === "2"
+                                  ? "Critical"
+                                  : "Medium"
+                            }
                           </div>
                         </div>
 
