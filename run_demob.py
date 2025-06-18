@@ -307,13 +307,14 @@ class DevUnit:
         full = None
         immap = {} # Evid to list of images for that event.
         new_images = []
+        event_severity = None  # Initialize to None to avoid UnboundLocalError
         for f in critical_images:
             if f not in self.critical_images_processed:
                 self.critical_images_processed.append(f)
                 new_images.append(f)
         for f in new_images:
             fname = f.split("/").pop()
-            event_severity = fname.split("_")[0]
+            event_severity = fname.split("_")[0]  # Set event_severity here for each new image
             evid = fname.split("_")[2]
             if evid not in immap:
                 immap[evid] = [f]
@@ -331,10 +332,13 @@ class DevUnit:
                 if ts > latest_ts or latest_full_evid is None:
                     latest_ts = ts
                     latest_full_evid = evid
+                    # Set event_severity from the filename of the latest image
+                    event_severity = fname.split("_")[0]
         if latest_full_evid is not None:
             logger.info(f"Sending {latest_full_evid} and images {immap[latest_full_evid]}")
             if len(immap[latest_full_evid]) == 2:
                 for f in immap[latest_full_evid]:
+                    fname = f.split("/").pop()
                     if f.find("_f.jpg") > 0:
                         full = f
                     elif f.find("_c.jpg") > 0:
