@@ -74,6 +74,7 @@ class CommandCenter:
         while True:
             self.logger.info("######### Command Center printing status ##############")
             for x in self.node_map.keys():
+                self.logger.info(f"Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID")
                 self.logger.info(f" ####### {x} : {self.node_map[x]}")
             for x in self.images_saved:
                 self.logger.info(f"Saved image : {x}")
