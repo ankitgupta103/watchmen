@@ -202,6 +202,7 @@ class CommandCenter:
     # A:1205
     def process_event(self, eventstr):
         parts = eventstr.split(':')
+        logger.info(f"Got event message : {eventstr}")
         if len(parts) != 4:
             self.logger.error(f"Error parsing event message : {eventstr}")
             return
@@ -467,6 +468,7 @@ class DevUnit:
     def send_event(self, evid, event_severity):
         t = get_time_str()
         msgstr = f"{self.devid}:{t}:{evid}:{event_severity}"
+        self.logger.info(f"Sending event id : {msgstr}")
         next_dest = get_next_dest(self.devid)
         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest, True)
 
