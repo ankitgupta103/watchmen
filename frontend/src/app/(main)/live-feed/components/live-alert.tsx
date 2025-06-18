@@ -654,7 +654,7 @@ export default function CriticalAlertSystem({
                                     height={100}
                                     src={alert.croppedImageUrl}
                                     alt="Cropped event image"
-                                    className="h-32 w-full rounded border object-cover"
+                                    className="h-full w-full rounded border object-cover"
                                   />
                                 </div>
                               )}
@@ -668,7 +668,7 @@ export default function CriticalAlertSystem({
                                     height={100}
                                     src={alert.fullImageUrl}
                                     alt="Full event image"
-                                    className="h-32 w-full rounded border object-cover"
+                                    className="h-full w-full rounded border object-cover"
                                   />
                                 </div>
                               )}

@@ -44,6 +44,8 @@ interface SimpleMachineData {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   stats_data: any;
   buffer_size: number;
+  // Add pulsating state for recent events
+  is_pulsating: boolean;
 }
 
 interface MapProps {
@@ -52,85 +54,72 @@ interface MapProps {
   getMachineData: (machineId: number) => SimpleMachineData;
 }
 
-// Get color based on event count
-const getEventColor = (eventCount: number) => {
-  if (eventCount === 0)
-    return {
-      bg: 'bg-blue-500',
-      border: 'border-blue-600',
-      text: 'text-blue-100',
-    };
-  if (eventCount <= 3)
-    return {
-      bg: 'bg-yellow-500',
-      border: 'border-yellow-600',
-      text: 'text-yellow-100',
-    };
-  if (eventCount <= 7)
-    return {
-      bg: 'bg-orange-500',
-      border: 'border-orange-600',
-      text: 'text-orange-100',
-    };
-  if (eventCount <= 12)
-    return { bg: 'bg-red-500', border: 'border-red-600', text: 'text-red-100' };
-  return { bg: 'bg-red-700', border: 'border-red-800', text: 'text-red-100' };
-};
-
-// Create enhanced custom icon with event-based coloring
-const createEventIcon = (machine: Machine, machineData: SimpleMachineData) => {
+// Create enhanced custom icon with online/offline status and pulsating animation
+const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
+  const isOnline = machineData.is_online;
+  const isPulsating = machineData.is_pulsating;
   const eventCount = machineData.event_count;
-  const colors = getEventColor(eventCount);
-  const isOffline = !machineData.is_online; // Use the correct status from useMachineStats
 
-  // Override colors if machine is offline
-  const finalColors = isOffline
-    ? { bg: 'bg-gray-500', border: 'border-gray-600', text: 'text-gray-100' }
-    : colors;
+  // Colors based on online/offline status
+  const colors = isOnline
+    ? { bg: 'bg-green-500', border: 'border-green-600', text: 'text-green-100' }
+    : { bg: 'bg-gray-500', border: 'border-gray-600', text: 'text-gray-100' };
 
   const iconHtml = renderToString(
     <div className="relative">
-      {/* Pulse animation for machines with events */}
-      {!isOffline && eventCount > 0 && (
-        <div
-          className={`absolute inset-0 rounded-full ${finalColors.bg} animate-ping opacity-75`}
-        ></div>
+      {/* Pulsating wave animation for machines with recent events */}
+      {isPulsating && (
+        <>
+          <div
+            className={`absolute inset-0 rounded-full ${colors.bg} animate-ping opacity-75 duration-100`}
+          ></div>
+          <div
+            className={`absolute inset-0 rounded-full ${colors.bg} animate-ping opacity-50 duration-500`}
+          ></div>
+          <div
+            className={`absolute inset-0 rounded-full ${colors.bg} animate-ping opacity-25 duration-1000`}
+          ></div>
+        </>
       )}
 
       {/* Main marker */}
       <div
         className={cn(
           `relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-white shadow-lg`,
-          finalColors.bg,
+          colors.bg,
         )}
       >
         <div className="h-2 w-2 rounded-full bg-white"></div>
       </div>
 
-      {/* Event count indicator */}
+      {/* Event count indicator (small badge if there are events) */}
       {eventCount > 0 && (
         <div
           className={cn(
             'absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white text-xs font-bold shadow-sm',
-            eventCount <= 3
-              ? 'bg-yellow-600 text-white'
-              : eventCount <= 7
-                ? 'bg-orange-600 text-white'
-                : eventCount <= 12
-                  ? 'bg-red-600 text-white'
-                  : 'bg-red-800 text-white',
+            isOnline
+              ? 'bg-orange-500 text-white'
+              : 'bg-gray-700 text-white',
           )}
         >
           {eventCount > 99 ? '99+' : eventCount}
         </div>
       )}
 
-      {/* Offline indicator */}
-      {isOffline && (
-        <div className="absolute -right-1 -bottom-1 flex h-3 w-3 items-center justify-center rounded-full border border-white bg-gray-700">
-          <div className="h-1 w-1 rounded-full bg-white"></div>
-        </div>
-      )}
+      {/* Status indicator dot */}
+      <div 
+        className={cn(
+          "absolute -right-1 -bottom-1 flex h-3 w-3 items-center justify-center rounded-full border border-white",
+          isOnline ? "bg-green-400" : "bg-gray-600"
+        )}
+      >
+        <div 
+          className={cn(
+            "h-1 w-1 rounded-full",
+            isOnline ? "bg-green-800" : "bg-gray-300"
+          )}
+        ></div>
+      </div>
     </div>,
   );
 
@@ -138,7 +127,7 @@ const createEventIcon = (machine: Machine, machineData: SimpleMachineData) => {
     html: iconHtml,
     iconSize: [32, 32],
     popupAnchor: [0, -16],
-    className: 'custom-event-marker',
+    className: 'custom-status-marker',
   });
 };
 
@@ -248,26 +237,25 @@ function EnhancedMarker({
     onMarkerClick(machine);
   };
 
-  const getEventLevelText = (count: number) => {
-    if (count === 0) return 'No events';
-    if (count <= 3) return 'Low activity';
-    if (count <= 7) return 'Medium activity';
-    if (count <= 12) return 'High activity';
-    return 'Critical activity';
+  const getStatusText = (isOnline: boolean, eventCount: number) => {
+    if (isOnline) {
+      if (eventCount > 0) {
+        return `Online - ${eventCount} recent events`;
+      }
+      return 'Online - No recent events';
+    } else {
+      return 'Offline';
+    }
   };
 
-  const getEventLevelColor = (count: number) => {
-    if (count === 0) return 'text-blue-600';
-    if (count <= 3) return 'text-yellow-600';
-    if (count <= 7) return 'text-orange-600';
-    if (count <= 12) return 'text-red-600';
-    return 'text-red-800';
+  const getStatusColor = (isOnline: boolean) => {
+    return isOnline ? 'text-green-600' : 'text-gray-600';
   };
 
   return (
     <Marker
       ref={markerRef}
-      icon={createEventIcon(machine, machineData)}
+      icon={createStatusIcon(machine, machineData)}
       position={[machineData.location.lat ?? 0, machineData.location.lng ?? 0]}
       eventHandlers={{
         click: handleClick,
@@ -303,16 +291,22 @@ function EnhancedMarker({
             <strong>Type:</strong> {machine.type.replace('_', ' ')}
           </div>
 
-          {/* Event information */}
+          {/* Status information */}
           <div
             className={cn(
               'font-medium',
-              getEventLevelColor(machineData.event_count),
+              getStatusColor(machineData.is_online),
             )}
           >
-            <strong>Events:</strong> {machineData.event_count} (
-            {getEventLevelText(machineData.event_count)})
+            <strong>Status:</strong> {getStatusText(machineData.is_online, machineData.event_count)}
           </div>
+
+          {/* Recent event activity indicator */}
+          {machineData.is_pulsating && (
+            <div className="mt-1 border-t pt-1 text-xs text-orange-600">
+              <strong>🔔 Recent Event Activity</strong>
+            </div>
+          )}
 
           {/* Last event info */}
           {machineData.last_event && (
@@ -377,7 +371,7 @@ export default function SimplifiedReactLeafletMap({
         </LayersControl.BaseLayer>
       </LayersControl>
 
-      {/* Machine Markers with Event-based Coloring */}
+      {/* Machine Markers with Status-based Coloring and Pulsating Animation */}
       {machines.map((machine) => (
         <EnhancedMarker
           key={machine.id}
