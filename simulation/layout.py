@@ -41,8 +41,8 @@ class Layout:
         # Add the command central
         self.nodes["ZZZ"] = {
             "id": "ZZZ",
-            "lat": self.center_lat,
-            "lon": self.center_lon,
+            "lat": self.center_lat + 0.01,
+            "lon": self.center_lon - 0.02,
             "neighbours": []
         }
 

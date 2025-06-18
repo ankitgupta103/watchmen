@@ -42,7 +42,6 @@ interface MapBounds {
   west: number;
 }
 
-// S3 Event data structure
 interface S3EventData {
   image_c_key: string;
   image_f_key: string;
@@ -58,12 +57,7 @@ interface ProcessedEvent extends S3EventData {
   timestamp: string | Date;
   croppedImageUrl?: string;
   fullImageUrl?: string;
-  imagesFetched: boolean;
-  fetchingImages: boolean;
-}
-
-interface DayEventData {
-  [date: string]: ProcessedEvent[]; // YYYY-MM-DD format
+  imagesLoaded: boolean;
 }
 
 const MONTHS = [
@@ -88,82 +82,51 @@ export default function HeatMapCalendar({
   orgId,
 }: HeatMapCalendarProps) {
   const { token } = useToken();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date(),
-  );
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showMapFilter, setShowMapFilter] = useState(false);
   const [areaFilter, setAreaFilter] = useState<MapBounds | null>(null);
-  const [eventData, setEventData] = useState<DayEventData>({});
-  const [loading, setLoading] = useState(false);
-  const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
+  const [modalImage, setModalImage] = useState<{ url: string; label: string } | null>(null);
+
+  // Simplified state - just store events by date string
+  const [events, setEvents] = useState<Record<string, ProcessedEvent[]>>({});
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>(
+    {},
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Filter machines based on selected area
   const filteredMachines = useMemo(() => {
     if (!areaFilter) return machines;
-
-    const filtered = machines.filter(
+    return machines.filter(
       (machine) =>
         machine.last_location.lat >= areaFilter.south &&
         machine.last_location.lat <= areaFilter.north &&
         machine.last_location.lng >= areaFilter.west &&
         machine.last_location.lng <= areaFilter.east,
     );
-
-    return filtered;
   }, [machines, areaFilter]);
 
-  // Fetch images from Django backend using your EventImageStatusView
-  const fetchEventImages = useCallback(
-    async (imageKeys: { image_c_key: string; image_f_key: string }) => {
-      if (!token) {
-        console.error('No authentication token available');
-        return null;
-      }
-
-      try {
-        const data = await fetcherClient<{
-          success: boolean;
-          cropped_image_url?: string;
-          full_image_url?: string;
-          error?: string;
-        }>(`${API_BASE_URL}/event-images/`, token, {
-          method: 'POST',
-          body: imageKeys,
-        });
-
-        if (data?.success) {
-          return {
-            croppedImageUrl: data.cropped_image_url,
-            fullImageUrl: data.full_image_url,
-          };
-        } else {
-          throw new Error(data?.error || 'Failed to fetch images');
-        }
-      } catch (error) {
-        console.error('Error fetching images:', error);
-        return null;
-      }
-    },
-    [token],
-  );
-
-  // Function to fetch events from S3 for a specific date
-  const fetchS3EventsForDate = useCallback(
-    async (date: Date): Promise<ProcessedEvent[]> => {
-      if (!token) {
-        console.error('No authentication token available');
-        return [];
-      }
+  // Simple function to fetch events for a single date
+  const fetchEventsForDate = useCallback(
+    async (date: Date) => {
+      if (!token) return;
 
       const dateStr = date.toISOString().split('T')[0];
-      const events: ProcessedEvent[] = [];
+
+      // Skip if already loading or loaded
+      if (loading[dateStr] || events[dateStr]) return;
+
+      setLoading((prev) => ({ ...prev, [dateStr]: true }));
+      setError(null);
 
       try {
         const machinesToCheck = areaFilter ? filteredMachines : machines;
+        const allEvents: ProcessedEvent[] = [];
 
-        const fetchPromises = machinesToCheck.map(async (machine) => {
+        // Fetch events for each machine for this date
+        for (const machine of machinesToCheck) {
           try {
             const result = await fetcherClient<{
               success: boolean;
@@ -178,315 +141,102 @@ export default function HeatMapCalendar({
               },
             });
 
-            if (!result?.success) {
-              if (result?.error && !result.error.includes('404')) {
-                console.error(`Error for machine ${machine.id}:`, result.error);
-              }
-              return [];
+            if (result?.success && result.events) {
+              const processedEvents: ProcessedEvent[] = result.events.map(
+                (event, index) => ({
+                  ...event,
+                  id: `${machine.id}-${dateStr}-${index}`,
+                  machineId: machine.id,
+                  machineName: machine.name,
+                  timestamp: event.timestamp
+                    ? new Date(event.timestamp)
+                    : new Date(dateStr + 'T12:00:00'),
+                  imagesLoaded: false,
+                }),
+              );
+
+              allEvents.push(...processedEvents);
             }
-
-            const s3Events: S3EventData[] = result.events || [];
-
-            const processedEvents: ProcessedEvent[] = s3Events.map(
-              (s3Event, index) => ({
-                ...s3Event,
-                id: `${machine.id}-${dateStr}-${index}`,
-                machineId: machine.id,
-                machineName: machine.name,
-                timestamp: s3Event.timestamp
-                  ? new Date(s3Event.timestamp)
-                  : new Date(dateStr + 'T12:00:00'),
-                imagesFetched: false,
-                fetchingImages: false,
-              }),
+          } catch (err) {
+            console.warn(
+              `Failed to fetch events for machine ${machine.id} on ${dateStr}:`,
+              err,
             );
-
-            return processedEvents;
-          } catch (error) {
-            console.error(
-              `Error fetching events for machine ${machine.id}:`,
-              error,
-            );
-            return [];
           }
-        });
+        }
 
-        const allMachineEvents = await Promise.all(fetchPromises);
-        events.push(...allMachineEvents.flat());
-      } catch (error) {
-        console.error('Error fetching S3 events for date:', date, error);
-        setError(
-          `Failed to fetch events: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
+        setEvents((prev) => ({ ...prev, [dateStr]: allEvents }));
+      } catch (err) {
+        console.error('Error fetching events for date:', dateStr, err);
+        setError(`Failed to fetch events for ${dateStr}`);
+      } finally {
+        setLoading((prev) => ({ ...prev, [dateStr]: false }));
       }
-
-      return events;
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [token, orgId, areaFilter, filteredMachines, machines],
   );
 
-  // Function to fetch events for entire month (optimized using date range API)
-  const fetchMonthEvents = useCallback(
-    async (year: number, month: number) => {
-      if (!token) {
-        console.error('No authentication token available');
-        return;
-      }
-
-      const monthKey = `${year}-${month}`;
-      if (loadedMonths.has(monthKey)) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0);
-
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = endDate.toISOString().split('T')[0];
-
-        const machinesToCheck = areaFilter ? filteredMachines : machines;
-        const machineIds = machinesToCheck.map((m) => m.id);
-
-        if (machineIds.length === 0) {
-          setLoadedMonths((prev) => new Set([...prev, monthKey]));
-          setLoading(false);
-          return;
-        }
-
-        const result = await fetcherClient<{
-          success: boolean;
-          date_events?: { [date: string]: S3EventData[] };
-          error?: string;
-        }>(`${API_BASE_URL}/s3-events/fetch-events/`, token, {
-          method: 'PUT',
-          body: {
-            org_id: orgId,
-            start_date: startDateStr,
-            end_date: endDateStr,
-            machine_ids: machineIds,
-          },
-        });
-
-        if (!result?.success) {
-          console.warn(
-            'Month range API failed, falling back to individual dates',
-          );
-          await fetchMonthEventsIndividually(year, month);
-          return;
-        }
-
-        const dateEvents = result.date_events || {};
-
-        const monthEventData: DayEventData = {};
-
-        Object.entries(dateEvents).forEach(([dateStr, dayEvents]) => {
-          const processedEvents: ProcessedEvent[] = (
-            dayEvents as S3EventData[]
-          ).map((s3Event, index) => {
-            const machine = machinesToCheck.find(
-              (m) => m.id === s3Event.machineId,
-            );
-            return {
-              ...s3Event,
-              id: `${s3Event.machineId}-${dateStr}-${index}`,
-              machineId: s3Event.machineId || 0,
-              machineName: machine?.name || `Machine ${s3Event.machineId}`,
-              timestamp: s3Event.timestamp
-                ? new Date(s3Event.timestamp)
-                : new Date(dateStr + 'T12:00:00'),
-              imagesFetched: false,
-              fetchingImages: false,
-            };
-          });
-
-          if (processedEvents.length > 0) {
-            monthEventData[dateStr] = processedEvents;
-          }
-        });
-
-        setEventData((prev) => ({
-          ...prev,
-          ...monthEventData,
-        }));
-
-        setLoadedMonths((prev) => new Set([...prev, monthKey]));
-      } catch (error) {
-        console.error('Error fetching month events:', error);
-        setError(
-          `Failed to fetch month events: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
-        await fetchMonthEventsIndividually(year, month);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [token, orgId, areaFilter, filteredMachines, machines, loadedMonths],
-  );
-
-  // Fallback method for individual date fetching
-  const fetchMonthEventsIndividually = useCallback(
-    async (year: number, month: number) => {
-      try {
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0);
-
-        const dates: Date[] = [];
-        const current = new Date(startDate);
-
-        while (current <= endDate) {
-          dates.push(new Date(current));
-          current.setDate(current.getDate() + 1);
-        }
-
-        const fetchPromises = dates.map(async (date) => {
-          const events = await fetchS3EventsForDate(date);
-          const dateStr = date.toISOString().split('T')[0];
-          return { dateStr, events };
-        });
-
-        const results = await Promise.all(fetchPromises);
-
-        const monthEventData: DayEventData = {};
-        results.forEach(({ dateStr, events }) => {
-          if (events.length > 0) {
-            monthEventData[dateStr] = events;
-          }
-        });
-
-        setEventData((prev) => ({
-          ...prev,
-          ...monthEventData,
-        }));
-
-        const monthKey = `${year}-${month}`;
-        setLoadedMonths((prev) => new Set([...prev, monthKey]));
-      } catch (error) {
-        console.error('Error in fallback month fetching:', error);
-        setError(
-          `Failed to fetch events: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
-      }
-    },
-    [fetchS3EventsForDate],
-  );
-
-  // Fetch images for events
+  // Simple function to fetch images for events
   const fetchImagesForEvents = useCallback(
-    async (events: ProcessedEvent[]) => {
-      const fetchPromises = events.map(async (event) => {
-        if (event.imagesFetched || event.fetchingImages) return event;
+    async (dateStr: string, eventList: ProcessedEvent[]) => {
+      if (!token || !eventList.length) return;
 
-        const updatedEvent = { ...event, fetchingImages: true };
+      // Skip if already loading images for this date
+      if (loadingImages[dateStr]) return;
 
-        try {
-          const imageUrls = await fetchEventImages({
-            image_c_key: event.image_c_key,
-            image_f_key: event.image_f_key,
-          });
+      setLoadingImages((prev) => ({ ...prev, [dateStr]: true }));
 
-          return {
-            ...updatedEvent,
-            croppedImageUrl: imageUrls?.croppedImageUrl,
-            fullImageUrl: imageUrls?.fullImageUrl,
-            imagesFetched: true,
-            fetchingImages: false,
-          };
-        } catch (error) {
-          console.error('Error fetching images for event:', event.id, error);
-          return {
-            ...updatedEvent,
-            fetchingImages: false,
-          };
-        }
-      });
+      try {
+        const updatedEvents = await Promise.all(
+          eventList.map(async (event) => {
+            if (event.imagesLoaded) return event;
 
-      return Promise.all(fetchPromises);
+            try {
+              const imageResult = await fetcherClient<{
+                success: boolean;
+                cropped_image_url?: string;
+                full_image_url?: string;
+                error?: string;
+              }>(`${API_BASE_URL}/event-images/`, token, {
+                method: 'POST',
+                body: {
+                  image_c_key: event.image_c_key,
+                  image_f_key: event.image_f_key,
+                },
+              });
+
+              if (imageResult?.success) {
+                return {
+                  ...event,
+                  croppedImageUrl: imageResult.cropped_image_url,
+                  fullImageUrl: imageResult.full_image_url,
+                  imagesLoaded: true,
+                };
+              }
+            } catch (err) {
+              console.warn('Failed to fetch images for event:', event.id, err);
+            }
+
+            return { ...event, imagesLoaded: true }; // Mark as loaded even if failed
+          }),
+        );
+
+        setEvents((prev) => ({ ...prev, [dateStr]: updatedEvents }));
+      } catch (err) {
+        console.error('Error fetching images for date:', dateStr, err);
+      } finally {
+        setLoadingImages((prev) => ({ ...prev, [dateStr]: false }));
+      }
     },
-    [fetchEventImages],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [token],
   );
-
-  // Clear loaded months when area filter changes
-  useEffect(() => {
-    setLoadedMonths(new Set());
-    setEventData({});
-    setError(null);
-  }, [areaFilter]);
-
-  // Load events when month changes
-  useEffect(() => {
-    if (token) {
-      const year = currentMonth.getFullYear();
-      const month = currentMonth.getMonth() + 1;
-      fetchMonthEvents(year, month);
-    }
-  }, [currentMonth, fetchMonthEvents, token]);
-
-  // Fetch images when selectedDate changes
-  useEffect(() => {
-    if (selectedDate && token) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      const dayEvents = eventData[dateStr];
-
-      if (dayEvents && dayEvents.length > 0) {
-        fetchImagesForEvents(dayEvents).then((updatedEvents) => {
-          setEventData((prev) => ({
-            ...prev,
-            [dateStr]: updatedEvents,
-          }));
-        });
-      }
-    }
-  }, [selectedDate, fetchImagesForEvents, token, eventData]);
-
-  // Process event data to create heat map data
-  const heatMapData = useMemo(() => {
-    const activityMap = new Map<
-      string,
-      {
-        date: Date;
-        eventCount: number;
-        events: ProcessedEvent[];
-        intensity: 'none' | 'low' | 'medium' | 'high' | 'critical';
-      }
-    >();
-
-    Object.entries(eventData).forEach(([dateStr, dayEvents]) => {
-      const date = new Date(dateStr + 'T00:00:00');
-      const dateKey = date.toDateString();
-
-      const eventCount = dayEvents.length;
-      let intensity: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
-
-      if (eventCount > 10) {
-        intensity = 'critical';
-      } else if (eventCount > 5) {
-        intensity = 'high';
-      } else if (eventCount > 2) {
-        intensity = 'medium';
-      } else if (eventCount > 0) {
-        intensity = 'low';
-      }
-
-      if (eventCount > 0) {
-        activityMap.set(dateKey, {
-          date,
-          eventCount,
-          events: dayEvents,
-          intensity,
-        });
-      }
-    });
-
-    return activityMap;
-  }, [eventData]);
 
   // Get calendar days for current month
-  const getCalendarDays = () => {
+  const getCalendarDays = useCallback(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-
     const firstDay = new Date(year, month, 1);
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
@@ -500,12 +250,50 @@ export default function HeatMapCalendar({
     }
 
     return days;
-  };
+  }, [currentMonth]);
+
+  // Clear events when area filter changes
+  useEffect(() => {
+    setEvents({});
+    setLoading({});
+    setLoadingImages({});
+    setError(null);
+  }, [areaFilter]);
+
+  // Fetch events for all visible days when month changes
+  useEffect(() => {
+    if (!token) return;
+
+    const days = getCalendarDays();
+    const currentMonthDays = days.filter(
+      (day) =>
+        day.getMonth() === currentMonth.getMonth() &&
+        day.getFullYear() === currentMonth.getFullYear(),
+    );
+
+    // Fetch events for each day in the current month
+    currentMonthDays.forEach((day) => {
+      fetchEventsForDate(day);
+    });
+  }, [currentMonth, fetchEventsForDate, token, getCalendarDays]);
+
+  // Fetch images for selected date events
+  useEffect(() => {
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dayEvents = events[dateStr];
+
+    if (
+      dayEvents &&
+      dayEvents.length > 0 &&
+      !dayEvents.every((e) => e.imagesLoaded)
+    ) {
+      fetchImagesForEvents(dateStr, dayEvents);
+    }
+  }, [selectedDate, events, fetchImagesForEvents]);
 
   const calendarDays = getCalendarDays();
-  const selectedDateActivity = selectedDate
-    ? heatMapData.get(selectedDate.toDateString())
-    : null;
+  const selectedDateStr = selectedDate.toISOString().split('T')[0];
+  const selectedDateEvents = events[selectedDateStr] || [];
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     setCurrentMonth((prev) => {
@@ -515,25 +303,57 @@ export default function HeatMapCalendar({
     });
   };
 
-  const isCurrentMonth = (date: Date) => {
-    return date.getMonth() === currentMonth.getMonth();
-  };
+  const isCurrentMonth = (date: Date) =>
+    date.getMonth() === currentMonth.getMonth();
+  const isToday = (date: Date) =>
+    date.toDateString() === new Date().toDateString();
+  const isSelected = (date: Date) =>
+    date.toDateString() === selectedDate.toDateString();
 
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
+  const getDateIntensity = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    const dayEvents = events[dateStr] || [];
+    const count = dayEvents.length;
 
-  const isSelected = (date: Date) => {
-    return selectedDate?.toDateString() === date.toDateString();
+    if (count > 10) return 'critical';
+    if (count > 5) return 'high';
+    if (count > 2) return 'medium';
+    if (count > 0) return 'low';
+    return 'none';
   };
 
   const handleAreaSelect = (bounds: MapBounds | null) => {
     setAreaFilter(bounds);
   };
 
+  const isLoadingAny = Object.values(loading).some(Boolean);
+
   return (
     <>
+      {/* Modal for image preview */}
+      {modalImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70" onClick={() => setModalImage(null)}>
+          <div className="relative max-w-3xl w-full mx-4" onClick={e => e.stopPropagation()}>
+            <button
+              className="absolute top-2 right-2 z-10 rounded-full bg-white p-1 shadow hover:bg-gray-100"
+              onClick={() => setModalImage(null)}
+              aria-label="Close"
+            >
+              <X className="h-6 w-6 text-gray-700" />
+            </button>
+            <div className="flex flex-col items-center justify-center bg-white rounded-lg p-4">
+              <Image
+                src={modalImage.url}
+                alt={modalImage.label}
+                width={800}
+                height={600}
+                className="max-h-[80vh] w-auto object-contain rounded"
+              />
+              <div className="mt-2 text-sm text-gray-700">{modalImage.label}</div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="relative flex flex-col gap-4 overflow-y-auto xl:flex-row">
         {/* Error Banner */}
         {error && (
@@ -575,7 +395,7 @@ export default function HeatMapCalendar({
                       ? `Filtered (${filteredMachines.length} machines)`
                       : 'Map Filter'}
                   </Button>
-                  {loading && (
+                  {isLoadingAny && (
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading events...
@@ -587,7 +407,7 @@ export default function HeatMapCalendar({
                     variant="outline"
                     size="sm"
                     onClick={() => navigateMonth('prev')}
-                    disabled={loading}
+                    disabled={isLoadingAny}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -595,7 +415,7 @@ export default function HeatMapCalendar({
                     variant="outline"
                     size="sm"
                     onClick={() => navigateMonth('next')}
-                    disabled={loading}
+                    disabled={isLoadingAny}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -639,7 +459,10 @@ export default function HeatMapCalendar({
               {/* Calendar Grid */}
               <div className="grid grid-cols-7 gap-2">
                 {calendarDays.map((date, index) => {
-                  const activity = heatMapData.get(date.toDateString());
+                  const dateStr = date.toLocaleDateString('en-CA');   
+                  const dayEvents = events[dateStr] || [];
+                  const intensity = getDateIntensity(date);
+                  const isLoadingDate = loading[dateStr];
 
                   return (
                     <Button
@@ -651,18 +474,12 @@ export default function HeatMapCalendar({
                           'ring-2 ring-blue-500 ring-offset-2',
                         !isCurrentMonth(date) && 'opacity-40',
                         isToday(date) && 'ring-1 ring-blue-400',
-                        activity &&
-                          activity.intensity === 'critical' &&
-                          'border-red-300 bg-red-50',
-                        activity &&
-                          activity.intensity === 'high' &&
+                        intensity === 'critical' && 'border-red-300 bg-red-50',
+                        intensity === 'high' &&
                           'border-orange-300 bg-orange-50',
-                        activity &&
-                          activity.intensity === 'medium' &&
+                        intensity === 'medium' &&
                           'border-yellow-300 bg-yellow-50',
-                        activity &&
-                          activity.intensity === 'low' &&
-                          'border-green-300 bg-green-50',
+                        intensity === 'low' && 'border-green-300 bg-green-50',
                       )}
                     >
                       <span
@@ -675,34 +492,31 @@ export default function HeatMapCalendar({
                         {date.getDate()}
                       </span>
 
+                      {/* Loading indicator */}
+                      {isLoadingDate && (
+                        <div className="mt-1">
+                          <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                        </div>
+                      )}
+
                       {/* Activity Badge */}
-                      {activity && (
+                      {!isLoadingDate && dayEvents.length > 0 && (
                         <div className="mt-1 flex w-full flex-col items-start gap-1">
                           <Badge
                             variant={
-                              activity.intensity === 'critical'
+                              intensity === 'critical'
                                 ? 'destructive'
-                                : activity.intensity === 'high'
+                                : intensity === 'high'
                                   ? 'secondary'
-                                  : activity.intensity === 'medium'
+                                  : intensity === 'medium'
                                     ? 'outline'
                                     : 'default'
                             }
                             className="h-auto w-full px-1 py-0.5 text-[10px]"
                           >
-                            {activity.eventCount} Event
-                            {activity.eventCount > 1 ? 's' : ''}
+                            {dayEvents.length} Event
+                            {dayEvents.length > 1 ? 's' : ''}
                           </Badge>
-                        </div>
-                      )}
-
-                      {/* Filter indicator */}
-                      {areaFilter && !activity && isCurrentMonth(date) && (
-                        <div className="absolute right-1 bottom-1">
-                          <div
-                            className="h-1.5 w-1.5 rounded-full bg-blue-400"
-                            title="Area filter active"
-                          />
                         </div>
                       )}
                     </Button>
@@ -719,18 +533,16 @@ export default function HeatMapCalendar({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Activity className="h-6 w-6" />
-                {selectedDate
-                  ? selectedDate.toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })
-                  : 'Select a Date'}
+                {selectedDate.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {selectedDateActivity ? (
+              {selectedDateEvents.length > 0 ? (
                 <div className="space-y-6">
                   {/* Filter Status in Details */}
                   {areaFilter && (
@@ -745,22 +557,30 @@ export default function HeatMapCalendar({
                   {/* Summary Stats */}
                   <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      {selectedDateActivity.eventCount}
+                      {selectedDateEvents.length}
                     </div>
                     <div className="text-xs font-medium text-blue-500">
                       Total Events
                     </div>
                   </div>
 
+                  {/* Loading images indicator */}
+                  {loadingImages[selectedDateStr] && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading images...
+                    </div>
+                  )}
+
                   {/* Event Details */}
                   <div className="max-h-80 space-y-3 overflow-y-auto">
                     <div className="flex items-center justify-between">
                       <h4 className="text-lg font-semibold">Event Timeline</h4>
                       <span className="text-xs text-gray-500">
-                        {selectedDateActivity.events.length} events
+                        {selectedDateEvents.length} events
                       </span>
                     </div>
-                    {selectedDateActivity.events
+                    {selectedDateEvents
                       .sort(
                         (a, b) =>
                           new Date(b.timestamp).getTime() -
@@ -805,37 +625,43 @@ export default function HeatMapCalendar({
                           </div>
 
                           {/* Image Display */}
-                          <div className="h-full w-full">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="h-full w-full space-y-2">
-                                <p className="text-xs text-gray-500">
-                                  Cropped
-                                </p>
-                                <Image
-                                  width={100}
-                                  height={100}
-                                  src={event?.croppedImageUrl ?? ''}
-                                  alt="Cropped event image"
-                                  className="h-full w-full rounded border object-contain"
-                                />
+                          {event.imagesLoaded &&
+                            (event.croppedImageUrl || event.fullImageUrl) && (
+                              <div className="mt-3 grid grid-cols-2 gap-2">
+                                {event.croppedImageUrl && (
+                                  <div className="space-y-1 cursor-pointer" onClick={() => setModalImage({ url: event.croppedImageUrl!, label: 'Cropped' })}>
+                                    <p className="text-xs text-gray-500">Cropped</p>
+                                    <Image
+                                      width={100}
+                                      height={100}
+                                      src={event.croppedImageUrl}
+                                      alt="Cropped event image"
+                                      className="h-20 w-full rounded border object-cover"
+                                    />
+                                  </div>
+                                )}
+                                {event.fullImageUrl && (
+                                  <div className="space-y-1 cursor-pointer" onClick={() => setModalImage({ url: event.fullImageUrl!, label: 'Full' })}>
+                                    <p className="text-xs text-gray-500">Full</p>
+                                    <Image
+                                      width={100}
+                                      height={100}
+                                      src={event.fullImageUrl}
+                                      alt="Full event image"
+                                      className="h-20 w-full rounded border object-cover"
+                                    />
+                                  </div>
+                                )}
                               </div>
-                              <div className="h-full w-full">
-                                <p className="mb-1 text-xs text-gray-500">
-                                  Full
-                                </p>
-                                <Image
-                                  width={100}
-                                  height={100}
-                                  src={event?.fullImageUrl ?? ''}
-                                  alt="Full event image"
-                                  className="h-full w-full rounded border object-contain"
-                                />
-                              </div>
-                            </div>
-                          </div>
+                            )}
                         </div>
                       ))}
                   </div>
+                </div>
+              ) : loading[selectedDateStr] ? (
+                <div className="py-12 text-center text-gray-500">
+                  <Loader2 className="mx-auto mb-4 h-16 w-16 animate-spin opacity-30" />
+                  <p className="text-lg font-medium">Loading events...</p>
                 </div>
               ) : (
                 <div className="py-12 text-center text-gray-500">
@@ -844,7 +670,7 @@ export default function HeatMapCalendar({
                   <p className="text-sm">
                     {areaFilter
                       ? 'No events found in the selected area for this date'
-                      : 'Select a date to view events'}
+                      : 'No events found for this date'}
                   </p>
                   {areaFilter && machines.length > filteredMachines.length && (
                     <Button

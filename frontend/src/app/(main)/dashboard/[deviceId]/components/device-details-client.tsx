@@ -1,23 +1,32 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import Image from 'next/image';
-import { 
-  Activity, 
-  Camera, 
-  Calendar, 
-  Info, 
-  Loader2, 
-  MapPin, 
-  Server, 
+import { useMachineStats } from '@/hooks/use-machine-stats';
+import useToken from '@/hooks/use-token';
+import {
+  Activity,
+  Calendar,
+  Camera,
+  Info,
+  Loader2,
+  MapPin,
+  Server,
   Wifi,
   WifiOff,
-  X
+  X,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -26,20 +35,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
-import { Machine } from '@/lib/types/machine';
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
+import { Machine } from '@/lib/types/machine';
 import { formatBufferSize } from '@/lib/utils';
-import { useMachineStats } from '@/hooks/use-machine-stats';
-import useToken from '@/hooks/use-token';
 
 import PageHeader from './page-header';
 
@@ -67,15 +67,20 @@ interface DeviceDetailsClientProps {
   orgId: number;
 }
 
-export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClientProps) {
+export default function DeviceDetailsClient({
+  device,
+  orgId,
+}: DeviceDetailsClientProps) {
   const { token } = useToken();
   const { data: machineStats, buffer } = useMachineStats(device.id);
-  
+
   const [events, setEvents] = useState<ProcessedEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7' | '30' | '90'>('30');
-  const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
+    null,
+  );
 
   // Fetch images from Django backend (from heat map calendar)
   const fetchEventImages = useCallback(
@@ -151,23 +156,24 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
         const allEvents: ProcessedEvent[] = [];
 
         Object.entries(dateEvents).forEach(([dateStr, dayEvents]) => {
-          const processedEvents: ProcessedEvent[] = (dayEvents as S3EventData[]).map(
-            (s3Event, index) => ({
-              ...s3Event,
-              id: `${device.id}-${dateStr}-${index}`,
-              machineId: device.id,
-              timestamp: s3Event.timestamp
-                ? new Date(s3Event.timestamp)
-                : new Date(dateStr + 'T12:00:00'),
-              imagesFetched: false,
-              fetchingImages: false,
-            })
-          );
+          const processedEvents: ProcessedEvent[] = (
+            dayEvents as S3EventData[]
+          ).map((s3Event, index) => ({
+            ...s3Event,
+            id: `${device.id}-${dateStr}-${index}`,
+            machineId: device.id,
+            timestamp: s3Event.timestamp
+              ? new Date(s3Event.timestamp)
+              : new Date(dateStr + 'T12:00:00'),
+            imagesFetched: false,
+            fetchingImages: false,
+          }));
           allEvents.push(...processedEvents);
         });
 
         return allEvents.sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          (a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
         );
       } catch (error) {
         console.error('Error fetching events for date range:', error);
@@ -175,7 +181,7 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token, orgId, device.id]
+    [token, orgId, device.id],
   );
 
   // Fallback individual date fetching
@@ -183,7 +189,7 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
     async (days: number) => {
       const dates: Date[] = [];
       const current = new Date();
-      
+
       for (let i = 0; i < days; i++) {
         const date = new Date(current);
         date.setDate(date.getDate() - i);
@@ -192,7 +198,7 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
 
       const fetchPromises = dates.map(async (date) => {
         const dateStr = date.toISOString().split('T')[0];
-        
+
         try {
           if (!token) {
             console.error('No authentication token available');
@@ -235,12 +241,13 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
 
       const results = await Promise.all(fetchPromises);
       const allEvents = results.flat();
-      
+
       return allEvents.sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
       );
     },
-    [token, orgId, device.id]
+    [token, orgId, device.id],
   );
 
   // Fetch images for events
@@ -275,7 +282,7 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
 
       return Promise.all(fetchPromises);
     },
-    [fetchEventImages]
+    [fetchEventImages],
   );
 
   // Load events when component mounts or date range changes
@@ -283,20 +290,23 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
     if (token) {
       setLoading(true);
       setError(null);
-      
+
       fetchEventsForDateRange(parseInt(dateRange))
         .then(async (fetchedEvents) => {
           setEvents(fetchedEvents);
-          
+
           // Fetch images for the first 10 events initially
           if (fetchedEvents.length > 0) {
             const eventsToFetchImages = fetchedEvents.slice(0, 10);
-            const eventsWithImages = await fetchImagesForEvents(eventsToFetchImages);
-            
-            setEvents(prev => {
+            const eventsWithImages =
+              await fetchImagesForEvents(eventsToFetchImages);
+
+            setEvents((prev) => {
               const updated = [...prev];
-              eventsWithImages.forEach(eventWithImage => {
-                const index = updated.findIndex(e => e.id === eventWithImage.id);
+              eventsWithImages.forEach((eventWithImage) => {
+                const index = updated.findIndex(
+                  (e) => e.id === eventWithImage.id,
+                );
                 if (index !== -1) {
                   updated[index] = eventWithImage;
                 }
@@ -319,24 +329,24 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
   const handleEventSelect = useCallback(
     async (event: ProcessedEvent) => {
       setSelectedEvent(event);
-      
+
       if (!event.imagesFetched && !event.fetchingImages) {
         const updatedEvent = await fetchImagesForEvents([event]);
         if (updatedEvent.length > 0) {
-          setEvents(prev => 
-            prev.map(e => e.id === event.id ? updatedEvent[0] : e)
+          setEvents((prev) =>
+            prev.map((e) => (e.id === event.id ? updatedEvent[0] : e)),
           );
           setSelectedEvent(updatedEvent[0]);
         }
       }
     },
-    [fetchImagesForEvents]
+    [fetchImagesForEvents],
   );
 
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader deviceId={device.id.toString()} deviceName={device.name} />
-      
+
       {/* Error Banner */}
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
@@ -365,16 +375,16 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="space-y-4">
               <div>
-                <h1 className="text-3xl font-bold mb-2">
+                <h1 className="mb-2 text-3xl font-bold">
                   {device.name.replace(/-/g, ' ')}
                 </h1>
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="mb-4 flex flex-wrap gap-2">
                   <Badge
                     variant={machineStats !== null ? 'default' : 'destructive'}
-                    className="capitalize flex items-center gap-1"
+                    className="flex items-center gap-1 capitalize"
                   >
                     {machineStats !== null ? (
                       <Wifi className="h-3 w-3" />
@@ -388,11 +398,15 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-semibold text-gray-600">Machine UID:</span>
+                  <span className="font-semibold text-gray-600">
+                    Machine UID:
+                  </span>
                   <p className="font-mono">{device.machine_uid}</p>
                 </div>
                 <div>
-                  <span className="font-semibold text-gray-600">Model UID:</span>
+                  <span className="font-semibold text-gray-600">
+                    Model UID:
+                  </span>
                   <p className="font-mono">{device.model_uid}</p>
                 </div>
                 <div>
@@ -408,42 +422,56 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
 
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-gray-600 mb-2 flex items-center gap-2">
+                <h3 className="mb-2 flex items-center gap-2 font-semibold text-gray-600">
                   <Calendar className="h-4 w-4" />
                   Important Dates
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Manufacturing:</span>
-                    <span>{new Date(device.mfg_date).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(device.mfg_date).toLocaleDateString()}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Activation:</span>
-                    <span>{new Date(device.activation_date).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(device.activation_date).toLocaleDateString()}
+                    </span>
                   </div>
                   {device.end_of_service_date && (
                     <div className="flex justify-between">
                       <span>End of Service:</span>
-                      <span>{new Date(device.end_of_service_date).toLocaleDateString()}</span>
+                      <span>
+                        {new Date(
+                          device.end_of_service_date,
+                        ).toLocaleDateString()}
+                      </span>
                     </div>
                   )}
                 </div>
               </div>
 
               <div>
-                <h3 className="font-semibold text-gray-600 mb-2 flex items-center gap-2">
+                <h3 className="mb-2 flex items-center gap-2 font-semibold text-gray-600">
                   <MapPin className="h-4 w-4" />
                   Location
                 </h3>
-                <div className="text-sm space-y-1">
+                <div className="space-y-1 text-sm">
                   <div>
                     <span className="font-medium">Real-time:</span>{' '}
-                    {machineStats?.message?.location?.lat?.toFixed(4) ?? device?.last_location?.lat?.toFixed(4) ?? 'N/A'},{' '}
-                    {machineStats?.message?.location?.lng?.toFixed(4) ?? device?.last_location?.lng?.toFixed(4) ?? 'N/A'}
+                    {machineStats?.message?.location?.lat?.toFixed(4) ??
+                      device?.last_location?.lat?.toFixed(4) ??
+                      'N/A'}
+                    ,{' '}
+                    {machineStats?.message?.location?.lng?.toFixed(4) ??
+                      device?.last_location?.lng?.toFixed(4) ??
+                      'N/A'}
                   </div>
                   <div>
                     <span className="font-medium">Last known:</span>{' '}
-                    {device?.last_location?.lat?.toFixed(4) ?? 'N/A'}, {device?.last_location?.lng?.toFixed(4) ?? 'N/A'}
+                    {device?.last_location?.lat?.toFixed(4) ?? 'N/A'},{' '}
+                    {device?.last_location?.lng?.toFixed(4) ?? 'N/A'}
                   </div>
                 </div>
               </div>
@@ -461,7 +489,12 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
               Recent Events
             </CardTitle>
             <div className="flex items-center gap-2">
-              <Select value={dateRange} onValueChange={(value: '7' | '30' | '90') => setDateRange(value)}>
+              <Select
+                value={dateRange}
+                onValueChange={(value: '7' | '30' | '90') =>
+                  setDateRange(value)
+                }
+              >
                 <SelectTrigger className="w-32">
                   <SelectValue />
                 </SelectTrigger>
@@ -487,10 +520,10 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
             </div>
           ) : events.length > 0 ? (
             <div className="space-y-4">
-              <div className="text-sm text-gray-600 mb-4">
+              <div className="mb-4 text-sm text-gray-600">
                 Found {events.length} events in the last {dateRange} days
               </div>
-              
+
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -519,7 +552,9 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
                         {event.fetchingImages ? (
                           <div className="flex items-center gap-2">
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm text-gray-500">Loading...</span>
+                            <span className="text-sm text-gray-500">
+                              Loading...
+                            </span>
                           </div>
                         ) : event.imagesFetched ? (
                           <div className="flex gap-2">
@@ -545,7 +580,9 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
                         ) : (
                           <div className="flex items-center gap-2">
                             <Camera className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm text-gray-500">Available</span>
+                            <span className="text-sm text-gray-500">
+                              Available
+                            </span>
                           </div>
                         )}
                       </TableCell>
@@ -562,9 +599,9 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
                   ))}
                 </TableBody>
               </Table>
-              
+
               {events.length > 50 && (
-                <div className="text-center text-sm text-gray-500 py-4">
+                <div className="py-4 text-center text-sm text-gray-500">
                   Showing first 50 events of {events.length} total
                 </div>
               )}
@@ -583,8 +620,8 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
 
       {/* Event Details Modal */}
       {selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
+        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+          <Card className="max-h-[90vh] w-full max-w-2xl overflow-auto">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -608,15 +645,21 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
                     <p>{selectedEvent.eventstr}</p>
                   </div>
                   <div>
-                    <span className="font-semibold text-gray-600">Timestamp:</span>
+                    <span className="font-semibold text-gray-600">
+                      Timestamp:
+                    </span>
                     <p>{new Date(selectedEvent.timestamp).toLocaleString()}</p>
                   </div>
                   <div>
-                    <span className="font-semibold text-gray-600">Machine:</span>
+                    <span className="font-semibold text-gray-600">
+                      Machine:
+                    </span>
                     <p>{device.name}</p>
                   </div>
                   <div>
-                    <span className="font-semibold text-gray-600">Machine ID:</span>
+                    <span className="font-semibold text-gray-600">
+                      Machine ID:
+                    </span>
                     <p>{selectedEvent.machineId}</p>
                   </div>
                 </div>
@@ -624,10 +667,12 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
                 {selectedEvent.imagesFetched && (
                   <div className="space-y-4">
                     <h3 className="font-semibold">Event Images</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       {selectedEvent.croppedImageUrl && (
                         <div>
-                          <p className="text-sm font-medium text-gray-600 mb-2">Cropped Image</p>
+                          <p className="mb-2 text-sm font-medium text-gray-600">
+                            Cropped Image
+                          </p>
                           <Image
                             src={selectedEvent.croppedImageUrl}
                             alt="Cropped event image"
@@ -639,7 +684,9 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
                       )}
                       {selectedEvent.fullImageUrl && (
                         <div>
-                          <p className="text-sm font-medium text-gray-600 mb-2">Full Image</p>
+                          <p className="mb-2 text-sm font-medium text-gray-600">
+                            Full Image
+                          </p>
                           <Image
                             src={selectedEvent.fullImageUrl}
                             alt="Full event image"
