@@ -125,6 +125,8 @@ class RFComm:
     def _process_read_message(self, msgstr):
         # Handle ack
         msgid, msgpyl = self.sep_part(msgstr, ';')
+        if msgid == None:
+            print(f"msgid is none in MSG: {msgstr}")
         (msgtype, src, dest, rid) = self._parse_msg_id(msgid)
         if dest is None or dest == "None":
             logger.info(f"{msgstr} is a broadcast")
