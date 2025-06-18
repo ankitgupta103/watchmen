@@ -113,7 +113,7 @@ GPIO_PIN=17
 OFF_TIME=60
 
 # Destination directory for copied files
-DEST_DIR="/home/ankit/images"
+DEST_DIR="/home/vyom/images"
 
 # Log file path
 LOG_FILE="/var/log/gpio-cycle.log"
@@ -200,7 +200,7 @@ check_destination() {
         log_message "ERROR: Cannot create destination directory $DEST_DIR"
         return 1
     fi
-    if ! chown ankit:ankit "$DEST_DIR" 2>>"$LOG_FILE"; then
+    if ! chown vyom:vyom "$DEST_DIR" 2>>"$LOG_FILE"; then
         log_message "WARNING: Could not change ownership of $DEST_DIR"
     fi
     if [ ! -w "$DEST_DIR" ]; then
