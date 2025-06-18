@@ -245,17 +245,40 @@ class DevUnit:
     def get_images_to_send(self, critical_images):
         cropped = None
         full = None
-        evid = None
+        immap = {} # Evid to list of images for that event.
+        new_images = []
         for f in critical_images:
             if f not in self.critical_images_processed:
                 self.critical_images_processed.append(f)
-                if f.find("_c.jpg") >= 0:
-                    cropped = f
+                new_images.append(f)
+        for f in new_images:
+            fname = f.split("/").pop()
+            evid = fname.split("_")[2]
+            if evid not in immap:
+                immap[evid] = [f]
+            else:
+                immap[evid].append(f)
+        latest_ts = "0"
+        latest_full_evid = None
+        for evid in immap:
+            if len(immap[evid]) != 2:
+                logger.error(f"{evid} doesnt have 2 images : {immap[evid]}")
+                continue
+            for f in immap[evid]:
                 fname = f.split("/").pop()
-                evid = fname.split("_")[2]
-                if f.find(f"{evid}_f.jpg") >= 0:
-                    full = f
-        return (evid, cropped, full)
+                ts = fname.split("_")[1]
+                if ts > latest_ts or latest_full_evid is None:
+                    latest_ts = ts
+                    latest_full_evid = evid
+        if latest_full_evid is not None:
+            logger.info(f"Sending {latest_full_evid} and images {immap[latest_full_evid]}")
+            if len(immap[latest_full_evid]) == 2:
+                for f in immap[latest_full_evid]:
+                    if f.find("_f.jpg") > 0:
+                        full = f
+                    elif f.find("_c.jpg") > 0:
+                        cropped = f
+        return (latest_full_evid, cropped, full)
 
     def send_img(self, imgfile, evid):
         next_dest = get_next_dest(self.devid)
@@ -311,8 +334,7 @@ class DevUnit:
         events_seen = 0
         while True:
             (photos_seen, critical_images) = get_files_in_dir(ALLDIR, CRITICAL_DIR)
-            #self.logger.info(f"Taken sofar={self.photos_taken}, now={photos_seen}")
-            #self.logger.info(f"Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
+            #self.logger.info(f"Photos sofar = {self.photos_taken}, Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
             self.photos_taken = photos_seen
             if len(critical_images) > 0:
                 (evid, cropped, full) = self.get_images_to_send(critical_images)
