@@ -212,8 +212,8 @@ class CommandCenter:
         event_severity = parts[3]
         if nodeid not in self.node_map:
             self.node_map[nodeid] = (0, "", "", 1, 1, [(eventtime, evid)])
+            # Happens because we publish event before ecerything else
             self.logger.warning(f"Wierd that node {nodeid} not in map yet")
-            return
         (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
         event_ts_list.append((eventtime, evid))
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
