@@ -61,7 +61,7 @@ def get_time_str():
     return f"{str(t.hour).zfill(2)}{str(t.minute).zfill(2)}"
 
 # New function to downscale image if needed
-def downscale_image_if_needed(image_path, target_kb=100, scale_percent=0.60):
+def downscale_image_if_needed(image_path, target_kb=60, scale_percent=0.60):
     """
     Checks the image size. If it's larger than target_kb, downscales it by scale_percent.
     Returns the image data as bytes (potentially downscaled).
