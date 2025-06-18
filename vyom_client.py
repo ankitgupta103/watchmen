@@ -169,6 +169,7 @@ class VyomClient:
                 )
                 return
             vyom_machine_id = self.HN_TO_VYOM_ID[node_hn]
+            epoch_ms = int(time.time() * 1000)
 
             if timestamp is None:
                 timestamp = datetime.now(timezone.utc).isoformat()
@@ -178,7 +179,7 @@ class VyomClient:
             self.logger.debug(f"[on_hb_arrive] Cached location for {node_hn}: {cached_location}")
             new_location = None
             if lat is not None and long is not None:
-                new_location = {"lat": lat, "long": long, "timestamp": timestamp}
+                new_location = {"lat": lat, "long": long, "timestamp": epoch_ms}
                 self.logger.debug(f"[on_hb_arrive] New location provided: {new_location}")
 
             if new_location:
@@ -199,11 +200,11 @@ class VyomClient:
                 "data_size": 0,
                 "data_size_uploaded": 0,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
+                "timestamp": epoch_ms,
                 "location": location,
                 "health": health_status,
             }
 
-            epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
 
             self.logger.info(f"[on_hb_arrive] Sending machine stats payload: {payload}")
