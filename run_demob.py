@@ -450,9 +450,9 @@ class DevUnit:
 
     # A:1205
     # Name, time
-    def send_event(self, evid, full_image_path):
+    def send_event(self, evid):
         t = get_time_str()
-        msgstr = f"{self.devid}:{t}:{evid}:{full_image_path}"
+        msgstr = f"{self.devid}:{t}:{evid}"
         next_dest = get_next_dest(self.devid)
         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest, True)
 
