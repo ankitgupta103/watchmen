@@ -101,9 +101,9 @@ echo "[3/6] Creating the USB control script at $SCRIPT_PATH..."
 cat > "$SCRIPT_PATH" << EOF
 #!/bin/bash
 
-# GPIO Power Cycle and File Transfer Script
+# GPIO Power Cycle and Image Transfer Script
 # This script uses GPIO to cycle power to a device, waits for it to mount,
-# copies all files, and then unmounts and powers it off.
+# moves all image files, and then unmounts and powers it off.
 
 # --- Configuration ---
 # GPIO pin for power control
@@ -112,7 +112,7 @@ GPIO_PIN=17
 # Time in seconds to keep the device powered OFF between cycles
 OFF_TIME=60
 
-# Destination directory for copied files
+# Destination directory for moved files
 DEST_DIR="/home/vyom/images"
 
 # Log file path
@@ -123,6 +123,9 @@ POWER_ON_STABILIZATION_TIME=5
 
 # Maximum time to wait for the device to be mounted by the system
 MAX_MOUNT_WAIT=10
+
+# Supported image file extensions (case insensitive)
+IMAGE_EXTENSIONS="jpg jpeg png gif bmp tiff tif raw cr2 nef arw dng"
 
 # --- Script Logic ---
 
@@ -159,33 +162,34 @@ eject_usb_devices() {
     log_message "Unmounting all external media..."
     sync # Ensure all pending writes are completed
 
-    MOUNT_POINTS=$(findmnt -lo TARGET,SOURCE -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
+    # Look for mounted devices in common mount locations
+    local mount_points=$(findmnt -ln -o TARGET,SOURCE -t vfat,ntfs,exfat,ext4,ext3,ext2 | grep -E "^(/media/|/mnt/|/run/media/)")
 
-    if [ -z "$MOUNT_POINTS" ]; then
+    if [ -z "$mount_points" ]; then
         log_message "No mounted devices found to unmount."
         return 0
     fi
 
     local unmount_success=true
     while IFS= read -r line; do
-        mount_point=$(echo "$line" | awk '{print $1}')
+        local mount_point=$(echo "$line" | awk '{print $1}')
         if [ -n "$mount_point" ] && [ -d "$mount_point" ]; then
             log_message "Unmounting: $mount_point"
-            if ! umount "$mount_point" 2>>"$LOG_FILE"; then
+            if umount "$mount_point" 2>>"$LOG_FILE"; then
+                log_message "Successfully unmounted: $mount_point"
+            else
                 log_message "WARNING: Failed to unmount $mount_point. Attempting force unmount..."
-                if ! umount -f "$mount_point" 2>>"$LOG_FILE"; then
+                if umount -f "$mount_point" 2>>"$LOG_FILE"; then
+                    log_message "Force unmount successful for $mount_point."
+                else
                     log_message "ERROR: Force unmount also failed for $mount_point."
                     unmount_success=false
-                else
-                    log_message "Force unmount successful for $mount_point."
                 fi
-            else
-                log_message "Successfully unmounted: $mount_point"
             fi
         fi
-    done <<< "$MOUNT_POINTS"
+    done <<< "$mount_points"
 
-    sleep 1 # Give the system a moment to process unmounts
+    sleep 2 # Give the system time to process unmounts
 
     if [ "$unmount_success" = true ]; then
         log_message "All detected media unmounted successfully."
@@ -200,146 +204,143 @@ check_destination() {
         log_message "ERROR: Cannot create destination directory $DEST_DIR"
         return 1
     fi
+    
     if ! chown vyom:vyom "$DEST_DIR" 2>>"$LOG_FILE"; then
         log_message "WARNING: Could not change ownership of $DEST_DIR"
     fi
+    
     if [ ! -w "$DEST_DIR" ]; then
         log_message "ERROR: Destination directory $DEST_DIR is not writable."
         return 1
     fi
+    
+    log_message "Destination directory ready: $DEST_DIR"
     return 0
 }
 
-# Fixed version of the copy_files function
-copy_files() {
-    log_message "Looking for mounted devices to copy files from..."
-    if ! check_destination; then
-        log_message "ERROR: Destination check failed. Aborting file copy."
-        return 1
+# Function to get file size (compatible with different systems)
+get_file_size() {
+    local file="$1"
+    if command -v stat >/dev/null 2>&1; then
+        # Try GNU stat first (Linux)
+        stat -c%s "$file" 2>/dev/null || \
+        # Try BSD stat (macOS)
+        stat -f%z "$file" 2>/dev/null || \
+        # Fallback to ls
+        ls -l "$file" | awk '{print $5}'
+    else
+        ls -l "$file" | awk '{print $5}'
     fi
-
-    MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
-    if [ -z "$MOUNT_POINTS" ]; then
-        log_message "No mounted devices found for file transfer."
-        return
-    fi
-
-    while IFS= read -r mount_point; do
-        log_message "Checking device at: $mount_point"
-        local copy_count=0
-        local fail_count=0
-        local temp_file=$(mktemp)
-
-        # Use process substitution instead of pipeline to avoid subshell
-        while IFS= read -r -d '' source_file; do
-            local filename=$(basename "$source_file")
-            local dest_file="$DEST_DIR/$filename"
-
-            if [ -f "$dest_file" ]; then
-                log_message "SKIP: $filename already exists in destination."
-                continue
-            fi
-
-            # Capture error output and show it in the log
-            if cp_output=$(cp -p "$source_file" "$dest_file" 2>&1); then
-                log_message "COPIED: $filename"
-                chown vyom:vyom "$dest_file" 2>/dev/null
-                copy_count=$((copy_count + 1))
-                # Delete the source file after successful copy
-                if rm "$source_file" 2>>"$LOG_FILE"; then
-                    log_message "DELETED: $filename from source after copy."
-                else
-                    log_message "WARNING: Failed to delete $filename from source after copy."
-                fi
-            else
-                log_message "ERROR: Failed to copy $filename. Error: $cp_output"
-                fail_count=$((fail_count + 1))
-            fi
-        done < <(find "$mount_point" -type f \( -iname "*.jpg" -o -iname "*.jpeg" \) -print0)
-        
-        rm -f "$temp_file"
-        log_message "Transfer complete for $mount_point: $copy_count files copied, $fail_count failed."
-    done <<< "$MOUNT_POINTS"
 }
 
-# Alternative version with better error handling and debugging
-copy_files_debug() {
-    log_message "Looking for mounted devices to copy files from..."
+# Function to check available space
+check_available_space() {
+    local dest_dir="$1"
+    df "$dest_dir" | awk 'NR==2 {print $4*1024}'
+}
+
+# Function to build find command for image extensions
+build_find_expression() {
+    local expr=""
+    local first=true
+    
+    for ext in $IMAGE_EXTENSIONS; do
+        if [ "$first" = true ]; then
+            expr="\( -iname \"*.$ext\""
+            first=false
+        else
+            expr="$expr -o -iname \"*.$ext\""
+        fi
+    done
+    expr="$expr \)"
+    echo "$expr"
+}
+
+# Function to move image files from mounted devices
+move_image_files() {
+    log_message "Looking for mounted devices to move image files from..."
+    
     if ! check_destination; then
-        log_message "ERROR: Destination check failed. Aborting file copy."
+        log_message "ERROR: Destination check failed. Aborting file transfer."
         return 1
     fi
 
-    MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
-    if [ -z "$MOUNT_POINTS" ]; then
+    # Find mounted devices
+    local mount_points=$(findmnt -ln -o TARGET -t vfat,ntfs,exfat,ext4,ext3,ext2 | grep -E "^(/media/|/mnt/|/run/media/)")
+    
+    if [ -z "$mount_points" ]; then
         log_message "No mounted devices found for file transfer."
-        return
+        return 0
     fi
+
+    local total_moved=0
+    local total_failed=0
+    local available_space=$(check_available_space "$DEST_DIR")
 
     while IFS= read -r mount_point; do
         log_message "Checking device at: $mount_point"
-        local copy_count=0
-        local fail_count=0
-
+        
         # Check if mount point is accessible
         if [ ! -r "$mount_point" ]; then
             log_message "ERROR: Cannot read from $mount_point"
             continue
         fi
 
-        # Use a more robust approach with explicit file handling
-        local file_list=$(find "$mount_point" -type f \( -iname "*.jpg" -o -iname "*.jpeg" \) 2>/dev/null)
-        if [ -z "$file_list" ]; then
-            log_message "No files found in $mount_point"
-            continue
-        fi
-
-        echo "$file_list" | while IFS= read -r source_file; do
+        local device_moved=0
+        local device_failed=0
+        
+        # Build find expression for image files
+        local find_expr=$(build_find_expression)
+        
+        # Find image files and process them
+        while IFS= read -r -d '' source_file; do
             local filename=$(basename "$source_file")
             local dest_file="$DEST_DIR/$filename"
-
-            # Skip if file already exists
+            
+            # Skip if file already exists in destination
             if [ -f "$dest_file" ]; then
                 log_message "SKIP: $filename already exists in destination."
                 continue
             fi
-
+            
             # Check source file permissions
             if [ ! -r "$source_file" ]; then
-                log_message "ERROR: Cannot read source file $filename (permissions)"
+                log_message "ERROR: Cannot read source file $filename"
+                device_failed=$((device_failed + 1))
                 continue
             fi
-
-            # Check available space (basic check)
-            local file_size=$(stat -f%z "$source_file" 2>/dev/null || stat -c%s "$source_file" 2>/dev/null)
-            local available_space=$(df "$DEST_DIR" | awk 'NR==2 {print $4*1024}')
             
+            # Check file size and available space
+            local file_size=$(get_file_size "$source_file")
             if [ "$file_size" -gt "$available_space" ]; then
-                log_message "ERROR: Not enough space to copy $filename"
+                log_message "ERROR: Not enough space to move $filename (${file_size} bytes needed, ${available_space} available)"
+                device_failed=$((device_failed + 1))
                 continue
             fi
-
-            # Attempt copy with verbose error reporting
-            log_message "Attempting to copy: $filename (${file_size} bytes)"
-            if cp -p "$source_file" "$dest_file" 2>&1; then
-                log_message "SUCCESS: Copied $filename"
+            
+            # Move the file (atomic operation)
+            log_message "Moving: $filename (${file_size} bytes)"
+            if mv "$source_file" "$dest_file" 2>>"$LOG_FILE"; then
+                log_message "SUCCESS: Moved $filename"
+                # Update ownership
                 chown vyom:vyom "$dest_file" 2>/dev/null || log_message "WARNING: Could not change ownership of $filename"
-                copy_count=$((copy_count + 1))
-                # Delete the source file after successful copy
-                if rm "$source_file" 2>>"$LOG_FILE"; then
-                    log_message "DELETED: $filename from source after copy."
-                else
-                    log_message "WARNING: Failed to delete $filename from source after copy."
-                fi
+                device_moved=$((device_moved + 1))
+                available_space=$((available_space - file_size))
             else
-                local error_msg=$(cp -p "$source_file" "$dest_file" 2>&1)
-                log_message "ERROR: Failed to copy $filename. Detailed error: $error_msg"
-                fail_count=$((fail_count + 1))
+                log_message "ERROR: Failed to move $filename"
+                device_failed=$((device_failed + 1))
             fi
-        done
+            
+        done < <(eval "find \"$mount_point\" -type f $find_expr -print0" 2>/dev/null)
         
-        log_message "Transfer complete for $mount_point: $copy_count files copied, $fail_count failed."
-    done <<< "$MOUNT_POINTS"
+        log_message "Transfer complete for $mount_point: $device_moved files moved, $device_failed failed."
+        total_moved=$((total_moved + device_moved))
+        total_failed=$((total_failed + device_failed))
+        
+    done <<< "$mount_points"
+    
+    log_message "Overall transfer summary: $total_moved files moved, $total_failed failed."
+    return 0
 }
 
 # Function to wait for a device to mount
@@ -348,14 +349,26 @@ wait_for_usb_mount() {
     local max_attempts=$((MAX_MOUNT_WAIT * 2)) # Poll every 0.5s
 
     log_message "Waiting for device to mount (max ${MAX_MOUNT_WAIT}s)..."
+    
     while [ $attempts -lt $max_attempts ]; do
-        if [ -n "$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E '^/media/|^/mnt/')" ]; then
-            log_message "Device detected as mounted. Proceeding with file transfer."
-            sleep 1 # Allow filesystem to stabilize
+        local mounted_devices=$(findmnt -ln -o TARGET -t vfat,ntfs,exfat,ext4,ext3,ext2 | grep -E "^(/media/|/mnt/|/run/media/)")
+        
+        if [ -n "$mounted_devices" ]; then
+            log_message "Device(s) detected as mounted:"
+            echo "$mounted_devices" | while read -r mount_point; do
+                log_message "  - $mount_point"
+            done
+            sleep 2 # Allow filesystem to stabilize
             return 0
         fi
+        
         sleep 0.5
         attempts=$((attempts + 1))
+        
+        # Show progress every 5 seconds
+        if [ $((attempts % 10)) -eq 0 ]; then
+            log_message "Still waiting... (${attempts}/2 seconds elapsed)"
+        fi
     done
 
     log_message "Timeout: No device mounted after ${MAX_MOUNT_WAIT} seconds."
@@ -363,36 +376,54 @@ wait_for_usb_mount() {
 }
 
 # --- Main Loop ---
-log_message "Starting device power cycle and copy service."
+log_message "Starting device power cycle and image transfer service."
 log_message "Destination: $DEST_DIR, OFF Time: ${OFF_TIME}s"
+log_message "Supported image extensions: $IMAGE_EXTENSIONS"
+
+# Ensure log file is writable
+touch "$LOG_FILE" 2>/dev/null || {
+    echo "ERROR: Cannot write to log file $LOG_FILE"
+    exit 1
+}
 
 # Set GPIO pin as output and initialize to LOW (OFF)
-pinctrl set ${GPIO_PIN} op dl
+if ! pinctrl set ${GPIO_PIN} op dl 2>>"$LOG_FILE"; then
+    log_message "ERROR: Failed to initialize GPIO pin $GPIO_PIN"
+    exit 1
+fi
 
+log_message "GPIO pin $GPIO_PIN initialized to LOW (OFF)"
+
+# Main processing loop
 while true; do
+    log_message "--- Starting new cycle ---"
+    
     # 1. Power ON
     device_power_on
-    log_message "Device powered on. Waiting ${POWER_ON_STABILIZATION_TIME}s for it to initialize..."
+    log_message "Device powered on. Waiting ${POWER_ON_STABILIZATION_TIME}s for initialization..."
     sleep $POWER_ON_STABILIZATION_TIME
 
     # 2. Wait for Mount
     if wait_for_usb_mount; then
-        # 3. Copy files if mount was successful
+        # 3. Move image files if mount was successful
         start_time=$(date +%s)
-        copy_files
+        move_image_files
         end_time=$(date +%s)
         transfer_time=$((end_time - start_time))
-        log_message "File copy process finished in ${transfer_time}s."
+        log_message "Image transfer process completed in ${transfer_time}s."
+    else
+        log_message "No device mounted, skipping file transfer."
     fi
 
-    # 4. Unmount Media
+    # 4. Unmount Media (always attempt this)
     eject_usb_devices
 
     # 5. Power OFF
     device_power_off
 
     # 6. Wait for the specified OFF duration
-    log_message "Device powered off. Waiting for $OFF_TIME seconds..."
+    log_message "Device powered off. Waiting for $OFF_TIME seconds before next cycle..."
+    log_message "--- Cycle complete ---"
     sleep $OFF_TIME
 done
 EOF
