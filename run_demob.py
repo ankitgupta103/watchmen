@@ -216,11 +216,21 @@ class CommandCenter:
         (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list) = self.node_map[nodeid]
         event_ts_list.append((eventtime, evid))
         self.node_map[nodeid] = (hbcount, hbtime, gpsloc, photos_taken, events_seen, event_ts_list)
+
+        meta = {
+            "node_id": nodeid,
+            "hb_count": hbcount,
+            "last_hb_time": hbtime,
+            "photos_taken": photos_taken,
+            "events_seen": events_seen,
+            "event_ts_list": event_ts_list
+        }
+
         # SENDING TO VYOM
         try:
             # TODO: Add event severity to the payload
             self.logger.info(f"Calling vyom_client.on_event_arrive(node_hn={nodeid}, event_id={evid}, event_severity={event_severity})")
-            self.vyom_client.on_event_arrive(node_hn=nodeid, event_id=evid, eventstr=eventstr, event_severity=event_severity)
+            self.vyom_client.on_event_arrive(node_hn=nodeid, event_id=evid, eventstr=eventstr, event_severity=event_severity, meta=meta)
             self.logger.info(f"Successfully sent event to vyom client: node_hn={nodeid}, event_id={evid} with severity {event_severity}")
         except Exception as e:
             self.logger.error(f"Error sending event to vyom client: node_hn={nodeid}, event_id={evid}, error={e}", exc_info=True)

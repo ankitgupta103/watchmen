@@ -94,6 +94,7 @@ class VyomClient:
         timestamp: str = None,
         eventstr: str = None,
         event_severity: str = None,
+        meta: dict = None,
     ):
         """_summary_
 
@@ -132,6 +133,7 @@ class VyomClient:
                 "image_c_key": f"{file_s3_dir}/{filename1}",
                 "image_f_key": f"{file_s3_dir}/{filename2}",
                 "event_severity": event_severity,
+                "meta": meta,
             }
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
