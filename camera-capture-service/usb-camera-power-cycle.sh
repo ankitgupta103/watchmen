@@ -109,7 +109,7 @@ check_destination() {
     return 0
 }
 
-# Function to find and copy all files from mounted devices
+# Fixed version of the copy_files function
 copy_files() {
     log_message "Looking for mounted devices to copy files from..."
     if ! check_destination; then
@@ -127,9 +127,10 @@ copy_files() {
         log_message "Checking device at: $mount_point"
         local copy_count=0
         local fail_count=0
+        local temp_file=$(mktemp)
 
-        # Find all files and copy them
-        find "$mount_point" -type f -print0 | while IFS= read -r -d '' source_file; do
+        # Use process substitution instead of pipeline to avoid subshell
+        while IFS= read -r -d '' source_file; do
             local filename=$(basename "$source_file")
             local dest_file="$DEST_DIR/$filename"
 
@@ -138,15 +139,92 @@ copy_files() {
                 continue
             fi
 
-            if cp -p "$source_file" "$dest_file" 2>>"$LOG_FILE"; then
+            # Capture error output and show it in the log
+            if cp_output=$(cp -p "$source_file" "$dest_file" 2>&1); then
                 log_message "COPIED: $filename"
-                chown ankit:ankit "$dest_file"
+                chown vyom:vyom "$dest_file" 2>/dev/null
                 copy_count=$((copy_count + 1))
             else
-                log_message "ERROR: Failed to copy $filename."
+                log_message "ERROR: Failed to copy $filename. Error: $cp_output"
+                fail_count=$((fail_count + 1))
+            fi
+        done < <(find "$mount_point" -type f -print0)
+        
+        rm -f "$temp_file"
+        log_message "Transfer complete for $mount_point: $copy_count files copied, $fail_count failed."
+    done <<< "$MOUNT_POINTS"
+}
+
+# Alternative version with better error handling and debugging
+copy_files_debug() {
+    log_message "Looking for mounted devices to copy files from..."
+    if ! check_destination; then
+        log_message "ERROR: Destination check failed. Aborting file copy."
+        return 1
+    fi
+
+    MOUNT_POINTS=$(findmnt -lo TARGET -t vfat,ntfs,exfat,ext4 | grep -E "^/media/|^/mnt/")
+    if [ -z "$MOUNT_POINTS" ]; then
+        log_message "No mounted devices found for file transfer."
+        return
+    fi
+
+    while IFS= read -r mount_point; do
+        log_message "Checking device at: $mount_point"
+        local copy_count=0
+        local fail_count=0
+
+        # Check if mount point is accessible
+        if [ ! -r "$mount_point" ]; then
+            log_message "ERROR: Cannot read from $mount_point"
+            continue
+        fi
+
+        # Use a more robust approach with explicit file handling
+        local file_list=$(find "$mount_point" -type f 2>/dev/null)
+        if [ -z "$file_list" ]; then
+            log_message "No files found in $mount_point"
+            continue
+        fi
+
+        echo "$file_list" | while IFS= read -r source_file; do
+            local filename=$(basename "$source_file")
+            local dest_file="$DEST_DIR/$filename"
+
+            # Skip if file already exists
+            if [ -f "$dest_file" ]; then
+                log_message "SKIP: $filename already exists in destination."
+                continue
+            fi
+
+            # Check source file permissions
+            if [ ! -r "$source_file" ]; then
+                log_message "ERROR: Cannot read source file $filename (permissions)"
+                continue
+            fi
+
+            # Check available space (basic check)
+            local file_size=$(stat -f%z "$source_file" 2>/dev/null || stat -c%s "$source_file" 2>/dev/null)
+            local available_space=$(df "$DEST_DIR" | awk 'NR==2 {print $4*1024}')
+            
+            if [ "$file_size" -gt "$available_space" ]; then
+                log_message "ERROR: Not enough space to copy $filename"
+                continue
+            fi
+
+            # Attempt copy with verbose error reporting
+            log_message "Attempting to copy: $filename (${file_size} bytes)"
+            if cp -p "$source_file" "$dest_file" 2>&1; then
+                log_message "SUCCESS: Copied $filename"
+                chown vyom:vyom "$dest_file" 2>/dev/null || log_message "WARNING: Could not change ownership of $filename"
+                copy_count=$((copy_count + 1))
+            else
+                local error_msg=$(cp -p "$source_file" "$dest_file" 2>&1)
+                log_message "ERROR: Failed to copy $filename. Detailed error: $error_msg"
                 fail_count=$((fail_count + 1))
             fi
         done
+        
         log_message "Transfer complete for $mount_point: $copy_count files copied, $fail_count failed."
     done <<< "$MOUNT_POINTS"
 }

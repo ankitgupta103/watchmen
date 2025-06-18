@@ -75,6 +75,8 @@ interface SimpleMachineData {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   stats_data: any;
   buffer_size: number;
+  // Add pulsating state for recent events
+  is_pulsating: boolean;
 }
 
 export default function LiveFeedWrapper({
@@ -94,6 +96,11 @@ export default function LiveFeedWrapper({
   // Track event counts for color coding
   const [machineEventCounts, setMachineEventCounts] = useState<
     Record<number, number>
+  >({});
+
+  // Track machines that recently received events (for pulsating animation)
+  const [pulsatingMachines, setPulsatingMachines] = useState<
+    Record<number, boolean>
   >({});
 
   // Use the custom hook to get all machine stats for status and location
@@ -187,6 +194,20 @@ export default function LiveFeedWrapper({
             [machineId]: Math.min((prev[machineId] || 0) + 1, 20),
           }));
 
+          // Start pulsating animation for this machine
+          setPulsatingMachines((prev) => ({
+            ...prev,
+            [machineId]: true,
+          }));
+
+          // Stop pulsating after 10 seconds
+          setTimeout(() => {
+            setPulsatingMachines((prev) => ({
+              ...prev,
+              [machineId]: false,
+            }));
+          }, 10000);
+
           // Fetch images if available
           if (eventMessage.image_c_key && eventMessage.image_f_key) {
             try {
@@ -258,6 +279,9 @@ export default function LiveFeedWrapper({
         lng: stats?.data?.message?.location?.long ?? 0,
       };
 
+      // Check if machine is currently pulsating
+      const isPulsating = pulsatingMachines[machineId] || false;
+
       return {
         machine_id: machineId,
         events: events,
@@ -269,9 +293,10 @@ export default function LiveFeedWrapper({
         location: location,
         stats_data: stats?.data,
         buffer_size: stats?.buffer ?? 0,
+        is_pulsating: isPulsating,
       };
     },
-    [machineEvents, machineEventCounts, machineStats],
+    [machineEvents, machineEventCounts, machineStats, pulsatingMachines],
   );
 
   // Calculate total events across all machines
@@ -318,6 +343,7 @@ export default function LiveFeedWrapper({
     // Clear events and counts to force refresh
     setMachineEvents({});
     setMachineEventCounts({});
+    setPulsatingMachines({});
 
     setTimeout(() => setIsRefreshing(false), 1500);
   };
@@ -369,7 +395,7 @@ export default function LiveFeedWrapper({
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-red-500"></div>
+              <div className="h-2 w-2 rounded-full bg-gray-500"></div>
               <span>
                 {offlineCount} Offline
                 {statusFilter === 'offline'
@@ -482,6 +508,7 @@ export default function LiveFeedWrapper({
             <div>Active machines: {Object.keys(machineEventCounts).length}</div>
             <div>Total events: {totalEvents}</div>
             <div>Topics: {mqttTopics.length}</div>
+            <div>Pulsating: {Object.values(pulsatingMachines).filter(Boolean).length}</div>
           </div>
         )}
       </div>
