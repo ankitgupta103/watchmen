@@ -192,12 +192,13 @@ class ProcessingService:
         Processes a single image: detects objects, determines severity,
         saves files, and deletes the original.
         """
-        logging.info(f"Processing new file: {image_path.name}")
+        logging.info(f"Processing new file: {image_path.name} | Most recent epoch: {self.most_recent_epoch}")
 
         # Update most recent epoch if this image is newer
         if image_epoch is not None:
             if self.most_recent_epoch is None or image_epoch > self.most_recent_epoch:
                 self.most_recent_epoch = image_epoch
+                logging.info(f"Updated most recent epoch to: {self.most_recent_epoch}")
 
         detected_objects = self.detector.detect_objects(image_path)
 
@@ -294,9 +295,10 @@ class ProcessingService:
                     if epoch is not None:
                         if self.most_recent_epoch is None or epoch > self.most_recent_epoch:
                             self.most_recent_epoch = epoch
+                            logging.info(f"Updated most recent epoch to: {self.most_recent_epoch}")
 
                 if not image_files:
-                    logging.info(f"No new images found. Waiting for {POLL_INTERVAL_SECONDS}s...")
+                    logging.info(f"No new images found. Waiting for {POLL_INTERVAL_SECONDS}s... | Most recent epoch: {self.most_recent_epoch}")
                 else:
                     for image_path in image_files:
                         image_epoch = self._extract_epoch_from_filename(image_path.name)
