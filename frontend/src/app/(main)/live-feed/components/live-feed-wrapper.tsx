@@ -255,7 +255,7 @@ export default function LiveFeedWrapper({
       // Get location from stats data
       const location = {
         lat: stats?.data?.message?.location?.lat ?? 0,
-        lng: stats?.data?.message?.location?.lng ?? 0,
+        lng: stats?.data?.message?.location?.long ?? 0,
       };
 
       return {

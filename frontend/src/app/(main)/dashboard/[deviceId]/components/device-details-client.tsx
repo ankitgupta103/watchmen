@@ -464,7 +464,7 @@ export default function DeviceDetailsClient({
                       device?.last_location?.lat?.toFixed(4) ??
                       'N/A'}
                     ,{' '}
-                    {machineStats?.message?.location?.lng?.toFixed(4) ??
+                    {machineStats?.message?.location?.long?.toFixed(4) ??
                       device?.last_location?.lng?.toFixed(4) ??
                       'N/A'}
                   </div>
