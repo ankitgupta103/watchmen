@@ -228,7 +228,6 @@ class CommandCenter:
 
         # SENDING TO VYOM
         try:
-            # TODO: Add event severity to the payload
             self.logger.info(f"Calling vyom_client.on_event_arrive(node_hn={nodeid}, event_id={evid}, event_severity={event_severity})")
             self.vyom_client.on_event_arrive(node_hn=nodeid, event_id=evid, eventstr=eventstr, event_severity=event_severity, meta=meta)
             self.logger.info(f"Successfully sent event to vyom client: node_hn={nodeid}, event_id={evid} with severity {event_severity}")
@@ -434,7 +433,6 @@ class DevUnit:
                 if cropped or full:
                     self.logger.info(f"Found new critical images, sending : {cropped}, {full}")
                     events_seen += 1
-                    # TODO: Send the image severity
                     self.send_event(evid, event_severity)
                     time.sleep(2)
                 if cropped:
