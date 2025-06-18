@@ -242,7 +242,7 @@ export default function CriticalAlertSystem({
   useEffect(() => {
     const pollForImages = async () => {
       const alertsNeedingImages = alerts.filter(
-        (alert) => !alert.imagesFetched && !alert.fetchingImages
+        (alert) => !alert.imagesFetched && !alert.fetchingImages,
       );
 
       if (alertsNeedingImages.length === 0) return;
@@ -252,8 +252,8 @@ export default function CriticalAlertSystem({
         prev.map((alert) =>
           alertsNeedingImages.some((a) => a.id === alert.id)
             ? { ...alert, fetchingImages: true }
-            : alert
-        )
+            : alert,
+        ),
       );
 
       // Try to fetch images for each alert
@@ -275,16 +275,16 @@ export default function CriticalAlertSystem({
                     imagesFetched: true,
                     fetchingImages: false,
                   }
-                : a
-            )
+                : a,
+            ),
           );
         } catch (error) {
           console.error(`Failed to fetch images for alert ${alert.id}:`, error);
           // Reset fetching state on error
           setAlerts((prev) =>
             prev.map((a) =>
-              a.id === alert.id ? { ...a, fetchingImages: false } : a
-            )
+              a.id === alert.id ? { ...a, fetchingImages: false } : a,
+            ),
           );
         }
       }
