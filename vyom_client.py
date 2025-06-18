@@ -135,6 +135,9 @@ class VyomClient:
                 "event_severity": event_severity,
                 "meta": meta,
             }
+
+            self.logger.info(f"[on_event_arrive] Payload: {payload}")
+            
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
             self.writer.write_message(
