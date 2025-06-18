@@ -325,6 +325,7 @@ class DevUnit:
                     time.sleep(40)
                 if full:
                     self.send_img(full, evid)
+                    time.sleep(60)
             time.sleep(10)
 
     # A:1205:100:12
@@ -352,7 +353,7 @@ class DevUnit:
         t = get_time_str()
         msgstr = f"{self.devid}:{t}:{evid}"
         next_dest = get_next_dest(self.devid)
-        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest)
+        self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest, True)
 
 def run_unit():
     hname = get_hostname()

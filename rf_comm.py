@@ -480,7 +480,9 @@ class RFComm:
         logger.info(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
         return sent
 
-    def send_message(self, payload, mst, dest):
+    def send_message(self, payload, mst, dest, acking_enabled=None):
+        if acking_enabled is None:
+            acking_enabled = ACKING_ENABLED
         if dest is None:
             if len(payload) < 30:
                 msg = payload
@@ -491,7 +493,7 @@ class RFComm:
                 return False
         if len(payload) < 30:
             msg = payload
-            if ACKING_ENABLED:
+            if acking_enabled:
                 sent = self._send_unicast(msg, mst, dest)
             else:
                 sent = self._send_unicast(msg, mst, dest, False, 1)
