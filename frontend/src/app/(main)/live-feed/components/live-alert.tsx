@@ -49,6 +49,7 @@ interface EventAlert {
   imagesFetched: boolean;
   fetchingImages: boolean;
 }
+
 interface AlertSystemProps {
   organizationId: string;
   machines: Machine[];
@@ -220,7 +221,7 @@ export default function CriticalAlertSystem({
         error?: string;
       }>(`${API_BASE_URL}/event-images/`, token, {
         method: 'POST',
-        body: JSON.stringify(imageKeys),
+        body: imageKeys,
       });
 
       if (data?.success) {
@@ -237,7 +238,68 @@ export default function CriticalAlertSystem({
     }
   };
 
-  // Handle MQTT message
+  // Polling mechanism to fetch images every 5 seconds
+  useEffect(() => {
+    const pollForImages = async () => {
+      const alertsNeedingImages = alerts.filter(
+        (alert) => !alert.imagesFetched && !alert.fetchingImages
+      );
+
+      if (alertsNeedingImages.length === 0) return;
+
+      // Mark alerts as fetching to prevent duplicate requests
+      setAlerts((prev) =>
+        prev.map((alert) =>
+          alertsNeedingImages.some((a) => a.id === alert.id)
+            ? { ...alert, fetchingImages: true }
+            : alert
+        )
+      );
+
+      // Try to fetch images for each alert
+      for (const alert of alertsNeedingImages) {
+        try {
+          const imageUrls = await fetchEventImages({
+            image_c_key: alert.message.image_c_key,
+            image_f_key: alert.message.image_f_key,
+          });
+
+          // Update alert with image URLs
+          setAlerts((prev) =>
+            prev.map((a) =>
+              a.id === alert.id
+                ? {
+                    ...a,
+                    croppedImageUrl: imageUrls?.croppedImageUrl,
+                    fullImageUrl: imageUrls?.fullImageUrl,
+                    imagesFetched: true,
+                    fetchingImages: false,
+                  }
+                : a
+            )
+          );
+        } catch (error) {
+          console.error(`Failed to fetch images for alert ${alert.id}:`, error);
+          // Reset fetching state on error
+          setAlerts((prev) =>
+            prev.map((a) =>
+              a.id === alert.id ? { ...a, fetchingImages: false } : a
+            )
+          );
+        }
+      }
+    };
+
+    // Start polling every 5 seconds
+    const interval = setInterval(pollForImages, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alerts, token]);
+
+  // Handle MQTT message - simplified, just sound alarm and create alert
   const handleMqttMessage = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (topic: string, data: any) => {
@@ -253,7 +315,7 @@ export default function CriticalAlertSystem({
         // Parse the event message
         const eventMessage: EventMessage = data;
 
-        // Create alert
+        // Create alert (without images initially)
         const alert: EventAlert = {
           id: `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           timestamp: new Date(),
@@ -316,41 +378,9 @@ export default function CriticalAlertSystem({
           },
         );
 
-        // Fetch images in background
-        setAlerts((prev) =>
-          prev.map((a) =>
-            a.id === alert.id ? { ...a, fetchingImages: true } : a,
-          ),
-        );
-
-        const imageUrls = await fetchEventImages({
-          image_c_key: eventMessage.image_c_key,
-          image_f_key: eventMessage.image_f_key,
-        });
-
-        // Update alert with image URLs
-        setAlerts((prev) =>
-          prev.map((a) =>
-            a.id === alert.id
-              ? {
-                  ...a,
-                  croppedImageUrl: imageUrls?.croppedImageUrl,
-                  fullImageUrl: imageUrls?.fullImageUrl,
-                  imagesFetched: true,
-                  fetchingImages: false,
-                }
-              : a,
-          ),
-        );
-
         // Callback for parent component
         if (onAlertReceived) {
-          onAlertReceived({
-            ...alert,
-            croppedImageUrl: imageUrls?.croppedImageUrl,
-            fullImageUrl: imageUrls?.fullImageUrl,
-            imagesFetched: true,
-          });
+          onAlertReceived(alert);
         }
       } catch (error) {
         console.error('Error handling MQTT message:', error);
@@ -646,7 +676,7 @@ export default function CriticalAlertSystem({
                           ) : (
                             <div className="flex items-center gap-2 text-sm text-gray-500">
                               <ImageIcon className="h-4 w-4" />
-                              Images not available
+                              Images not available yet...
                             </div>
                           )}
                         </div>
