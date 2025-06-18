@@ -143,6 +143,7 @@ class ProcessingService:
         self.processed_dir = processed_dir
         self.critical_dir = processed_dir / "critical"
         self.is_running = False
+        self.most_recent_epoch = None  # Track the most recent processed epoch timestamp
 
         # Create directories if they don't exist
         self.processed_dir.mkdir(parents=True, exist_ok=True)
@@ -178,12 +179,25 @@ class ProcessingService:
                 return obj
         return None
 
-    def process_and_store_image(self, image_path: Path):
+    def _extract_epoch_from_filename(self, filename: str) -> Optional[int]:
+        """Extracts the epoch timestamp from the filename (expects format like 1718131200.jpg)."""
+        try:
+            base = filename.split(".")[0]
+            return int(base)
+        except Exception:
+            return None
+
+    def process_and_store_image(self, image_path: Path, image_epoch: Optional[int] = None):
         """
         Processes a single image: detects objects, determines severity,
         saves files, and deletes the original.
         """
         logging.info(f"Processing new file: {image_path.name}")
+
+        # Update most recent epoch if this image is newer
+        if image_epoch is not None:
+            if self.most_recent_epoch is None or image_epoch > self.most_recent_epoch:
+                self.most_recent_epoch = image_epoch
 
         detected_objects = self.detector.detect_objects(image_path)
 
@@ -274,11 +288,27 @@ class ProcessingService:
                     if p.is_file() and p.suffix.lower() in image_extensions
                 ]
 
+                # Find the most recent epoch among all images (in case of restart)
+                for p in image_files:
+                    epoch = self._extract_epoch_from_filename(p.name)
+                    if epoch is not None:
+                        if self.most_recent_epoch is None or epoch > self.most_recent_epoch:
+                            self.most_recent_epoch = epoch
+
                 if not image_files:
                     logging.info(f"No new images found. Waiting for {POLL_INTERVAL_SECONDS}s...")
                 else:
                     for image_path in image_files:
-                        self.process_and_store_image(image_path)
+                        image_epoch = self._extract_epoch_from_filename(image_path.name)
+                        if image_epoch is not None and self.most_recent_epoch is not None:
+                            if image_epoch < self.most_recent_epoch - 900:
+                                logging.info(f"Deleting stale image {image_path.name} (epoch {image_epoch}) older than 15 min from most recent epoch {self.most_recent_epoch}.")
+                                try:
+                                    image_path.unlink()
+                                except OSError as e:
+                                    logging.error(f"Error deleting stale file {image_path}: {e}")
+                                continue
+                        self.process_and_store_image(image_path, image_epoch=image_epoch)
 
                 time.sleep(POLL_INTERVAL_SECONDS)
 
