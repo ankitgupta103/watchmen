@@ -9,6 +9,8 @@ import socket
 import random
 from rf_comm import RFComm
 from vyom_client import VyomClient
+from PIL import Image # Import Pillow for image manipulation
+import io # For handling image bytes
 import logging
 
 import gps
@@ -57,6 +59,53 @@ def get_files_in_dir(alldir, criticaldir):
 def get_time_str():
     t = datetime.now()
     return f"{str(t.hour).zfill(2)}{str(t.minute).zfill(2)}"
+
+# New function to downscale image if needed
+def downscale_image_if_needed(image_path, target_kb=100, scale_percent=0.60):
+    """
+    Checks the image size. If it's larger than target_kb, downscales it by scale_percent.
+    Returns the image data as bytes (potentially downscaled).
+    """
+    try:
+        # Read image as bytes
+        with open(image_path, 'rb') as f:
+            image_bytes = f.read()
+
+        # Get original size in KB
+        original_size_kb = len(image_bytes) / 1024
+        logger.info(f"Original image size for {os.path.basename(image_path)}: {original_size_kb:.2f} KB")
+
+        if original_size_kb > target_kb:
+            logger.info(f"Image {os.path.basename(image_path)} is larger than {target_kb}KB. Downscaling...")
+            img = Image.open(io.BytesIO(image_bytes))
+            width, height = img.size
+            new_width = int(width * scale_percent)
+            new_height = int(height * scale_percent)
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+            # Save the downscaled image to a bytes buffer
+            img_byte_arr = io.BytesIO()
+            # Determine format based on original file extension
+            format = img.format if img.format else "JPEG" # Default to JPEG if format is not detected
+            img.save(img_byte_arr, format=format)
+            downscaled_image_bytes = img_byte_arr.getvalue()
+            downscaled_size_kb = len(downscaled_image_bytes) / 1024
+            logger.info(f"Downscaled image size: {downscaled_size_kb:.2f} KB")
+            return downscaled_image_bytes
+        else:
+            logger.info(f"Image {os.path.basename(image_path)} is within size limits ({target_kb}KB). No downscaling needed.")
+            return image_bytes
+
+    except Exception as e:
+        logger.error(f"Error processing image {image_path} for downscaling: {e}", exc_info=True)
+        # If an error occurs, return the original image bytes to avoid breaking the flow
+        try:
+            with open(image_path, 'rb') as f:
+                return f.read()
+        except Exception as read_e:
+            logger.error(f"Failed to read original image bytes after downscaling error: {read_e}")
+            return None
+
 
 class CommandCenter:
     def __init__(self, devid):
@@ -280,19 +329,47 @@ class DevUnit:
                         cropped = f
         return (latest_full_evid, cropped, full)
 
+    # def send_img(self, imgfile, evid):
+    #     next_dest = get_next_dest(self.devid)
+    #     self.logger.info(f"Sending image {imgfile} to {next_dest}")
+    #     if next_dest == None:
+    #         self.logger.warning(f"{self.devid} Weird no dest for {self.devid}")
+    #         return
+    #     mst = constants.MESSAGE_TYPE_PHOTO
+    #     fname = imgfile.split("/").pop()
+    #     im = {"i_f" : fname,
+    #           "i_s" : self.devid,
+    #           "i_t" : str(int(time.time())),
+    #           "e_i" : evid,
+    #           "i_d" : image.image2string(imgfile)}
+    #     msgstr = json.dumps(im)
+    #     self.rf.send_message(msgstr, mst, next_dest)
+
+
     def send_img(self, imgfile, evid):
         next_dest = get_next_dest(self.devid)
         self.logger.info(f"Sending image {imgfile} to {next_dest}")
         if next_dest == None:
             self.logger.warning(f"{self.devid} Weird no dest for {self.devid}")
             return
+        
+        # Downscale image if necessary
+        processed_image_bytes = downscale_image_if_needed(imgfile)
+        if processed_image_bytes is None:
+            self.logger.error(f"Failed to process image {imgfile} for sending. Skipping.")
+            return
+
         mst = constants.MESSAGE_TYPE_PHOTO
         fname = imgfile.split("/").pop()
+        
+        # Use image.bytes2string to convert the processed bytes to a string
+        imstr = image.bytes2string(processed_image_bytes)
+
         im = {"i_f" : fname,
               "i_s" : self.devid,
               "i_t" : str(int(time.time())),
               "e_i" : evid,
-              "i_d" : image.image2string(imgfile)}
+              "i_d" : imstr} # Use the potentially downscaled image string
         msgstr = json.dumps(im)
         self.rf.send_message(msgstr, mst, next_dest)
 
