@@ -333,21 +333,6 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
     [fetchImagesForEvents]
   );
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'online':
-      case 'active':
-        return 'default';
-      case 'offline':
-      case 'inactive':
-        return 'destructive';
-      case 'maintenance':
-        return 'secondary';
-      default:
-        return 'outline';
-    }
-  };
-
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader deviceId={device.id.toString()} deviceName={device.name} />
@@ -387,25 +372,16 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
                   {device.name.replace(/-/g, ' ')}
                 </h1>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  <Badge variant="secondary" className="capitalize">
-                    {device.type.replace(/_/g, ' ')}
-                  </Badge>
                   <Badge
-                    variant={getStatusBadgeVariant(device.machine_status)}
-                    className="capitalize"
-                  >
-                    {device.machine_status}
-                  </Badge>
-                  <Badge
-                    variant={getStatusBadgeVariant(device.connection_status)}
+                    variant={machineStats !== null ? 'default' : 'destructive'}
                     className="capitalize flex items-center gap-1"
                   >
-                    {device.connection_status === 'online' ? (
+                    {machineStats !== null ? (
                       <Wifi className="h-3 w-3" />
                     ) : (
                       <WifiOff className="h-3 w-3" />
                     )}
-                    {device.connection_status}
+                    {machineStats !== null ? 'Online' : 'Offline'}
                   </Badge>
                 </div>
               </div>
@@ -462,12 +438,12 @@ export default function DeviceDetailsClient({ device, orgId }: DeviceDetailsClie
                 <div className="text-sm space-y-1">
                   <div>
                     <span className="font-medium">Real-time:</span>{' '}
-                    {machineStats?.message?.location?.lat?.toFixed(4) ?? device.last_location.lat.toFixed(4)},{' '}
-                    {machineStats?.message?.location?.lng?.toFixed(4) ?? device.last_location.lng.toFixed(4)}
+                    {machineStats?.message?.location?.lat?.toFixed(4) ?? device?.last_location?.lat?.toFixed(4) ?? 'N/A'},{' '}
+                    {machineStats?.message?.location?.lng?.toFixed(4) ?? device?.last_location?.lng?.toFixed(4) ?? 'N/A'}
                   </div>
                   <div>
                     <span className="font-medium">Last known:</span>{' '}
-                    {device.last_location.lat.toFixed(4)}, {device.last_location.lng.toFixed(4)}
+                    {device?.last_location?.lat?.toFixed(4) ?? 'N/A'}, {device?.last_location?.lng?.toFixed(4) ?? 'N/A'}
                   </div>
                 </div>
               </div>

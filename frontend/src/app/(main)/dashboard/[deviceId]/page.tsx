@@ -1,4 +1,25 @@
-export default async function DeviceDetailsPage() {
+import { getOrg } from "@/lib/auth/getOrg";
+import DeviceDetailsClient from "./components/device-details-client";
+import { Machine } from "@/lib/types/machine";
+import { fetcher } from "@/lib/fetcher";
+import { API_BASE_URL } from "@/lib/constants";
+
+export default async function DeviceDetailsPage({
+  params,
+}: {
+  params: Promise<{ deviceId: string }>;
+}) {
+  const { deviceId } = await params;
+    const { organization_uid, organization_id } = await getOrg();
+
+  const { data: machines } = await fetcher<{
+    status: string;
+    data: Machine[];
+  }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`);
+
+
+  const device = machines.find((m) => m.id === Number(deviceId));
+    if (!device) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
         <h2 className="mb-2 text-2xl font-bold">Device not found</h2>
@@ -7,4 +28,7 @@ export default async function DeviceDetailsPage() {
         </p>
       </div>
     );
+  }
+
+  return <DeviceDetailsClient device={device} orgId={organization_id} />;
 }
