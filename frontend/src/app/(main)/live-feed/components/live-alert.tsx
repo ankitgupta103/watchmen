@@ -35,6 +35,14 @@ interface EventMessage {
   image_c_key: string;
   image_f_key: string;
   event_severity: string;
+  meta: {
+    node_id: string;
+    hb_count: string;
+    last_hb_time: string;
+    photos_taken: string;
+    events_seen: string;
+    event_ts_list: string[];
+  };
 }
 
 interface EventAlert {
@@ -360,12 +368,30 @@ export default function CriticalAlertSystem({
                   </p>
                   <p className="text-sm text-gray-700">
                     {machineName}: {
-                      eventMessage.event_severity === "1"
+                      eventMessage?.event_severity === "1"
                         ? "High"
-                        : eventMessage.event_severity === "2"
+                        : eventMessage?.event_severity === "2"
                           ? "Critical"
                           : "Medium"
                     }
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    {eventMessage?.meta?.node_id}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    {eventMessage?.meta?.hb_count}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    {eventMessage?.meta?.last_hb_time}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    {eventMessage?.meta?.photos_taken}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    {eventMessage?.meta?.events_seen}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    {eventMessage?.meta?.event_ts_list}
                   </p>
                 </div>
               </div>
