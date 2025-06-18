@@ -144,6 +144,12 @@ copy_files() {
                 log_message "COPIED: $filename"
                 chown vyom:vyom "$dest_file" 2>/dev/null
                 copy_count=$((copy_count + 1))
+                # Delete the source file after successful copy
+                if rm "$source_file" 2>>"$LOG_FILE"; then
+                    log_message "DELETED: $filename from source after copy."
+                else
+                    log_message "WARNING: Failed to delete $filename from source after copy."
+                fi
             else
                 log_message "ERROR: Failed to copy $filename. Error: $cp_output"
                 fail_count=$((fail_count + 1))

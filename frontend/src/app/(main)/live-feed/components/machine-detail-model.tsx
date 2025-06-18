@@ -686,26 +686,27 @@ export default function MachineDetailModal({
           open={!!selectedImageUrl}
           onOpenChange={() => setSelectedImageUrl(null)}
         >
-          <DialogContent className="max-h-[90vh] max-w-4xl p-2">
-            <DialogHeader className="pb-2">
-              <DialogTitle className="flex items-center justify-between">
-                Event Image
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedImageUrl(null)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex items-center justify-center">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center justify-between">
+              Event Image
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedImageUrl(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <DialogContent className="max-h-[90vh] max-w-4xl p-2 flex flex-col items-center justify-center">
+            <div className="flex items-center justify-center w-full h-full">
               <Image
                 src={selectedImageUrl}
                 alt="Event image full view"
-                width={800}
-                height={600}
-                className="max-h-[70vh] w-auto rounded-lg"
+                width={1000}
+                height={1000}
+                className="max-h-[75vh] h-full w-auto rounded-lg shadow-lg object-contain bg-white"
+                style={{ background: 'white' }}
               />
             </div>
           </DialogContent>
