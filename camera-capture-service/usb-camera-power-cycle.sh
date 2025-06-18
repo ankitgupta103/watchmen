@@ -224,6 +224,12 @@ copy_files_debug() {
                 log_message "SUCCESS: Copied $filename"
                 chown vyom:vyom "$dest_file" 2>/dev/null || log_message "WARNING: Could not change ownership of $filename"
                 copy_count=$((copy_count + 1))
+                # Delete the source file after successful copy
+                if rm "$source_file" 2>>"$LOG_FILE"; then
+                    log_message "DELETED: $filename from source after copy."
+                else
+                    log_message "WARNING: Failed to delete $filename from source after copy."
+                fi
             else
                 local error_msg=$(cp -p "$source_file" "$dest_file" 2>&1)
                 log_message "ERROR: Failed to copy $filename. Detailed error: $error_msg"
