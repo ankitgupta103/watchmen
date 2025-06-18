@@ -202,12 +202,13 @@ class CommandCenter:
     # A:1205
     def process_event(self, eventstr):
         parts = eventstr.split(':')
-        if len(parts) != 3:
+        if len(parts) != 4:
             self.logger.error(f"Error parsing event message : {eventstr}")
             return
         nodeid = parts[0]
         eventtime = parts[1]
         evid = parts[2]
+        event_severity = parts[3]
         if nodeid not in self.node_map:
             self.node_map[nodeid] = (0, "", "", 1, 1, [(eventtime, evid)])
             self.logger.warning(f"Wierd that node {nodeid} not in map yet")
@@ -218,9 +219,9 @@ class CommandCenter:
         # SENDING TO VYOM
         try:
             # TODO: Add event severity to the payload
-            self.logger.info(f"Calling vyom_client.on_event_arrive(node_hn={nodeid}, event_id={evid})")
-            self.vyom_client.on_event_arrive(node_hn=nodeid, event_id=evid, eventstr=eventstr )
-            self.logger.info(f"Successfully sent event to vyom client: node_hn={nodeid}, event_id={evid}")
+            self.logger.info(f"Calling vyom_client.on_event_arrive(node_hn={nodeid}, event_id={evid}, event_severity={event_severity})")
+            self.vyom_client.on_event_arrive(node_hn=nodeid, event_id=evid, eventstr=eventstr, event_severity=event_severity)
+            self.logger.info(f"Successfully sent event to vyom client: node_hn={nodeid}, event_id={evid} with severity {event_severity}")
         except Exception as e:
             self.logger.error(f"Error sending event to vyom client: node_hn={nodeid}, event_id={evid}, error={e}", exc_info=True)
 
@@ -302,6 +303,7 @@ class DevUnit:
                 new_images.append(f)
         for f in new_images:
             fname = f.split("/").pop()
+            event_severity = fname.split("_")[0]
             evid = fname.split("_")[2]
             if evid not in immap:
                 immap[evid] = [f]
@@ -327,7 +329,7 @@ class DevUnit:
                         full = f
                     elif f.find("_c.jpg") > 0:
                         cropped = f
-        return (latest_full_evid, cropped, full)
+        return (latest_full_evid, cropped, full, event_severity)
 
     # def send_img(self, imgfile, evid):
     #     next_dest = get_next_dest(self.devid)
@@ -362,8 +364,8 @@ class DevUnit:
         mst = constants.MESSAGE_TYPE_PHOTO
         fname = imgfile.split("/").pop()
         
-        # Use image.bytes2string to convert the processed bytes to a string
-        imstr = image.bytes2string(processed_image_bytes)
+        # Use image.imagebytes2string to convert the processed bytes to a string
+        imstr = image.imagebytes2string(processed_image_bytes)
 
         im = {"i_f" : fname,
               "i_s" : self.devid,
@@ -414,12 +416,12 @@ class DevUnit:
             #self.logger.info(f"Photos sofar = {self.photos_taken}, Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
             self.photos_taken = photos_seen
             if len(critical_images) > 0:
-                (evid, cropped, full) = self.get_images_to_send(critical_images)
+                (evid, cropped, full, event_severity) = self.get_images_to_send(critical_images)
                 if cropped or full:
                     self.logger.info(f"Found new critical images, sending : {cropped}, {full}")
                     events_seen += 1
                     # TODO: Send the image severity
-                    self.send_event(evid)
+                    self.send_event(evid, event_severity)
                     time.sleep(2)
                 if cropped:
                     self.send_img(cropped, evid)
@@ -450,9 +452,9 @@ class DevUnit:
 
     # A:1205
     # Name, time
-    def send_event(self, evid):
+    def send_event(self, evid, event_severity):
         t = get_time_str()
-        msgstr = f"{self.devid}:{t}:{evid}"
+        msgstr = f"{self.devid}:{t}:{evid}:{event_severity}"
         next_dest = get_next_dest(self.devid)
         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest, True)
 
