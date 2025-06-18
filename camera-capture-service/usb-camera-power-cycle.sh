@@ -154,7 +154,7 @@ copy_files() {
                 log_message "ERROR: Failed to copy $filename. Error: $cp_output"
                 fail_count=$((fail_count + 1))
             fi
-        done < <(find "$mount_point" -type f -print0)
+        done < <(find "$mount_point" -type f \( -iname "*.jpg" -o -iname "*.jpeg" \) -print0)
         
         rm -f "$temp_file"
         log_message "Transfer complete for $mount_point: $copy_count files copied, $fail_count failed."
@@ -187,7 +187,7 @@ copy_files_debug() {
         fi
 
         # Use a more robust approach with explicit file handling
-        local file_list=$(find "$mount_point" -type f 2>/dev/null)
+        local file_list=$(find "$mount_point" -type f \( -iname "*.jpg" -o -iname "*.jpeg" \) 2>/dev/null)
         if [ -z "$file_list" ]; then
             log_message "No files found in $mount_point"
             continue
