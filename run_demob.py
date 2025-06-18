@@ -341,6 +341,7 @@ class DevUnit:
                 if cropped or full:
                     self.logger.info(f"Found new critical images, sending : {cropped}, {full}")
                     events_seen += 1
+                    # TODO: Send the image severity
                     self.send_event(evid)
                     time.sleep(2)
                 if cropped:
@@ -372,9 +373,9 @@ class DevUnit:
 
     # A:1205
     # Name, time
-    def send_event(self, evid):
+    def send_event(self, evid, full_image_path):
         t = get_time_str()
-        msgstr = f"{self.devid}:{t}:{evid}"
+        msgstr = f"{self.devid}:{t}:{evid}:{full_image_path}"
         next_dest = get_next_dest(self.devid)
         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_EVENT, next_dest, True)
 
