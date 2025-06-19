@@ -101,6 +101,9 @@ class EventDetector:
         for r in results:
             for box in r.boxes:
                 object_name = self.model.names[int(box.cls)]
+                
+                logging.info(f"Object name: {object_name} | Confidence: {box.conf}")
+
                 detected_boxes.append({
                     'box': box.xyxy[0].cpu().numpy(),
                     'label': object_name,
