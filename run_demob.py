@@ -490,52 +490,15 @@ class DevUnit:
 
     # A:23.1,67.1
     # Name:GPS
-    # def send_gps(self):
-    #     gpsgetter= gps.Gps()
-    #     loc = gpsgetter.get_lat_lng()
-    #     if loc is not None:
-    #         (lat, lng) = loc
-    #         next_dest = get_next_dest(self.devid)
-    #         msgstr = f"{self.devid}:{lat},{lng}"
-    #         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
-
     def send_gps(self):
         gpsgetter= gps.Gps()
-        loc = gpsgetter.get_lat_lng() # Example: loc could be (0.0, 0.0), (34.12, 74.87), or None
-
-        lat = None
-        lng = None
-
-        # Corrected logic: Check if loc is valid and NOT (0.0, 0.0)
-        if loc and loc[0] is not None and loc[1] is not None and loc != (0.0, 0.0):
-            try:
-                lat = float(loc[0])
-                lng = float(loc[1])
-                self.logger.info(f"Obtained GPS for DevUnit {self.devid}: Lat={lat:.2f}, Lng={lng:.2f}")
-            except ValueError as e:
-                self.logger.error(f"Error converting GPS coordinates '{loc[0]}', '{loc[1]}' to float: {e}. Using fallback.")
-                lat = None # Force fallback if conversion fails
-                lng = None
-        
-        if lat is None or lng is None: # If GPS was invalid or conversion failed, use fallback
-            self.logger.warning(f"Could not obtain valid GPS for DevUnit {self.devid} (received {loc}). Using random Srinagar location.")
-            srinagar_locations = [
-                (34.083656, 74.797371),  # General Srinagar
-                (34.1200, 74.8700),      # Dal Lake
-                (34.1424, 74.8398),      # Nigeen Lake (approx)
-                (34.1426, 74.8629),      # Shalimar Bagh (Srinagar)
-                (34.098352, 74.809180)   # Jamia Masjid Srinagar
-            ]
-            lat, lng = random.choice(srinagar_locations)
-            self.logger.info(f"Using fallback Srinagar location for DevUnit {self.devid}: Lat={lat:.2f}, Lng={lng:.2f}")
-
-        # Now `lat` and `lng` are guaranteed to be floats (either actual GPS or fallback)
-        next_dest = get_next_dest(self.devid)
-        if next_dest: # Only send if there's a next destination
+        loc = gpsgetter.get_lat_lng()
+        if loc is not None:
+            (lat, lng) = loc
+            next_dest = get_next_dest(self.devid)
             msgstr = f"{self.devid}:{lat},{lng}"
             self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
-        else:
-            self.logger.warning(f"Cannot send GPS from {self.devid}: no next destination.")
+
 
     # A:1205
     # Name, time
