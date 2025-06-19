@@ -164,6 +164,7 @@ export default function CriticalAlertSystem({
   // Generate topics for all machines
   const topics = React.useMemo(() => {
     const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
+    if (machines.length === 0) return [];
     return machines.map(
       (machine) =>
         `${organizationId}/_all_/${today}/${machine.id}/_all_/EVENT/#`,
