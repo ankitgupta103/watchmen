@@ -12,7 +12,21 @@ JK_EVENT_COUNT = "event_count"
 JK_IMAGE_DATA = "image_data"
 JK_IMAGE_TS = "image_ts"
 
+# Message Types
 MESSAGE_TYPE_SCAN = "scan"
 MESSAGE_TYPE_SPATH = "spath"
 MESSAGE_TYPE_HEARTBEAT = "heartbeat"
 MESSAGE_TYPE_PHOTO = "photo"
+LOG_MESSAGE = "log_message" # New message type for logging
+
+# The network layout grid
+node_layout = [
+    ["R", "Q", "P", "O", "N"],
+    ["S", "F", "E", "D", "M"],
+    ["T", "G", "A", "C", "L"],
+    ["U", "H", "I", "B", "K"],
+    ["V", "W", "X", "Y", "J"]
+]
+
+# Command Central Node ID
+CENTRAL_NODE_ID = "ZZZ"

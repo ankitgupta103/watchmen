@@ -9,92 +9,74 @@ class IPCCommunicator:
     def __init__(self, websocket_manager=None):
         self.simulated_layout = layout.Layout()
         self.dev = {}  # ID -> Obj
-        self.robustness = 0.7  # Higher robustness for better demo
+        self.robustness = 0.60
         self.websocket_manager = websocket_manager
         self.flaky_nodes = ["VVV", "NNN", "CCC", "QQQ"]
-        self.node_status = {}  # Track node status
+        self.node_status = {}
 
     def add_dev(self, devid, devobj):
         self.dev[devid] = devobj
-        self.node_status[devid] = "up"  # Initialize as up
+        self.node_status[devid] = "up"
 
-    async def add_flakiness(self, msg, devid):
-        """Simulate network flakiness for certain nodes."""
-        # Only apply flakiness to designated flaky nodes
-        if devid in self.flaky_nodes:
-            if random.random() > self.robustness:
-                print(f"Network flaky: Node {devid} is temporarily down.")
+    async def log_message(self, text):
+        if self.websocket_manager:
+            log_msg = {"type": constants.LOG_MESSAGE, "message": text, "timestamp": time.time()}
+            await self.websocket_manager.broadcast(json.dumps(log_msg))
+
+    async def add_flakiness(self, devid):
+        if devid in self.flaky_nodes and random.random() > self.robustness:
+            if self.node_status.get(devid) != "down":
                 self.node_status[devid] = "down"
+                await self.log_message(f"STATUS: Node {devid} went offline due to flakiness.")
                 if self.websocket_manager:
-                    await self.websocket_manager.broadcast(json.dumps({
-                        "type": "STATUS_UPDATE",
-                        "nodeId": devid,
-                        "status": "down"
-                    }))
-                return True
-        
-        # If node is not flaky or passes robustness check, mark as up
+                    await self.websocket_manager.broadcast(json.dumps({"type": "STATUS_UPDATE", "nodeId": devid, "status": "down"}))
+            return True
         if self.node_status.get(devid) != "up":
             self.node_status[devid] = "up"
+            await self.log_message(f"STATUS: Node {devid} is back online.")
             if self.websocket_manager:
-                await self.websocket_manager.broadcast(json.dumps({
-                    "type": "STATUS_UPDATE",
-                    "nodeId": devid,
-                    "status": "up"
-                }))
-        
+                await self.websocket_manager.broadcast(json.dumps({"type": "STATUS_UPDATE", "nodeId": devid, "status": "up"}))
         return False
 
     async def send_to_network(self, msg, devid, dest=None):
-        """Send message to network with visualization."""
-        # Small delay to simulate network latency
-        await asyncio.sleep(0.01)
-        
-        # Check if sender is flaky
-        if await self.add_flakiness(msg, devid):
+        await asyncio.sleep(0.1)
+        if await self.add_flakiness(devid):
             return False
 
-        # Determine destinations
-        destinations = [dest] if dest is not None else self.simulated_layout.get_neighbours(devid)
+        msg_type = msg.get(constants.JK_MESSAGE_TYPE, "unknown")
+        destinations = [dest] if dest else self.simulated_layout.get_neighbours(devid)
         
         if not destinations:
-            print(f"No destinations found for {devid}")
             return False
-            
-        success_count = 0
+
+        log_action = "UNICAST" if dest else "BROADCAST"
+        log_targets = dest if dest else "Neighbors"
+        await self.log_message(f"{log_action}: {devid} -> {log_targets} ({msg_type})")
         
+        success_count = 0
         for target in destinations:
             if target in self.dev:
-                try:
-                    # Check if target is down due to flakiness
-                    if self.node_status.get(target) == "down":
-                        print(f"Message from {devid} to {target} failed - target is down")
-                        continue
-                    
-                    # Broadcast the communication link to the frontend
-                    if self.websocket_manager:
-                        # Get the full path taken by the message
-                        path_so_far = msg.get(constants.JK_PATH_SO_FAR, [])
-                        full_path = path_so_far + [devid, target]
-                        
-                        comm_message = {
-                            "type": "COMMUNICATION",
-                            "source": devid,
-                            "target": target,
-                            "msg_type": msg.get(constants.JK_MESSAGE_TYPE, "unknown"),
-                            "full_path": full_path
-                        }
-                        
-                        await self.websocket_manager.broadcast(json.dumps(comm_message))
-                        print(f"Communication: {devid} -> {target} ({msg.get(constants.JK_MESSAGE_TYPE)})")
-                    
-                    # Deliver message to target device
-                    self.dev[target].process_msg(msg)
-                    success_count += 1
-                    
-                except Exception as e:
-                    print(f"Error sending message from {devid} to {target}: {e}")
-            else:
-                print(f"Target device {target} not found in network")
-        
+                if self.node_status.get(target) == "down":
+                    await self.log_message(f"FAILED: {devid} -> {target}. Target is offline.")
+                    continue
+                
+                if self.websocket_manager:
+                    # --- CRITICAL FIX START ---
+                    # Add the message's path to the payload for frontend visualization
+                    path_so_far = msg.get(constants.JK_PATH_SO_FAR, [])
+                    full_path = path_so_far + [devid, target]
+                    comm_message = {
+                        "type": "COMMUNICATION",
+                        "source": devid,
+                        "target": target,
+                        "msg_type": msg_type,
+                        "msg": msg,
+                        "full_path": full_path if len(full_path) > 2 else None
+                    }
+                    # --- CRITICAL FIX END ---
+                    await self.websocket_manager.broadcast(json.dumps(comm_message))
+                
+                self.dev[target].process_msg(msg)
+                success_count += 1
+                await asyncio.sleep(0.05)
         return success_count > 0
