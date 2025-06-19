@@ -32,10 +32,6 @@ export default function DeviceStatusBufferLocation({
         </Badge>
       </TableCell>
       <TableCell>{formatBufferSize(buffer)}</TableCell>
-      <TableCell>
-        {data?.message?.location?.lat?.toFixed(4) ?? '-'},{' '}
-        {data?.message?.location?.long?.toFixed(4) ?? '-'}
-      </TableCell>
     </>
   );
 }
