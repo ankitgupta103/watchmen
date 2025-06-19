@@ -57,7 +57,7 @@ interface MachineEvent {
   cropped_image_url?: string;
   full_image_url?: string;
   images_loaded?: boolean;
-  event_severity?: number;
+  event_severity?: string;
 }
 
 interface SimpleMachineData {
@@ -170,7 +170,7 @@ export default function LiveFeedWrapper({
             eventstr: eventMessage.eventstr || '',
             image_c_key: eventMessage.image_c_key,
             image_f_key: eventMessage.image_f_key,
-            event_severity: eventMessage.event_severity,
+            event_severity: eventMessage.event_severity.toString(),
             images_loaded: false,
           };
 
@@ -262,7 +262,7 @@ export default function LiveFeedWrapper({
       const eventCount = machineEventCounts[machineId] || 0;
       const lastEvent = events[events.length - 1];
       const stats = machineStats[machineId];
-      const is_critical = events.some((event) => event.event_severity == 3);
+      const is_critical = events.some((event) => event.event_severity == '3');
       console.log('is_critical', is_critical);
 
       // Determine online status: device is online if stats.data is not null
