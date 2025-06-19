@@ -120,12 +120,11 @@ export default function MachineDetailModal({
   const [liveEvents, setLiveEvents] = useState<MachineEvent[]>([]);
   const [mqttConnected, setMqttConnected] = useState(false);
 
-        const lastSeen = selectedMachine?.last_location?.timestamp
-        ? new Date(selectedMachine.last_location.timestamp)
-        : null;
-      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
-
+  const lastSeen = selectedMachine?.last_location?.timestamp
+    ? new Date(selectedMachine.last_location.timestamp)
+    : null;
+  const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+  const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
   // Generate MQTT topics for the selected machine
   const mqttTopics = React.useMemo(() => {
@@ -530,12 +529,10 @@ export default function MachineDetailModal({
                     Status:
                   </span>
                   <div className="text-sm">
-                    <Badge
-                      variant={
-                        isOnline ? 'default' : 'destructive'
-                      }
-                    >
-                      {selectedMachine.last_location?.timestamp ? 'Online' : 'Offline'}
+                    <Badge variant={isOnline ? 'default' : 'destructive'}>
+                      {selectedMachine.last_location?.timestamp
+                        ? 'Online'
+                        : 'Offline'}
                     </Badge>
                   </div>
                 </div>

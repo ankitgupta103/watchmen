@@ -14,7 +14,7 @@ export const formatBufferSize = (
   decimals = 2,
   useIEC = false,
 ) => {
-  if(typeof bytes !== 'number' || isNaN(Number(bytes))) return '-';
+  if (typeof bytes !== 'number' || isNaN(Number(bytes))) return '-';
   if (bytes === 0) return '0 Bytes';
   const k = useIEC ? 1024 : 1000;
   const sizes = useIEC
@@ -22,7 +22,9 @@ export const formatBufferSize = (
     : ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
   const i = Math.floor(Math.log(Number(bytes)) / Math.log(k));
 
-  const formattedSize = parseFloat((Number(bytes) / Math.pow(k, i)).toFixed(decimals));
+  const formattedSize = parseFloat(
+    (Number(bytes) / Math.pow(k, i)).toFixed(decimals),
+  );
   return `${formattedSize} ${sizes[i]}`;
 };
 

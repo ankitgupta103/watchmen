@@ -2,8 +2,7 @@ import { getOrg } from '@/lib/auth/getOrg';
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcher } from '@/lib/fetcher';
 import { Machine } from '@/lib/types/machine';
-
-import DeviceDetailsClient from './components/device-details-client';
+import DeviceDetailsClient from './components/device-details';
 
 export default async function DeviceDetailsPage({
   params,

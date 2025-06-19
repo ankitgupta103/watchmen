@@ -199,11 +199,10 @@ function EnhancedMarker({
   let hoverTimeout: NodeJS.Timeout;
 
   const lastSeen = machine.last_location?.timestamp
-        ? new Date(machine.last_location.timestamp)
-        : null;
-      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
-
+    ? new Date(machine.last_location.timestamp)
+    : null;
+  const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+  const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
   const handleMouseOver = () => {
     if (hoverTimeout) {
@@ -229,8 +228,6 @@ function EnhancedMarker({
     }
     onMarkerClick(machine);
   };
-
-
 
   const getStatusText = (isOnline: boolean, eventCount: number) => {
     if (isOnline) {
@@ -286,9 +283,7 @@ function EnhancedMarker({
           </div>
 
           {/* Status information */}
-          <div
-            className={cn('font-medium', getStatusColor(isOnline))}
-          >
+          <div className={cn('font-medium', getStatusColor(isOnline))}>
             <strong>Status:</strong>{' '}
             {getStatusText(isOnline, machineData.event_count)}
           </div>
