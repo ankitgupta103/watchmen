@@ -120,11 +120,46 @@ export default function MachineDetailModal({
   const mqttTopics = React.useMemo(() => {
     if (!selectedMachine || !organizationId) return [];
 
-    const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
+    const today = new Date().toISOString().split('T')[0]; // YYYY-mm-dd format
     return [
       `${organizationId}/_all_/${today}/${selectedMachine.id}/_all_/EVENT/#`,
     ];
   }, [organizationId, selectedMachine]);
+
+    // Function to fetch images for events
+  const fetchEventImages = useCallback(
+    async (imageKeys: { image_c_key: string; image_f_key: string }) => {
+      try {
+        if (!token) return null;
+
+        const data = await fetcherClient<{
+          success: boolean;
+          cropped_image_url?: string;
+          full_image_url?: string;
+          error?: string;
+        }>(`${API_BASE_URL}/event-images/`, token, {
+          method: 'POST',
+          body: {
+            image_c_key: imageKeys.image_c_key,
+            image_f_key: imageKeys.image_f_key,
+          },
+        });
+
+        if (data?.success) {
+          return {
+            croppedImageUrl: data.cropped_image_url,
+            fullImageUrl: data.full_image_url,
+          };
+        } else {
+          throw new Error(data?.error || 'Failed to fetch images');
+        }
+      } catch (error) {
+        console.error('Error fetching images:', error);
+        return null;
+      }
+    },
+    [token],
+  );
 
   // Handle MQTT messages for live events
   const handleMqttMessage = useCallback(
@@ -148,11 +183,12 @@ export default function MachineDetailModal({
           event_severity: eventMessage.event_severity,
         };
 
-        setLiveEvents(() => [newEvent]);
+        // FIX: Prepend the new event to the liveEvents array instead of overwriting it
+        setLiveEvents((prev) => [newEvent, ...prev]);
 
         // Start fetching images for this event automatically (live events should load immediately)
         if (eventMessage.image_c_key && eventMessage.image_f_key) {
-          setLoadingImages(() => ({ [newEvent.id]: true }));
+          setLoadingImages((prev) => ({ ...prev, [newEvent.id]: true })); // Use functional update for setLoadingImages
 
           try {
             const imageUrls = await fetchEventImages({
@@ -189,7 +225,7 @@ export default function MachineDetailModal({
               ),
             );
           } finally {
-            setLoadingImages(() => ({ [newEvent.id]: false }));
+            setLoadingImages((prev) => ({ ...prev, [newEvent.id]: false })); // Use functional update for setLoadingImages
           }
         }
       } catch (error) {
@@ -199,7 +235,7 @@ export default function MachineDetailModal({
         );
       }
     },
-    [selectedMachine],
+    [selectedMachine, fetchEventImages], // Added fetchEventImages to dependency array for completeness
   );
 
   // Use PubSub hook for MQTT connection
@@ -210,40 +246,7 @@ export default function MachineDetailModal({
     setMqttConnected(isConnected);
   }, [isConnected]);
 
-  // Function to fetch images for events
-  const fetchEventImages = useCallback(
-    async (imageKeys: { image_c_key: string; image_f_key: string }) => {
-      try {
-        if (!token) return null;
 
-        const data = await fetcherClient<{
-          success: boolean;
-          cropped_image_url?: string;
-          full_image_url?: string;
-          error?: string;
-        }>(`${API_BASE_URL}/event-images/`, token, {
-          method: 'POST',
-          body: {
-            image_c_key: imageKeys.image_c_key,
-            image_f_key: imageKeys.image_f_key,
-          },
-        });
-
-        if (data?.success) {
-          return {
-            croppedImageUrl: data.cropped_image_url,
-            fullImageUrl: data.full_image_url,
-          };
-        } else {
-          throw new Error(data?.error || 'Failed to fetch images');
-        }
-      } catch (error) {
-        console.error('Error fetching images:', error);
-        return null;
-      }
-    },
-    [token],
-  );
 
   // Function to fetch historical events for the past 7 days (metadata only)
   const fetchHistoricalEvents = useCallback(
@@ -253,6 +256,7 @@ export default function MachineDetailModal({
       setLoadingHistorical(true);
       setHistoricalEvents([]);
       setImagesLoadedCounter(0); // Reset counter
+      setLiveEvents([]); // Clear live events when fetching historical for a new machine
 
       try {
         const allEvents: HistoricalEvent[] = [];
@@ -347,19 +351,19 @@ export default function MachineDetailModal({
         return;
       }
 
-      // Mark these events as requested
+      // Mark these events as requested and set loading state
       setHistoricalEvents((prev) =>
-        prev.map((event) =>
-          eventsNeedingImages.some(e => e.id === event.id)
-            ? { ...event, images_requested: true }
-            : event
-        )
+        prev.map((event) => {
+          if (eventsNeedingImages.some(e => e.id === event.id)) {
+            setLoadingImages((loadingPrev) => ({ ...loadingPrev, [event.id]: true }));
+            return { ...event, images_requested: true };
+          }
+          return event;
+        })
       );
 
       // Fetch images for these events concurrently
       const imagePromises = eventsNeedingImages.map(async (event) => {
-        setLoadingImages((prev) => ({ ...prev, [event.id]: true }));
-
         try {
           const imageUrls = await fetchEventImages({
             image_c_key: event.image_c_key!,
@@ -425,7 +429,7 @@ export default function MachineDetailModal({
       setHistoricalEvents([]);
       setLoadingImages({});
       setSelectedImageUrl(null);
-      setLiveEvents([]);
+      setLiveEvents([]); // Ensure live events are also cleared
       setImagesLoadedCounter(0);
     }
   }, [selectedMachine]);
