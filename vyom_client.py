@@ -194,6 +194,9 @@ class VyomClient:
 
             cached_location = self.location_cache.get(node_hn)
             self.logger.debug(f"[on_hb_arrive] Cached location for {node_hn}: {cached_location}")
+            if cached_location is None:
+                cached_location =  {"lat": None, "long": None, "timestamp": epoch_ms}
+                            
             new_location = None
             if lat is not None and long is not None:
                 new_location = {"lat": lat, "long": long, "timestamp": epoch_ms}
