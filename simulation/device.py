@@ -99,21 +99,26 @@ class Device:
     
     async def spread_spath(self, msg):
         path_from_sender = msg.get(constants.JK_SHORTEST_PATH, [])
+        source = msg.get(constants.JK_SOURCE)
         if not path_from_sender:
             return
 
-        # If the received path already starts with our ID, it's for us.
-        # Otherwise, we prepend our ID to the path from our neighbor.
         if path_from_sender[0] == self.devid:
             new_spath = path_from_sender
         else:
             new_spath = [self.devid] + path_from_sender
         
-        if not self.spath or len(new_spath) < len(self.spath):
+        
+        is_new_or_shorter = not self.spath or len(new_spath) < len(self.spath)
+        is_refresh_from_parent = self.spath and len(self.spath) > 1 and source == self.spath[1]
+
+        if is_new_or_shorter or is_refresh_from_parent:
             self.spath = new_spath
-            await self.log(f"New shortest path: {'->'.join(self.spath)}")
+            if is_new_or_shorter:
+                await self.log(f"New shortest path: {'->'.join(self.spath)}")
+            else:
+                await self.log(f"Refreshed path: {'->'.join(self.spath)}")
             
-            # Propagate our new, correct path to our neighbors
             new_msg = {
                 constants.JK_MESSAGE_TYPE: constants.MESSAGE_TYPE_SPATH,
                 constants.JK_SOURCE: self.devid,
@@ -125,3 +130,4 @@ class Device:
             for neighbour in self.neighbours_seen:
                 if neighbour != last_hop_in_path:
                     await self.send_message(new_msg.copy(), neighbour)
+                    
