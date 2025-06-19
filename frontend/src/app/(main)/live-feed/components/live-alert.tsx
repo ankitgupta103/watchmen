@@ -340,12 +340,12 @@ export default function CriticalAlertSystem({
         setUnacknowledgedCount((prev) => prev + 1);
 
         // Play alarm sound only for severity 2 or higher
-        if (isAudioEnabled && parseInt(eventMessage.event_severity) >= 2) {
+        if (isAudioEnabled && parseInt(eventMessage.event_severity) >= 1) {
           try {
             await audioManagerRef.current.playAlarm(volume);
             // Play alarm 3 times with intervals
-            setTimeout(() => audioManagerRef.current.playAlarm(volume), 1000);
-            setTimeout(() => audioManagerRef.current.playAlarm(volume), 2000);
+            // setTimeout(() => audioManagerRef.current.playAlarm(volume), 1000);
+            // setTimeout(() => audioManagerRef.current.playAlarm(volume), 2000);
           } catch (error) {
             console.warn('Failed to play alarm sound:', error);
           }
@@ -651,11 +651,11 @@ export default function CriticalAlertSystem({
                           </div>
                           <div className="text-sm text-gray-600">
                             Severity:{' '}
-                            {alert.message.event_severity === '1'
+                            {alert.message.event_severity === '2'
                               ? 'High'
-                              : alert.message.event_severity === '2'
+                              : alert.message.event_severity === '3'
                                 ? 'Critical'
-                                : 'Medium'}
+                                : 'Low'}
                           </div>
                           <p className="text-sm text-gray-700">
                             {alert.message?.meta?.node_id}
