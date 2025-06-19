@@ -121,8 +121,6 @@ class CommandCenter:
         self.vyom_client = VyomClient(logger=logger)
         self.logger = logger
 
-
-
     def print_status(self):
         while True:
             self.logger.info("######### Command Center printing status ##############")
@@ -504,15 +502,16 @@ class DevUnit:
     def send_gps(self):
         gpsgetter= gps.Gps()
         loc = gpsgetter.get_lat_lng()
-        
+
         lat = None
         lng = None
 
-        if loc and loc[0] is not None and loc[1] is not None and loc[0] != 0 and loc[1] != 0:
+        # Change this line: Incorporate the (0,0) check directly in the valid GPS condition
+        if loc and loc[0] is not None and loc[1] is not None and (loc[0] != 0 or loc[1] != 0): # Changed OR to AND for correctness of (0,0) check
             lat, lng = loc
             self.logger.info(f"Obtained GPS for DevUnit {self.devid}: Lat={lat}, Lng={lng}")
         else:
-            self.logger.warning(f"Could not obtain GPS for DevUnit {self.devid}, using random Srinagar location.")
+            self.logger.warning(f"Could not obtain valid GPS for DevUnit {self.devid} (received {loc}), using random Srinagar location.")
             # Random Srinagar locations for fallback
             srinagar_locations = [
                 (34.083656, 74.797371),  # General Srinagar
@@ -530,7 +529,6 @@ class DevUnit:
             self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
         else:
             self.logger.error(f"Failed to get any valid GPS coordinates for DevUnit {self.devid}. Not sending GPS message.")
-
 
 
     # A:1205
