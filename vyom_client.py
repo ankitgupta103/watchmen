@@ -236,7 +236,7 @@ class VyomClient:
             self.logger.error(f"Error setting location in VyomClient: {e}")
 
 
-    def send_central_unit_hb(self, lat: Union[int, float], long: Union[int, float]):
+    def _send_central_unit_hb(self, lat: Union[int, float], long: Union[int, float]):
         """
         Helper function to send central unit heartbeat data to RootStore.
         This function will be run in a separate thread.
