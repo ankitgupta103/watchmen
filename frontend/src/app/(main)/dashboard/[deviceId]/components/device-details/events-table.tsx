@@ -61,7 +61,7 @@ const EventsTable = ({
             })}
           </TableCell>
           <TableCell>
-            <Badge variant="outline">{event.eventstr}</Badge>
+            <Badge variant="outline">{event?.eventstr || 'N/A'}</Badge>
           </TableCell>
           <TableCell>
             {event.fetchingImages ? (
@@ -77,7 +77,7 @@ const EventsTable = ({
                     alt="Cropped"
                     width={40}
                     height={40}
-                    className="rounded border object-cover"
+                    className="rounded border object-cover h-40 w-40"
                   />
                 )}
                 {event.fullImageUrl && (
@@ -86,7 +86,7 @@ const EventsTable = ({
                     alt="Full"
                     width={40}
                     height={40}
-                    className="rounded border object-cover"
+                    className="rounded border object-contain h-40 w-fit"
                   />
                 )}
               </div>

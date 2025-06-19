@@ -14,6 +14,7 @@ import { Machine } from '@/lib/types/machine';
 import DeviceInfo from './device-info';
 import EventDetailsModal from './event-details-modal';
 import EventsSection from './events-section';
+import PageHeader from '../page-header';
 
 interface S3EventData {
   image_c_key: string;
@@ -110,6 +111,7 @@ export default function DeviceDetailsClient({
 
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
+      <PageHeader deviceId={device.id.toString()} deviceName={device.name} />
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
           <div className="flex items-center justify-between">
