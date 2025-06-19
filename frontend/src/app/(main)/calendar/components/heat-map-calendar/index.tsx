@@ -162,7 +162,9 @@ export default function HeatMapCalendar({
               );
             }
           } catch (err) {
-            console.warn(`Fetch failed for machine ${machine.id} on ${dateStr} ${err}`);
+            console.warn(
+              `Fetch failed for machine ${machine.id} on ${dateStr} ${err}`,
+            );
           }
         }
         setEvents((prev) => ({ ...prev, [dateStr]: allEvents }));
@@ -216,7 +218,9 @@ export default function HeatMapCalendar({
         setEvents((prev) => {
           const newDayEvents = [...(prev[dateStr] || [])];
           updatedEventsWithImages.forEach((updatedEvent) => {
-            const index = newDayEvents.findIndex((e) => e.id === updatedEvent.id);
+            const index = newDayEvents.findIndex(
+              (e) => e.id === updatedEvent.id,
+            );
             if (index !== -1) newDayEvents[index] = updatedEvent;
           });
           return { ...prev, [dateStr]: newDayEvents };
@@ -394,6 +398,24 @@ export default function HeatMapCalendar({
                 {getCalendarDays().map((date, index) => {
                   const dateStr = date.toLocaleDateString('en-CA');
                   const dayEventsCount = (events[dateStr] || []).length;
+                  const dayEventsSeverity = (events[dateStr] || []).reduce(
+                    (acc, event) => {
+                      if (event?.event_severity) {
+                        acc[event.event_severity] =
+                          (acc[event.event_severity] || 0) + 1;
+                      } else {
+                        acc['0'] = (acc['0'] || 0) + 1;
+                      }
+                      return acc;
+                    },
+                    {
+                      '0': 0,
+                      '1': 0,
+                      '2': 0,
+                      '3': 0,
+                    } as Record<string, number>,
+                  );
+
                   return (
                     <Button
                       key={index}
@@ -430,12 +452,38 @@ export default function HeatMapCalendar({
                         <Loader2 className="mt-1 h-3 w-3 animate-spin text-blue-500" />
                       )}
                       {!loading[dateStr] && dayEventsCount > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="mt-1 px-1.5 py-0.5 text-[10px]"
-                        >
-                          {dayEventsCount} Event{dayEventsCount > 1 ? 's' : ''}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(dayEventsSeverity).map(
+                            ([severity, count]) => {
+                              if (count === 0) return null;
+                              return (
+                                <Badge
+                                  variant="secondary"
+                                  key={severity}
+                                  className={cn(
+                                    'px-0.5 py-0.5 text-[10px]',
+                                    severity === '0' &&
+                                      'bg-gray-200 text-gray-500',
+                                    severity === '1' &&
+                                      'bg-yellow-500 text-black',
+                                    severity === '2' &&
+                                      'bg-orange-500 text-white',
+                                    severity === '3' && 'bg-red-500 text-white',
+                                  )}
+                                >
+                                  {count}{' '}
+                                  {severity === '1'
+                                    ? 'Low'
+                                    : severity === '2'
+                                      ? 'High'
+                                      : severity === '0'
+                                        ? 'Unknown'
+                                        : 'Critical'}
+                                </Badge>
+                              );
+                            },
+                          )}
+                        </div>
                       )}
                     </Button>
                   );
