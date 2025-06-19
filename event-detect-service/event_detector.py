@@ -113,6 +113,9 @@ class EventDetector:
         if detected_boxes:
             labels = {obj['label'] for obj in detected_boxes}
             logging.info(f"Found objects in {image_path.name}: {list(labels)}")
+
+            all_classes = [(obj['label'], obj['confidence']) for obj in detected_boxes]
+            logging.info(f"All detected classes in {image_path.name}: {all_classes}")
         else:
             logging.info(f"No objects found in {image_path.name}")
 
