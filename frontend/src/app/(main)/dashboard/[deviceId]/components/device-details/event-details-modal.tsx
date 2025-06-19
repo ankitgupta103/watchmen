@@ -45,7 +45,7 @@ const EventDetailsModal = ({
   }, [event, onFetchImages]);
 
   return (
-    <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+    <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <Card className="max-h-[90vh] w-full max-w-4xl overflow-auto">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -90,8 +90,8 @@ const EventDetailsModal = ({
 
             {event.imagesFetched && (
               <div className="space-y-4">
-                <h3 className="font-semibold">Event Images</h3>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <h3 className="font-semibold ">Event Images</h3>
+                <div className="flex flex-col lg:flex-row gap-4 items-center justify-center">
                   {event.croppedImageUrl && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-gray-600">
@@ -103,7 +103,7 @@ const EventDetailsModal = ({
                           alt="Cropped event image"
                           width={400}
                           height={600} // Example aspect ratio
-                          className="h-auto w-full object-contain"
+                          className="h-80 w-fit object-contain"
                         />
                       </div>
                     </div>
@@ -119,7 +119,7 @@ const EventDetailsModal = ({
                           alt="Full event image"
                           width={600} // Example aspect ratio
                           height={400}
-                          className="h-auto w-full object-contain"
+                          className="h-80 w-fit object-contain"
                         />
                       </div>
                     </div>
