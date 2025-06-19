@@ -64,7 +64,7 @@ class EventDetector:
             # self.model = YOLO(model_path)
             self.model = YOLOWorld(model_path)
             self.model.set_classes(DETECTION_CLASSES)
-            
+
             logging.info(f"Successfully loaded model '{model_path}'")
         except Exception as e:
             logging.error(f"Failed to load YOLO model from '{model_path}'. Error: {e}")
@@ -94,6 +94,8 @@ class EventDetector:
             return []
 
         results = self.model(image)
+        
+        logging.info(f"Results: {results}")
 
         detected_boxes = []
         for r in results:
