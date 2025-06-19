@@ -317,20 +317,20 @@ export default function LiveFeedWrapper({
   // Calculate online/offline counts using proper status logic
   const onlineCount = machines.filter((machine) => {
     const lastSeen = machine.last_location?.timestamp
-        ? new Date(machine.last_location.timestamp)
-        : null;
-      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
+      ? new Date(machine.last_location.timestamp)
+      : null;
+    const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+    const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
     return isOnline;
   }).length;
 
   const offlineCount = machines.filter((machine) => {
     const lastSeen = machine.last_location?.timestamp
-        ? new Date(machine.last_location.timestamp)
-        : null;
-      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
+      ? new Date(machine.last_location.timestamp)
+      : null;
+    const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+    const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
     return !isOnline;
   }).length;

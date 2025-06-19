@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 // Import Leaflet and its CSS from the installed npm package
 import L from 'leaflet';
+
 import 'leaflet/dist/leaflet.css';
 
 // --- Type Definitions ---
@@ -28,7 +29,10 @@ type NodeStatus = Record<string, 'up' | 'down'>;
 type NodeInfo = Record<string, { neighbours: string[] }>;
 
 type WebSocketMessage =
-  | { type: 'INITIAL_LAYOUT'; nodes: Array<{ id: string; position: [number, number] }> }
+  | {
+      type: 'INITIAL_LAYOUT';
+      nodes: Array<{ id: string; position: [number, number] }>;
+    }
   | {
       type: 'COMMUNICATION';
       source: string;
@@ -43,7 +47,6 @@ type WebSocketMessage =
   | { type: 'STATUS_UPDATE'; nodeId: string; status: 'up' | 'down' }
   | { type: 'log_message'; message: string; timestamp: number };
 
-
 // --- Constants ---
 const BANGALORE_CENTER: [number, number] = [12.9716, 77.5946];
 const MAP_ZOOM_LEVEL = 13;
@@ -56,14 +59,14 @@ const COLORS = {
     heartbeat: '#32CD32',
     photo: '#FFD700',
     default: '#999999',
-    activePath: '#fef08a'
+    activePath: '#fef08a',
   },
   node: {
     up: '#28a745',
     down: '#dc3545',
     central: '#fd7e14',
     border: '#FFFFFF',
-  }
+  },
 };
 
 // --- Main Component ---
@@ -76,7 +79,9 @@ const NetworkMap: React.FC = () => {
   const [nodeInfo, setNodeInfo] = useState<NodeInfo>({});
   const [currentPhase, setCurrentPhase] = useState<string>('Simulation Paused');
   const [isSimRunning, setIsSimRunning] = useState<boolean>(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [connectionStatus, setConnectionStatus] = useState<
+    'connecting' | 'connected' | 'disconnected'
+  >('connecting');
 
   const ws = useRef<WebSocket | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -87,10 +92,13 @@ const NetworkMap: React.FC = () => {
   const logContainerRef = useRef<HTMLDivElement | null>(null);
   const activePathTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const projectGridToLatLng = (gridNodes: Array<{ id: string; position: [number, number] }>): Node[] => {
+  const projectGridToLatLng = (
+    gridNodes: Array<{ id: string; position: [number, number] }>,
+  ): Node[] => {
     if (gridNodes.length === 0) return [];
-    let avgX = 0, avgY = 0;
-    gridNodes.forEach(n => {
+    let avgX = 0,
+      avgY = 0;
+    gridNodes.forEach((n) => {
       avgX += n.position[0];
       avgY += n.position[1];
     });
@@ -98,8 +106,10 @@ const NetworkMap: React.FC = () => {
     avgY /= gridNodes.length;
 
     return gridNodes.map(({ id, position }) => {
-      const lon = BANGALORE_CENTER[1] + (position[0] - avgX) * COORD_SCALE_FACTOR;
-      const lat = BANGALORE_CENTER[0] - (position[1] - avgY) * COORD_SCALE_FACTOR * 0.8;
+      const lon =
+        BANGALORE_CENTER[1] + (position[0] - avgX) * COORD_SCALE_FACTOR;
+      const lat =
+        BANGALORE_CENTER[0] - (position[1] - avgY) * COORD_SCALE_FACTOR * 0.8;
       return { id, position, latlng: [lat, lon] };
     });
   };
@@ -107,7 +117,7 @@ const NetworkMap: React.FC = () => {
   // Effect to initialize the map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
-    
+
     const map = L.map(mapContainerRef.current, {
       center: BANGALORE_CENTER,
       zoom: MAP_ZOOM_LEVEL,
@@ -117,16 +127,20 @@ const NetworkMap: React.FC = () => {
       doubleClickZoom: false,
       touchZoom: false,
     });
-    
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-    }).addTo(map);
-    
+
+    L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      {
+        attribution:
+          '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+      },
+    ).addTo(map);
+
     mapInstanceRef.current = map;
     nodeLayerRef.current = L.layerGroup().addTo(map);
     linkLayerRef.current = L.layerGroup().addTo(map);
     pathLayerRef.current = L.layerGroup().addTo(map);
-    
+
     // Add custom styles for our node markers and tooltips
     const style = document.createElement('style');
     style.innerHTML = `
@@ -136,7 +150,6 @@ const NetworkMap: React.FC = () => {
       .hover-tooltip { background-color: rgba(0, 0, 0, 0.8) !important; border: 1px solid #fff !important; color: white !important; }
     `;
     document.head.appendChild(style);
-
   }, []);
 
   // Effect for WebSocket connection
@@ -154,32 +167,64 @@ const NetworkMap: React.FC = () => {
         switch (data.type) {
           case 'INITIAL_LAYOUT':
             setNodes(projectGridToLatLng(data.nodes));
-            setNodeStatus(data.nodes.reduce((acc, node) => ({...acc, [node.id]: 'up'}), {}));
+            setNodeStatus(
+              data.nodes.reduce(
+                (acc, node) => ({ ...acc, [node.id]: 'up' }),
+                {},
+              ),
+            );
             break;
           case 'COMMUNICATION': {
             const linkId = `${data.source}-${data.target}-${Date.now()}`;
-            setLinks(prev => [...prev, { id: linkId, sourceId: data.source, targetId: data.target, type: data.msg_type }]);
-            setTimeout(() => setLinks(prev => prev.filter(l => l.id !== linkId)), 1500);
-            
+            setLinks((prev) => [
+              ...prev,
+              {
+                id: linkId,
+                sourceId: data.source,
+                targetId: data.target,
+                type: data.msg_type,
+              },
+            ]);
+            setTimeout(
+              () => setLinks((prev) => prev.filter((l) => l.id !== linkId)),
+              1500,
+            );
+
             if (data.full_path) {
-                if(activePathTimeout.current) clearTimeout(activePathTimeout.current);
-                setActivePath(data.full_path);
-                activePathTimeout.current = setTimeout(() => setActivePath(null), 2500);
+              if (activePathTimeout.current)
+                clearTimeout(activePathTimeout.current);
+              setActivePath(data.full_path);
+              activePathTimeout.current = setTimeout(
+                () => setActivePath(null),
+                2500,
+              );
             }
-            
+
             // This is where neighbor info is received
-            if (data.msg_type === 'heartbeat' && data.msg.source && data.msg.neighbours) {
-              setNodeInfo(prev => ({ ...prev, [data.msg.source as string]: { neighbours: data.msg.neighbours as string[] } }));
+            if (
+              data.msg_type === 'heartbeat' &&
+              data.msg.source &&
+              data.msg.neighbours
+            ) {
+              setNodeInfo((prev) => ({
+                ...prev,
+                [data.msg.source as string]: {
+                  neighbours: data.msg.neighbours as string[],
+                },
+              }));
             }
             break;
           }
           case 'STATUS_UPDATE':
             // This is where offline status is received
-            setNodeStatus(prev => ({ ...prev, [data.nodeId]: data.status }));
+            setNodeStatus((prev) => ({ ...prev, [data.nodeId]: data.status }));
             break;
           case 'log_message': {
-            const newLog: LogEntry = { timestamp: new Date(data.timestamp * 1000).toLocaleTimeString(), message: data.message };
-            setLogs(prev => [...prev.slice(-200), newLog]);
+            const newLog: LogEntry = {
+              timestamp: new Date(data.timestamp * 1000).toLocaleTimeString(),
+              message: data.message,
+            };
+            setLogs((prev) => [...prev.slice(-200), newLog]);
             if (data.message.startsWith('SIM_PHASE:')) {
               setCurrentPhase(data.message.replace('SIM_PHASE: ', ''));
             } else if (data.message.startsWith('CONTROL: Simulation paused')) {
@@ -192,9 +237,9 @@ const NetworkMap: React.FC = () => {
     };
     connect();
     return () => {
-        ws.current?.close();
-        if(activePathTimeout.current) clearTimeout(activePathTimeout.current);
-    }
+      ws.current?.close();
+      if (activePathTimeout.current) clearTimeout(activePathTimeout.current);
+    };
   }, []);
 
   // --- CRITICAL FIX: This single hook now handles all node drawing. ---
@@ -204,54 +249,58 @@ const NetworkMap: React.FC = () => {
     if (!nodeLayerRef.current) return;
     nodeLayerRef.current.clearLayers();
 
-    nodes.forEach(node => {
-        const isCentral = node.id === 'ZZZ';
-        // Get the most recent status, default to 'up'
-        const status = nodeStatus[node.id] || 'up';
-        const color = isCentral ? COLORS.node.central : COLORS.node[status];
-        const size = isCentral ? 24 : 16;
+    nodes.forEach((node) => {
+      const isCentral = node.id === 'ZZZ';
+      // Get the most recent status, default to 'up'
+      const status = nodeStatus[node.id] || 'up';
+      const color = isCentral ? COLORS.node.central : COLORS.node[status];
+      const size = isCentral ? 24 : 16;
 
-        // Create the HTML for the custom marker icon
-        const iconHtml = `
+      // Create the HTML for the custom marker icon
+      const iconHtml = `
             <div class="custom-node-marker">
                 <div class="custom-node-label">${node.id}</div>
                 <div class="node-circle" style="width: ${size}px; height: ${size}px; background-color: ${color};"></div>
             </div>
         `;
-        
-        const customIcon = L.divIcon({
-            html: iconHtml,
-            className: '', // important to clear default leaflet styles
-            iconSize: [50, 40],
-            iconAnchor: [25, 20], // Anchor point of the icon
-        });
-        
-        // Get the most recent neighbor info
-        const neighbors = nodeInfo[node.id]?.neighbours || [];
-        const tooltipContent = `
+
+      const customIcon = L.divIcon({
+        html: iconHtml,
+        className: '', // important to clear default leaflet styles
+        iconSize: [50, 40],
+        iconAnchor: [25, 20], // Anchor point of the icon
+      });
+
+      // Get the most recent neighbor info
+      const neighbors = nodeInfo[node.id]?.neighbours || [];
+      const tooltipContent = `
             <div class="font-bold">Neighbors:</div>
             <div>${neighbors.length > 0 ? neighbors.join(', ') : 'None detected'}</div>
         `;
 
-        const marker = L.marker(node.latlng, { icon: customIcon })
-            .bindTooltip(tooltipContent, { className: 'hover-tooltip', offset: [0, -20] });
-      
-        nodeLayerRef?.current?.addLayer(marker);
+      const marker = L.marker(node.latlng, { icon: customIcon }).bindTooltip(
+        tooltipContent,
+        { className: 'hover-tooltip', offset: [0, -20] },
+      );
+
+      nodeLayerRef?.current?.addLayer(marker);
     });
   }, [nodes, nodeStatus, nodeInfo]); // This dependency array is key to fixing the bugs
-  
+
   // Effect for drawing ephemeral links
   useEffect(() => {
     if (!linkLayerRef.current || !nodes.length) return;
     linkLayerRef.current.clearLayers();
-    
-    links.forEach(link => {
-      const sourceNode = nodes.find(n => n.id === link.sourceId);
-      const targetNode = nodes.find(n => n.id === link.targetId);
+
+    links.forEach((link) => {
+      const sourceNode = nodes.find((n) => n.id === link.sourceId);
+      const targetNode = nodes.find((n) => n.id === link.targetId);
 
       if (sourceNode && targetNode && linkLayerRef.current) {
         L.polyline([sourceNode.latlng, targetNode.latlng], {
-          color: COLORS.link[link.type as keyof typeof COLORS.link] || COLORS.link.default,
+          color:
+            COLORS.link[link.type as keyof typeof COLORS.link] ||
+            COLORS.link.default,
           weight: 2.5,
           opacity: 0.8,
         }).addTo(linkLayerRef.current);
@@ -265,21 +314,20 @@ const NetworkMap: React.FC = () => {
     pathLayerRef.current.clearLayers();
 
     if (activePath && activePath.length > 1) {
-        const pathPositions = activePath
-            .map(nodeId => nodes.find(n => n.id === nodeId)?.latlng)
-            .filter((p): p is [number, number] => p !== undefined);
+      const pathPositions = activePath
+        .map((nodeId) => nodes.find((n) => n.id === nodeId)?.latlng)
+        .filter((p): p is [number, number] => p !== undefined);
 
-        if (pathPositions.length > 1) {
-            L.polyline(pathPositions, {
-                color: COLORS.link.activePath,
-                weight: 6,
-                opacity: 0.9,
-                dashArray: '10, 5'
-            }).addTo(pathLayerRef.current);
-        }
+      if (pathPositions.length > 1) {
+        L.polyline(pathPositions, {
+          color: COLORS.link.activePath,
+          weight: 6,
+          opacity: 0.9,
+          dashArray: '10, 5',
+        }).addTo(pathLayerRef.current);
+      }
     }
   }, [activePath, nodes]);
-
 
   // Effect for auto-scrolling the log panel
   useEffect(() => {
@@ -287,7 +335,7 @@ const NetworkMap: React.FC = () => {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs]);
-  
+
   // Handler to start/stop the simulation
   const handleToggleSimulation = () => {
     if (ws.current?.readyState === WebSocket.OPEN) {
@@ -302,59 +350,112 @@ const NetworkMap: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen bg-gray-900 font-sans text-gray-200">
-      <div className="relative flex-grow h-full">
+      <div className="relative h-full flex-grow">
         <div ref={mapContainerRef} className="h-full w-full" />
-        <div className="absolute top-0 left-0 right-0 p-4 z-[1000] pointer-events-none">
+        <div className="pointer-events-none absolute top-0 right-0 left-0 z-[1000] p-4">
           <div className="w-full text-center">
-            <div className="inline-block bg-black bg-opacity-70 rounded-lg px-6 py-2">
+            <div className="bg-opacity-70 inline-block rounded-lg bg-black px-6 py-2">
               <p className="text-sm text-gray-400">CURRENT PHASE</p>
               <p className="text-xl font-bold text-amber-400">{currentPhase}</p>
             </div>
           </div>
         </div>
-        <div className="absolute top-4 right-4 z-[1000] bg-black bg-opacity-70 rounded-lg p-4 pointer-events-auto">
-          <h3 className="text-lg font-bold mb-3">Legend</h3>
+        <div className="bg-opacity-70 pointer-events-auto absolute top-4 right-4 z-[1000] rounded-lg bg-black p-4">
+          <h3 className="mb-3 text-lg font-bold">Legend</h3>
           <div className="space-y-3 text-sm">
             <div>
-              <h4 className="font-semibold mb-1 text-gray-300">Node Status</h4>
-              <div className="flex items-center"><div className="h-4 w-4 rounded-full mr-2" style={{backgroundColor: COLORS.node.central}}></div>Command Central</div>
-              <div className="flex items-center"><div className="h-4 w-4 rounded-full mr-2" style={{backgroundColor: COLORS.node.up}}></div>Device (Online)</div>
-              <div className="flex items-center"><div className="h-4 w-4 rounded-full mr-2" style={{backgroundColor: COLORS.node.down}}></div>Device (Offline)</div>
+              <h4 className="mb-1 font-semibold text-gray-300">Node Status</h4>
+              <div className="flex items-center">
+                <div
+                  className="mr-2 h-4 w-4 rounded-full"
+                  style={{ backgroundColor: COLORS.node.central }}
+                ></div>
+                Command Central
+              </div>
+              <div className="flex items-center">
+                <div
+                  className="mr-2 h-4 w-4 rounded-full"
+                  style={{ backgroundColor: COLORS.node.up }}
+                ></div>
+                Device (Online)
+              </div>
+              <div className="flex items-center">
+                <div
+                  className="mr-2 h-4 w-4 rounded-full"
+                  style={{ backgroundColor: COLORS.node.down }}
+                ></div>
+                Device (Offline)
+              </div>
             </div>
             <div>
-              <h4 className="font-semibold mb-1 text-gray-300">Communication</h4>
-              <div className="flex items-center"><div className="h-1 w-6 mr-2" style={{backgroundColor: COLORS.link.scan}}></div>Scan Message</div>
-              <div className="flex items-center"><div className="h-1 w-6 mr-2" style={{backgroundColor: COLORS.link.spath}}></div>Shortest Path</div>
-              <div className="flex items-center"><div className="h-1 w-6 mr-2" style={{backgroundColor: COLORS.link.heartbeat}}></div>Heartbeat</div>
-              <div className="flex items-center"><div className="h-2 w-6 border-2 border-dashed mr-2" style={{borderColor: COLORS.link.activePath}}></div>Active Message Path</div>
+              <h4 className="mb-1 font-semibold text-gray-300">
+                Communication
+              </h4>
+              <div className="flex items-center">
+                <div
+                  className="mr-2 h-1 w-6"
+                  style={{ backgroundColor: COLORS.link.scan }}
+                ></div>
+                Scan Message
+              </div>
+              <div className="flex items-center">
+                <div
+                  className="mr-2 h-1 w-6"
+                  style={{ backgroundColor: COLORS.link.spath }}
+                ></div>
+                Shortest Path
+              </div>
+              <div className="flex items-center">
+                <div
+                  className="mr-2 h-1 w-6"
+                  style={{ backgroundColor: COLORS.link.heartbeat }}
+                ></div>
+                Heartbeat
+              </div>
+              <div className="flex items-center">
+                <div
+                  className="mr-2 h-2 w-6 border-2 border-dashed"
+                  style={{ borderColor: COLORS.link.activePath }}
+                ></div>
+                Active Message Path
+              </div>
             </div>
           </div>
         </div>
-         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-[1000]">
-            <button
-              onClick={handleToggleSimulation}
-              disabled={connectionStatus !== 'connected'}
-              className={`transform rounded-lg px-8 py-4 font-bold text-white shadow-lg transition-all hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  isSimRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {isSimRunning ? 'Pause Simulation' : 'Start Simulation'}
-            </button>
+        <div className="absolute bottom-5 left-1/2 z-[1000] -translate-x-1/2">
+          <button
+            onClick={handleToggleSimulation}
+            disabled={connectionStatus !== 'connected'}
+            className={`transform rounded-lg px-8 py-4 font-bold text-white shadow-lg transition-all hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 ${
+              isSimRunning
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {isSimRunning ? 'Pause Simulation' : 'Start Simulation'}
+          </button>
         </div>
       </div>
-      <div className="flex flex-col h-full w-[450px] bg-gray-800 border-l border-gray-600 shadow-lg">
-        <h2 className="text-lg font-bold p-3 border-b border-gray-600 flex justify-between items-center">
+      <div className="flex h-full w-[450px] flex-col border-l border-gray-600 bg-gray-800 shadow-lg">
+        <h2 className="flex items-center justify-between border-b border-gray-600 p-3 text-lg font-bold">
           <span>Event Log</span>
           <div className={`flex items-center space-x-2 text-sm`}>
-            <div className={`h-3 w-3 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <div
+              className={`h-3 w-3 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`}
+            ></div>
             <span>{connectionStatus}</span>
           </div>
         </h2>
-        <div ref={logContainerRef} className="flex-grow overflow-y-auto p-3 font-mono text-xs">
+        <div
+          ref={logContainerRef}
+          className="flex-grow overflow-y-auto p-3 font-mono text-xs"
+        >
           {logs.map((log, index) => (
             <div key={index} className="flex">
-              <span className="text-gray-500 mr-2 flex-shrink-0">{log.timestamp}</span>
-              <p className="text-gray-300 break-words">{log.message}</p>
+              <span className="mr-2 flex-shrink-0 text-gray-500">
+                {log.timestamp}
+              </span>
+              <p className="break-words text-gray-300">{log.message}</p>
             </div>
           ))}
         </div>
