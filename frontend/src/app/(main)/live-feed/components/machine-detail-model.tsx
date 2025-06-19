@@ -520,14 +520,6 @@ export default function MachineDetailModal({
                 </div>
                 <div>
                   <span className="text-sm font-medium text-gray-500">
-                    Type:
-                  </span>
-                  <div className="text-sm capitalize">
-                    {selectedMachine.type.replace('_', ' ')}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-gray-500">
                     Status:
                   </span>
                   <div className="text-sm">
@@ -555,8 +547,8 @@ export default function MachineDetailModal({
                     Location:
                   </span>
                   <div className="text-sm">
-                    {machineData.location.lat.toFixed(6)},{' '}
-                    {machineData.location.lng.toFixed(6)}
+                    {selectedMachine.last_location?.lat ?? '0.000000'},{' '}
+                    {selectedMachine.last_location?.long ?? '0.000000'}
                   </div>
                 </div>
                 <div>

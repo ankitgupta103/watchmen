@@ -461,17 +461,17 @@ export default function DeviceDetailsClient({
                   <div>
                     <span className="font-medium">Real-time:</span>{' '}
                     {machineStats?.message?.location?.lat?.toFixed(4) ??
-                      device?.last_location?.lat?.toFixed(4) ??
+                      device?.last_location?.lat ??
                       'N/A'}
                     ,{' '}
                     {machineStats?.message?.location?.long?.toFixed(4) ??
-                      device?.last_location?.long?.toFixed(4) ??
+                      device?.last_location?.long ??
                       'N/A'}
                   </div>
                   <div>
                     <span className="font-medium">Last known:</span>{' '}
-                    {device?.last_location?.lat?.toFixed(4) ?? 'N/A'},{' '}
-                    {device?.last_location?.long?.toFixed(4) ?? 'N/A'}
+                    {device?.last_location?.lat ?? 'N/A'},{' '}
+                    {device?.last_location?.long ?? 'N/A'}
                   </div>
                 </div>
               </div>
