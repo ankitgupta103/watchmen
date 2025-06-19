@@ -67,7 +67,7 @@ interface SimpleMachineData {
   last_updated: string;
   // Status and location from useMachineStats
   is_online: boolean;
-  location: { lat: number; lng: number, timestamp: string };
+  location: { lat: number; lng: number; timestamp: string };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   stats_data: any;
   buffer_size: number;
@@ -271,7 +271,7 @@ export default function LiveFeedWrapper({
         ? new Date(machines[machineId].last_location.timestamp)
         : null;
       const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-      
+
       const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
       // Get location from stats data
@@ -299,7 +299,13 @@ export default function LiveFeedWrapper({
         is_critical: is_critical,
       };
     },
-    [machineEvents, machineEventCounts, machineStats, pulsatingMachines, machines],
+    [
+      machineEvents,
+      machineEventCounts,
+      machineStats,
+      pulsatingMachines,
+      machines,
+    ],
   );
 
   // Calculate total events across all machines
