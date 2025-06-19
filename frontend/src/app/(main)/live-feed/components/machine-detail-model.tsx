@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
-import useToken from '@/hooks/use-token';
 import { usePubSub } from '@/hooks/use-pub-sub';
+import useToken from '@/hooks/use-token';
 import {
   Calendar,
   Camera,
@@ -68,6 +68,7 @@ interface SimpleMachineData {
   buffer_size: number;
   // Add pulsating state for recent events
   is_pulsating: boolean;
+  is_critical: boolean;
 }
 
 // MQTT Event Message structure (similar to live-alert)
@@ -106,7 +107,7 @@ export default function MachineDetailModal({
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>(
     {},
   );
-  
+
   // New state for MQTT live events
   const [liveEvents, setLiveEvents] = useState<MachineEvent[]>([]);
   const [mqttConnected, setMqttConnected] = useState(false);
@@ -114,7 +115,7 @@ export default function MachineDetailModal({
   // Generate MQTT topics for the selected machine
   const mqttTopics = React.useMemo(() => {
     if (!selectedMachine || !organizationId) return [];
-    
+
     const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
     return [
       `${organizationId}/_all_/${today}/${selectedMachine.id}/_all_/EVENT/#`,
@@ -142,13 +143,12 @@ export default function MachineDetailModal({
           event_severity: eventMessage.event_severity,
         };
 
-        // Add event to live events (keep last 50)
-        setLiveEvents((prev) => [newEvent, ...prev.slice(0, 49)]);
+        setLiveEvents(() => [newEvent]);
 
         // Start fetching images for this event
         if (eventMessage.image_c_key && eventMessage.image_f_key) {
-          setLoadingImages((prev) => ({ ...prev, [newEvent.id]: true }));
-          
+          setLoadingImages(() => ({ [newEvent.id]: true }));
+
           try {
             const imageUrls = await fetchEventImages({
               image_c_key: eventMessage.image_c_key,
@@ -170,19 +170,27 @@ export default function MachineDetailModal({
               );
             }
           } catch (error) {
-            console.warn(`Failed to fetch images for event ${newEvent.id}:`, error);
+            console.warn(
+              `Failed to fetch images for event ${newEvent.id}:`,
+              error,
+            );
             // Mark as loaded even if failed so loading indicator disappears
             setLiveEvents((prev) =>
               prev.map((event) =>
-                event.id === newEvent.id ? { ...event, images_loaded: true } : event,
+                event.id === newEvent.id
+                  ? { ...event, images_loaded: true }
+                  : event,
               ),
             );
           } finally {
-            setLoadingImages((prev) => ({ ...prev, [newEvent.id]: false }));
+            setLoadingImages(() => ({ [newEvent.id]: false }));
           }
         }
       } catch (error) {
-        console.error('Error handling MQTT message in MachineDetailModal:', error);
+        console.error(
+          'Error handling MQTT message in MachineDetailModal:',
+          error,
+        );
       }
     },
     [selectedMachine],
@@ -365,7 +373,7 @@ export default function MachineDetailModal({
       setHistoricalEvents([]);
       setLoadingImages({});
       setSelectedImageUrl(null);
-      setLiveEvents([]); 
+      setLiveEvents([]);
     }
   }, [selectedMachine]);
 
@@ -472,9 +480,7 @@ export default function MachineDetailModal({
                     MQTT Status:
                   </span>
                   <div className="text-sm">
-                    <Badge
-                      variant={mqttConnected ? 'default' : 'destructive'}
-                    >
+                    <Badge variant={mqttConnected ? 'default' : 'destructive'}>
                       {mqttConnected ? 'Connected' : 'Disconnected'}
                     </Badge>
                   </div>
@@ -526,11 +532,6 @@ export default function MachineDetailModal({
                 <TabsTrigger value="recent" className="flex items-center gap-2">
                   <Camera className="h-4 w-4" />
                   Live Events
-                  {liveEvents.length > 0 && (
-                    <Badge variant="outline" className="ml-1">
-                      {liveEvents.length}
-                    </Badge>
-                  )}
                 </TabsTrigger>
                 <TabsTrigger
                   value="historical"
@@ -551,7 +552,7 @@ export default function MachineDetailModal({
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-semibold">Live Events</h3>
-                    <Badge 
+                    <Badge
                       variant={mqttConnected ? 'default' : 'destructive'}
                       className="text-xs"
                     >
@@ -581,10 +582,9 @@ export default function MachineDetailModal({
                         No Live Events
                       </h3>
                       <p className="text-gray-500">
-                        {mqttConnected 
-                          ? "Waiting for live events from this machine..."
-                          : "Connecting to MQTT to receive live events..."
-                        }
+                        {mqttConnected
+                          ? 'Waiting for live events from this machine...'
+                          : 'Connecting to MQTT to receive live events...'}
                       </p>
                     </div>
                   ) : (
@@ -603,7 +603,10 @@ export default function MachineDetailModal({
                             <CardContent className="space-y-3 p-4">
                               <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
-                                  <Badge variant="default" className="bg-green-600">
+                                  <Badge
+                                    variant="default"
+                                    className="bg-green-600"
+                                  >
                                     Live Event
                                   </Badge>
                                   <div className="text-sm">
@@ -611,10 +614,7 @@ export default function MachineDetailModal({
                                       {event.eventstr}
                                     </span>
                                     {event.event_severity && (
-                                      <Badge 
-                                        variant="outline" 
-                                        className="ml-2"
-                                      >
+                                      <Badge variant="outline" className="ml-2">
                                         Severity {event.event_severity}
                                       </Badge>
                                     )}

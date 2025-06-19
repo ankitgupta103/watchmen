@@ -46,6 +46,7 @@ interface SimpleMachineData {
   buffer_size: number;
   // Add pulsating state for recent events
   is_pulsating: boolean;
+  is_critical: boolean;
 }
 
 interface MapProps {
@@ -58,12 +59,25 @@ interface MapProps {
 const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
   const isOnline = machineData.is_online;
   const isPulsating = machineData.is_pulsating;
+  const isCritical = machineData.is_critical;
   const eventCount = machineData.event_count;
 
+  console.log('machineData', machineData);
+
   // Colors based on online/offline status
-  const colors = isOnline
-    ? { bg: 'bg-green-500', border: 'border-green-600', text: 'text-green-100' }
-    : { bg: 'bg-gray-500', border: 'border-gray-600', text: 'text-gray-100' };
+  const colors = isCritical
+    ? { bg: 'bg-red-500', border: 'border-red-600', text: 'text-red-100' }
+    : eventCount > 10
+      ? {
+          bg: 'bg-orange-500',
+          border: 'border-orange-600',
+          text: 'text-orange-100',
+        }
+      : {
+          bg: 'bg-yellow-500',
+          border: 'border-yellow-600',
+          text: 'text-yellow-100',
+        };
 
   const iconHtml = renderToString(
     <div className="relative">
@@ -85,45 +99,32 @@ const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
       {/* Main marker */}
       <div
         className={cn(
-          `relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-white shadow-lg`,
-          colors.bg,
+          `relative flex h-5 w-5 items-center justify-center rounded-full border-1`,
+          isOnline ? 'bg-green-500 text-white' : 'bg-gray-700 text-white',
         )}
       >
-        <div className="h-2 w-2 rounded-full bg-white"></div>
+        <span className="text-xs font-bold">
+          {eventCount > 99 ? '99+' : eventCount}
+        </span>
       </div>
 
       {/* Event count indicator (small badge if there are events) */}
-      {eventCount > 0 && (
+      {/* {eventCount > 0 && (
         <div
           className={cn(
-            'absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white text-xs font-bold shadow-sm',
+            'absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border text-xs font-bold shadow-sm',
             isOnline ? 'bg-orange-500 text-white' : 'bg-gray-700 text-white',
           )}
         >
           {eventCount > 99 ? '99+' : eventCount}
         </div>
-      )}
-
-      {/* Status indicator dot */}
-      <div
-        className={cn(
-          'absolute -right-1 -bottom-1 flex h-3 w-3 items-center justify-center rounded-full border border-white',
-          isOnline ? 'bg-green-400' : 'bg-gray-600',
-        )}
-      >
-        <div
-          className={cn(
-            'h-1 w-1 rounded-full',
-            isOnline ? 'bg-green-800' : 'bg-gray-300',
-          )}
-        ></div>
-      </div>
+      )} */}
     </div>,
   );
 
   return L.divIcon({
     html: iconHtml,
-    iconSize: [32, 32],
+    iconSize: [24, 24],
     popupAnchor: [0, -16],
     className: 'custom-status-marker',
   });
@@ -258,17 +259,17 @@ function EnhancedMarker({
         machineData.machine_id === 206
           ? machineData.location.lat + 0.001
           : machineData.machine_id === 207
-          ? machineData.location.lat + 0.002
-          : machineData.machine_id === 208
-          ? machineData.location.lat + 0.003
-          : machineData.location.lat,
+            ? machineData.location.lat + 0.002
+            : machineData.machine_id === 208
+              ? machineData.location.lat + 0.003
+              : machineData.location.lat,
         machineData.machine_id === 206
           ? machineData.location.lng + 0.001
           : machineData.machine_id === 207
-          ? machineData.location.lng + 0.002
-          : machineData.machine_id === 208
-          ? machineData.location.lng + 0.003
-          : machineData.location.lng,
+            ? machineData.location.lng + 0.002
+            : machineData.machine_id === 208
+              ? machineData.location.lng + 0.003
+              : machineData.location.lng,
       ]}
       eventHandlers={{
         click: handleClick,

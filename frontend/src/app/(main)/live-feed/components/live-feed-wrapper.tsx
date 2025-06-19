@@ -3,7 +3,7 @@
 import 'leaflet/dist/leaflet.css';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMachineStats } from '@/hooks/use-machine-stats';
+import useAllMachineStats from '@/hooks/use-all-machine-stats';
 import useOrganization from '@/hooks/use-organization';
 import { usePubSub } from '@/hooks/use-pub-sub';
 import { Calendar, RefreshCw, Shield } from 'lucide-react';
@@ -33,23 +33,19 @@ const ReactLeafletMap = dynamic(() => import('./react-leaflet-map'), {
   ssr: false,
 });
 
-// Custom hook to collect all machine stats by calling useMachineStats for each machine at the top level
-function useAllMachineStats(machines: Machine[]) {
-  // This will force all useMachineStats hooks to be called in the same order every render
-  // eslint-disable-next-line
-  const stats: Record<number, { buffer: number; data: any | null }> = {};
-  for (let i = 0; i < machines.length; i++) {
-    const machine = machines[i];
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    stats[machine.id] = useMachineStats(machine.id);
-  }
-  return stats;
-}
-
 interface EventMessage {
   image_c_key: string;
   image_f_key: string;
   eventstr: string;
+  event_severity: number;
+  meta: {
+    node_id: string;
+    hb_count: string;
+    last_hb_time: string;
+    photos_taken: string;
+    events_seen: string;
+    event_ts_list: string[];
+  };
 }
 
 interface MachineEvent {
@@ -61,6 +57,7 @@ interface MachineEvent {
   cropped_image_url?: string;
   full_image_url?: string;
   images_loaded?: boolean;
+  event_severity?: number;
 }
 
 interface SimpleMachineData {
@@ -77,6 +74,7 @@ interface SimpleMachineData {
   buffer_size: number;
   // Add pulsating state for recent events
   is_pulsating: boolean;
+  is_critical: boolean;
 }
 
 export default function LiveFeedWrapper({
@@ -109,8 +107,7 @@ export default function LiveFeedWrapper({
   // Create MQTT topics for all machines
   const mqttTopics = useMemo(() => {
     return machines.map(
-      (machine) =>
-        `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
+      (machine) => `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
     );
   }, [organizationId, machines]);
 
@@ -173,6 +170,7 @@ export default function LiveFeedWrapper({
             eventstr: eventMessage.eventstr || '',
             image_c_key: eventMessage.image_c_key,
             image_f_key: eventMessage.image_f_key,
+            event_severity: eventMessage.event_severity,
             images_loaded: false,
           };
 
@@ -195,13 +193,13 @@ export default function LiveFeedWrapper({
             [machineId]: true,
           }));
 
-          // Stop pulsating after 10 seconds
+          // Stop pulsating after 30 seconds
           setTimeout(() => {
             setPulsatingMachines((prev) => ({
               ...prev,
               [machineId]: false,
             }));
-          }, 10000);
+          }, 30000);
 
           // Fetch images if available
           if (eventMessage.image_c_key && eventMessage.image_f_key) {
@@ -236,7 +234,7 @@ export default function LiveFeedWrapper({
     } catch (error) {
       console.error('Error processing MQTT message:', error, { topic, data });
     }
-  }
+  };
 
   // Use the PubSub hook for MQTT connection
   const { isConnected, error: mqttError } = usePubSub(
@@ -264,6 +262,8 @@ export default function LiveFeedWrapper({
       const eventCount = machineEventCounts[machineId] || 0;
       const lastEvent = events[events.length - 1];
       const stats = machineStats[machineId];
+      const is_critical = events.some((event) => event.event_severity == 3);
+      console.log('is_critical', is_critical);
 
       // Determine online status: device is online if stats.data is not null
       const isOnline = stats?.data !== null;
@@ -289,6 +289,7 @@ export default function LiveFeedWrapper({
         stats_data: stats?.data,
         buffer_size: stats?.buffer ?? 0,
         is_pulsating: isPulsating,
+        is_critical: is_critical,
       };
     },
     [machineEvents, machineEventCounts, machineStats, pulsatingMachines],
