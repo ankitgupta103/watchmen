@@ -46,6 +46,13 @@ class VyomClient:
         self.expiration_time = 5000  # milisecond
         self.location_cache = {}  # Cache for last known location per node
 
+        try:
+            self.root_store = RootStore()
+            self.logger.info("RootStore instantiated successfully in VyomClient __init__.")
+        except Exception as e:
+            self.logger.error(f"Error instantiating RootStore in VyomClient __init__: {e}", exc_info=True)
+            self.root_store = None # Handle case where it fails
+
     def on_image_arrive(
         self,
         node_hn: str,
@@ -241,12 +248,19 @@ class VyomClient:
         Helper function to send central unit heartbeat data to RootStore.
         This function will be run in a separate thread.
         """
+        if self.root_store is None:
+            self.logger.error("RootStore instance is not available. Cannot send central unit heartbeat.")
+            return
+
         try:
-            store = RootStore()
+            # --- CHANGE: Use the pre-instantiated self.root_store ---
+            store = self.root_store 
+            # --------------------------------------------------------
+
             epoch_ms = int(time.time() * 1000)
             location = {"lat": lat, "long": long, "timestamp": epoch_ms}
-            health = {"status": 1, "message": "Healthy"} # Assuming healthy for central unit heartbeat
-            
+            health = {"status": 1, "message": "Healthy"}
+
             self.logger.info(f"Storing central unit location: {location}")
             store.set_data("location", location)
             self.logger.info(f"Storing central unit health: {health}")
@@ -254,16 +268,18 @@ class VyomClient:
             store.cleanup()
             self.logger.info("Central unit heartbeat data sent to RootStore.")
         except Exception as e:
-            self.logger.error(f"Error sending central unit heartbeat to RootStore: {e}")
+            self.logger.error(f"Error sending central unit heartbeat to RootStore: {e}", exc_info=True)
 
     def on_central_unit_hb_arrive(self, lat: Union[int, float], long: Union[int, float]):
-            """
-            Function to handle heartbeat from the central unit.
-            It will send the GPS lat and long to the RootStore on a different thread.
-            """
-            self.logger.info(f"[on_central_unit_hb_arrive] Called with lat={lat}, long={long}")
-            hb_thread = threading.Thread(target=self._send_central_unit_hb, args=(lat, long,))
-            hb_thread.start()
+        """
+        Function to handle heartbeat from the central unit.
+        It will send the GPS lat and long to the RootStore on a different thread.
+        """
+        self.logger.info(f"[on_central_unit_hb_arrive] Called with lat={lat}, long={long}")
+        # Make sure the target is correct: self._send_central_unit_hb
+        hb_thread = threading.Thread(target=self._send_central_unit_hb, args=(lat, long,))
+        hb_thread.start()
+
 
     def cleanup(self):
         try:
