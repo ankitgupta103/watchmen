@@ -36,6 +36,10 @@ export default function DeviceListing({ machines }: { machines: Machine[] }) {
             </TableCell>
             <TableCell>{machine.type.replace(/_/g, ' ')}</TableCell>
             <DeviceStatusBufferLocation machineId={machine.id} />
+            <TableCell>
+              {machine?.last_location?.lat?.toFixed(4) ?? '-'},{' '}
+              {machine?.last_location?.long?.toFixed(4) ?? '-'}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

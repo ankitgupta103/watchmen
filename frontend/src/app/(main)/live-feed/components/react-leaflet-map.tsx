@@ -119,9 +119,7 @@ const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
 };
 
 // Calculate map center
-function getMapCenter(
-  machines: Machine[],
-): [number, number] {
+function getMapCenter(machines: Machine[]): [number, number] {
   if (machines.length === 0) return [12.9716, 77.5946]; // Default to Bangalore
 
   const bounds = machines.reduce(
@@ -148,9 +146,7 @@ function getMapCenter(
 }
 
 // Calculate optimal zoom level
-function getOptimalZoom(
-  machines: Machine[],
-): number {
+function getOptimalZoom(machines: Machine[]): number {
   if (machines.length <= 1) return 12;
 
   const bounds = machines.reduce(
@@ -308,7 +304,8 @@ function EnhancedMarker({
           )}
 
           <div className="mt-1 border-t pt-1 text-xs text-gray-500">
-            <strong>Location:</strong> {machine?.last_location?.lat.toFixed(4) ?? '0.0000'},{' '}
+            <strong>Location:</strong>{' '}
+            {machine?.last_location?.lat.toFixed(4) ?? '0.0000'},{' '}
             {machine?.last_location?.long.toFixed(4) ?? '0.0000'}
           </div>
 
