@@ -501,17 +501,19 @@ class DevUnit:
 
     def send_gps(self):
         gpsgetter= gps.Gps()
-        loc = gpsgetter.get_lat_lng()
+        loc = gpsgetter.get_lat_lng() # Example: loc could be (0.0, 0.0), (34.12, 74.87), or None
 
         lat = None
         lng = None
 
-        # Change this line: Incorporate the (0,0) check directly in the valid GPS condition
-        if loc and loc[0] is not None and loc[1] is not None and (loc[0] != 0 or loc[1] != 0): # Changed OR to AND for correctness of (0,0) check
+        # The core change is here:
+        # Check if loc is not None, and then check if it's NOT (0.0, 0.0)
+        # Using a tuple comparison (loc != (0.0, 0.0)) is explicit and clear.
+        if loc and loc[0] is not None and loc[1] is not None and loc != (0.0, 0.0):
             lat, lng = loc
-            self.logger.info(f"Obtained GPS for DevUnit {self.devid}: Lat={lat}, Lng={lng}")
+            self.logger.info(f"Obtained GPS for DevUnit {self.devid}: Lat={lat:.2f}, Lng={lng:.2f}") # Added formatting for logs
         else:
-            self.logger.warning(f"Could not obtain valid GPS for DevUnit {self.devid} (received {loc}), using random Srinagar location.")
+            self.logger.warning(f"Could not obtain valid GPS for DevUnit {self.devid} (received {loc}). Using random Srinagar location.")
             # Random Srinagar locations for fallback
             srinagar_locations = [
                 (34.083656, 74.797371),  # General Srinagar
@@ -521,7 +523,7 @@ class DevUnit:
                 (34.098352, 74.809180)   # Jamia Masjid Srinagar
             ]
             lat, lng = random.choice(srinagar_locations)
-            self.logger.info(f"Using fallback Srinagar location for DevUnit {self.devid}: Lat={lat}, Lng={lng}")
+            self.logger.info(f"Using fallback Srinagar location for DevUnit {self.devid}: Lat={lat:.2f}, Lng={lng:.2f}")
 
         if lat is not None and lng is not None:
             next_dest = get_next_dest(self.devid)
