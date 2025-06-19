@@ -16,6 +16,8 @@ import logging
 import gps
 import constants
 
+
+
 ALLDIR = "../processed_images"
 CCDIR = "../command_images"
 CRITICAL_DIR = "../processed_images/critical"
@@ -119,6 +121,8 @@ class CommandCenter:
         self.vyom_client = VyomClient(logger=logger)
         self.logger = logger
 
+
+
     def print_status(self):
         while True:
             self.logger.info("######### Command Center printing status ##############")
@@ -159,6 +163,40 @@ class CommandCenter:
                 self.logger.info(f"Successfully sent image to vyom client: node_hn={ims}, filename={filename}")
             except Exception as e:
                 self.logger.error(f"Error sending image to vyom client: node_hn={ims}, filename={filename}, error={e}", exc_info=True)
+
+
+    def hb_central(self):
+        """
+        Sends heartbeat data for the central unit to the VyomClient.
+        This function will be run in a separate thread, periodically.
+        """
+        gpsgetter= gps.Gps()
+        loc = gpsgetter.get_lat_lng()
+        
+        lat = None
+        long = None
+
+        if loc and loc[0] is not None and loc[1] is not None and loc[0] != 0 and loc[1] != 0:
+            lat, long = loc
+            self.logger.info(f"Central unit GPS obtained: Lat={lat}, Long={long}")
+        else:
+            self.logger.warning("Could not obtain central unit GPS, using random Srinagar location.")
+            # Random Srinagar locations for fallback
+            srinagar_locations = [
+                (34.083656, 74.797371),  # General Srinagar
+                (34.1200, 74.8700),      # Dal Lake
+                (34.1424, 74.8398),      # Nigeen Lake (approx)
+                (34.1426, 74.8629),      # Shalimar Bagh (Srinagar)
+                (34.098352, 74.809180)   # Jamia Masjid Srinagar
+            ]
+            lat, long = random.choice(srinagar_locations)
+            self.logger.info(f"Using fallback Srinagar location: Lat={lat}, Long={long}")
+
+        try:
+            self.vyom_client.on_central_unit_hb_arrive(lat=lat, long=long)
+            self.logger.info(f"Successfully sent central unit heartbeat to VyomClient with Lat={lat}, Long={long}")
+        except Exception as e:
+            self.logger.error(f"Error sending central unit heartbeat to VyomClient: {e}", exc_info=True)   
 
     # A:1205:100:12
     def process_hb(self, hbstr):
@@ -454,14 +492,46 @@ class DevUnit:
 
     # A:23.1,67.1
     # Name:GPS
+    # def send_gps(self):
+    #     gpsgetter= gps.Gps()
+    #     loc = gpsgetter.get_lat_lng()
+    #     if loc is not None:
+    #         (lat, lng) = loc
+    #         next_dest = get_next_dest(self.devid)
+    #         msgstr = f"{self.devid}:{lat},{lng}"
+    #         self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
+
     def send_gps(self):
         gpsgetter= gps.Gps()
         loc = gpsgetter.get_lat_lng()
-        if loc is not None:
-            (lat, lng) = loc
+        
+        lat = None
+        lng = None
+
+        if loc and loc[0] is not None and loc[1] is not None and loc[0] != 0 and loc[1] != 0:
+            lat, lng = loc
+            self.logger.info(f"Obtained GPS for DevUnit {self.devid}: Lat={lat}, Lng={lng}")
+        else:
+            self.logger.warning(f"Could not obtain GPS for DevUnit {self.devid}, using random Srinagar location.")
+            # Random Srinagar locations for fallback
+            srinagar_locations = [
+                (34.083656, 74.797371),  # General Srinagar
+                (34.1200, 74.8700),      # Dal Lake
+                (34.1424, 74.8398),      # Nigeen Lake (approx)
+                (34.1426, 74.8629),      # Shalimar Bagh (Srinagar)
+                (34.098352, 74.809180)   # Jamia Masjid Srinagar
+            ]
+            lat, lng = random.choice(srinagar_locations)
+            self.logger.info(f"Using fallback Srinagar location for DevUnit {self.devid}: Lat={lat}, Lng={lng}")
+
+        if lat is not None and lng is not None:
             next_dest = get_next_dest(self.devid)
             msgstr = f"{self.devid}:{lat},{lng}"
             self.rf.send_message(msgstr, constants.MESSAGE_TYPE_GPS, next_dest)
+        else:
+            self.logger.error(f"Failed to get any valid GPS coordinates for DevUnit {self.devid}. Not sending GPS message.")
+
+
 
     # A:1205
     # Name, time

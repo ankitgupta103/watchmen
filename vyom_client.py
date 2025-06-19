@@ -136,12 +136,11 @@ class VyomClient:
                 "image_c_key": f"{file_s3_dir}/{filename1}",
                 "image_f_key": f"{file_s3_dir}/{filename2}",
                 "event_severity": event_severity,
-                "eventstr": eventstr,
                 "meta": meta,
             }
 
             self.logger.info(f"[on_event_arrive] Payload: {payload}")
-
+            
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
             self.writer.write_message(
@@ -162,8 +161,8 @@ class VyomClient:
     def on_hb_arrive(
         self,
         node_hn: str,
-        lat: Union[int, float] = 12.971599,
-        long: Union[int, float] = 77.594566,
+        lat: Union[int, float] = None,
+        long: Union[int, float] = None,
         timestamp: str = None,
     ):
         """
@@ -237,7 +236,7 @@ class VyomClient:
             self.logger.error(f"Error setting location in VyomClient: {e}")
 
 
-    def _send_central_unit_hb(self, lat: Union[int, float], long: Union[int, float]):
+    def send_central_unit_hb(self, lat: Union[int, float], long: Union[int, float]):
         """
         Helper function to send central unit heartbeat data to RootStore.
         This function will be run in a separate thread.
@@ -257,7 +256,7 @@ class VyomClient:
         except Exception as e:
             self.logger.error(f"Error sending central unit heartbeat to RootStore: {e}")
 
-        def on_central_unit_hb_arrive(self, lat: Union[int, float], long: Union[int, float]):
+    def on_central_unit_hb_arrive(self, lat: Union[int, float], long: Union[int, float]):
             """
             Function to handle heartbeat from the central unit.
             It will send the GPS lat and long to the RootStore on a different thread.
@@ -305,7 +304,7 @@ if __name__ == "__main__":
         client.on_central_unit_hb_arrive(lat=76.987934, long=76.937954)
         # Give the thread some time to execute
         time.sleep(2) 
-        
+
 
     except Exception as e:
         client.logger.error(f"Getting Error in running examples: {str(e)}")
