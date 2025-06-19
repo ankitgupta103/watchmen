@@ -133,11 +133,12 @@ class VyomClient:
                 "image_c_key": f"{file_s3_dir}/{filename1}",
                 "image_f_key": f"{file_s3_dir}/{filename2}",
                 "event_severity": event_severity,
+                "eventstr": eventstr,
                 "meta": meta,
             }
 
             self.logger.info(f"[on_event_arrive] Payload: {payload}")
-            
+
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
             self.writer.write_message(
@@ -158,8 +159,8 @@ class VyomClient:
     def on_hb_arrive(
         self,
         node_hn: str,
-        lat: Union[int, float] = None,
-        long: Union[int, float] = None,
+        lat: Union[int, float] = 12.971599,
+        long: Union[int, float] = 77.594566,
         timestamp: str = None,
     ):
         """
