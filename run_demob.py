@@ -120,48 +120,18 @@ class CommandCenter:
         self.msgids_seen = []
         self.vyom_client = VyomClient(logger=logger)
         self.logger = logger
+        self._start_central_heartbeat()
 
-    def print_status(self):
+    def _run_central_heartbeat(self):
+        # Initial send on startup
+        self.hb_central()
         while True:
-            self.logger.info("######### Command Center printing status ##############")
-            self.logger.info(f"### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###")
-            for x in self.node_map.keys():
-                self.logger.info(f" ####### {x} : {self.node_map[x]}")
-            for x in self.images_saved:
-                self.logger.info(f"Saved image : {x}")
-            self.logger.info("#######################################################")
-            time.sleep(10)
+            time.sleep(300) # Send heartbeat every 5 minutes (300 seconds)
+            self.hb_central()
 
-    def process_image(self, msgstr):
-        try:
-            orig_msg = json.loads(msgstr)
-        except Exception as e:
-            self.logger.error(f"Error loading json {e}")
-        self.logger.info("Checking for image")
-        if "i_d" in orig_msg:
-            self.logger.info("Seems like an image")
-            imf = orig_msg["i_f"]
-            ims = orig_msg["i_s"]
-            imstr = orig_msg["i_d"]
-            evid = orig_msg["e_i"]
-            im = image.imstrtoimage(imstr)
-            fname = f"{CCDIR}/{ims}_{random.randint(1000,2000)}_{imf}"
-            self.logger.info(f"Saving image to {fname}")
-            im.save(fname)
-            self.images_saved.append(fname)
-            # im.show()
-            # SENDING TO VYOM
-            try:
-                imf = orig_msg["i_f"]
-                file_name_suffix = imf.split("_")[-1].split(".")[0]
-                filename = f"{evid}_{file_name_suffix}.jpg"
-                image_bytes = image.imstrtobytes(imstr)
-                self.logger.info(f"Calling vyom_client.on_image_arrive(node_hn={ims}, filename={filename})")
-                self.vyom_client.on_image_arrive(node_hn=ims, image=image_bytes, filename=filename)
-                self.logger.info(f"Successfully sent image to vyom client: node_hn={ims}, filename={filename}")
-            except Exception as e:
-                self.logger.error(f"Error sending image to vyom client: node_hn={ims}, filename={filename}, error={e}", exc_info=True)
-
+    def _start_central_heartbeat(self):
+        central_hb_thread = threading.Thread(target=self._run_central_heartbeat, daemon=True)
+        central_hb_thread.start()
 
     def hb_central(self):
         """
@@ -234,7 +204,48 @@ class CommandCenter:
             self.logger.info(f"Successfully sent heartbeat to vyom client: node_hn={nodeid}, lat={lat}, long={long}")
         except Exception as e:
             self.logger.error(f"Error sending hb to vyom client: node_hn={nodeid}, lat={lat}, long={long}, error={e}", exc_info=True)
-    
+
+    def print_status(self):
+        while True:
+            self.logger.info("######### Command Center printing status ##############")
+            self.logger.info(f"### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###")
+            for x in self.node_map.keys():
+                self.logger.info(f" ####### {x} : {self.node_map[x]}")
+            for x in self.images_saved:
+                self.logger.info(f"Saved image : {x}")
+            self.logger.info("#######################################################")
+            time.sleep(10)
+
+    def process_image(self, msgstr):
+        try:
+            orig_msg = json.loads(msgstr)
+        except Exception as e:
+            self.logger.error(f"Error loading json {e}")
+        self.logger.info("Checking for image")
+        if "i_d" in orig_msg:
+            self.logger.info("Seems like an image")
+            imf = orig_msg["i_f"]
+            ims = orig_msg["i_s"]
+            imstr = orig_msg["i_d"]
+            evid = orig_msg["e_i"]
+            im = image.imstrtoimage(imstr)
+            fname = f"{CCDIR}/{ims}_{random.randint(1000,2000)}_{imf}"
+            self.logger.info(f"Saving image to {fname}")
+            im.save(fname)
+            self.images_saved.append(fname)
+            # im.show()
+            # SENDING TO VYOM
+            try:
+                imf = orig_msg["i_f"]
+                file_name_suffix = imf.split("_")[-1].split(".")[0]
+                filename = f"{evid}_{file_name_suffix}.jpg"
+                image_bytes = image.imstrtobytes(imstr)
+                self.logger.info(f"Calling vyom_client.on_image_arrive(node_hn={ims}, filename={filename})")
+                self.vyom_client.on_image_arrive(node_hn=ims, image=image_bytes, filename=filename)
+                self.logger.info(f"Successfully sent image to vyom client: node_hn={ims}, filename={filename}")
+            except Exception as e:
+                self.logger.error(f"Error sending image to vyom client: node_hn={ims}, filename={filename}, error={e}", exc_info=True)
+                    
     # A:1205
     def process_event(self, eventstr):
         parts = eventstr.split(':')
