@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   icons: {
     icon: '/assets/png/vyomos-logo-filled.png',
   },
-  description: 'Stupidly smart fleet management',
+  description: 'VyomOS Netrajaal',
 };
 
 export default function RootLayout({
