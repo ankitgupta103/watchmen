@@ -38,7 +38,6 @@ const MapFilter = dynamic(() => import('../map-filter'), {
   ssr: false,
 });
 
-// --- TYPE DEFINITIONS ---
 interface HeatMapCalendarProps {
   machines: Machine[];
   orgId: number;
@@ -57,6 +56,7 @@ interface S3EventData {
   eventstr: string;
   timestamp?: string | Date;
   machineId?: number;
+  event_severity?: string; // Ensure this is part of the API response
 }
 
 interface ProcessedEvent extends S3EventData {
@@ -67,7 +67,6 @@ interface ProcessedEvent extends S3EventData {
   croppedImageUrl?: string;
   fullImageUrl?: string;
   imagesLoaded: boolean;
-  event_severity?: string;
 }
 
 const MONTHS = [
@@ -116,7 +115,7 @@ export default function HeatMapCalendar({
 
   // Pagination state
   const [detailsCurrentPage, setDetailsCurrentPage] = useState(1);
-  const eventsPerPage = 10; // Updated as per request
+  const eventsPerPage = 10;
 
   const filteredMachines = useMemo(() => {
     if (!areaFilter) return machines;
@@ -133,14 +132,9 @@ export default function HeatMapCalendar({
     async (date: Date) => {
       if (!token) return;
       const dateStr = date.toLocaleDateString('en-CA');
-
-      // Use refs to check current state without adding state to dependencies
-      if (loadingRef.current[dateStr] || eventsRef.current[dateStr]) {
-        return;
-      }
+      if (loadingRef.current[dateStr] || eventsRef.current[dateStr]) return;
 
       setLoading((prev) => ({ ...prev, [dateStr]: true }));
-
       try {
         const machinesToCheck = areaFilter ? filteredMachines : machines;
         const allEvents: ProcessedEvent[] = [];
@@ -168,10 +162,7 @@ export default function HeatMapCalendar({
               );
             }
           } catch (err) {
-            console.warn(
-              `Failed to fetch for machine ${machine.id} on ${dateStr}:`,
-              err,
-            );
+            console.warn(`Fetch failed for machine ${machine.id} on ${dateStr} ${err}`);
           }
         }
         setEvents((prev) => ({ ...prev, [dateStr]: allEvents }));
@@ -181,53 +172,60 @@ export default function HeatMapCalendar({
         setLoading((prev) => ({ ...prev, [dateStr]: false }));
       }
     },
-    // Dependencies are stable and won't cause a re-creation loop
     [token, orgId, areaFilter, filteredMachines, machines],
   );
 
   const fetchImagesForEvents = useCallback(
     async (dateStr: string, eventList: ProcessedEvent[]) => {
-      if (!token || !eventList.length || loadingImages[dateStr]) return;
+      const eventsToFetch = eventList.filter(
+        (e) => e.image_c_key && !e.imagesLoaded,
+      );
+      if (!token || eventsToFetch.length === 0) return;
+
       setLoadingImages((prev) => ({ ...prev, [dateStr]: true }));
       try {
-        const updatedEvents = await Promise.all(
-          eventList.map(async (event) => {
-            if (event.imagesLoaded) return event;
-            try {
-              const imageResult = await fetcherClient<{
-                success: boolean;
-                cropped_image_url?: string;
-                full_image_url?: string;
-              }>(`${API_BASE_URL}/event-images/`, token, {
-                method: 'POST',
-                body: {
-                  image_c_key: event.image_c_key,
-                  image_f_key: event.image_f_key,
-                },
-              });
-              if (imageResult?.success) {
-                return {
-                  ...event,
-                  croppedImageUrl: imageResult.cropped_image_url,
-                  fullImageUrl: imageResult.full_image_url,
-                  imagesLoaded: true,
-                };
-              }
-            } catch (err) {
-              console.warn(
-                `Failed to fetch images for event: ${event.id}`,
-                err,
-              );
+        const imagePromises = eventsToFetch.map(async (event) => {
+          try {
+            const imageResult = await fetcherClient<{
+              success: boolean;
+              cropped_image_url?: string;
+              full_image_url?: string;
+            }>(`${API_BASE_URL}/event-images/`, token, {
+              method: 'POST',
+              body: {
+                image_c_key: event.image_c_key,
+                image_f_key: event.image_f_key,
+              },
+            });
+            if (imageResult?.success) {
+              return {
+                ...event,
+                croppedImageUrl: imageResult.cropped_image_url,
+                fullImageUrl: imageResult.full_image_url,
+                imagesLoaded: true,
+              };
             }
-            return { ...event, imagesLoaded: true };
-          }),
-        );
-        setEvents((prev) => ({ ...prev, [dateStr]: updatedEvents }));
+          } catch (err) {
+            console.warn(`Image fetch failed for event: ${event.id} ${err}`);
+          }
+          return { ...event, imagesLoaded: true };
+        });
+
+        const updatedEventsWithImages = await Promise.all(imagePromises);
+
+        setEvents((prev) => {
+          const newDayEvents = [...(prev[dateStr] || [])];
+          updatedEventsWithImages.forEach((updatedEvent) => {
+            const index = newDayEvents.findIndex((e) => e.id === updatedEvent.id);
+            if (index !== -1) newDayEvents[index] = updatedEvent;
+          });
+          return { ...prev, [dateStr]: newDayEvents };
+        });
       } finally {
         setLoadingImages((prev) => ({ ...prev, [dateStr]: false }));
       }
     },
-    [token, loadingImages],
+    [token],
   );
 
   const getCalendarDays = useCallback(() => {
@@ -250,47 +248,49 @@ export default function HeatMapCalendar({
     setLoadingImages({});
   }, [areaFilter]);
 
-  // OPTIMIZED: Fetch events sequentially instead of all at once
+  // OPTIMIZED: Fetch events in parallel batches of 5
   useEffect(() => {
-    const fetchMonthDataSequentially = async () => {
+    const fetchInBatches = async () => {
       if (!token) return;
       const daysInMonth = getCalendarDays().filter(
         (day) => day.getMonth() === currentMonth.getMonth(),
       );
 
-      for (const day of daysInMonth) {
-        // The await keyword ensures each fetch completes before the next one starts
-        await fetchEventsForDate(day);
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < daysInMonth.length; i += BATCH_SIZE) {
+        const batch = daysInMonth.slice(i, i + BATCH_SIZE);
+        const promises = batch.map((day) => fetchEventsForDate(day));
+        await Promise.all(promises);
       }
     };
-
-    fetchMonthDataSequentially();
+    fetchInBatches();
   }, [currentMonth, fetchEventsForDate, token, getCalendarDays]);
 
-  useEffect(() => {
-    const dateStr = selectedDate.toLocaleDateString('en-CA');
-    const dayEvents = events[dateStr] || [];
-    if (dayEvents.length > 0 && !dayEvents.every((e) => e.imagesLoaded)) {
-      fetchImagesForEvents(dateStr, dayEvents);
-    }
-    setDetailsCurrentPage(1);
-  }, [selectedDate, events, fetchImagesForEvents]);
-
-  const calendarDays = getCalendarDays();
-  const selectedDateStr = selectedDate.toLocaleDateString('en-CA');
   const selectedDateEvents = useMemo(
     () =>
-      (events[selectedDateStr] || []).sort(
+      (events[selectedDate.toLocaleDateString('en-CA')] || []).sort(
         (a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
       ),
-    [events, selectedDateStr],
+    [events, selectedDate],
   );
 
   const paginatedDetailsEvents = useMemo(() => {
     const startIndex = (detailsCurrentPage - 1) * eventsPerPage;
     return selectedDateEvents.slice(startIndex, startIndex + eventsPerPage);
-  }, [selectedDateEvents, detailsCurrentPage, eventsPerPage]);
+  }, [selectedDateEvents, detailsCurrentPage]);
+
+  // OPTIMIZED: Fetch images only for the visible page in the details panel
+  useEffect(() => {
+    if (paginatedDetailsEvents.length > 0) {
+      const dateStr = selectedDate.toLocaleDateString('en-CA');
+      fetchImagesForEvents(dateStr, paginatedDetailsEvents);
+    }
+  }, [paginatedDetailsEvents, selectedDate, fetchImagesForEvents]);
+
+  useEffect(() => {
+    setDetailsCurrentPage(1);
+  }, [selectedDate]);
 
   const totalDetailsPages = Math.ceil(
     selectedDateEvents.length / eventsPerPage,
@@ -331,7 +331,6 @@ export default function HeatMapCalendar({
         />
       )}
       <div className="relative flex flex-col gap-4 overflow-y-auto xl:flex-row">
-        {/* Calendar */}
         <div className="mb-4 flex-1">
           <Card className="h-fit">
             <CardHeader>
@@ -392,7 +391,7 @@ export default function HeatMapCalendar({
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-2">
-                {calendarDays.map((date, index) => {
+                {getCalendarDays().map((date, index) => {
                   const dateStr = date.toLocaleDateString('en-CA');
                   const dayEventsCount = (events[dateStr] || []).length;
                   return (
@@ -445,8 +444,6 @@ export default function HeatMapCalendar({
             </CardContent>
           </Card>
         </div>
-
-        {/* Details Panel */}
         <div className="sticky top-0 mb-4 h-fit w-full space-y-4 xl:w-96">
           <Card className="h-full">
             <CardHeader>
@@ -471,7 +468,7 @@ export default function HeatMapCalendar({
                       Total Events
                     </div>
                   </div>
-                  {loadingImages[selectedDateStr] && (
+                  {loadingImages[selectedDate.toLocaleDateString('en-CA')] && (
                     <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading images...
@@ -490,22 +487,22 @@ export default function HeatMapCalendar({
                               {event.machineName}
                             </span>
                           </div>
-                          {/* TODO: Add event severity */}
                           {event?.event_severity && (
                             <Badge
                               variant="outline"
                               className={cn(
-                                event?.event_severity === '1' &&
+                                'text-xs',
+                                event.event_severity === '1' &&
                                   'border-yellow-500 bg-yellow-400 text-black',
-                                event?.event_severity === '2' &&
+                                event.event_severity === '2' &&
                                   'border-orange-600 bg-orange-500 text-white',
-                                event?.event_severity === '3' &&
+                                event.event_severity === '3' &&
                                   'border-red-700 bg-red-600 text-white',
                               )}
                             >
-                              {event?.event_severity === '1'
+                              {event.event_severity === '1'
                                 ? 'Low'
-                                : event?.event_severity === '2'
+                                : event.event_severity === '2'
                                   ? 'High'
                                   : 'Critical'}
                             </Badge>
@@ -566,7 +563,7 @@ export default function HeatMapCalendar({
                     onPageChange={setDetailsCurrentPage}
                   />
                 </div>
-              ) : loading[selectedDateStr] ? (
+              ) : loading[selectedDate.toLocaleDateString('en-CA')] ? (
                 <div className="py-12 text-center text-gray-500">
                   <Loader2 className="mx-auto mb-4 h-16 w-16 animate-spin opacity-30" />
                   <p>Loading events...</p>
