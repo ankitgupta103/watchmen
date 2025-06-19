@@ -38,11 +38,7 @@ class CommandCentral:
         await self.log(f"Broadcasting shortest path info to {len(self.neighbours_seen)} direct neighbors.")
         
         for neighbour in self.neighbours_seen:
-            # --- CRITICAL FIX START ---
-            # The path being sent IS the path from the neighbour to the central node.
-            # It must include the central node as the destination.
             spath_to_send = [neighbour, self.devid]
-            # --- CRITICAL FIX END ---
 
             spath_msg = {
                 constants.JK_MESSAGE_TYPE: constants.MESSAGE_TYPE_SPATH,

@@ -13,10 +13,6 @@ class Layout:
                 node_name = f"{char}{char}{char}"
                 self.node_pos[node_name] = (r, c)
         
-        # central_rows = len(self.inp)
-        # central_cols = len(self.inp[0]) // 2
-        # self.node_pos[constants.CENTRAL_NODE_ID] = (central_rows + 1, central_cols)
-
         self.node_pos[constants.CENTRAL_NODE_ID] = (4, 5)
         
         self.gateway_nodes = ["JJJ", "KKK"]

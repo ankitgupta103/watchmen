@@ -42,17 +42,50 @@ class Device:
         }
 
     async def propagate_message(self, msg):
-        if msg is None: return
+        """
+        Propagates a message, trying the shortest path first and then falling
+        back to other neighbors if the primary route fails.
+        """
+        if msg is None: 
+            return
 
         path_so_far = msg.get(constants.JK_PATH_SO_FAR, [])
-        next_hop = self.get_next_on_spath()
+        primary_next_hop = self.get_next_on_spath()
         
-        if next_hop and next_hop not in path_so_far:
-            msg[constants.JK_DEST] = next_hop
-            msg[constants.JK_PATH_SO_FAR] = path_so_far + [self.devid]
-            msg[constants.JK_LAST_TS] = time.time_ns()
-            await self.log(f"Propagating {msg.get(constants.JK_MESSAGE_TYPE)} to {next_hop}...")
-            await self.send_message(msg, next_hop)
+        # 1. Attempt to send via the primary shortest path
+        primary_send_success = False
+        if primary_next_hop and primary_next_hop not in path_so_far:
+            primary_msg = msg.copy()
+            primary_msg[constants.JK_DEST] = primary_next_hop
+            primary_msg[constants.JK_PATH_SO_FAR] = path_so_far + [self.devid]
+            primary_msg[constants.JK_LAST_TS] = time.time_ns()
+            
+            await self.log(f"Propagating {primary_msg.get(constants.JK_MESSAGE_TYPE)} to primary hop {primary_next_hop}...")
+            primary_send_success = await self.send_message(primary_msg, primary_next_hop)
+
+        # 2. If primary send failed, attempt fallback routing
+        if not primary_send_success:
+            if primary_next_hop: # Log failure only if there was a primary hop to begin with
+                await self.log(f"Primary hop {primary_next_hop} failed. Searching for fallback route...")
+            
+            # Iterate through other known neighbors to find a fallback
+            for fallback_neighbour in self.neighbours_seen:
+                # A valid fallback cannot be the failed primary hop or anyone already in the path
+                if fallback_neighbour != primary_next_hop and fallback_neighbour not in path_so_far:
+                    fallback_msg = msg.copy()
+                    fallback_msg[constants.JK_DEST] = fallback_neighbour
+                    fallback_msg[constants.JK_PATH_SO_FAR] = path_so_far + [self.devid]
+                    fallback_msg[constants.JK_LAST_TS] = time.time_ns()
+
+                    await self.log(f"Redirecting via fallback neighbor {fallback_neighbour}...")
+                    fallback_send_success = await self.send_message(fallback_msg, fallback_neighbour)
+                    
+                    if fallback_send_success:
+                        # Once we successfully send to one fallback neighbor, our job is done.
+                        return # Exit the function
+            
+            # If we get here, all fallbacks also failed or no valid ones were found
+            await self.log("No viable fallback neighbors found. Message propagation failed.")
         
     async def send_scan_message(self):
         await self.log("Scanning for neighbors...")
@@ -108,7 +141,6 @@ class Device:
         else:
             new_spath = [self.devid] + path_from_sender
         
-        
         is_new_or_shorter = not self.spath or len(new_spath) < len(self.spath)
         is_refresh_from_parent = self.spath and len(self.spath) > 1 and source == self.spath[1]
 
@@ -130,4 +162,3 @@ class Device:
             for neighbour in self.neighbours_seen:
                 if neighbour != last_hop_in_path:
                     await self.send_message(new_msg.copy(), neighbour)
-                    
