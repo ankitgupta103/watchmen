@@ -10,7 +10,7 @@ import random
 import string
 
 import cv2
-from ultralytics import YOLO
+from ultralytics import YOLO, YOLOWorld
 
 # --- Constants and Configuration ---
 
@@ -21,7 +21,9 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-YOLO_MODEL_NAME = "yolov8n.pt"
+# TODO: Old was yolo 8n.pt
+# YOLO_MODEL_NAME = "yolov11n.pt"
+YOLO_MODEL_NAME = "yolov8s-world.pt"
 POLL_INTERVAL_SECONDS = 5  # Time to wait between directory scans
 
 SEVERITY_LOW = 0
@@ -29,8 +31,17 @@ SEVERITY_MEDIUM = 1
 SEVERITY_HIGH = 2
 SEVERITY_CRITICAL = 3
 
-POTENTIAL_WEAPONS = {"knife", "scissors", "baseball bat", "gun"}
-BAG_OBJECTS = {"backpack", "handbag", "suitcase"}
+DETECTION_CLASSES = [
+    "person",
+    "gun", "pistol", "firearm", "rifle",  # Various weapon terms
+    "knife", "blade", "dagger",           # Knife variants
+    "scissors",
+    "baseball bat", "bat",
+    "backpack", "bag", "handbag", "suitcase", "luggage"
+]
+
+POTENTIAL_WEAPONS = {"gun", "pistol", "firearm", "rifle", "knife", "blade", "dagger", "scissors", "baseball bat", "bat"}
+BAG_OBJECTS = {"backpack", "bag", "handbag", "suitcase", "luggage"}
 
 def generate_random_string(length: int = 3) -> str:
     """Generate a random alphanumeric string of given length (default 3)."""
@@ -50,7 +61,10 @@ class EventDetector:
             model_path (str): The path to the YOLO model file.
         """
         try:
-            self.model = YOLO(model_path)
+            # self.model = YOLO(model_path)
+            self.model = YOLOWorld(model_path)
+            self.model.set_classes(DETECTION_CLASSES)
+            
             logging.info(f"Successfully loaded model '{model_path}'")
         except Exception as e:
             logging.error(f"Failed to load YOLO model from '{model_path}'. Error: {e}")
