@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
 import useToken from '@/hooks/use-token';
+import { usePubSub } from '@/hooks/use-pub-sub';
 import {
   Calendar,
   Camera,
@@ -38,6 +39,7 @@ interface MachineEvent {
   cropped_image_url?: string;
   full_image_url?: string;
   images_loaded?: boolean;
+  event_severity?: string;
 }
 
 interface HistoricalEvent {
@@ -68,6 +70,21 @@ interface SimpleMachineData {
   is_pulsating: boolean;
 }
 
+// MQTT Event Message structure (similar to live-alert)
+interface EventMessage {
+  image_c_key: string;
+  image_f_key: string;
+  event_severity: string;
+  meta: {
+    node_id: string;
+    hb_count: string;
+    last_hb_time: string;
+    photos_taken: string;
+    events_seen: string;
+    event_ts_list: string[];
+  };
+}
+
 interface MachineDetailModalProps {
   selectedMachine: Machine | null;
   setSelectedMachine: React.Dispatch<React.SetStateAction<Machine | null>>;
@@ -89,6 +106,95 @@ export default function MachineDetailModal({
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>(
     {},
   );
+  
+  // New state for MQTT live events
+  const [liveEvents, setLiveEvents] = useState<MachineEvent[]>([]);
+  const [mqttConnected, setMqttConnected] = useState(false);
+
+  // Generate MQTT topics for the selected machine
+  const mqttTopics = React.useMemo(() => {
+    if (!selectedMachine || !organizationId) return [];
+    
+    const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
+    return [
+      `${organizationId}/_all_/${today}/${selectedMachine.id}/_all_/EVENT/#`,
+    ];
+  }, [organizationId, selectedMachine]);
+
+  // Handle MQTT messages for live events
+  const handleMqttMessage = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async (topic: string, data: any) => {
+      try {
+        if (!selectedMachine) return;
+
+        // Parse the event message
+        const eventMessage: EventMessage = data;
+
+        // Create new live event
+        const newEvent: MachineEvent = {
+          id: `live-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date(),
+          eventstr: `Event detected - Severity ${eventMessage.event_severity}`,
+          image_c_key: eventMessage.image_c_key,
+          image_f_key: eventMessage.image_f_key,
+          images_loaded: false,
+          event_severity: eventMessage.event_severity,
+        };
+
+        // Add event to live events (keep last 50)
+        setLiveEvents((prev) => [newEvent, ...prev.slice(0, 49)]);
+
+        // Start fetching images for this event
+        if (eventMessage.image_c_key && eventMessage.image_f_key) {
+          setLoadingImages((prev) => ({ ...prev, [newEvent.id]: true }));
+          
+          try {
+            const imageUrls = await fetchEventImages({
+              image_c_key: eventMessage.image_c_key,
+              image_f_key: eventMessage.image_f_key,
+            });
+
+            if (imageUrls) {
+              setLiveEvents((prev) =>
+                prev.map((event) =>
+                  event.id === newEvent.id
+                    ? {
+                        ...event,
+                        cropped_image_url: imageUrls.croppedImageUrl,
+                        full_image_url: imageUrls.fullImageUrl,
+                        images_loaded: true,
+                      }
+                    : event,
+                ),
+              );
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch images for event ${newEvent.id}:`, error);
+            // Mark as loaded even if failed so loading indicator disappears
+            setLiveEvents((prev) =>
+              prev.map((event) =>
+                event.id === newEvent.id ? { ...event, images_loaded: true } : event,
+              ),
+            );
+          } finally {
+            setLoadingImages((prev) => ({ ...prev, [newEvent.id]: false }));
+          }
+        }
+      } catch (error) {
+        console.error('Error handling MQTT message in MachineDetailModal:', error);
+      }
+    },
+    [selectedMachine],
+  );
+
+  // Use PubSub hook for MQTT connection
+  const { isConnected, error } = usePubSub(mqttTopics, handleMqttMessage);
+
+  // Update connection status
+  useEffect(() => {
+    setMqttConnected(isConnected);
+  }, [isConnected]);
 
   // Function to fetch images for events
   const fetchEventImages = useCallback(
@@ -259,6 +365,7 @@ export default function MachineDetailModal({
       setHistoricalEvents([]);
       setLoadingImages({});
       setSelectedImageUrl(null);
+      setLiveEvents([]); 
     }
   }, [selectedMachine]);
 
@@ -304,13 +411,13 @@ export default function MachineDetailModal({
               <Camera className="h-6 w-6 text-blue-600" />
               {toTitleCase(selectedMachine.name)}
 
-              {machineData.event_count > 0 && (
+              {liveEvents.length > 0 && (
                 <Badge
                   variant="outline"
                   className="border-orange-300 text-orange-700"
                 >
-                  {machineData.event_count} Recent Event
-                  {machineData.event_count > 1 ? 's' : ''}
+                  {liveEvents.length} Live Event
+                  {liveEvents.length > 1 ? 's' : ''}
                 </Badge>
               )}
             </DialogTitle>
@@ -362,6 +469,18 @@ export default function MachineDetailModal({
                 </div>
                 <div>
                   <span className="text-sm font-medium text-gray-500">
+                    MQTT Status:
+                  </span>
+                  <div className="text-sm">
+                    <Badge
+                      variant={mqttConnected ? 'default' : 'destructive'}
+                    >
+                      {mqttConnected ? 'Connected' : 'Disconnected'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-500">
                     Location:
                   </span>
                   <div className="text-sm">
@@ -385,14 +504,14 @@ export default function MachineDetailModal({
                     {formatBufferSize(machineData.buffer_size)}
                   </div>
                 </div>
-                {machineData.last_event && (
+                {liveEvents.length > 0 && liveEvents[0] && (
                   <div className="col-span-full">
                     <span className="text-sm font-medium text-gray-500">
                       Last Event:
                     </span>
                     <div className="text-sm">
-                      {machineData.last_event.eventstr} -{' '}
-                      {getTimeElapsed(machineData.last_event.timestamp)}
+                      {liveEvents[0].eventstr} -{' '}
+                      {getTimeElapsed(liveEvents[0].timestamp)}
                     </div>
                   </div>
                 )}
@@ -406,10 +525,10 @@ export default function MachineDetailModal({
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="recent" className="flex items-center gap-2">
                   <Camera className="h-4 w-4" />
-                  Recent Events
-                  {machineData.event_count > 0 && (
+                  Live Events
+                  {liveEvents.length > 0 && (
                     <Badge variant="outline" className="ml-1">
-                      {machineData.event_count}
+                      {liveEvents.length}
                     </Badge>
                   )}
                 </TabsTrigger>
@@ -427,32 +546,50 @@ export default function MachineDetailModal({
                 </TabsTrigger>
               </TabsList>
 
-              {/* Recent Events Tab */}
+              {/* Live Events Tab (MQTT) */}
               <TabsContent value="recent" className="mt-4">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-semibold">Live Events</h3>
-                    {machineData.event_count > 0 && (
+                    <Badge 
+                      variant={mqttConnected ? 'default' : 'destructive'}
+                      className="text-xs"
+                    >
+                      {mqttConnected ? 'Live' : 'Disconnected'}
+                    </Badge>
+                    {liveEvents.length > 0 && (
                       <Badge variant="outline">
-                        {machineData.event_count} event
-                        {machineData.event_count > 1 ? 's' : ''}
+                        {liveEvents.length} event
+                        {liveEvents.length > 1 ? 's' : ''}
                       </Badge>
                     )}
                   </div>
 
-                  {machineData.events.length === 0 ? (
+                  {/* MQTT Connection Error */}
+                  {error && (
+                    <div className="rounded-lg border-l-4 border-l-red-500 bg-red-50/30 p-3">
+                      <div className="text-sm text-red-700">
+                        MQTT Connection Error: {error.message}
+                      </div>
+                    </div>
+                  )}
+
+                  {liveEvents.length === 0 ? (
                     <div className="py-12 text-center">
                       <Camera className="mx-auto mb-4 h-16 w-16 text-gray-300" />
                       <h3 className="mb-2 text-lg font-medium text-gray-600">
-                        No Recent Events
+                        No Live Events
                       </h3>
                       <p className="text-gray-500">
-                        This machine hasn&apos;t triggered any events recently
+                        {mqttConnected 
+                          ? "Waiting for live events from this machine..."
+                          : "Connecting to MQTT to receive live events..."
+                        }
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {machineData.events
+                      {liveEvents
                         .sort(
                           (a, b) =>
                             new Date(b.timestamp).getTime() -
@@ -461,16 +598,26 @@ export default function MachineDetailModal({
                         .map((event) => (
                           <Card
                             key={event.id}
-                            className="border-l-4 border-l-orange-500 bg-orange-50/30"
+                            className="border-l-4 border-l-green-500 bg-green-50/30"
                           >
                             <CardContent className="space-y-3 p-4">
                               <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
-                                  <Badge variant="secondary">Live Event</Badge>
+                                  <Badge variant="default" className="bg-green-600">
+                                    Live Event
+                                  </Badge>
                                   <div className="text-sm">
                                     <span className="font-medium">
                                       {event.eventstr}
                                     </span>
+                                    {event.event_severity && (
+                                      <Badge 
+                                        variant="outline" 
+                                        className="ml-2"
+                                      >
+                                        Severity {event.event_severity}
+                                      </Badge>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1">
