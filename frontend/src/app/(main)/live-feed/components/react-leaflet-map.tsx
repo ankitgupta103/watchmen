@@ -57,7 +57,12 @@ interface MapProps {
 
 // Create enhanced custom icon with online/offline status and pulsating animation
 const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
-  const isOnline = machineData.is_online;
+  const lastSeen = machine.last_location?.timestamp
+        ? new Date(machine.last_location.timestamp)
+        : null;
+  const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+  const isOnline = !!lastSeen && lastSeen > oneHourAgo;
+
   const isPulsating = machineData.is_pulsating;
   const isCritical = machineData.is_critical;
   const eventCount = machineData.event_count;

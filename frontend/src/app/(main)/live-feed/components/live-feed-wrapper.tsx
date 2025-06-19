@@ -67,7 +67,7 @@ interface SimpleMachineData {
   last_updated: string;
   // Status and location from useMachineStats
   is_online: boolean;
-  location: { lat: number; lng: number };
+  location: { lat: number; lng: number, timestamp: string };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   stats_data: any;
   buffer_size: number;
@@ -105,6 +105,7 @@ export default function LiveFeedWrapper({
 
   // Create MQTT topics for all machines
   const mqttTopics = useMemo(() => {
+    if (machines.length === 0) return [];
     return machines.map(
       (machine) => `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
     );
@@ -257,6 +258,7 @@ export default function LiveFeedWrapper({
   // Helper to get machine data
   const getMachineData = useCallback(
     (machineId: number): SimpleMachineData => {
+      console.log('machineId', machineId);
       const events = machineEvents[machineId] || [];
       const eventCount = machineEventCounts[machineId] || 0;
       const lastEvent = events[events.length - 1];
@@ -264,13 +266,19 @@ export default function LiveFeedWrapper({
       const is_critical = events.some((event) => event.event_severity == '3');
       console.log('is_critical', is_critical);
 
-      // Determine online status: device is online if stats.data is not null
-      const isOnline = stats?.data !== null;
+      // Parse last_location.timestamp as Date and check if within last hour
+      const lastSeen = machines[machineId]?.last_location?.timestamp
+        ? new Date(machines[machineId].last_location.timestamp)
+        : null;
+      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+      
+      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
       // Get location from stats data
       const location = {
         lat: stats?.data?.message?.location?.lat ?? 0,
         lng: stats?.data?.message?.location?.long ?? 0,
+        timestamp: stats?.data?.message?.location?.timestamp ?? '',
       };
 
       // Check if machine is currently pulsating
@@ -291,7 +299,7 @@ export default function LiveFeedWrapper({
         is_critical: is_critical,
       };
     },
-    [machineEvents, machineEventCounts, machineStats, pulsatingMachines],
+    [machineEvents, machineEventCounts, machineStats, pulsatingMachines, machines],
   );
 
   // Calculate total events across all machines
@@ -318,8 +326,12 @@ export default function LiveFeedWrapper({
     }
 
     return machines.filter((machine) => {
-      const stats = machineStats[machine.id];
-      const isOnline = stats?.data !== null;
+      // Use the same 1-hour logic as getMachineData
+      const lastSeen = machine.last_location?.timestamp
+        ? new Date(machine.last_location.timestamp)
+        : null;
+      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
       if (statusFilter === 'online') {
         return isOnline;
@@ -329,7 +341,7 @@ export default function LiveFeedWrapper({
 
       return true;
     });
-  }, [machines, statusFilter, machineStats]);
+  }, [machines, statusFilter]);
 
   // Refresh function
   const handleRefresh = () => {
