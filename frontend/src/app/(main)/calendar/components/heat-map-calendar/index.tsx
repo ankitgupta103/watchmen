@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Activity,
   Camera,
@@ -8,7 +14,6 @@ import {
   ChevronRight,
   Filter,
   Loader2,
-  X,
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -25,6 +30,8 @@ import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
+
+import ImageViewerModal from './image-viewer';
 import Pagination from './pagination';
 
 const MapFilter = dynamic(() => import('../map-filter'), {
@@ -206,7 +213,10 @@ export default function HeatMapCalendar({
                 };
               }
             } catch (err) {
-              console.warn(`Failed to fetch images for event: ${event.id}`, err);
+              console.warn(
+                `Failed to fetch images for event: ${event.id}`,
+                err,
+              );
             }
             return { ...event, imagesLoaded: true };
           }),
@@ -314,30 +324,10 @@ export default function HeatMapCalendar({
   return (
     <>
       {modalImage && (
-        <div
-          className="bg-opacity-70 fixed inset-0 z-50 flex items-center justify-center bg-black"
-          onClick={() => setModalImage(null)}
-        >
-          <div className="relative mx-4 w-full max-w-3xl">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute -top-2 -right-2 z-10 h-8 w-8 rounded-full bg-white p-1 shadow-lg hover:bg-gray-100"
-              onClick={() => setModalImage(null)}
-            >
-              <X className="h-5 w-5 text-gray-700" />
-            </Button>
-            <div className="rounded-lg bg-white p-4">
-              <Image
-                src={modalImage.url}
-                alt={modalImage.label}
-                width={800}
-                height={600}
-                className="max-h-[80vh] w-auto rounded object-contain"
-              />
-            </div>
-          </div>
-        </div>
+        <ImageViewerModal
+          modalImage={modalImage}
+          setModalImage={setModalImage}
+        />
       )}
       <div className="relative flex flex-col gap-4 overflow-y-auto xl:flex-row">
         {/* Calendar */}
@@ -392,7 +382,10 @@ export default function HeatMapCalendar({
             <CardContent>
               <div className="mb-4 grid grid-cols-7 gap-2">
                 {WEEKDAYS.map((day) => (
-                  <div key={day} className="py-2 text-center text-sm font-medium text-gray-500">
+                  <div
+                    key={day}
+                    className="py-2 text-center text-sm font-medium text-gray-500"
+                  >
                     {day}
                   </div>
                 ))}
@@ -406,25 +399,41 @@ export default function HeatMapCalendar({
                       key={index}
                       onClick={() => setSelectedDate(date)}
                       className={cn(
-                        'relative flex h-24 w-full flex-col items-start justify-start rounded-lg border-2 p-1 text-left text-primary transition-all hover:bg-gray-50',
-                        isSelected(date) && 'ring-2 ring-blue-500 ring-offset-2',
+                        'text-primary relative flex h-24 w-full flex-col items-start justify-start rounded-lg border-2 p-1 text-left transition-all hover:bg-gray-50',
+                        isSelected(date) &&
+                          'ring-2 ring-blue-500 ring-offset-2',
                         !isCurrentMonth(date) && 'opacity-40',
                         isToday(date) && 'border-blue-400',
                         {
-                          'border-red-300 bg-red-50': getDateIntensity(date) === 'critical',
-                          'border-orange-300 bg-orange-50': getDateIntensity(date) === 'high',
-                          'border-yellow-300 bg-yellow-50': getDateIntensity(date) === 'medium',
-                          'border-green-300 bg-green-50': getDateIntensity(date) === 'low',
-                          'border-gray-200 bg-white': getDateIntensity(date) === 'none',
+                          'border-red-300 bg-red-50':
+                            getDateIntensity(date) === 'critical',
+                          'border-orange-300 bg-orange-50':
+                            getDateIntensity(date) === 'high',
+                          'border-yellow-300 bg-yellow-50':
+                            getDateIntensity(date) === 'medium',
+                          'border-green-300 bg-green-50':
+                            getDateIntensity(date) === 'low',
+                          'border-gray-200 bg-white':
+                            getDateIntensity(date) === 'none',
                         },
                       )}
                     >
-                      <span className={cn('font-semibold', isToday(date) && 'text-blue-600')}>
+                      <span
+                        className={cn(
+                          'font-semibold',
+                          isToday(date) && 'text-blue-600',
+                        )}
+                      >
                         {date.getDate()}
                       </span>
-                      {loading[dateStr] && <Loader2 className="mt-1 h-3 w-3 animate-spin text-blue-500" />}
+                      {loading[dateStr] && (
+                        <Loader2 className="mt-1 h-3 w-3 animate-spin text-blue-500" />
+                      )}
                       {!loading[dateStr] && dayEventsCount > 0 && (
-                        <Badge variant="secondary" className="mt-1 px-1.5 py-0.5 text-[10px]">
+                        <Badge
+                          variant="secondary"
+                          className="mt-1 px-1.5 py-0.5 text-[10px]"
+                        >
                           {dayEventsCount} Event{dayEventsCount > 1 ? 's' : ''}
                         </Badge>
                       )}
@@ -457,7 +466,9 @@ export default function HeatMapCalendar({
                     <div className="text-2xl font-bold text-blue-600">
                       {selectedDateEvents.length}
                     </div>
-                    <div className="text-xs font-medium text-blue-500">Total Events</div>
+                    <div className="text-xs font-medium text-blue-500">
+                      Total Events
+                    </div>
                   </div>
                   {loadingImages[selectedDateStr] && (
                     <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
@@ -467,22 +478,37 @@ export default function HeatMapCalendar({
                   )}
                   <div className="flex-grow space-y-3 overflow-y-auto">
                     {paginatedDetailsEvents.map((event) => (
-                      <div key={event.id} className="rounded-lg border p-3 transition-colors hover:bg-gray-50">
+                      <div
+                        key={event.id}
+                        className="rounded-lg border p-3 transition-colors hover:bg-gray-50"
+                      >
                         <div className="mb-2 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Camera className="h-4 w-4 text-blue-500" />
-                            <span className="text-sm font-medium">{event.machineName}</span>
+                            <span className="text-sm font-medium">
+                              {event.machineName}
+                            </span>
                           </div>
-                          <Badge variant="outline" className="text-xs">{event.eventstr}</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {event.eventstr}
+                          </Badge>
                         </div>
                         <div className="text-xs text-gray-600">
-                          Time: <span className="font-medium">{new Date(event.timestamp).toLocaleTimeString()}</span>
+                          Time:{' '}
+                          <span className="font-medium">
+                            {new Date(event.timestamp).toLocaleTimeString()}
+                          </span>
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           {event.croppedImageUrl && (
                             <div
                               className="cursor-pointer"
-                              onClick={() => setModalImage({ url: event.croppedImageUrl!, label: 'Cropped' })}
+                              onClick={() =>
+                                setModalImage({
+                                  url: event.croppedImageUrl!,
+                                  label: 'Cropped',
+                                })
+                              }
                             >
                               <Image
                                 width={100}
@@ -496,7 +522,12 @@ export default function HeatMapCalendar({
                           {event.fullImageUrl && (
                             <div
                               className="cursor-pointer"
-                              onClick={() => setModalImage({ url: event.fullImageUrl!, label: 'Full' })}
+                              onClick={() =>
+                                setModalImage({
+                                  url: event.fullImageUrl!,
+                                  label: 'Full',
+                                })
+                              }
                             >
                               <Image
                                 width={100}
