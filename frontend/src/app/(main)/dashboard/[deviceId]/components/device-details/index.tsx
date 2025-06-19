@@ -11,10 +11,10 @@ import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
 
+import PageHeader from '../page-header';
 import DeviceInfo from './device-info';
 import EventDetailsModal from './event-details-modal';
 import EventsSection from './events-section';
-import PageHeader from '../page-header';
 
 interface S3EventData {
   image_c_key: string;
