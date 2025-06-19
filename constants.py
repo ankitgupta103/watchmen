@@ -69,7 +69,7 @@ HN_ID = {
 # Last is CC
 # Everything in between is passthrough.
 NEXT_DEST_MAP = {
-        "C" : "B",
+        "C" : "A",
         "B" : "A"
         }
 
