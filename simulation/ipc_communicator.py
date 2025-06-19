@@ -61,8 +61,6 @@ class IPCCommunicator:
                     continue
                 
                 if self.websocket_manager:
-                    # --- CRITICAL FIX START ---
-                    # Add the message's path to the payload for frontend visualization
                     path_so_far = msg.get(constants.JK_PATH_SO_FAR, [])
                     full_path = path_so_far + [devid, target]
                     comm_message = {
@@ -73,7 +71,6 @@ class IPCCommunicator:
                         "msg": msg,
                         "full_path": full_path if len(full_path) > 2 else None
                     }
-                    # --- CRITICAL FIX END ---
                     await self.websocket_manager.broadcast(json.dumps(comm_message))
                 
                 self.dev[target].process_msg(msg)
