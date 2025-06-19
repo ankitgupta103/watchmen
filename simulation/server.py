@@ -34,7 +34,7 @@ class WebSocketManager:
 # --- FastAPI and Simulation State ---
 app = FastAPI()
 manager = WebSocketManager()
-# Add a lock to prevent race conditions when starting the simulation
+# Add a lock to prevent race conditions from creating two simulation loops
 simulation_lock = asyncio.Lock()
 simulation_state = {"running": False, "task": None}
 fcomm = IPCCommunicator(websocket_manager=manager)
@@ -71,6 +71,7 @@ async def simulation_loop():
             await asyncio.sleep(0.5)
             continue
         try:
+            # This is a clean, single-instance loop.
             await fcomm.log_message("SIM_PHASE: All nodes scanning for neighbors.")
             await asyncio.sleep(1)
             for device in devices:
@@ -101,7 +102,7 @@ async def simulation_loop():
             await asyncio.sleep(2)
 
 async def start_simulation():
-    """Start the simulation if it's not already running, using a lock."""
+    """Safely start the simulation using a lock to prevent duplicates."""
     async with simulation_lock:
         if simulation_state["task"] is None or simulation_state["task"].done():
             await fcomm.log_message("SYSTEM: Creating new simulation task.")
@@ -120,6 +121,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     print("New client connected.")
     
+    # Immediately send layout info to the new client
     initial_layout_message = {"type": "INITIAL_LAYOUT", "nodes": layout_instance.get_all_nodes()}
     await websocket.send_text(json.dumps(initial_layout_message))
     

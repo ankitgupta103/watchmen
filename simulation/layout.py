@@ -13,13 +13,13 @@ class Layout:
                 node_name = f"{char}{char}{char}"
                 self.node_pos[node_name] = (r, c)
         
-        # Add Command Central, placing it visually separate from the grid
-        central_rows = len(self.inp)
-        central_cols = len(self.inp[0]) // 2
-        self.node_pos[constants.CENTRAL_NODE_ID] = (central_rows + 1, central_cols)
+        # central_rows = len(self.inp)
+        # central_cols = len(self.inp[0]) // 2
+        # self.node_pos[constants.CENTRAL_NODE_ID] = (central_rows + 1, central_cols)
+
+        self.node_pos[constants.CENTRAL_NODE_ID] = (4, 5)
         
-        # Define the gateway node that can talk to Command Central
-        self.gateway_node = "AAA"
+        self.gateway_nodes = ["JJJ", "KKK"]
 
     def get_all_nodes(self):
         """
@@ -34,17 +34,14 @@ class Layout:
     def is_neighbour(self, a, b):
         """
         Checks if two nodes are neighbours. Neighbours are adjacent in the grid,
-        including diagonals. A special rule connects the gateway to central command.
+        including diagonals. A special rule connects the gateways to central command.
         """
-        # --- CRITICAL FIX START ---
-        # Special rule: The gateway node and central command are neighbours
-        if (a == self.gateway_node and b == constants.CENTRAL_NODE_ID) or \
-           (b == self.gateway_node and a == constants.CENTRAL_NODE_ID):
+        if (a in self.gateway_nodes and b == constants.CENTRAL_NODE_ID) or \
+           (b in self.gateway_nodes and a == constants.CENTRAL_NODE_ID):
             return True
-        # --- CRITICAL FIX END ---
             
         if a == constants.CENTRAL_NODE_ID or b == constants.CENTRAL_NODE_ID:
-            return False # Central node is only connected to the gateway
+            return False # Central node is only connected to the gateways
             
         if a not in self.node_pos or b not in self.node_pos:
             return False
