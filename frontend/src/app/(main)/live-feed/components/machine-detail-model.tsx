@@ -39,6 +39,7 @@ interface MachineEvent {
   cropped_image_url?: string;
   full_image_url?: string;
   images_loaded?: boolean;
+  images_requested?: boolean; // New field to track if images were requested
   event_severity?: string;
 }
 
@@ -51,6 +52,7 @@ interface HistoricalEvent {
   cropped_image_url?: string;
   full_image_url?: string;
   images_loaded?: boolean;
+  images_requested?: boolean; // New field to track if images were requested
   date: string; // Date string for grouping
 }
 
@@ -82,7 +84,6 @@ interface EventMessage {
     last_hb_time: string;
     photos_taken: string;
     events_seen: string;
-    event_ts_list: string[];
   };
 }
 
@@ -100,13 +101,16 @@ export default function MachineDetailModal({
   const { token } = useToken();
   const { organizationId } = useOrganization();
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  const [historicalEvents, setHistoricalEvents] = useState<HistoricalEvent[]>(
-    [],
-  );
+  const [historicalEvents, setHistoricalEvents] = useState<HistoricalEvent[]>([]);
   const [loadingHistorical, setLoadingHistorical] = useState(false);
-  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
+  
+  // New state for image loading pagination
+  const [loadingMoreImages, setLoadingMoreImages] = useState(false);
+  const [imagesLoadedCounter, setImagesLoadedCounter] = useState(0);
+  const IMAGES_PER_BATCH = 10;
+
+  console.log('imagesLoadedCounter', imagesLoadedCounter);
 
   // New state for MQTT live events
   const [liveEvents, setLiveEvents] = useState<MachineEvent[]>([]);
@@ -140,12 +144,13 @@ export default function MachineDetailModal({
           image_c_key: eventMessage.image_c_key,
           image_f_key: eventMessage.image_f_key,
           images_loaded: false,
+          images_requested: false,
           event_severity: eventMessage.event_severity,
         };
 
         setLiveEvents(() => [newEvent]);
 
-        // Start fetching images for this event
+        // Start fetching images for this event automatically (live events should load immediately)
         if (eventMessage.image_c_key && eventMessage.image_f_key) {
           setLoadingImages(() => ({ [newEvent.id]: true }));
 
@@ -164,6 +169,7 @@ export default function MachineDetailModal({
                         cropped_image_url: imageUrls.croppedImageUrl,
                         full_image_url: imageUrls.fullImageUrl,
                         images_loaded: true,
+                        images_requested: true,
                       }
                     : event,
                 ),
@@ -178,7 +184,7 @@ export default function MachineDetailModal({
             setLiveEvents((prev) =>
               prev.map((event) =>
                 event.id === newEvent.id
-                  ? { ...event, images_loaded: true }
+                  ? { ...event, images_loaded: true, images_requested: true }
                   : event,
               ),
             );
@@ -239,13 +245,14 @@ export default function MachineDetailModal({
     [token],
   );
 
-  // Function to fetch historical events for the past 7 days
+  // Function to fetch historical events for the past 7 days (metadata only)
   const fetchHistoricalEvents = useCallback(
     async (machineId: number) => {
       if (!token || !organizationId) return;
 
       setLoadingHistorical(true);
       setHistoricalEvents([]);
+      setImagesLoadedCounter(0); // Reset counter
 
       try {
         const allEvents: HistoricalEvent[] = [];
@@ -287,6 +294,7 @@ export default function MachineDetailModal({
                   image_c_key: event.image_c_key,
                   image_f_key: event.image_f_key,
                   images_loaded: false,
+                  images_requested: false, // Initialize as not requested
                   date: dateStr,
                 }),
               );
@@ -304,61 +312,105 @@ export default function MachineDetailModal({
             new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
         );
 
-        // Show events immediately without waiting for images
+        // Show events immediately with metadata only
         setHistoricalEvents(allEvents);
         setLoadingHistorical(false);
 
-        // Start fetching images concurrently for all events that have image keys
-        const eventsWithImages = allEvents.filter(
-          (event) => event.image_c_key && event.image_f_key,
-        );
-
-        // Fetch images concurrently (not sequentially) for better performance
-        eventsWithImages.forEach(async (event) => {
-          setLoadingImages((prev) => ({ ...prev, [event.id]: true }));
-
-          try {
-            const imageUrls = await fetchEventImages({
-              image_c_key: event.image_c_key!,
-              image_f_key: event.image_f_key!,
-            });
-
-            if (imageUrls) {
-              setHistoricalEvents((prev) =>
-                prev.map((e) =>
-                  e.id === event.id
-                    ? {
-                        ...e,
-                        cropped_image_url: imageUrls.croppedImageUrl,
-                        full_image_url: imageUrls.fullImageUrl,
-                        images_loaded: true,
-                      }
-                    : e,
-                ),
-              );
-            }
-          } catch (error) {
-            console.warn(
-              `Failed to fetch images for event ${event.id}:`,
-              error,
-            );
-            // Mark as loaded even if failed so loading indicator disappears
-            setHistoricalEvents((prev) =>
-              prev.map((e) =>
-                e.id === event.id ? { ...e, images_loaded: true } : e,
-              ),
-            );
-          } finally {
-            setLoadingImages((prev) => ({ ...prev, [event.id]: false }));
-          }
-        });
+        // DO NOT automatically fetch images - wait for user request
       } catch (error) {
         console.error('Error fetching historical events:', error);
         setLoadingHistorical(false);
       }
     },
-    [token, organizationId, fetchEventImages],
+    [token, organizationId],
   );
+
+  // New function to load more images in batches
+  const loadMoreImages = useCallback(async () => {
+    if (loadingMoreImages) return;
+
+    setLoadingMoreImages(true);
+
+    try {
+      // Get events that have image keys but haven't been requested yet
+      const eventsNeedingImages = historicalEvents
+        .filter(
+          (event) => 
+            event.image_c_key && 
+            event.image_f_key && 
+            !event.images_requested
+        )
+        .slice(0, IMAGES_PER_BATCH);
+
+      if (eventsNeedingImages.length === 0) {
+        setLoadingMoreImages(false);
+        return;
+      }
+
+      // Mark these events as requested
+      setHistoricalEvents((prev) =>
+        prev.map((event) =>
+          eventsNeedingImages.some(e => e.id === event.id)
+            ? { ...event, images_requested: true }
+            : event
+        )
+      );
+
+      // Fetch images for these events concurrently
+      const imagePromises = eventsNeedingImages.map(async (event) => {
+        setLoadingImages((prev) => ({ ...prev, [event.id]: true }));
+
+        try {
+          const imageUrls = await fetchEventImages({
+            image_c_key: event.image_c_key!,
+            image_f_key: event.image_f_key!,
+          });
+
+          if (imageUrls) {
+            setHistoricalEvents((prev) =>
+              prev.map((e) =>
+                e.id === event.id
+                  ? {
+                      ...e,
+                      cropped_image_url: imageUrls.croppedImageUrl,
+                      full_image_url: imageUrls.fullImageUrl,
+                      images_loaded: true,
+                    }
+                  : e,
+              ),
+            );
+          } else {
+            // Mark as loaded even if failed
+            setHistoricalEvents((prev) =>
+              prev.map((e) =>
+                e.id === event.id ? { ...e, images_loaded: true } : e,
+              ),
+            );
+          }
+        } catch (error) {
+          console.warn(
+            `Failed to fetch images for event ${event.id}:`,
+            error,
+          );
+          // Mark as loaded even if failed
+          setHistoricalEvents((prev) =>
+            prev.map((e) =>
+              e.id === event.id ? { ...e, images_loaded: true } : e,
+            ),
+          );
+        } finally {
+          setLoadingImages((prev) => ({ ...prev, [event.id]: false }));
+        }
+      });
+
+      await Promise.all(imagePromises);
+      setImagesLoadedCounter(prev => prev + eventsNeedingImages.length);
+    } catch (error) {
+      console.error('Error loading more images:', error);
+    } finally {
+      setLoadingMoreImages(false);
+    }
+  }, [historicalEvents, loadingMoreImages, fetchEventImages]);
 
   // Fetch historical events when machine is selected
   useEffect(() => {
@@ -374,6 +426,7 @@ export default function MachineDetailModal({
       setLoadingImages({});
       setSelectedImageUrl(null);
       setLiveEvents([]);
+      setImagesLoadedCounter(0);
     }
   }, [selectedMachine]);
 
@@ -406,6 +459,15 @@ export default function MachineDetailModal({
     },
     {} as Record<string, HistoricalEvent[]>,
   );
+
+  // Calculate stats for load more button
+  const eventsWithImages = historicalEvents.filter(
+    (event) => event.image_c_key && event.image_f_key
+  );
+  const eventsWithImagesRequested = historicalEvents.filter(
+    (event) => event.images_requested
+  );
+  const hasMoreImagesToLoad = eventsWithImagesRequested.length < eventsWithImages.length;
 
   return (
     <>
@@ -538,7 +600,7 @@ export default function MachineDetailModal({
                   className="flex items-center gap-2"
                 >
                   <ImageIcon className="h-4 w-4" />
-                  Images Captured (7 days)
+                  Historical Events (7 days)
                   {historicalEvents.length > 0 && (
                     <Badge variant="outline" className="ml-1">
                       {historicalEvents.length}
@@ -696,7 +758,7 @@ export default function MachineDetailModal({
                 </div>
               </TabsContent>
 
-              {/* Historical Images Tab */}
+              {/* Historical Events Tab - Updated with lazy loading */}
               <TabsContent value="historical" className="mt-4">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -707,6 +769,11 @@ export default function MachineDetailModal({
                       {historicalEvents.length > 0 && (
                         <Badge variant="outline">
                           {historicalEvents.length} events (7 days)
+                        </Badge>
+                      )}
+                      {eventsWithImages.length > 0 && (
+                        <Badge variant="secondary">
+                          {eventsWithImagesRequested.length}/{eventsWithImages.length} images loaded
                         </Badge>
                       )}
                     </div>
@@ -781,10 +848,26 @@ export default function MachineDetailModal({
                                         </span>
                                       </div>
 
-                                      {/* Image Display */}
-                                      {event.image_c_key &&
-                                      event.image_f_key ? (
-                                        loadingImages[event.id] ? (
+                                      {/* Updated Image Display Logic */}
+                                      {event.image_c_key && event.image_f_key ? (
+                                        // Event has image keys
+                                        !event.images_requested ? (
+                                          // Images not requested yet - show metadata only
+                                          <div className="flex items-center justify-center rounded border bg-blue-50 py-8 text-blue-600">
+                                            <div className="text-center">
+                                              <ImageIcon className="mx-auto mb-2 h-8 w-8" />
+                                              <p className="text-xs font-medium">
+                                                Images Available
+                                              </p>
+                                              <p className="text-xs text-blue-500">
+                                                {event.image_c_key ? 'Cropped' : ''}
+                                                {event.image_c_key && event.image_f_key ? ' • ' : ''}
+                                                {event.image_f_key ? 'Full' : ''}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        ) : loadingImages[event.id] ? (
+                                          // Images requested and loading
                                           <div className="flex items-center justify-center rounded border bg-gray-50 py-8">
                                             <div className="text-center">
                                               <Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin text-gray-400" />
@@ -796,6 +879,7 @@ export default function MachineDetailModal({
                                         ) : event.images_loaded &&
                                           (event.cropped_image_url ||
                                             event.full_image_url) ? (
+                                          // Images loaded successfully
                                           <div className="space-y-2">
                                             {event.cropped_image_url && (
                                               <div>
@@ -836,26 +920,19 @@ export default function MachineDetailModal({
                                               </div>
                                             )}
                                           </div>
-                                        ) : event.images_loaded ? (
-                                          <div className="flex items-center justify-center rounded border bg-gray-50 py-8 text-gray-400">
+                                        ) : (
+                                          // Images requested but failed to load
+                                          <div className="flex items-center justify-center rounded border bg-red-50 py-8 text-red-400">
                                             <div className="text-center">
                                               <ImageIcon className="mx-auto mb-2 h-8 w-8" />
                                               <p className="text-xs">
-                                                Images not available
-                                              </p>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="flex animate-pulse items-center justify-center rounded border bg-gray-100 py-8">
-                                            <div className="text-center">
-                                              <div className="mx-auto mb-2 h-8 w-8 rounded bg-gray-300"></div>
-                                              <p className="text-xs text-gray-500">
-                                                Preparing to load...
+                                                Failed to load images
                                               </p>
                                             </div>
                                           </div>
                                         )
                                       ) : (
+                                        // No image keys available
                                         <div className="flex items-center justify-center rounded border bg-gray-50 py-8 text-gray-400">
                                           <div className="text-center">
                                             <ImageIcon className="mx-auto mb-2 h-8 w-8" />
@@ -872,6 +949,39 @@ export default function MachineDetailModal({
                             </div>
                           </div>
                         ))}
+                      
+                      {/* Load More Images Button */}
+                      {hasMoreImagesToLoad && (
+                        <div className="flex justify-center pt-6">
+                          <Button
+                            onClick={loadMoreImages}
+                            disabled={loadingMoreImages}
+                            variant="outline"
+                            size="lg"
+                            className="flex items-center gap-2"
+                          >
+                            {loadingMoreImages ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading Images...
+                              </>
+                            ) : (
+                              <>
+                                <ImageIcon className="h-4 w-4" />
+                                Load More Images ({Math.min(IMAGES_PER_BATCH, eventsWithImages.length - eventsWithImagesRequested.length)})
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {!hasMoreImagesToLoad && eventsWithImages.length > 0 && (
+                        <div className="text-center pt-4">
+                          <p className="text-sm text-gray-500">
+                            All images have been loaded ({eventsWithImages.length} total)
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
