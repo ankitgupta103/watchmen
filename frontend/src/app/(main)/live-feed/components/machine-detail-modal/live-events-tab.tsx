@@ -1,3 +1,6 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import { Calendar, Camera, Clock, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -30,12 +33,35 @@ const LiveEventsTab = ({
   mqttError: Error | null;
   onImageClick: (url: string) => void;
 }) => {
-  const getTimeElapsed = (timestamp: Date) => {
-    const diff = new Date().getTime() - timestamp.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    return minutes > 0 ? `${minutes}m ${seconds}s ago` : `${seconds}s ago`;
-  };
+  const [relativeTimes, setRelativeTimes] = useState<Record<string, string>>(
+    {},
+  );
+
+  useEffect(() => {
+    const calculateAllRelativeTimes = () => {
+      const now = new Date().getTime();
+      const newRelativeTimes: Record<string, string> = {};
+
+      for (const event of events) {
+        const diff = now - event.timestamp.getTime();
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+
+        if (minutes > 0) {
+          newRelativeTimes[event.id] = `${minutes}m ${seconds}s ago`;
+        } else {
+          newRelativeTimes[event.id] = `${Math.max(0, seconds)}s ago`;
+        }
+      }
+      setRelativeTimes(newRelativeTimes);
+    };
+
+    calculateAllRelativeTimes();
+
+    const intervalId = setInterval(calculateAllRelativeTimes, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [events]);
 
   return (
     <div className="space-y-4">
@@ -73,7 +99,7 @@ const LiveEventsTab = ({
                   </div>
                   <span className="flex items-center gap-1 text-xs text-gray-500">
                     <Clock className="h-3 w-3" />
-                    {getTimeElapsed(event.timestamp)}
+                    {relativeTimes[event.id] || '...'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -82,10 +108,11 @@ const LiveEventsTab = ({
                     variant="outline"
                     className={cn(
                       event?.event_severity === '1' &&
-                        'bg-yellow-500 text-white',
+                        'border-yellow-500 bg-yellow-400 text-black',
                       event?.event_severity === '2' &&
-                        'bg-orange-500 text-white',
-                      event?.event_severity === '3' && 'bg-red-500 text-white',
+                        'border-orange-600 bg-orange-500 text-white',
+                      event?.event_severity === '3' &&
+                        'border-red-700 bg-red-600 text-white',
                     )}
                   >
                     {event?.event_severity === '1'
@@ -101,9 +128,9 @@ const LiveEventsTab = ({
                     Loading images...
                   </div>
                 ) : event.images_loaded ? (
-                  <div className="flex flex-col lg:flex-row gap-2 items-center justify-center">
+                  <div className="flex flex-col items-center justify-center gap-2 lg:flex-row">
                     {event.cropped_image_url && (
-                      <div className="space-y-1 w-full">
+                      <div className="w-full space-y-1">
                         <Image
                           src={event.cropped_image_url}
                           alt="Cropped live event"
@@ -115,7 +142,7 @@ const LiveEventsTab = ({
                       </div>
                     )}
                     {event.full_image_url && (
-                      <div className="space-y-1 w-full">
+                      <div className="w-full space-y-1">
                         <Image
                           src={event.full_image_url}
                           alt="Full live event"
