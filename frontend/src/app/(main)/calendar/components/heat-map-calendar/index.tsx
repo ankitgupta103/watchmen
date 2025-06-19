@@ -67,6 +67,7 @@ interface ProcessedEvent extends S3EventData {
   croppedImageUrl?: string;
   fullImageUrl?: string;
   imagesLoaded: boolean;
+  event_severity?: string;
 }
 
 const MONTHS = [
@@ -489,9 +490,26 @@ export default function HeatMapCalendar({
                               {event.machineName}
                             </span>
                           </div>
-                          <Badge variant="outline" className="text-xs">
-                            {event.eventstr}
-                          </Badge>
+                          {/* TODO: Add event severity */}
+                          {event?.event_severity && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                event?.event_severity === '1' &&
+                                  'border-yellow-500 bg-yellow-400 text-black',
+                                event?.event_severity === '2' &&
+                                  'border-orange-600 bg-orange-500 text-white',
+                                event?.event_severity === '3' &&
+                                  'border-red-700 bg-red-600 text-white',
+                              )}
+                            >
+                              {event?.event_severity === '1'
+                                ? 'Low'
+                                : event?.event_severity === '2'
+                                  ? 'High'
+                                  : 'Critical'}
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-xs text-gray-600">
                           Time:{' '}
