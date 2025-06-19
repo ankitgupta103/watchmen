@@ -460,11 +460,11 @@ export default function DeviceDetailsClient({
                 <div className="space-y-1 text-sm">
                   <div>
                     <span className="font-medium">Real-time:</span>{' '}
-                    {machineStats?.message?.location?.lat?.toFixed(4) ??
+                    {machineStats?.message?.location?.lat ??
                       device?.last_location?.lat ??
                       'N/A'}
                     ,{' '}
-                    {machineStats?.message?.location?.long?.toFixed(4) ??
+                    {machineStats?.message?.location?.long ??
                       device?.last_location?.long ??
                       'N/A'}
                   </div>
