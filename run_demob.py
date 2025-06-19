@@ -271,7 +271,6 @@ class CommandCenter:
             "last_hb_time": hbtime,
             "photos_taken": photos_taken,
             "events_seen": events_seen,
-            "event_ts_list": event_ts_list
         }
 
         # SENDING TO VYOM

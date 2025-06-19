@@ -44,7 +44,6 @@ interface EventMessage {
     last_hb_time: string;
     photos_taken: string;
     events_seen: string;
-    event_ts_list: string[];
   };
 }
 

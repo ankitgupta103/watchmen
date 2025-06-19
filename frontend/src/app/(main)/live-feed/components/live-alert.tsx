@@ -41,7 +41,6 @@ interface EventMessage {
     last_hb_time: string;
     photos_taken: string;
     events_seen: string;
-    event_ts_list: string[];
   };
 }
 
@@ -657,24 +656,6 @@ export default function CriticalAlertSystem({
                                 ? 'Critical'
                                 : 'Low'}
                           </div>
-                          <p className="text-sm text-gray-700">
-                            {alert.message?.meta?.node_id}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            {alert.message?.meta?.hb_count}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            {alert.message?.meta?.last_hb_time}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            {alert.message?.meta?.photos_taken}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            {alert.message?.meta?.events_seen}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            {alert.message?.meta?.event_ts_list}
-                          </p>
                         </div>
 
                         {/* Image Display */}
