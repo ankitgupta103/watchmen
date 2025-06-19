@@ -254,7 +254,22 @@ function EnhancedMarker({
     <Marker
       ref={markerRef}
       icon={createStatusIcon(machine, machineData)}
-      position={[machineData.location.lat ?? 0, machineData.location.lng ?? 0]}
+      position={[
+        machineData.machine_id === 206
+          ? machineData.location.lat + 0.001
+          : machineData.machine_id === 207
+          ? machineData.location.lat + 0.002
+          : machineData.machine_id === 208
+          ? machineData.location.lat + 0.003
+          : machineData.location.lat,
+        machineData.machine_id === 206
+          ? machineData.location.lng + 0.001
+          : machineData.machine_id === 207
+          ? machineData.location.lng + 0.002
+          : machineData.machine_id === 208
+          ? machineData.location.lng + 0.003
+          : machineData.location.lng,
+      ]}
       eventHandlers={{
         click: handleClick,
         mouseover: handleMouseOver,

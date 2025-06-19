@@ -108,15 +108,11 @@ export default function LiveFeedWrapper({
 
   // Create MQTT topics for all machines
   const mqttTopics = useMemo(() => {
-    const currentDate = selectedDate
-      ? selectedDate.toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-
     return machines.map(
       (machine) =>
-        `${organizationId}/_all_/${currentDate}/${machine.id}/EVENT/#`,
+        `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
     );
-  }, [organizationId, selectedDate, machines]);
+  }, [organizationId, machines]);
 
   // Fetch images from Django API
   const fetchEventImages = async (imageKeys: {
@@ -154,15 +150,13 @@ export default function LiveFeedWrapper({
 
   // MQTT message handler
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleMqttMessage = useCallback(async (topic: string, data: any) => {
+  const handleMqttMessage = async (topic: string, data: any) => {
     try {
       // Extract machine ID from topic path
       // Topic format: organization_id/_all_/2025-06-17/machine_id/EVENT/#
       const topicParts = topic.split('/');
-      const dateIndex = topicParts.findIndex((part) =>
-        part.match(/\d{4}-\d{2}-\d{2}/),
-      );
-      const machineIdPart = topicParts[dateIndex + 1];
+      console.log('topicParts', topicParts, topicParts[3]);
+      const machineIdPart = topicParts[3];
 
       if (machineIdPart && machineIdPart !== '_all_') {
         const machineId = parseInt(machineIdPart);
@@ -195,6 +189,7 @@ export default function LiveFeedWrapper({
           }));
 
           // Start pulsating animation for this machine
+          console.log('pulsatingMachines', machineId);
           setPulsatingMachines((prev) => ({
             ...prev,
             [machineId]: true,
@@ -241,7 +236,7 @@ export default function LiveFeedWrapper({
     } catch (error) {
       console.error('Error processing MQTT message:', error, { topic, data });
     }
-  }, []);
+  }
 
   // Use the PubSub hook for MQTT connection
   const { isConnected, error: mqttError } = usePubSub(
