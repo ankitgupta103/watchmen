@@ -308,8 +308,8 @@ function EnhancedMarker({
           )}
 
           <div className="mt-1 border-t pt-1 text-xs text-gray-500">
-            <strong>Location:</strong> {machineData.location.lat.toFixed(4)},{' '}
-            {machineData.location.lng.toFixed(4)}
+            <strong>Location:</strong> {machine?.last_location?.lat.toFixed(4) ?? '0.0000'},{' '}
+            {machine?.last_location?.long.toFixed(4) ?? '0.0000'}
           </div>
 
           <div className="text-xs text-gray-400">Click to view details</div>
