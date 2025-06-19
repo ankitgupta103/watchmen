@@ -8,6 +8,7 @@ from device import Device
 from central import CommandCentral
 from ipc_communicator import IPCCommunicator
 from layout import Layout
+import constants
 
 # --- WebSocket Manager ---
 class WebSocketManager:
@@ -23,143 +24,104 @@ class WebSocketManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: str):
-        disconnected = []
         for connection in self.active_connections:
             try:
                 if connection.client_state == WebSocketState.CONNECTED:
                     await connection.send_text(message)
-                else:
-                    disconnected.append(connection)
-            except Exception as e:
-                print(f"Error broadcasting to connection: {e}")
-                disconnected.append(connection)
-        
-        # Remove disconnected connections
-        for conn in disconnected:
-            self.disconnect(conn)
+            except Exception:
+                self.disconnect(connection)
 
-# --- Global Simulation State ---
-class SimulationState:
-    def __init__(self):
-        self.running = False
-        self.task = None
-        self.devices = []
-        self.cc = None
-        self.fcomm = None
-        self.manager = None
-
-simulation_state = SimulationState()
-
-# --- FastAPI App Setup ---
+# --- FastAPI and Simulation State ---
 app = FastAPI()
 manager = WebSocketManager()
-simulation_state.manager = manager
+# Add a lock to prevent race conditions when starting the simulation
+simulation_lock = asyncio.Lock()
+simulation_state = {"running": False, "task": None}
+fcomm = IPCCommunicator(websocket_manager=manager)
+layout_instance = Layout()
+devices = []
+cc = None
 
-# --- Simulation Logic ---
+async def setup_simulation():
+    global devices, cc
+    await fcomm.log_message("SYSTEM: Initializing simulation environment...")
+    
+    node_ids = [node['id'] for node in layout_instance.get_all_nodes() if node['id'] != constants.CENTRAL_NODE_ID]
+    devices = []
+    for devid in node_ids:
+        device = Device(devid, fcomm, None)
+        devices.append(device)
+        fcomm.add_dev(devid, device)
+    
+    cc = CommandCentral(constants.CENTRAL_NODE_ID, fcomm, None)
+    fcomm.add_dev(cc.devid, cc)
+    
+    await fcomm.log_message(f"SYSTEM: Created {len(devices)} devices and 1 command central.")
+    
+    initial_layout_message = {"type": "INITIAL_LAYOUT", "nodes": layout_instance.get_all_nodes()}
+    await manager.broadcast(json.dumps(initial_layout_message))
+    await fcomm.log_message("SYSTEM: Sent initial network layout to frontend.")
+
+
 async def simulation_loop():
-    """The main simulation logic."""
-    try:
-        print("Initializing simulation...")
-        num_units = 25
-        simulation_state.fcomm = IPCCommunicator(websocket_manager=manager)
-        layout_instance = Layout(num_units + 1)
-        
-        # Send initial layout to all connected clients
-        initial_layout_message = {
-            "type": "INITIAL_LAYOUT",
-            "nodes": layout_instance.get_all_nodes()
-        }
-        await manager.broadcast(json.dumps(initial_layout_message))
+    await setup_simulation()
 
-        # Create devices
-        simulation_state.devices = []
-        for i in range(num_units):
-            c = chr(i + 65)
-            devid = f"{c}{c}{c}"
-            device = Device(devid, simulation_state.fcomm, None)
-            simulation_state.devices.append(device)
+    while True:
+        if not simulation_state["running"]:
+            await asyncio.sleep(0.5)
+            continue
+        try:
+            await fcomm.log_message("SIM_PHASE: All nodes scanning for neighbors.")
+            await asyncio.sleep(1)
+            for device in devices:
+                if not simulation_state["running"]: break
+                await device.send_scan_message()
+                await asyncio.sleep(0.2)
+            if not simulation_state["running"]: continue
+            await asyncio.sleep(2)
 
-        # Create command central
-        simulation_state.cc = CommandCentral("ZZZ", simulation_state.fcomm, None)
-        simulation_state.fcomm.add_dev(simulation_state.cc.devid, simulation_state.cc)
-        
-        for d in simulation_state.devices:
-            simulation_state.fcomm.add_dev(d.devid, d)
+            await fcomm.log_message("SIM_PHASE: Central node broadcasting path information.")
+            await asyncio.sleep(1)
+            await cc.send_spath()
+            if not simulation_state["running"]: continue
+            await asyncio.sleep(3)
 
-        print("Simulation initialized. Waiting for start command...")
+            await fcomm.log_message("SIM_PHASE: All nodes sending heartbeats.")
+            await asyncio.sleep(1)
+            for device in devices:
+                 if not simulation_state["running"]: break
+                 await device.send_hb()
+                 await asyncio.sleep(0.3)
+            if not simulation_state["running"]: continue
+            await fcomm.log_message("SIM_PHASE: Round complete. Waiting before next cycle.")
+            await asyncio.sleep(5)
 
-        # Main simulation loop
-        while True:
-            if not simulation_state.running:
-                await asyncio.sleep(0.1)
-                continue
-
-            try:
-                # Device scanning and heartbeat phase
-                for device in simulation_state.devices:
-                    if not simulation_state.running:
-                        break
-                    
-                    # Send scan message
-                    scan_msg = {
-                        "message_type": "scan",
-                        "source": device.devid,
-                        "source_timestamp": time.time_ns(),
-                        "path_so_far": [device.devid]
-                    }
-                    await simulation_state.fcomm.send_to_network(scan_msg, device.devid)
-                    
-                    # Send heartbeat if device has a path
-                    hb_msg = device.make_hb_msg(time.time_ns())
-                    if hb_msg:
-                        await simulation_state.fcomm.send_to_network(hb_msg, device.devid)
-                    
-                    await asyncio.sleep(0.05)  # Small delay between device operations
-
-                if simulation_state.running:
-                    # Command central sends shortest path updates
-                    await simulation_state.cc.send_spath()
-                    print(f"Simulation round completed. CC neighbours: {simulation_state.cc.neighbours_seen}")
-                    await asyncio.sleep(2)  # Wait before next round
-
-            except Exception as e:
-                print(f"Error in simulation loop: {e}")
-                await asyncio.sleep(1)
-
-    except Exception as e:
-        print(f"Fatal error in simulation: {e}")
+        except Exception as e:
+            await fcomm.log_message(f"ERROR: Simulation loop crashed: {e}")
+            await asyncio.sleep(2)
 
 async def start_simulation():
-    """Start the simulation."""
-    if simulation_state.task is None or simulation_state.task.done():
-        print("Starting simulation task...")
-        simulation_state.task = asyncio.create_task(simulation_loop())
-    simulation_state.running = True
-    print("Simulation started!")
+    """Start the simulation if it's not already running, using a lock."""
+    async with simulation_lock:
+        if simulation_state["task"] is None or simulation_state["task"].done():
+            await fcomm.log_message("SYSTEM: Creating new simulation task.")
+            simulation_state["task"] = asyncio.create_task(simulation_loop())
+    
+    simulation_state["running"] = True
+    await fcomm.log_message("CONTROL: Simulation started by user.")
 
 async def stop_simulation():
     """Stop the simulation."""
-    simulation_state.running = False
-    print("Simulation stopped!")
-
-@app.on_event("startup")
-async def startup_event():
-    """Start the simulation task when the app starts."""
-    await start_simulation()
+    simulation_state["running"] = False
+    await fcomm.log_message("CONTROL: Simulation paused by user.")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
-    print(f"New WebSocket connection. Total connections: {len(manager.active_connections)}")
+    print("New client connected.")
     
-    # Send initial layout to the new client
-    if simulation_state.fcomm:
-        layout_instance = Layout(26)
-        initial_layout_message = {
-            "type": "INITIAL_LAYOUT", 
-            "nodes": layout_instance.get_all_nodes()
-        }
-        await websocket.send_text(json.dumps(initial_layout_message))
+    initial_layout_message = {"type": "INITIAL_LAYOUT", "nodes": layout_instance.get_all_nodes()}
+    await websocket.send_text(json.dumps(initial_layout_message))
     
     try:
         while True:
@@ -168,18 +130,13 @@ async def websocket_endpoint(websocket: WebSocket):
             command = message.get("command")
             
             if command == "start":
-                print(">>> Command Received: START Simulation")
-                simulation_state.running = True
-                if simulation_state.task is None or simulation_state.task.done():
-                    await start_simulation()
+                await start_simulation()
             elif command == "stop":
-                print(">>> Command Received: STOP Simulation")
                 await stop_simulation()
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        print(f"Client disconnected. Remaining connections: {len(manager.active_connections)}")
+        print("Client disconnected.")
 
 if __name__ == "__main__":
-    print("Starting FastAPI server on http://127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)
