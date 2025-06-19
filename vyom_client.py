@@ -14,6 +14,9 @@ from vyomcloudbridge.constants.constants import default_mission_id
 import json
 import logging
 
+import threading
+from vyomcloudbridge.services.root_store import RootStore
+
 
 class VyomClient:
     def __init__(self, logger=None):
@@ -233,6 +236,36 @@ class VyomClient:
         except Exception as e:
             self.logger.error(f"Error setting location in VyomClient: {e}")
 
+
+    def _send_central_unit_hb(self, lat: Union[int, float], long: Union[int, float]):
+        """
+        Helper function to send central unit heartbeat data to RootStore.
+        This function will be run in a separate thread.
+        """
+        try:
+            store = RootStore()
+            epoch_ms = int(time.time() * 1000)
+            location = {"lat": lat, "long": long, "timestamp": epoch_ms}
+            health = {"status": 1, "message": "Healthy"} # Assuming healthy for central unit heartbeat
+            
+            self.logger.info(f"Storing central unit location: {location}")
+            store.set_data("location", location)
+            self.logger.info(f"Storing central unit health: {health}")
+            store.set_data("health", health)
+            store.cleanup()
+            self.logger.info("Central unit heartbeat data sent to RootStore.")
+        except Exception as e:
+            self.logger.error(f"Error sending central unit heartbeat to RootStore: {e}")
+
+        def on_central_unit_hb_arrive(self, lat: Union[int, float], long: Union[int, float]):
+            """
+            Function to handle heartbeat from the central unit.
+            It will send the GPS lat and long to the RootStore on a different thread.
+            """
+            self.logger.info(f"[on_central_unit_hb_arrive] Called with lat={lat}, long={long}")
+            hb_thread = threading.Thread(target=self._send_central_unit_hb, args=(lat, long,))
+            hb_thread.start()
+
     def cleanup(self):
         try:
             self.writer.cleanup()
@@ -266,6 +299,14 @@ if __name__ == "__main__":
 
         # test on_hb_arrive
         client.on_hb_arrive(node_hn="rpi4", lat=75.66666, long=73.0589455)
+
+
+        # test on_central_unit_hb_arrive
+        client.on_central_unit_hb_arrive(lat=76.987934, long=76.937954)
+        # Give the thread some time to execute
+        time.sleep(2) 
+        
+
     except Exception as e:
         client.logger.error(f"Getting Error in running examples: {str(e)}")
     finally:
