@@ -107,18 +107,6 @@ const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
           {eventCount > 99 ? '99+' : eventCount}
         </span>
       </div>
-
-      {/* Event count indicator (small badge if there are events) */}
-      {/* {eventCount > 0 && (
-        <div
-          className={cn(
-            'absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border text-xs font-bold shadow-sm',
-            isOnline ? 'bg-orange-500 text-white' : 'bg-gray-700 text-white',
-          )}
-        >
-          {eventCount > 99 ? '99+' : eventCount}
-        </div>
-      )} */}
     </div>,
   );
 
@@ -133,25 +121,23 @@ const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
 // Calculate map center
 function getMapCenter(
   machines: Machine[],
-  getMachineData: (id: number) => SimpleMachineData,
 ): [number, number] {
   if (machines.length === 0) return [12.9716, 77.5946]; // Default to Bangalore
 
   const bounds = machines.reduce(
     (acc, m) => {
-      const machineData = getMachineData(m.id);
       return {
-        minLat: Math.min(acc.minLat, machineData.location.lat),
-        maxLat: Math.max(acc.maxLat, machineData.location.lat),
-        minLng: Math.min(acc.minLng, machineData.location.lng),
-        maxLng: Math.max(acc.maxLng, machineData.location.lng),
+        minLat: Math.min(acc.minLat, m?.last_location?.lat ?? 12.9716),
+        maxLat: Math.max(acc.maxLat, m?.last_location?.lat ?? 12.9716),
+        minLng: Math.min(acc.minLng, m?.last_location?.long ?? 77.5946),
+        maxLng: Math.max(acc.maxLng, m?.last_location?.long ?? 77.5946),
       };
     },
     {
-      minLat: getMachineData(machines[0].id).location.lat,
-      maxLat: getMachineData(machines[0].id).location.lat,
-      minLng: getMachineData(machines[0].id).location.lng,
-      maxLng: getMachineData(machines[0].id).location.lng,
+      minLat: machines[0]?.last_location?.lat ?? 12.9716,
+      maxLat: machines[0]?.last_location?.lat ?? 12.9716,
+      minLng: machines[0]?.last_location?.long ?? 77.5946,
+      maxLng: machines[0]?.last_location?.long ?? 77.5946,
     },
   );
 
@@ -164,25 +150,23 @@ function getMapCenter(
 // Calculate optimal zoom level
 function getOptimalZoom(
   machines: Machine[],
-  getMachineData: (id: number) => SimpleMachineData,
 ): number {
   if (machines.length <= 1) return 12;
 
   const bounds = machines.reduce(
     (acc, m) => {
-      const machineData = getMachineData(m.id);
       return {
-        minLat: Math.min(acc.minLat, machineData.location.lat),
-        maxLat: Math.max(acc.maxLat, machineData.location.lat),
-        minLng: Math.min(acc.minLng, machineData.location.lng),
-        maxLng: Math.max(acc.maxLng, machineData.location.lng),
+        minLat: Math.min(acc.minLat, m?.last_location?.lat ?? 12.9716),
+        maxLat: Math.max(acc.maxLat, m?.last_location?.lat ?? 12.9716),
+        minLng: Math.min(acc.minLng, m?.last_location?.long ?? 77.5946),
+        maxLng: Math.max(acc.maxLng, m?.last_location?.long ?? 77.5946),
       };
     },
     {
-      minLat: getMachineData(machines[0].id).location.lat,
-      maxLat: getMachineData(machines[0].id).location.lat,
-      minLng: getMachineData(machines[0].id).location.lng,
-      maxLng: getMachineData(machines[0].id).location.lng,
+      minLat: machines[0]?.last_location?.lat ?? 12.9716,
+      maxLat: machines[0]?.last_location?.lat ?? 12.9716,
+      minLng: machines[0]?.last_location?.long ?? 77.5946,
+      maxLng: machines[0]?.last_location?.long ?? 77.5946,
     },
   );
 
@@ -190,6 +174,8 @@ function getOptimalZoom(
   const lngDiff = bounds.maxLng - bounds.minLng;
   const maxDiff = Math.max(latDiff, lngDiff);
 
+  if (maxDiff > 10) return 4;
+  if (maxDiff > 5) return 6;
   if (maxDiff > 1) return 8;
   if (maxDiff > 0.5) return 10;
   if (maxDiff > 0.1) return 12;
@@ -256,20 +242,8 @@ function EnhancedMarker({
       ref={markerRef}
       icon={createStatusIcon(machine, machineData)}
       position={[
-        machineData.machine_id === 206
-          ? machineData.location.lat + 0.001
-          : machineData.machine_id === 207
-            ? machineData.location.lat + 0.002
-            : machineData.machine_id === 208
-              ? machineData.location.lat + 0.003
-              : machineData.location.lat,
-        machineData.machine_id === 206
-          ? machineData.location.lng + 0.001
-          : machineData.machine_id === 207
-            ? machineData.location.lng + 0.002
-            : machineData.machine_id === 208
-              ? machineData.location.lng + 0.003
-              : machineData.location.lng,
+        machine?.last_location?.lat ?? 12.9716,
+        machine?.last_location?.long ?? 77.5946,
       ]}
       eventHandlers={{
         click: handleClick,
@@ -350,8 +324,8 @@ export default function SimplifiedReactLeafletMap({
   onMarkerClick,
   getMachineData,
 }: MapProps) {
-  const center = getMapCenter(machines, getMachineData);
-  const zoom = getOptimalZoom(machines, getMachineData);
+  const center = getMapCenter(machines);
+  const zoom = getOptimalZoom(machines);
 
   return (
     <MapContainer

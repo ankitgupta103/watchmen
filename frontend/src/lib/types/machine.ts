@@ -11,7 +11,7 @@ export interface Machine {
   current_owner_name: string;
   machine_status: string;
   connection_status: string;
-  last_location: { lat: number; lng: number };
+  last_location: { lat: number; long: number };
   created_at: string;
   updated_at: string;
   model_id: number;
