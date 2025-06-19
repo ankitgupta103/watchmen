@@ -90,7 +90,7 @@ class AudioManager {
 
     // Create a more urgent alarm sound
     const sampleRate = this.audioContext.sampleRate;
-    const duration = 1.5; // seconds
+    const duration = 30; // seconds
     const buffer = this.audioContext.createBuffer(
       1,
       sampleRate * duration,
