@@ -22,7 +22,7 @@ import {
 import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
 
-import MachineDetailModal from './machine-detail-model';
+import MachineDetailModal from './machine-detail-modal';
 
 interface LiveFeedWrapperProps {
   machines: Machine[];

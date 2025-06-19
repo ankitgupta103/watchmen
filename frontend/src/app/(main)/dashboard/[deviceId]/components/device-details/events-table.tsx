@@ -77,7 +77,7 @@ const EventsTable = ({
                     alt="Cropped"
                     width={40}
                     height={40}
-                    className="rounded border object-cover h-40 w-40"
+                    className="h-40 w-40 rounded border object-cover"
                   />
                 )}
                 {event.fullImageUrl && (
@@ -86,7 +86,7 @@ const EventsTable = ({
                     alt="Full"
                     width={40}
                     height={40}
-                    className="rounded border object-contain h-40 w-fit"
+                    className="h-40 w-fit rounded border object-contain"
                   />
                 )}
               </div>

@@ -90,8 +90,8 @@ const EventDetailsModal = ({
 
             {event.imagesFetched && (
               <div className="space-y-4">
-                <h3 className="font-semibold ">Event Images</h3>
-                <div className="flex flex-col lg:flex-row gap-4 items-center justify-center">
+                <h3 className="font-semibold">Event Images</h3>
+                <div className="flex flex-col items-center justify-center gap-4 lg:flex-row">
                   {event.croppedImageUrl && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-gray-600">

@@ -27,9 +27,6 @@ export default async function LiveFeed() {
         organizationId="20"
         machines={machines}
         enableSound={true}
-        // onAlertReceived={(alert) => {
-        //   console.log('alert received', alert);
-        // }}
       />
     </section>
   );
