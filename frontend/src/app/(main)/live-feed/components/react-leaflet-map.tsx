@@ -198,6 +198,13 @@ function EnhancedMarker({
   const markerRef = useRef<L.Marker>(null);
   let hoverTimeout: NodeJS.Timeout;
 
+  const lastSeen = machine.last_location?.timestamp
+        ? new Date(machine.last_location.timestamp)
+        : null;
+      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
+
+
   const handleMouseOver = () => {
     if (hoverTimeout) {
       clearTimeout(hoverTimeout);
@@ -222,6 +229,8 @@ function EnhancedMarker({
     }
     onMarkerClick(machine);
   };
+
+
 
   const getStatusText = (isOnline: boolean, eventCount: number) => {
     if (isOnline) {
@@ -264,10 +273,10 @@ function EnhancedMarker({
             {machine.name.toUpperCase()}
           </h3>
           <Badge
-            variant={machineData.is_online ? 'default' : 'destructive'}
+            variant={isOnline ? 'default' : 'destructive'}
             className="text-xs"
           >
-            {machineData.is_online ? 'Online' : 'Offline'}
+            {isOnline ? 'Online' : 'Offline'}
           </Badge>
         </div>
 
@@ -276,16 +285,12 @@ function EnhancedMarker({
             <strong>Machine ID:</strong> {machine.id}
           </div>
 
-          <div>
-            <strong>Type:</strong> {machine.type.replace('_', ' ')}
-          </div>
-
           {/* Status information */}
           <div
-            className={cn('font-medium', getStatusColor(machineData.is_online))}
+            className={cn('font-medium', getStatusColor(isOnline))}
           >
             <strong>Status:</strong>{' '}
-            {getStatusText(machineData.is_online, machineData.event_count)}
+            {getStatusText(isOnline, machineData.event_count)}
           </div>
 
           {/* Recent event activity indicator */}
