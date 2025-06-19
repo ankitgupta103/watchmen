@@ -106,8 +106,8 @@ export default function HeatMapCalendar({
       (machine) =>
         machine.last_location.lat >= areaFilter.south &&
         machine.last_location.lat <= areaFilter.north &&
-        machine.last_location.lng >= areaFilter.west &&
-        machine.last_location.lng <= areaFilter.east,
+        machine.last_location.long >= areaFilter.west &&
+        machine.last_location.long <= areaFilter.east,
     );
   }, [machines, areaFilter]);
 

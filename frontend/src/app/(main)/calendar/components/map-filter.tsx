@@ -193,14 +193,14 @@ const MapFilter = ({
       (acc, m) => ({
         minLat: Math.min(acc.minLat, m.last_location.lat),
         maxLat: Math.max(acc.maxLat, m.last_location.lat),
-        minLng: Math.min(acc.minLng, m.last_location.lng),
-        maxLng: Math.max(acc.maxLng, m.last_location.lng),
+        minLng: Math.min(acc.minLng, m.last_location.long),
+        maxLng: Math.max(acc.maxLng, m.last_location.long),
       }),
       {
         minLat: machines[0]?.last_location?.lat ?? 12.9716,
         maxLat: machines[0]?.last_location?.lat ?? 12.9716,
-        minLng: machines[0]?.last_location?.lng ?? 77.5946,
-        maxLng: machines[0]?.last_location?.lng ?? 77.5946,
+        minLng: machines[0]?.last_location?.long ?? 77.5946,
+        maxLng: machines[0]?.last_location?.long ?? 77.5946,
       },
     );
 
@@ -217,14 +217,14 @@ const MapFilter = ({
       (acc, m) => ({
         minLat: Math.min(acc.minLat, m.last_location.lat),
         maxLat: Math.max(acc.maxLat, m.last_location.lat),
-        minLng: Math.min(acc.minLng, m.last_location.lng),
-        maxLng: Math.max(acc.maxLng, m.last_location.lng),
+        minLng: Math.min(acc.minLng, m.last_location.long),
+        maxLng: Math.max(acc.maxLng, m.last_location.long),
       }),
       {
         minLat: machines[0]?.last_location?.lat ?? 12.9716,
         maxLat: machines[0]?.last_location?.lat ?? 12.9716,
-        minLng: machines[0]?.last_location?.lng ?? 77.5946,
-        maxLng: machines[0]?.last_location?.lng ?? 77.5946,
+        minLng: machines[0]?.last_location?.long ?? 77.5946,
+        maxLng: machines[0]?.last_location?.long ?? 77.5946,
       },
     );
 
@@ -253,8 +253,8 @@ const MapFilter = ({
     return (
       machine.last_location.lat >= tempBounds.south &&
       machine.last_location.lat <= tempBounds.north &&
-      machine.last_location.lng >= tempBounds.west &&
-      machine.last_location.lng <= tempBounds.east
+      machine.last_location.long >= tempBounds.west &&
+      machine.last_location.long <= tempBounds.east
     );
   };
 
@@ -348,7 +348,7 @@ const MapFilter = ({
                     key={machine.id}
                     position={[
                       machine.last_location.lat,
-                      machine.last_location.lng,
+                      machine.last_location.long,
                     ]}
                     icon={createMachineIcon(
                       machine,
@@ -391,7 +391,7 @@ const MapFilter = ({
                       key={`coverage-${machine.id}`}
                       center={[
                         machine.last_location.lat,
-                        machine.last_location.lng,
+                        machine.last_location.long,
                       ]}
                       radius={200}
                       pathOptions={{
