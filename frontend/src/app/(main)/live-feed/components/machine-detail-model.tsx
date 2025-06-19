@@ -101,10 +101,14 @@ export default function MachineDetailModal({
   const { token } = useToken();
   const { organizationId } = useOrganization();
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  const [historicalEvents, setHistoricalEvents] = useState<HistoricalEvent[]>([]);
+  const [historicalEvents, setHistoricalEvents] = useState<HistoricalEvent[]>(
+    [],
+  );
   const [loadingHistorical, setLoadingHistorical] = useState(false);
-  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
-  
+  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>(
+    {},
+  );
+
   // New state for image loading pagination
   const [loadingMoreImages, setLoadingMoreImages] = useState(false);
   const [imagesLoadedCounter, setImagesLoadedCounter] = useState(0);
@@ -126,7 +130,7 @@ export default function MachineDetailModal({
     ];
   }, [organizationId, selectedMachine]);
 
-    // Function to fetch images for events
+  // Function to fetch images for events
   const fetchEventImages = useCallback(
     async (imageKeys: { image_c_key: string; image_f_key: string }) => {
       try {
@@ -160,7 +164,6 @@ export default function MachineDetailModal({
     },
     [token],
   );
-
 
   // Handle MQTT messages for live events
   const handleMqttMessage = useCallback(
@@ -336,10 +339,8 @@ export default function MachineDetailModal({
       // Get events that have image keys but haven't been requested yet
       const eventsNeedingImages = historicalEvents
         .filter(
-          (event) => 
-            event.image_c_key && 
-            event.image_f_key && 
-            !event.images_requested
+          (event) =>
+            event.image_c_key && event.image_f_key && !event.images_requested,
         )
         .slice(0, IMAGES_PER_BATCH);
 
@@ -351,12 +352,15 @@ export default function MachineDetailModal({
       // Mark these events as requested and set loading state
       setHistoricalEvents((prev) =>
         prev.map((event) => {
-          if (eventsNeedingImages.some(e => e.id === event.id)) {
-            setLoadingImages((loadingPrev) => ({ ...loadingPrev, [event.id]: true }));
+          if (eventsNeedingImages.some((e) => e.id === event.id)) {
+            setLoadingImages((loadingPrev) => ({
+              ...loadingPrev,
+              [event.id]: true,
+            }));
             return { ...event, images_requested: true };
           }
           return event;
-        })
+        }),
       );
 
       // Fetch images for these events concurrently
@@ -389,10 +393,7 @@ export default function MachineDetailModal({
             );
           }
         } catch (error) {
-          console.warn(
-            `Failed to fetch images for event ${event.id}:`,
-            error,
-          );
+          console.warn(`Failed to fetch images for event ${event.id}:`, error);
           // Mark as loaded even if failed
           setHistoricalEvents((prev) =>
             prev.map((e) =>
@@ -405,7 +406,7 @@ export default function MachineDetailModal({
       });
 
       await Promise.all(imagePromises);
-      setImagesLoadedCounter(prev => prev + eventsNeedingImages.length);
+      setImagesLoadedCounter((prev) => prev + eventsNeedingImages.length);
     } catch (error) {
       console.error('Error loading more images:', error);
     } finally {
@@ -463,12 +464,13 @@ export default function MachineDetailModal({
 
   // Calculate stats for load more button
   const eventsWithImages = historicalEvents.filter(
-    (event) => event.image_c_key && event.image_f_key
+    (event) => event.image_c_key && event.image_f_key,
   );
   const eventsWithImagesRequested = historicalEvents.filter(
-    (event) => event.images_requested
+    (event) => event.images_requested,
   );
-  const hasMoreImagesToLoad = eventsWithImagesRequested.length < eventsWithImages.length;
+  const hasMoreImagesToLoad =
+    eventsWithImagesRequested.length < eventsWithImages.length;
 
   return (
     <>
@@ -774,7 +776,8 @@ export default function MachineDetailModal({
                       )}
                       {eventsWithImages.length > 0 && (
                         <Badge variant="secondary">
-                          {eventsWithImagesRequested.length}/{eventsWithImages.length} images loaded
+                          {eventsWithImagesRequested.length}/
+                          {eventsWithImages.length} images loaded
                         </Badge>
                       )}
                     </div>
@@ -850,7 +853,8 @@ export default function MachineDetailModal({
                                       </div>
 
                                       {/* Updated Image Display Logic */}
-                                      {event.image_c_key && event.image_f_key ? (
+                                      {event.image_c_key &&
+                                      event.image_f_key ? (
                                         // Event has image keys
                                         !event.images_requested ? (
                                           // Images not requested yet - show metadata only
@@ -861,9 +865,16 @@ export default function MachineDetailModal({
                                                 Images Available
                                               </p>
                                               <p className="text-xs text-blue-500">
-                                                {event.image_c_key ? 'Cropped' : ''}
-                                                {event.image_c_key && event.image_f_key ? ' • ' : ''}
-                                                {event.image_f_key ? 'Full' : ''}
+                                                {event.image_c_key
+                                                  ? 'Cropped'
+                                                  : ''}
+                                                {event.image_c_key &&
+                                                event.image_f_key
+                                                  ? ' • '
+                                                  : ''}
+                                                {event.image_f_key
+                                                  ? 'Full'
+                                                  : ''}
                                               </p>
                                             </div>
                                           </div>
@@ -950,7 +961,7 @@ export default function MachineDetailModal({
                             </div>
                           </div>
                         ))}
-                      
+
                       {/* Load More Images Button */}
                       {hasMoreImagesToLoad && (
                         <div className="flex justify-center pt-6">
@@ -969,17 +980,24 @@ export default function MachineDetailModal({
                             ) : (
                               <>
                                 <ImageIcon className="h-4 w-4" />
-                                Load More Images ({Math.min(IMAGES_PER_BATCH, eventsWithImages.length - eventsWithImagesRequested.length)})
+                                Load More Images (
+                                {Math.min(
+                                  IMAGES_PER_BATCH,
+                                  eventsWithImages.length -
+                                    eventsWithImagesRequested.length,
+                                )}
+                                )
                               </>
                             )}
                           </Button>
                         </div>
                       )}
-                      
+
                       {!hasMoreImagesToLoad && eventsWithImages.length > 0 && (
-                        <div className="text-center pt-4">
+                        <div className="pt-4 text-center">
                           <p className="text-sm text-gray-500">
-                            All images have been loaded ({eventsWithImages.length} total)
+                            All images have been loaded (
+                            {eventsWithImages.length} total)
                           </p>
                         </div>
                       )}

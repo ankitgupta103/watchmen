@@ -58,8 +58,8 @@ interface MapProps {
 // Create enhanced custom icon with online/offline status and pulsating animation
 const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
   const lastSeen = machine.last_location?.timestamp
-        ? new Date(machine.last_location.timestamp)
-        : null;
+    ? new Date(machine.last_location.timestamp)
+    : null;
   const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
   const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
@@ -309,9 +309,8 @@ function EnhancedMarker({
           )}
 
           <div className="mt-1 border-t pt-1 text-xs text-gray-500">
-            <strong>Location:</strong>{' '}
-            {machine?.last_location?.lat ?? '0.0000'},{' '}
-            {machine?.last_location?.long ?? '0.0000'}
+            <strong>Location:</strong> {machine?.last_location?.lat ?? '0.0000'}
+            , {machine?.last_location?.long ?? '0.0000'}
           </div>
 
           <div className="text-xs text-gray-400">Click to view details</div>
