@@ -472,6 +472,7 @@ class DevUnit:
         photos_seen = 0
         events_seen = 0
         while True:
+            time.sleep(10)
             (photos_seen, critical_images) = get_files_in_dir(ALLDIR, CRITICAL_DIR)
             #self.logger.info(f"Photos sofar = {self.photos_taken}, Critical sofar={len(self.critical_images_processed)}, now={len(critical_images)}")
             self.photos_taken = photos_seen
@@ -488,7 +489,6 @@ class DevUnit:
                 if full:
                     self.send_img(full, evid)
                     time.sleep(60)
-            time.sleep(10)
 
     # A:1205:100:12
     # Name, time, images taken, events noticed.
