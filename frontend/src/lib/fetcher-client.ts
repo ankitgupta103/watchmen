@@ -24,7 +24,7 @@ export async function fetcherClient<TResponse = unknown, TRequest = unknown>(
   token: string,
   options?: FetchOptions<TRequest>,
 ): Promise<TResponse | undefined> {
-  const { method = 'GET', body, headers } = options || {};
+  const { method = 'GET', body, headers, signal } = options || {};
 
   try {
     const res = await fetch(url, {
@@ -35,6 +35,7 @@ export async function fetcherClient<TResponse = unknown, TRequest = unknown>(
         ...(headers || {}),
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal,
     });
 
     if (res.ok) {

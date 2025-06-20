@@ -12,11 +12,13 @@ export type FetchMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
  * @property {FetchMethod} [method] - The HTTP method to use (default is 'GET').
  * @property {T} [body] - The request payload to send (for POST/PUT requests).
  * @property {HeadersInit} [headers] - Additional headers to include in the request.
+ * @property {AbortSignal} [signal] - An optional signal to abort the request.
  */
 export interface FetchOptions<T = unknown> {
   method?: FetchMethod;
   body?: T;
   headers?: HeadersInit;
+  signal?: AbortSignal;
 }
 
 /**
