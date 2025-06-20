@@ -24,7 +24,7 @@ logging.basicConfig(
 # TODO: Old was yolo 8n.pt
 # YOLO_MODEL_NAME = "yolov11n.pt"
 YOLO_MODEL_NAME = "yolov8s-world.pt"
-POLL_INTERVAL_SECONDS = 5  # Time to wait between directory scans
+POLL_INTERVAL_SECONDS = 60  # Time to wait between directory scans (changed from 5 to 60)
 
 SEVERITY_LOW = 0
 SEVERITY_MEDIUM = 1
@@ -165,7 +165,7 @@ class ProcessingService:
         self.processed_dir = processed_dir
         self.critical_dir = processed_dir / "critical"
         self.is_running = False
-        self.most_recent_epoch = None  # Track the most recent processed epoch timestamp
+        self.last_processed_timestamp = None  # Track the last processed timestamp
 
         # Create directories if they don't exist
         self.processed_dir.mkdir(parents=True, exist_ok=True)
@@ -209,18 +209,79 @@ class ProcessingService:
         except Exception:
             return None
 
-    def process_and_store_image(self, image_path: Path, image_epoch: Optional[int] = None):
+    def _get_latest_image(self, image_files: List[Path]) -> Optional[Path]:
+        """
+        Returns the latest image based on epoch timestamp in filename or file modification time.
+        
+        Args:
+            image_files (List[Path]): List of image file paths
+            
+        Returns:
+            Optional[Path]: The latest image file, or None if no images found
+        """
+        if not image_files:
+            return None
+            
+        latest_image = None
+        latest_timestamp = 0
+        
+        for image_path in image_files:
+            # Try to get epoch from filename first
+            epoch = self._extract_epoch_from_filename(image_path.name)
+            
+            if epoch is not None:
+                timestamp = epoch
+            else:
+                # Fall back to file modification time
+                timestamp = int(image_path.stat().st_mtime)
+            
+            if timestamp > latest_timestamp:
+                latest_timestamp = timestamp
+                latest_image = image_path
+                
+        return latest_image
+
+    def _delete_stale_images(self, image_files: List[Path]):
+        """
+        Delete images that are more than 10 minutes older than the last processed timestamp.
+        
+        Args:
+            image_files (List[Path]): List of image file paths to check
+        """
+        if self.last_processed_timestamp is None:
+            return
+            
+        stale_threshold = 600  # 10 minutes in seconds (changed from 900 to 600)
+        
+        for image_path in image_files:
+            # Try to get epoch from filename first
+            epoch = self._extract_epoch_from_filename(image_path.name)
+            
+            if epoch is not None:
+                image_timestamp = epoch
+            else:
+                # Fall back to file modification time
+                image_timestamp = int(image_path.stat().st_mtime)
+            
+            # Delete if image is more than 10 minutes older than last processed
+            if self.last_processed_timestamp - image_timestamp > stale_threshold:
+                logging.info(f"Deleting stale image {image_path.name} (timestamp {image_timestamp}) older than 10 min from last processed timestamp {self.last_processed_timestamp}.")
+                try:
+                    image_path.unlink()
+                except OSError as e:
+                    logging.error(f"Error deleting stale file {image_path}: {e}")
+
+    def process_and_store_image(self, image_path: Path, image_timestamp: Optional[int] = None):
         """
         Processes a single image: detects objects, determines severity,
         saves files, and deletes the original.
         """
-        logging.info(f"Processing new file: {image_path.name} | Most recent epoch: {self.most_recent_epoch}")
+        logging.info(f"Processing latest file: {image_path.name} | Last processed timestamp: {self.last_processed_timestamp}")
 
-        # Update most recent epoch if this image is newer
-        if image_epoch is not None:
-            if self.most_recent_epoch is None or image_epoch > self.most_recent_epoch:
-                self.most_recent_epoch = image_epoch
-                logging.info(f"Updated most recent epoch to: {self.most_recent_epoch}")
+        # Update last processed timestamp
+        if image_timestamp is not None:
+            self.last_processed_timestamp = image_timestamp
+            logging.info(f"Updated last processed timestamp to: {self.last_processed_timestamp}")
 
         detected_objects = self.detector.detect_objects(image_path)
 
@@ -311,28 +372,27 @@ class ProcessingService:
                     if p.is_file() and p.suffix.lower() in image_extensions
                 ]
 
-                # Find the most recent epoch among all images (in case of restart)
-                for p in image_files:
-                    epoch = self._extract_epoch_from_filename(p.name)
-                    if epoch is not None:
-                        if self.most_recent_epoch is None or epoch > self.most_recent_epoch:
-                            self.most_recent_epoch = epoch
-                            logging.info(f"Updated most recent epoch to: {self.most_recent_epoch}")
-
                 if not image_files:
-                    logging.info(f"No new images found. Waiting for {POLL_INTERVAL_SECONDS}s... | Most recent epoch: {self.most_recent_epoch}")
+                    logging.info(f"No images found. Waiting for {POLL_INTERVAL_SECONDS}s... | Last processed timestamp: {self.last_processed_timestamp}")
                 else:
-                    for image_path in image_files:
-                        image_epoch = self._extract_epoch_from_filename(image_path.name)
-                        if image_epoch is not None and self.most_recent_epoch is not None:
-                            if image_epoch < self.most_recent_epoch - 900:
-                                logging.info(f"Deleting stale image {image_path.name} (epoch {image_epoch}) older than 15 min from most recent epoch {self.most_recent_epoch}.")
-                                try:
-                                    image_path.unlink()
-                                except OSError as e:
-                                    logging.error(f"Error deleting stale file {image_path}: {e}")
-                                continue
-                        self.process_and_store_image(image_path, image_epoch=image_epoch)
+                    # Get the latest image
+                    latest_image = self._get_latest_image(image_files)
+                    
+                    if latest_image:
+                        # Get timestamp for the latest image
+                        epoch = self._extract_epoch_from_filename(latest_image.name)
+                        if epoch is None:
+                            epoch = int(latest_image.stat().st_mtime)
+                        
+                        # Process only the latest image
+                        self.process_and_store_image(latest_image, image_timestamp=epoch)
+                        
+                        # After processing, delete any stale images
+                        remaining_files = [
+                            p for p in self.source_dir.iterdir()
+                            if p.is_file() and p.suffix.lower() in image_extensions
+                        ]
+                        self._delete_stale_images(remaining_files)
 
                 time.sleep(POLL_INTERVAL_SECONDS)
 
