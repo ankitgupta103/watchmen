@@ -69,12 +69,12 @@ HN_ID = {
 # Last is CC
 # Everything in between is passthrough.
 NEXT_DEST_MAP = {
-        # BLR
+        # BLR Parallel to A
         "C" : "A",
         "B" : "A",
-        # GUR
+        # GUR F->E->D
         "F" : "E",
-        "E",: "D"
+        "E" : "D"
         }
 
 # PATH_DEMOB = ["C", "D", "A"]
