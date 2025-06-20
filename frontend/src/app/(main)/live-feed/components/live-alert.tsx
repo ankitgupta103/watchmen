@@ -597,7 +597,7 @@ export default function CriticalAlertSystem({
               <Separator />
 
               {/* Alerts List */}
-              <div className="max-h-[90vh] overflow-y-auto">
+              <div className="max-h-[60vh] overflow-y-auto">
                 {alerts.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     <Camera className="mx-auto mb-2 h-12 w-12 opacity-30" />
