@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -13,8 +14,9 @@ import {
 } from '@/components/ui/table';
 
 import { Machine } from '@/lib/types/machine';
+import { isMachineOnline } from '@/lib/utils';
 
-import DeviceStatusBufferLocation from './device-status-buffer-location';
+import DeviceBuffer from './device-status-buffer-location';
 
 export default function DeviceListing({ machines }: { machines: Machine[] }) {
   return (
@@ -37,7 +39,17 @@ export default function DeviceListing({ machines }: { machines: Machine[] }) {
               </Link>
             </TableCell>
             <TableCell>{machine.type.replace(/_/g, ' ')}</TableCell>
-            <DeviceStatusBufferLocation machineId={machine.id} />
+            <TableCell>
+              <TableCell>
+                <Badge
+                  variant={isMachineOnline(machine) ? 'default' : 'destructive'}
+                  className="capitalize"
+                >
+                  {isMachineOnline(machine) ? 'Online' : 'Offline'}
+                </Badge>
+              </TableCell>
+            </TableCell>
+            <DeviceBuffer machineId={machine.id} />
             <TableCell>
               {machine?.last_location?.lat ?? '-'},{' '}
               {machine?.last_location?.long ?? '-'}

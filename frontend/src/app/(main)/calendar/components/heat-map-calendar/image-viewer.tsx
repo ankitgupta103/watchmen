@@ -1,7 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 export default function ImageViewerModal({
   modalImage,
@@ -12,6 +12,7 @@ export default function ImageViewerModal({
 }) {
   return (
     <Dialog open={!!modalImage} onOpenChange={() => setModalImage(null)}>
+      <DialogTitle>Event Image</DialogTitle>
       <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col items-center justify-center p-4">
         <div className="flex h-[80vh] w-fit items-center justify-center">
           <Image
