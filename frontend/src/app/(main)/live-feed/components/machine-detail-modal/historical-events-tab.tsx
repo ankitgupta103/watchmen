@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock, ImageIcon, Loader2 } from 'lucide-react';
-import Image from 'next/image';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +11,7 @@ import { fetcherClient } from '@/lib/fetcher-client';
 import { cn } from '@/lib/utils';
 
 import Pagination from './pagination';
+import EventImage from './event-image';
 
 interface MachineEvent {
   id: string;
@@ -19,39 +19,8 @@ interface MachineEvent {
   eventstr: string;
   image_c_key?: string;
   image_f_key?: string;
-  cropped_image_url?: string;
-  full_image_url?: string;
-  images_loaded: boolean;
-  images_requested: boolean;
   event_severity?: string;
 }
-
-const fetchEventImages = async (
-  token: string,
-  imageKeys: { image_c_key: string; image_f_key: string },
-) => {
-  try {
-    const data = await fetcherClient<{
-      success: boolean;
-      cropped_image_url?: string;
-      full_image_url?: string;
-      error?: string;
-    }>(`${API_BASE_URL}/event-images/`, token, {
-      method: 'POST',
-      body: imageKeys,
-    });
-    if (data?.success) {
-      return {
-        croppedImageUrl: data.cropped_image_url,
-        fullImageUrl: data.full_image_url,
-      };
-    }
-    throw new Error(data?.error || 'Failed to fetch images');
-  } catch (error) {
-    console.error('Error fetching images:', error);
-    return null;
-  }
-};
 
 const HistoricalEventsTab = ({
   machineId,
@@ -67,6 +36,7 @@ const HistoricalEventsTab = ({
   const [events, setEvents] = useState<MachineEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
   const eventsPerPage = 15;
 
   const fetchHistoricalEvents = useCallback(async () => {
@@ -78,7 +48,7 @@ const HistoricalEventsTab = ({
     const promises = Array.from({ length: 7 }).map((_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateStr = date.toLocaleDateString('en-CA'); //  आएन-CA
+      const dateStr = date.toLocaleDateString('en-CA');
       return fetcherClient<{
         success: boolean;
         events?: Array<{
@@ -86,6 +56,7 @@ const HistoricalEventsTab = ({
           image_f_key: string;
           eventstr: string;
           timestamp?: string | Date;
+          event_severity?: string;
         }>;
       }>(`${API_BASE_URL}/s3-events/fetch-events/`, token, {
         method: 'POST',
@@ -98,8 +69,6 @@ const HistoricalEventsTab = ({
       ...event,
       id: `hist-${machineId}-${index}`,
       timestamp: new Date(event.timestamp || Date.now()),
-      images_loaded: false,
-      images_requested: false,
     }));
 
     allEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -110,43 +79,6 @@ const HistoricalEventsTab = ({
   useEffect(() => {
     fetchHistoricalEvents();
   }, [fetchHistoricalEvents]);
-
-  // Fetch images for the current page
-  useEffect(() => {
-    if (events.length === 0 || !token) return;
-
-    const startIndex = (currentPage - 1) * eventsPerPage;
-    const endIndex = startIndex + eventsPerPage;
-    const currentEvents = events.slice(startIndex, endIndex);
-
-    currentEvents.forEach((event) => {
-      if (event.image_c_key && event.image_f_key && !event.images_requested) {
-        setEvents((prev) =>
-          prev.map((e) =>
-            e.id === event.id ? { ...e, images_requested: true } : e,
-          ),
-        );
-
-        fetchEventImages(token, {
-          image_c_key: event.image_c_key,
-          image_f_key: event.image_f_key,
-        }).then((imageUrls) => {
-          setEvents((prev) =>
-            prev.map((e) =>
-              e.id === event.id
-                ? {
-                    ...e,
-                    cropped_image_url: imageUrls?.croppedImageUrl,
-                    full_image_url: imageUrls?.fullImageUrl,
-                    images_loaded: true,
-                  }
-                : e,
-            ),
-          );
-        });
-      }
-    });
-  }, [events, currentPage, token]);
 
   const groupedEvents = useMemo(() => {
     return events.reduce(
@@ -179,7 +111,8 @@ const HistoricalEventsTab = ({
       events: paginated,
       totalPages: totalPages,
     };
-  }, [groupedEvents, currentPage]);
+  }, [groupedEvents, currentPage, eventsPerPage]);
+
 
   if (loading) {
     return (
@@ -202,64 +135,6 @@ const HistoricalEventsTab = ({
       </div>
     );
   }
-
-  const ImageDisplay = ({ event }: { event: MachineEvent }) => {
-    const hasImageKeys = event.image_c_key && event.image_f_key;
-
-    if (event.images_requested && !event.images_loaded) {
-      return (
-        <div className="flex h-32 items-center justify-center rounded border bg-gray-50">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-        </div>
-      );
-    }
-
-    if (
-      event.images_loaded &&
-      (event.cropped_image_url || event.full_image_url)
-    ) {
-      return (
-        <div className="grid grid-cols-2 gap-2">
-          {event.cropped_image_url && (
-            <Image
-              src={event.cropped_image_url}
-              alt="Cropped historical"
-              width={150}
-              height={150}
-              className="h-24 w-full cursor-pointer rounded border object-cover"
-              onClick={() => onImageClick(event.cropped_image_url!)}
-            />
-          )}
-          {event.full_image_url && (
-            <Image
-              src={event.full_image_url}
-              alt="Full historical"
-              width={150}
-              height={150}
-              className="h-24 w-full cursor-pointer rounded border object-cover"
-              onClick={() => onImageClick(event.full_image_url!)}
-            />
-          )}
-        </div>
-      );
-    }
-
-    if (hasImageKeys) {
-      return (
-        <div className="flex h-32 flex-col items-center justify-center rounded border bg-blue-50/50 text-center text-xs text-blue-600">
-          <ImageIcon className="mb-1 h-6 w-6" />
-          Images Available
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex h-32 flex-col items-center justify-center rounded border bg-gray-50 text-center text-xs text-gray-500">
-        <ImageIcon className="mb-1 h-6 w-6 text-gray-400" />
-        No Image Data
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-4">
@@ -312,7 +187,12 @@ const HistoricalEventsTab = ({
                         {event.timestamp.toLocaleDateString()}
                       </span>
                     </div>
-                    <ImageDisplay event={event} />
+                    <EventImage
+                        token={token}
+                        image_c_key={event.image_c_key}
+                        image_f_key={event.image_f_key}
+                        onImageClick={onImageClick}
+                    />
                     <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
                       <Clock className="h-3 w-3" />
                       {event.timestamp.toLocaleTimeString()}

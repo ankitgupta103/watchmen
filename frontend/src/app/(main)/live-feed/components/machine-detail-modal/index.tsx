@@ -152,7 +152,7 @@ export default function MachineDetailModal({
         open={!!selectedMachine}
         onOpenChange={() => setSelectedMachine(null)}
       >
-        <DialogContent className="flex h-full max-h-[95vh] w-full max-w-6xl flex-col  bg-gray-50">
+        <DialogContent className="flex h-full max-h-[95vh] w-full max-w-6xl flex-col bg-gray-50">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3 text-xl">
               <Camera className="h-6 w-6 text-blue-600" />

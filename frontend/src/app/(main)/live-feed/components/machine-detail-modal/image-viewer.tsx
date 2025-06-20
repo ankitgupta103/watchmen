@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 const ImageViewer = ({
   imageUrl,
@@ -12,6 +12,7 @@ const ImageViewer = ({
   if (!imageUrl) return null;
   return (
     <Dialog open={!!imageUrl} onOpenChange={onClose}>
+      <DialogTitle>Event Image</DialogTitle>
       <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col items-center justify-center p-4">
         <div className="flex h-[80vh] w-fit items-center justify-center">
           <Image

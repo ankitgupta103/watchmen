@@ -2,10 +2,10 @@ import { Info } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 import { Machine } from '@/lib/types/machine';
 import { formatBufferSize } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
 
 const MachineInfoHeader = ({
   machine,
@@ -23,7 +23,7 @@ const MachineInfoHeader = ({
   const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
   return (
-    <Card className="shadow flex flex-col gap-2">
+    <Card className="flex flex-col gap-2 shadow">
       <CardHeader className="h-10">
         <CardTitle className="flex items-center gap-1 text-lg">
           <Info className="h-5 w-5" />
@@ -31,7 +31,7 @@ const MachineInfoHeader = ({
         </CardTitle>
         <Separator />
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3 flex-1" >
+      <CardContent className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
         <div>
           <span className="text-sm font-medium text-gray-500">Status</span>
           <div className="text-sm">
