@@ -147,15 +147,11 @@ export default function HeatMapCalendar({
           fetcherClient<{
             success: boolean;
             events?: S3EventData[];
-          }>(
-            `${API_BASE_URL}/s3-events/fetch-events/`,
-            token,
-            {
-              method: 'POST',
-              body: { org_id: orgId, date: dateStr, machine_id: machine.id },
-              signal,
-            },
-          )
+          }>(`${API_BASE_URL}/s3-events/fetch-events/`, token, {
+            method: 'POST',
+            body: { org_id: orgId, date: dateStr, machine_id: machine.id },
+            signal,
+          })
             .then((result) => {
               if (result?.success && result.events) {
                 const newEvents = result.events.map((event, index) => ({
@@ -214,18 +210,14 @@ export default function HeatMapCalendar({
             success: boolean;
             cropped_image_url?: string;
             full_image_url?: string;
-          }>(
-            `${API_BASE_URL}/event-images/`,
-            token,
-            {
-              method: 'POST',
-              body: {
-                image_c_key: event.image_c_key,
-                image_f_key: event.image_f_key,
-              },
-              signal,
+          }>(`${API_BASE_URL}/event-images/`, token, {
+            method: 'POST',
+            body: {
+              image_c_key: event.image_c_key,
+              image_f_key: event.image_f_key,
             },
-          )
+            signal,
+          })
             .then((imageResult) => {
               if (signal.aborted) return;
               const updatedEvent = {
@@ -609,7 +601,7 @@ export default function HeatMapCalendar({
                             <Badge
                               variant="outline"
                               className={cn(
-                                'text-xs' ,
+                                'text-xs',
                                 event.event_severity === '1' &&
                                   'border-yellow-500 bg-yellow-400 text-black',
                                 event.event_severity === '2' &&
