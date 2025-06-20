@@ -60,7 +60,7 @@ const COLORS = {
     photo: '#FFD700',
     default: '#999999',
     activePath: '#fef08a',
-    neighbor: '#00fffb', 
+    neighbor: '#00fffb',
   },
   node: {
     up: '#28a745',
@@ -89,7 +89,7 @@ const NetworkMap: React.FC = () => {
   const mapInstanceRef = useRef<L.Map | null>(null);
   const nodeLayerRef = useRef<L.LayerGroup | null>(null);
   const linkLayerRef = useRef<L.LayerGroup | null>(null);
-  const neighborLayerRef = useRef<L.LayerGroup | null>(null); 
+  const neighborLayerRef = useRef<L.LayerGroup | null>(null);
   const pathLayerRef = useRef<L.LayerGroup | null>(null);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
   const activePathTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -237,12 +237,12 @@ const NetworkMap: React.FC = () => {
           case 'STATUS_UPDATE':
             // This is where offline status is received
             setNodeStatus((prev) => ({ ...prev, [data.nodeId]: data.status }));
-            
+
             // Clear neighbors when node goes offline
             if (data.status === 'down') {
               setNodeInfo((prev) => ({
                 ...prev,
-                [data.nodeId]: { neighbours: [] }
+                [data.nodeId]: { neighbours: [] },
               }));
             }
             break;
@@ -276,7 +276,7 @@ const NetworkMap: React.FC = () => {
 
     // Build a set of all unique neighbor connections
     const neighborConnections = new Set<string>();
-    
+
     Object.entries(nodeInfo).forEach(([nodeId, info]) => {
       info.neighbours.forEach((neighborId) => {
         // Create a unique key for each connection (sorted to avoid duplicates)

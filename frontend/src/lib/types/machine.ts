@@ -1,3 +1,5 @@
+import { MachineEvent } from './activity';
+
 export interface Machine {
   id: number;
   name: string;
@@ -20,25 +22,6 @@ export interface Machine {
   model_specifications: Record<string, unknown>;
 }
 
-export interface SuspiciousEvent {
-  timestamp: string;
-  type: string;
-  confidence: number;
-  marked?: 'noted' | 'ignored' | 'unreviewed';
-  url?: string;
-}
-
-export interface HealthEvent {
-  timestamp: string;
-  type:
-    | 'offline'
-    | 'hardware_failure'
-    | 'low_battery'
-    | 'gps_failure'
-    | 'camera_failure';
-  severity: 'low' | 'medium' | 'high' | 'critical';
-}
-
 export interface MQTTEvent {
   id: string;
   timestamp: Date;
@@ -50,30 +33,31 @@ export interface MQTTEvent {
   images_loaded?: boolean;
 }
 
-export interface MachineData {
+export interface SimpleMachineData {
   machine_id: number;
-  health_status: number;
-  status: 'online' | 'offline' | 'maintenance';
-  location: {
-    lat: number;
-    lng: number;
-  };
+  events: MachineEvent[];
+  event_count: number;
+  last_event?: MachineEvent;
   last_updated: string;
-  lastSeen?: string;
-  is_live: boolean;
-  suspiciousEvents?: SuspiciousEvent[];
-  healthEvents?: HealthEvent[];
-  events?: MQTTEvent[];
-  event_count?: number;
-  last_event?: MQTTEvent;
-  alert_status?: boolean;
-  error_count?: number;
-  warning_count?: number;
+  is_online: boolean;
+  location: { lat: number; lng: number; timestamp: string };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  stats_data: any;
+  buffer_size: number;
+  is_pulsating: boolean;
+  is_critical: boolean;
 }
 
 export interface MachineStats {
   buffer: number;
   data: {
-    message: Partial<MachineData>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    message: any;
   } | null;
+}
+
+export interface MarkerColors {
+  bg: string;
+  border: string;
+  text: string;
 }
