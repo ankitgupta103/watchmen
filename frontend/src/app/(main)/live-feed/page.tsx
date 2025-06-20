@@ -15,8 +15,6 @@ export default async function LiveFeed() {
     data: Machine[];
   }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`);
 
-  console.log('machines', machines);
-
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader />
