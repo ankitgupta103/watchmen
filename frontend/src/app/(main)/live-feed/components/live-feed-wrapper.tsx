@@ -69,25 +69,24 @@ export default function LiveFeedWrapper({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Track MQTT events per machine (simplified without image loading states)
   const [machineEvents, setMachineEvents] = useState<
     Record<number, MachineEvent[]>
   >({});
 
-  // Track event counts for color coding
+  const [processedEventKeys, setProcessedEventKeys] = useState(
+    () => new Set<string>(),
+  );
+
   const [machineEventCounts, setMachineEventCounts] = useState<
     Record<number, number>
   >({});
 
-  // Track machines that recently received events (for pulsating animation)
   const [pulsatingMachines, setPulsatingMachines] = useState<
     Record<number, boolean>
   >({});
 
-  // Use the custom hook to get all machine stats for status and location
   const machineStats = useAllMachineStats(machines);
 
-  // Create MQTT topics for all machines
   const mqttTopics = useMemo(() => {
     if (machines.length === 0) return [];
     return machines.map(
@@ -106,30 +105,32 @@ export default function LiveFeedWrapper({
     return null;
   };
 
-  /**
-   * Creates a new machine event from MQTT message (simplified)
-   */
   const createMachineEvent = (eventMessage: EventMessage): MachineEvent => {
     return {
       id: generateEventId(),
       timestamp: new Date(),
-      eventstr: eventMessage.eventstr || `Event - Severity ${eventMessage.event_severity}`,
+      eventstr:
+        eventMessage.eventstr ||
+        `Event - Severity ${eventMessage.event_severity}`,
       image_c_key: eventMessage.image_c_key,
       image_f_key: eventMessage.image_f_key,
       event_severity: eventMessage.event_severity.toString(),
     };
   };
 
-  const addEventToMachine = useCallback((machineId: number, newEvent: MachineEvent) => {
-    setMachineEvents((prev) => {
-      const currentEvents = prev[machineId] || [];
-      const updatedEvents = [newEvent, ...currentEvents].slice(
-        0,
-        MAX_EVENTS_PER_MACHINE,
-      );
-      return { ...prev, [machineId]: updatedEvents };
-    });
-  }, []);
+  const addEventToMachine = useCallback(
+    (machineId: number, newEvent: MachineEvent) => {
+      setMachineEvents((prev) => {
+        const currentEvents = prev[machineId] || [];
+        const updatedEvents = [newEvent, ...currentEvents].slice(
+          0,
+          MAX_EVENTS_PER_MACHINE,
+        );
+        return { ...prev, [machineId]: updatedEvents };
+      });
+    },
+    [],
+  );
 
   const incrementEventCount = useCallback((machineId: number) => {
     setMachineEventCounts((prev) => ({
@@ -146,30 +147,28 @@ export default function LiveFeedWrapper({
       ...prev,
       [machineId]: true,
     }));
-
-    // Stop pulsating after timeout
     setTimeout(() => {
-      setPulsatingMachines((prev) => ({
-        ...prev,
-        [machineId]: false,
-      }));
+      setPulsatingMachines((prev) => ({ ...prev, [machineId]: false }));
     }, PULSATING_DURATION_MS);
   }, []);
 
-  /**
-   * MQTT message handler (simplified - no image fetching)
-   */
   const handleMqttMessage = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (topic: string, data: any) => {
+    async (topic: string, data: EventMessage) => {
       try {
         const machineId = extractMachineIdFromTopic(topic);
         if (!machineId) return;
 
-        const eventMessage: EventMessage = data;
-        const newEvent = createMachineEvent(eventMessage);
+        // Use a unique key from the message to check for duplicates
+        const eventKey = data.image_f_key;
+        if (!eventKey || processedEventKeys.has(eventKey)) {
+          // If no key or key has been processed, ignore the event.
+          return;
+        }
 
-        // Update machine state (no image processing needed)
+        // Add the new key to the set of processed events
+        setProcessedEventKeys((prev) => new Set(prev).add(eventKey));
+
+        const newEvent = createMachineEvent(data);
         addEventToMachine(machineId, newEvent);
         incrementEventCount(machineId);
         startPulsatingAnimation(machineId);
@@ -177,20 +176,20 @@ export default function LiveFeedWrapper({
         console.error('Error processing MQTT message:', error, { topic, data });
       }
     },
-    [addEventToMachine, incrementEventCount, startPulsatingAnimation],
+    [
+      processedEventKeys,
+      addEventToMachine,
+      incrementEventCount,
+      startPulsatingAnimation,
+    ],
   );
 
-  // Use the PubSub hook for MQTT connection
   const { isConnected, error: mqttError } = usePubSub(
     mqttTopics,
     handleMqttMessage,
-    {
-      autoReconnect: true,
-      parseJson: true,
-    },
+    { autoReconnect: true, parseJson: true },
   );
 
-  // Log MQTT connection status changes
   useEffect(() => {
     if (isConnected) {
       console.log('MQTT Connected to topics:', mqttTopics);
@@ -207,17 +206,6 @@ export default function LiveFeedWrapper({
       const stats = machineStats[machineId];
       const machine = machines.find((m) => m.id === machineId);
 
-      const isOnline = machine ? isMachineOnline(machine) : false;
-      const isCritical = hasCriticalEvents(events);
-      const isPulsating = pulsatingMachines[machineId] || false;
-
-      // Get location from stats data
-      const location = {
-        lat: stats?.data?.message?.location?.lat ?? 0,
-        lng: stats?.data?.message?.location?.long ?? 0,
-        timestamp: stats?.data?.message?.location?.timestamp ?? '',
-      };
-
       return {
         machine_id: machineId,
         events: events,
@@ -225,12 +213,16 @@ export default function LiveFeedWrapper({
         last_event: lastEvent,
         last_updated:
           lastEvent?.timestamp.toISOString() || new Date().toISOString(),
-        is_online: isOnline,
-        location: location,
+        is_online: machine ? isMachineOnline(machine) : false,
+        location: {
+          lat: stats?.data?.message?.location?.lat ?? 0,
+          lng: stats?.data?.message?.location?.long ?? 0,
+          timestamp: stats?.data?.message?.location?.timestamp ?? '',
+        },
         stats_data: stats?.data,
         buffer_size: stats?.buffer ?? 0,
-        is_pulsating: isPulsating,
-        is_critical: isCritical,
+        is_pulsating: pulsatingMachines[machineId] || false,
+        is_critical: hasCriticalEvents(events),
       };
     },
     [
@@ -242,21 +234,17 @@ export default function LiveFeedWrapper({
     ],
   );
 
-  // Calculate metrics
   const totalEvents = Object.values(machineEventCounts).reduce(
     (sum, count) => sum + count,
     0,
   );
-
   const { online: onlineCount, offline: offlineCount } =
     countMachinesByStatus(machines);
 
   const filteredMachines = useMemo(() => {
     if (statusFilter === 'all') return machines;
-
     return machines.filter((machine) => {
       const isOnline = isMachineOnline(machine);
-
       if (statusFilter === 'online') return isOnline;
       if (statusFilter === 'offline') return !isOnline;
 
@@ -266,19 +254,17 @@ export default function LiveFeedWrapper({
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-
-    // Clear events and counts to force refresh
     setMachineEvents({});
     setMachineEventCounts({});
     setPulsatingMachines({});
-
+    setProcessedEventKeys(new Set()); // Clear processed keys on refresh
     setTimeout(() => setIsRefreshing(false), 1500);
   };
 
   const handleClearAllFilters = () => {
     setStatusFilter('all');
   };
-  
+
   const liveEventsForModal = selectedMachine
     ? machineEvents[selectedMachine.id] || []
     : [];

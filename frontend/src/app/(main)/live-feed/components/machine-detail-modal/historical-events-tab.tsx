@@ -10,8 +10,8 @@ import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { cn } from '@/lib/utils';
 
-import Pagination from './pagination';
 import EventImage from './event-image';
+import Pagination from './pagination';
 
 interface MachineEvent {
   id: string;
@@ -113,7 +113,6 @@ const HistoricalEventsTab = ({
     };
   }, [groupedEvents, currentPage, eventsPerPage]);
 
-
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -188,10 +187,10 @@ const HistoricalEventsTab = ({
                       </span>
                     </div>
                     <EventImage
-                        token={token}
-                        image_c_key={event.image_c_key}
-                        image_f_key={event.image_f_key}
-                        onImageClick={onImageClick}
+                      token={token}
+                      image_c_key={event.image_c_key}
+                      image_f_key={event.image_f_key}
+                      onImageClick={onImageClick}
                     />
                     <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
                       <Clock className="h-3 w-3" />

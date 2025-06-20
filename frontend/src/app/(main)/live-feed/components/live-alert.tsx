@@ -667,7 +667,7 @@ export default function CriticalAlertSystem({
                               Fetching images...
                             </div>
                           ) : alert.imagesFetched ? (
-                            <div className="flex gap-2 items-center">
+                            <div className="flex items-center gap-2">
                               {alert.croppedImageUrl && (
                                 <div>
                                   <p className="mb-1 text-xs text-gray-500">
