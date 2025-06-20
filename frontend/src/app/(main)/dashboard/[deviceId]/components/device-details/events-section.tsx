@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, Loader2 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
 
-import EventsTable from './events-table';
+import EventRow from './event-row';
 import Pagination from './pagination';
 
 interface S3EventData {
@@ -51,47 +51,25 @@ const EventsSection = ({
   const [events, setEvents] = useState<ProcessedEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState<'7' | '30' | '90'>('30');
-
   const [currentPage, setCurrentPage] = useState(1);
-  const eventsPerPage = 15;
 
-  const fetchEventImages = async (
-    token: string | null,
-    imageKeys: { image_c_key: string; image_f_key: string },
-  ) => {
-    if (!token) {
-      console.error('No authentication token available');
-      return null;
-    }
-    try {
-      const data = await fetcherClient<{
-        success: boolean;
-        cropped_image_url?: string;
-        full_image_url?: string;
-        error?: string;
-      }>(`${API_BASE_URL}/event-images/`, token, {
-        method: 'POST',
-        body: imageKeys,
-      });
-
-      if (data?.success) {
-        return {
-          croppedImageUrl: data.cropped_image_url,
-          fullImageUrl: data.full_image_url,
-        };
-      } else {
-        throw new Error(data?.error || 'Failed to fetch images');
-      }
-    } catch (error) {
-      console.error('Error fetching images:', error);
-      return null;
-    }
-  };
+  const eventsPerPage = 10;
+  const controllerRef = useRef<AbortController | null>(null);
 
   const fetchEventsForDateRange = useCallback(
     async (days: number) => {
       if (!token) return;
+
+      // Abort previous request
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      controllerRef.current = controller;
+
       setLoading(true);
+      setEvents([]);
 
       const endDate = new Date();
       const startDate = new Date();
@@ -112,7 +90,10 @@ const EventsSection = ({
             end_date: endDateStr,
             machine_ids: [device.id],
           },
+          signal: controller.signal,
         });
+
+        if (controller.signal.aborted) return;
 
         if (!result?.success) {
           throw new Error(result?.error || 'Failed to fetch events');
@@ -141,77 +122,36 @@ const EventsSection = ({
             new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
         );
 
-        setEvents(sortedEvents);
-        setCurrentPage(1); // Reset to first page
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        console.error('Error fetching events:', err);
+        if (!controller.signal.aborted) {
+          setEvents(sortedEvents);
+          setCurrentPage(1);
+        }
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Error fetching events:', err);
+          if (!controller.signal.aborted) {
+            setEvents([]);
+          }
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     },
     [token, orgId, device.id],
   );
 
-  const fetchImagesForCurrentPage = useCallback(
-    async (page: number) => {
-      const startIndex = (page - 1) * eventsPerPage;
-      const endIndex = startIndex + eventsPerPage;
-      const eventsForPage = events.slice(startIndex, endIndex);
-
-      const eventsToFetch = eventsForPage.filter(
-        (event) => !event.imagesFetched && !event.fetchingImages,
-      );
-
-      if (eventsToFetch.length === 0) return;
-
-      setEvents((prev) =>
-        prev.map((e) =>
-          eventsToFetch.some((etf) => etf.id === e.id)
-            ? { ...e, fetchingImages: true }
-            : e,
-        ),
-      );
-
-      const updatedEvents = await Promise.all(
-        eventsToFetch.map(async (event) => {
-          const imageUrls = await fetchEventImages(token, {
-            image_c_key: event.image_c_key,
-            image_f_key: event.image_f_key,
-          });
-          return {
-            ...event,
-            croppedImageUrl: imageUrls?.croppedImageUrl,
-            fullImageUrl: imageUrls?.fullImageUrl,
-            imagesFetched: true,
-            fetchingImages: false,
-          };
-        }),
-      );
-
-      setEvents((prev) => {
-        const updatedState = [...prev];
-        updatedEvents.forEach((updatedEvent) => {
-          const index = updatedState.findIndex((e) => e.id === updatedEvent.id);
-          if (index !== -1) {
-            updatedState[index] = updatedEvent;
-          }
-        });
-        return updatedState;
-      });
-    },
-    [events, token],
-  );
-
+  // Effect for fetching events when date range changes
   useEffect(() => {
     fetchEventsForDateRange(parseInt(dateRange));
-  }, [dateRange, fetchEventsForDateRange]);
 
-  useEffect(() => {
-    if (events.length > 0) {
-      fetchImagesForCurrentPage(currentPage);
-    }
-  }, [currentPage, events, fetchImagesForCurrentPage]);
+    return () => {
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+    };
+  }, [dateRange, fetchEventsForDateRange]);
 
   const totalPages = Math.ceil(events.length / eventsPerPage);
   const startIndex = (currentPage - 1) * eventsPerPage;
@@ -243,29 +183,64 @@ const EventsSection = ({
             {loading && (
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Loading...</span>
+                <span>Loading events...</span>
               </div>
             )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {loading && events.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2 text-gray-600">Loading events...</span>
           </div>
         ) : events.length > 0 ? (
           <div>
             <div className="mb-4 text-sm text-gray-600">
               Found {events.length} events in the last {dateRange} days.
             </div>
-            <EventsTable events={currentEvents} onViewDetails={onEventSelect} />
+
+            {/* Events Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Timestamp
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Event Description
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Images
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {currentEvents.map((event) => (
+                    <EventRow
+                      key={event.id}
+                      event={event}
+                      token={token}
+                      onViewDetails={onEventSelect}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             {totalPages > 1 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
+              <div className="mt-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
             )}
           </div>
         ) : (

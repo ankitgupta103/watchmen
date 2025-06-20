@@ -40,6 +40,11 @@ export async function fetcherClient<TResponse = unknown, TRequest = unknown>(
 
     if (res.ok) {
       return res.json() as Promise<TResponse>;
+    } else {
+      const errorText = await res.text();
+      throw new Error(
+        `HTTP ${res.status}: ${res.statusText}${errorText ? ` - ${errorText}` : ''}`,
+      );
     }
   } catch (error: unknown) {
     if (error instanceof Error) {
