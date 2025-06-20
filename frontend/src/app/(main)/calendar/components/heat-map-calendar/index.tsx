@@ -107,11 +107,12 @@ export default function HeatMapCalendar({
     {},
   );
 
-  // Refs to hold current state for use in callbacks without causing loops
+  // Refs to hold current state for use in callbacks and for aborting fetches
   const eventsRef = useRef(events);
   eventsRef.current = events;
   const loadingRef = useRef(loading);
   loadingRef.current = loading;
+  const imageFetchControllerRef = useRef<AbortController | null>(null);
 
   // Pagination state
   const [detailsCurrentPage, setDetailsCurrentPage] = useState(1);
@@ -129,27 +130,35 @@ export default function HeatMapCalendar({
   }, [machines, areaFilter]);
 
   const fetchEventsForDate = useCallback(
-    async (date: Date) => {
+    async (date: Date, signal: AbortSignal) => {
       if (!token) return;
       const dateStr = date.toLocaleDateString('en-CA');
-      if (loadingRef.current[dateStr] || eventsRef.current[dateStr]) return;
+      // More robust check to prevent any re-fetching
+      if (dateStr in eventsRef.current) {
+        return;
+      }
 
       setLoading((prev) => ({ ...prev, [dateStr]: true }));
+      setEvents((prev) => ({ ...prev, [dateStr]: [] })); // Initialize to show loading and prevent refetch
+
       try {
         const machinesToCheck = areaFilter ? filteredMachines : machines;
-        const allEvents: ProcessedEvent[] = [];
-        for (const machine of machinesToCheck) {
-          try {
-            const result = await fetcherClient<{
-              success: boolean;
-              events?: S3EventData[];
-            }>(`${API_BASE_URL}/s3-events/fetch-events/`, token, {
+        const fetchPromises = machinesToCheck.map((machine) =>
+          fetcherClient<{
+            success: boolean;
+            events?: S3EventData[];
+          }>(
+            `${API_BASE_URL}/s3-events/fetch-events/`,
+            token,
+            {
               method: 'POST',
               body: { org_id: orgId, date: dateStr, machine_id: machine.id },
-            });
-            if (result?.success && result.events) {
-              allEvents.push(
-                ...result.events.map((event, index) => ({
+              signal,
+            },
+          )
+            .then((result) => {
+              if (result?.success && result.events) {
+                const newEvents = result.events.map((event, index) => ({
                   ...event,
                   id: `${machine.id}-${dateStr}-${index}`,
                   machineId: machine.id,
@@ -158,27 +167,41 @@ export default function HeatMapCalendar({
                     ? new Date(event.timestamp)
                     : new Date(dateStr + 'T12:00:00'),
                   imagesLoaded: false,
-                })),
-              );
-            }
-          } catch (err) {
-            console.warn(
-              `Fetch failed for machine ${machine.id} on ${dateStr} ${err}`,
-            );
-          }
-        }
-        setEvents((prev) => ({ ...prev, [dateStr]: allEvents }));
+                }));
+                setEvents((prev) => ({
+                  ...prev,
+                  [dateStr]: [...(prev[dateStr] || []), ...newEvents],
+                }));
+              }
+            })
+            .catch((err) => {
+              if (err.name !== 'AbortError') {
+                console.warn(
+                  `Fetch failed for machine ${machine.id} on ${dateStr} ${err}`,
+                );
+              }
+            }),
+        );
+        await Promise.allSettled(fetchPromises);
       } catch (err) {
-        console.error(`Failed to fetch events for ${dateStr}`, err);
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error(`Failed to fetch events for ${dateStr}`, err);
+        }
       } finally {
-        setLoading((prev) => ({ ...prev, [dateStr]: false }));
+        if (!signal.aborted) {
+          setLoading((prev) => ({ ...prev, [dateStr]: false }));
+        }
       }
     },
     [token, orgId, areaFilter, filteredMachines, machines],
   );
 
   const fetchImagesForEvents = useCallback(
-    async (dateStr: string, eventList: ProcessedEvent[]) => {
+    async (
+      dateStr: string,
+      eventList: ProcessedEvent[],
+      signal: AbortSignal,
+    ) => {
       const eventsToFetch = eventList.filter(
         (e) => e.image_c_key && !e.imagesLoaded,
       );
@@ -186,47 +209,60 @@ export default function HeatMapCalendar({
 
       setLoadingImages((prev) => ({ ...prev, [dateStr]: true }));
       try {
-        const imagePromises = eventsToFetch.map(async (event) => {
-          try {
-            const imageResult = await fetcherClient<{
-              success: boolean;
-              cropped_image_url?: string;
-              full_image_url?: string;
-            }>(`${API_BASE_URL}/event-images/`, token, {
+        const imagePromises = eventsToFetch.map((event) =>
+          fetcherClient<{
+            success: boolean;
+            cropped_image_url?: string;
+            full_image_url?: string;
+          }>(
+            `${API_BASE_URL}/event-images/`,
+            token,
+            {
               method: 'POST',
               body: {
                 image_c_key: event.image_c_key,
                 image_f_key: event.image_f_key,
               },
-            });
-            if (imageResult?.success) {
-              return {
+              signal,
+            },
+          )
+            .then((imageResult) => {
+              if (signal.aborted) return;
+              const updatedEvent = {
                 ...event,
-                croppedImageUrl: imageResult.cropped_image_url,
-                fullImageUrl: imageResult.full_image_url,
+                croppedImageUrl: imageResult?.cropped_image_url,
+                fullImageUrl: imageResult?.full_image_url,
                 imagesLoaded: true,
               };
-            }
-          } catch (err) {
-            console.warn(`Image fetch failed for event: ${event.id} ${err}`);
-          }
-          return { ...event, imagesLoaded: true };
-        });
-
-        const updatedEventsWithImages = await Promise.all(imagePromises);
-
-        setEvents((prev) => {
-          const newDayEvents = [...(prev[dateStr] || [])];
-          updatedEventsWithImages.forEach((updatedEvent) => {
-            const index = newDayEvents.findIndex(
-              (e) => e.id === updatedEvent.id,
-            );
-            if (index !== -1) newDayEvents[index] = updatedEvent;
-          });
-          return { ...prev, [dateStr]: newDayEvents };
-        });
+              setEvents((prev) => {
+                const newDayEvents = [...(prev[dateStr] || [])];
+                const index = newDayEvents.findIndex((e) => e.id === event.id);
+                if (index !== -1) newDayEvents[index] = updatedEvent;
+                return { ...prev, [dateStr]: newDayEvents };
+              });
+            })
+            .catch((err) => {
+              if (err.name !== 'AbortError') {
+                console.warn(
+                  `Image fetch failed for event: ${event.id} ${err}`,
+                );
+                const updatedEvent = { ...event, imagesLoaded: true };
+                setEvents((prev) => {
+                  const newDayEvents = [...(prev[dateStr] || [])];
+                  const index = newDayEvents.findIndex(
+                    (e) => e.id === event.id,
+                  );
+                  if (index !== -1) newDayEvents[index] = updatedEvent;
+                  return { ...prev, [dateStr]: newDayEvents };
+                });
+              }
+            }),
+        );
+        await Promise.allSettled(imagePromises);
       } finally {
-        setLoadingImages((prev) => ({ ...prev, [dateStr]: false }));
+        if (!signal.aborted) {
+          setLoadingImages((prev) => ({ ...prev, [dateStr]: false }));
+        }
       }
     },
     [token],
@@ -252,8 +288,11 @@ export default function HeatMapCalendar({
     setLoadingImages({});
   }, [areaFilter]);
 
-  // OPTIMIZED: Fetch events in parallel batches of 6
+  // Fetch events in sequential batches, from last day of month to first.
   useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
     const fetchInBatches = async () => {
       if (!token) return;
       const daysInMonth = getCalendarDays().filter(
@@ -262,15 +301,26 @@ export default function HeatMapCalendar({
 
       const BATCH_SIZE = 6;
       for (let i = daysInMonth.length - 1; i >= 0; i -= BATCH_SIZE) {
-        const batch = daysInMonth.slice(i, i + BATCH_SIZE);
-        const promises = batch.map((day) => {
-          if (day > new Date()) return Promise.resolve();
-          return fetchEventsForDate(day);
+        if (signal.aborted) break;
+        const batchDays = daysInMonth
+          .slice(Math.max(0, i - BATCH_SIZE + 1), i + 1)
+          .reverse();
+
+        const batchPromises = batchDays.map((day) => {
+          if (day <= new Date()) {
+            return fetchEventsForDate(day, signal);
+          }
+          return Promise.resolve();
         });
-        await Promise.all(promises);
+        await Promise.all(batchPromises);
       }
     };
+
     fetchInBatches();
+
+    return () => {
+      controller.abort();
+    };
   }, [currentMonth, fetchEventsForDate, token, getCalendarDays]);
 
   const selectedDateEvents = useMemo(
@@ -287,12 +337,26 @@ export default function HeatMapCalendar({
     return selectedDateEvents.slice(startIndex, startIndex + eventsPerPage);
   }, [selectedDateEvents, detailsCurrentPage]);
 
-  // OPTIMIZED: Fetch images only for the visible page in the details panel
+  // Fetch images for the visible page, with cancellation on page change.
   useEffect(() => {
-    if (paginatedDetailsEvents.length > 0) {
-      const dateStr = selectedDate.toLocaleDateString('en-CA');
-      fetchImagesForEvents(dateStr, paginatedDetailsEvents);
+    // Abort previous image fetches before starting new ones
+    if (imageFetchControllerRef.current) {
+      imageFetchControllerRef.current.abort();
     }
+
+    if (paginatedDetailsEvents.length > 0) {
+      const controller = new AbortController();
+      imageFetchControllerRef.current = controller;
+      const dateStr = selectedDate.toLocaleDateString('en-CA');
+      fetchImagesForEvents(dateStr, paginatedDetailsEvents, controller.signal);
+    }
+
+    return () => {
+      // Cleanup when the component unmounts or selectedDate changes
+      if (imageFetchControllerRef.current) {
+        imageFetchControllerRef.current.abort();
+      }
+    };
   }, [paginatedDetailsEvents, selectedDate, fetchImagesForEvents]);
 
   useEffect(() => {
