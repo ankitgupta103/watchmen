@@ -126,7 +126,8 @@ class RFComm:
         # Handle ack
         msgid, msgpyl = self.sep_part(msgstr, ';')
         if msgid is None or len(msgid) < 3:
-            print(f"msgid is none or too short in MSG: {msgstr}")
+            print(f" ERROR reading msgid is none or too short in MSG: {msgstr}")
+            return
         (msgtype, src, dest, rid) = self._parse_msg_id(msgid)
         if dest is None or dest == "None":
             logger.info(f"{msgstr} is a broadcast")
