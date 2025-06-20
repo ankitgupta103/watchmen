@@ -70,7 +70,7 @@ HN_ID = {
 # Everything in between is passthrough.
 NEXT_DEST_MAP = {
         # BLR Parallel to A
-        "C" : "A",
+        "C" : "B",
         "B" : "A",
         # GUR F->E->D
         "F" : "E",
