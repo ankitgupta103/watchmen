@@ -60,6 +60,7 @@ const COLORS = {
     photo: '#FFD700',
     default: '#999999',
     activePath: '#fef08a',
+    neighbor: '#00fffb', // Light gray for permanent neighbor connections
   },
   node: {
     up: '#28a745',
@@ -88,6 +89,7 @@ const NetworkMap: React.FC = () => {
   const mapInstanceRef = useRef<L.Map | null>(null);
   const nodeLayerRef = useRef<L.LayerGroup | null>(null);
   const linkLayerRef = useRef<L.LayerGroup | null>(null);
+  const neighborLayerRef = useRef<L.LayerGroup | null>(null); // New layer for permanent neighbor connections
   const pathLayerRef = useRef<L.LayerGroup | null>(null);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
   const activePathTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -138,16 +140,33 @@ const NetworkMap: React.FC = () => {
 
     mapInstanceRef.current = map;
     nodeLayerRef.current = L.layerGroup().addTo(map);
+    neighborLayerRef.current = L.layerGroup().addTo(map); // Initialize neighbor layer
     linkLayerRef.current = L.layerGroup().addTo(map);
     pathLayerRef.current = L.layerGroup().addTo(map);
 
-    // Add custom styles for our node markers and tooltips
+    // Add custom styles for our node markers, tooltips, and pulse animations
     const style = document.createElement('style');
     style.innerHTML = `
       .custom-node-label { font-size: 12px; font-weight: bold; color: white; text-shadow: 0 0 3px black; text-align: center; width: 50px; line-height: 1; }
       .custom-node-marker { position: relative; display: flex; flex-direction: column; align-items: center; }
       .node-circle { border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px black; }
       .hover-tooltip { background-color: rgba(0, 0, 0, 0.8) !important; border: 1px solid #fff !important; color: white !important; }
+      
+      /* Pulse animation styles */
+      @keyframes pulse-flow {
+        0% { stroke-dashoffset: 100%; opacity: 0.8; }
+        50% { opacity: 1; }
+        100% { stroke-dashoffset: 0%; opacity: 0.3; }
+      }
+      
+      .neighbor-pulse {
+        stroke-dasharray: 8 4;
+        animation: pulse-flow 3s ease-in-out infinite;
+      }
+      
+      .neighbor-pulse:nth-child(odd) {
+        animation-delay: 1.5s;
+      }
     `;
     document.head.appendChild(style);
   }, []);
@@ -218,6 +237,14 @@ const NetworkMap: React.FC = () => {
           case 'STATUS_UPDATE':
             // This is where offline status is received
             setNodeStatus((prev) => ({ ...prev, [data.nodeId]: data.status }));
+            
+            // Clear neighbors when node goes offline
+            if (data.status === 'down') {
+              setNodeInfo((prev) => ({
+                ...prev,
+                [data.nodeId]: { neighbours: [] }
+              }));
+            }
             break;
           case 'log_message': {
             const newLog: LogEntry = {
@@ -241,6 +268,42 @@ const NetworkMap: React.FC = () => {
       if (activePathTimeout.current) clearTimeout(activePathTimeout.current);
     };
   }, []);
+
+  // Effect for drawing permanent neighbor connections
+  useEffect(() => {
+    if (!neighborLayerRef.current || !nodes.length) return;
+    neighborLayerRef.current.clearLayers();
+
+    // Build a set of all unique neighbor connections
+    const neighborConnections = new Set<string>();
+    
+    Object.entries(nodeInfo).forEach(([nodeId, info]) => {
+      info.neighbours.forEach((neighborId) => {
+        // Create a unique key for each connection (sorted to avoid duplicates)
+        const connectionKey = [nodeId, neighborId].sort().join('-');
+        neighborConnections.add(connectionKey);
+      });
+    });
+
+    // Draw the neighbor connections
+    neighborConnections.forEach((connectionKey) => {
+      const [nodeId1, nodeId2] = connectionKey.split('-');
+      const node1 = nodes.find((n) => n.id === nodeId1);
+      const node2 = nodes.find((n) => n.id === nodeId2);
+
+      if (node1 && node2 && neighborLayerRef.current) {
+        // Create a subtle line for the neighbor connection
+        const neighborLine = L.polyline([node1.latlng, node2.latlng], {
+          color: COLORS.link.neighbor,
+          weight: 1.5,
+          opacity: 0.4,
+          className: 'neighbor-pulse', // Add pulse animation class
+        });
+
+        neighborLayerRef.current.addLayer(neighborLine);
+      }
+    });
+  }, [nodes, nodeInfo]);
 
   // --- CRITICAL FIX: This single hook now handles all node drawing. ---
   // It correctly depends on `nodes`, `nodeStatus`, and `nodeInfo`.
@@ -301,8 +364,8 @@ const NetworkMap: React.FC = () => {
           color:
             COLORS.link[link.type as keyof typeof COLORS.link] ||
             COLORS.link.default,
-          weight: 2.5,
-          opacity: 0.8,
+          weight: 3,
+          opacity: 0.9,
         }).addTo(linkLayerRef.current);
       }
     });
@@ -391,6 +454,13 @@ const NetworkMap: React.FC = () => {
               <h4 className="mb-1 font-semibold text-gray-300">
                 Communication
               </h4>
+              <div className="flex items-center">
+                <div
+                  className="mr-2 h-1 w-6"
+                  style={{ backgroundColor: COLORS.link.neighbor }}
+                ></div>
+                Neighbor Link
+              </div>
               <div className="flex items-center">
                 <div
                   className="mr-2 h-1 w-6"

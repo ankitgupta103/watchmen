@@ -3,11 +3,11 @@ import { Eye, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
 
 interface ProcessedEvent {
   id: string;
@@ -127,29 +127,29 @@ const EventRow: React.FC<EventRowProps> = ({
           </div>
           <Separator />
           <div className="flex items-center gap-1">
-          {event?.event_severity && (
-            <>
-              <span className="text-xs text-gray-500">Severity: </span>
-              <Badge
-                variant="outline"
-                className={cn(
-                  event?.event_severity === '1' &&
-                    'border-yellow-500 bg-yellow-400 text-black',
-                  event?.event_severity === '2' &&
-                    'border-orange-600 bg-orange-500 text-white',
-                  event?.event_severity === '3' &&
-                    'border-red-700 bg-red-600 text-white',
-                )}
-              >
-                {event?.event_severity === '1'
-                  ? 'Low'
-                  : event?.event_severity === '2'
-                    ? 'High'
-                    : 'Critical'}
-              </Badge>
-            </>
-          )}
-        </div>
+            {event?.event_severity && (
+              <>
+                <span className="text-xs text-gray-500">Severity: </span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    event?.event_severity === '1' &&
+                      'border-yellow-500 bg-yellow-400 text-black',
+                    event?.event_severity === '2' &&
+                      'border-orange-600 bg-orange-500 text-white',
+                    event?.event_severity === '3' &&
+                      'border-red-700 bg-red-600 text-white',
+                  )}
+                >
+                  {event?.event_severity === '1'
+                    ? 'Low'
+                    : event?.event_severity === '2'
+                      ? 'High'
+                      : 'Critical'}
+                </Badge>
+              </>
+            )}
+          </div>
         </div>
       </td>
       <td className="px-4 py-3">
