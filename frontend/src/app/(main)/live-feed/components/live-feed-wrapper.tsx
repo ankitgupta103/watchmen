@@ -152,7 +152,6 @@ export default function LiveFeedWrapper({
       // Extract machine ID from topic path
       // Topic format: organization_id/_all_/2025-06-17/machine_id/EVENT/#
       const topicParts = topic.split('/');
-      console.log('topicParts', topicParts, topicParts[3]);
       const machineIdPart = topicParts[3];
 
       if (machineIdPart && machineIdPart !== '_all_') {
@@ -187,7 +186,6 @@ export default function LiveFeedWrapper({
           }));
 
           // Start pulsating animation for this machine
-          console.log('pulsatingMachines', machineId);
           setPulsatingMachines((prev) => ({
             ...prev,
             [machineId]: true,
@@ -258,13 +256,11 @@ export default function LiveFeedWrapper({
   // Helper to get machine data
   const getMachineData = useCallback(
     (machineId: number): SimpleMachineData => {
-      console.log('machineId', machineId);
       const events = machineEvents[machineId] || [];
       const eventCount = machineEventCounts[machineId] || 0;
       const lastEvent = events[events.length - 1];
       const stats = machineStats[machineId];
       const is_critical = events.some((event) => event.event_severity == '3');
-      console.log('is_critical', is_critical);
 
       // Parse last_location.timestamp as Date and check if within last hour
       const lastSeen = machines[machineId]?.last_location?.timestamp

@@ -67,8 +67,6 @@ const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
   const isCritical = machineData.is_critical;
   const eventCount = machineData.event_count;
 
-  console.log('machineData', machineData);
-
   // Colors based on online/offline status
   const colors = isCritical
     ? { bg: 'bg-red-500', border: 'border-red-600', text: 'text-red-100' }
