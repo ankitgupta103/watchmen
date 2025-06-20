@@ -1,10 +1,11 @@
-import { MapPin } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { Machine } from '@/lib/types/machine';
 import { formatBufferSize } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const MachineInfoHeader = ({
   machine,
@@ -22,14 +23,15 @@ const MachineInfoHeader = ({
   const isOnline = !!lastSeen && lastSeen > oneHourAgo;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <MapPin className="h-5 w-5" />
+    <Card className="shadow flex flex-col gap-2">
+      <CardHeader className="h-10">
+        <CardTitle className="flex items-center gap-1 text-lg">
+          <Info className="h-5 w-5" />
           Machine Information
         </CardTitle>
+        <Separator />
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3 flex-1" >
         <div>
           <span className="text-sm font-medium text-gray-500">Status</span>
           <div className="text-sm">

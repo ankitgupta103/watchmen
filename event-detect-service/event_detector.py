@@ -80,6 +80,7 @@ class EventDetector:
         Returns:
             List[Dict[str, Any]]: A list of detected objects.
         """
+        logging.debug(f"detect_objects() called with image_path={image_path}")
         if not image_path.is_file():
             logging.error(f"Image file not found during detection: {image_path}")
             return []
@@ -93,6 +94,7 @@ class EventDetector:
             logging.error(f"Error reading image {image_path}: {e}")
             return []
 
+        logging.debug(f"Running YOLO model on image: {image_path}")
         results = self.model(image)
         
         logging.info(f"Results: {results}")
@@ -119,6 +121,7 @@ class EventDetector:
         else:
             logging.info(f"No objects found in {image_path.name}")
 
+        logging.debug(f"detect_objects() returning {len(detected_boxes)} objects.")
         return detected_boxes
 
     @staticmethod
@@ -132,13 +135,17 @@ class EventDetector:
         Returns:
             int: The calculated severity level (0=low, 1=medium, 2=high, 3=critical).
         """
+        logging.debug(f"determine_severity() called with detected_objects={detected_objects}")
         if not detected_objects:
+            logging.info("No detected objects, returning SEVERITY_LOW.")
             return SEVERITY_LOW
 
         label_set = {obj['label'] for obj in detected_objects}
+        logging.debug(f"Labels found: {label_set}")
 
         # No person detected = LOW severity
         if "person" not in label_set:
+            logging.info("No person detected, returning SEVERITY_LOW.")
             return SEVERITY_LOW
 
         # Person detected - check for weapons and bags
@@ -147,12 +154,15 @@ class EventDetector:
 
         # Person + weapon = CRITICAL
         if has_weapon:
+            logging.info("Person + weapon detected, returning SEVERITY_CRITICAL.")
             return SEVERITY_CRITICAL
         
         # Person + bag = HIGH
         if has_bag:
+            logging.info("Person + bag detected, returning SEVERITY_HIGH.")
             return SEVERITY_HIGH
         
+        logging.info("Person detected, returning SEVERITY_MEDIUM.")
         return SEVERITY_MEDIUM
 
 class ProcessingService:
@@ -277,6 +287,7 @@ class ProcessingService:
         saves files, and deletes the original.
         """
         logging.info(f"Processing latest file: {image_path.name} | Last processed timestamp: {self.last_processed_timestamp}")
+        logging.debug(f"process_and_store_image() called with image_path={image_path}, image_timestamp={image_timestamp}")
 
         # Update last processed timestamp
         if image_timestamp is not None:
@@ -284,16 +295,19 @@ class ProcessingService:
             logging.info(f"Updated last processed timestamp to: {self.last_processed_timestamp}")
 
         detected_objects = self.detector.detect_objects(image_path)
+        logging.debug(f"Detected objects: {detected_objects}")
 
         if not detected_objects:
             logging.info(f"No objects to process in {image_path.name}. Deleting original.")
             try:
                 image_path.unlink()
+                logging.debug(f"Deleted original file: {image_path}")
             except OSError as e:
                 logging.error(f"Error deleting original file {image_path}: {e}")
             return
 
         severity = self.detector.determine_severity(detected_objects)
+        logging.info(f"Determined severity for {image_path.name}: {severity}")
         timestamp = time.strftime("%H%M%S", time.localtime())
         
         original_image = cv2.imread(str(image_path))
@@ -307,13 +321,7 @@ class ProcessingService:
         has_weapon = not detected_labels.isdisjoint(POTENTIAL_WEAPONS)
         is_critical = severity == SEVERITY_CRITICAL or severity == SEVERITY_HIGH or has_person
         
-        print(f"--------------------------------")
-        print(f"Severity: {severity}")
-        print(f"is_critical: {is_critical}")
-        print(f"has_person: {has_person}")
-        print(f"has_bag: {has_bag}")
-        print(f"has_weapon: {has_weapon}")
-        print(f"--------------------------------")
+        logging.debug(f"Image {image_path.name}: has_person={has_person}, has_bag={has_bag}, has_weapon={has_weapon}, is_critical={is_critical}")
 
         save_dir = self.critical_dir if is_critical else self.processed_dir
         uid = generate_random_string()
@@ -336,6 +344,7 @@ class ProcessingService:
 
         # 2. Save ONE cropped version if there's a weapon or bag
         priority_object = self.find_priority_object(detected_objects)
+        logging.debug(f"Priority object for cropping: {priority_object}")
         
         if priority_object:
             cropped_image_name = f"{severity}_{timestamp}_{uid}_c.jpg"
@@ -364,26 +373,30 @@ class ProcessingService:
             logging.error(f"Error deleting original file {image_path}: {e}")
 
     def start_service_loop(self):
+        logging.info("Entered ProcessingService.start_service_loop(). Beginning monitoring loop.")
         image_extensions = {".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif"}
         while self.is_running:
             try:
+                logging.debug(f"Scanning directory: {self.source_dir}")
                 image_files = [
                     p for p in self.source_dir.iterdir()
                     if p.is_file() and p.suffix.lower() in image_extensions
                 ]
+                logging.debug(f"Found image files: {[str(p) for p in image_files]}")
 
                 if not image_files:
                     logging.info(f"No images found. Waiting for {POLL_INTERVAL_SECONDS}s... | Last processed timestamp: {self.last_processed_timestamp}")
                 else:
                     # Get the latest image
                     latest_image = self._get_latest_image(image_files)
+                    logging.debug(f"Latest image selected: {latest_image}")
                     
                     if latest_image:
                         # Get timestamp for the latest image
                         epoch = self._extract_epoch_from_filename(latest_image.name)
                         if epoch is None:
                             epoch = int(latest_image.stat().st_mtime)
-                        
+                        logging.debug(f"Processing image {latest_image.name} with epoch {epoch}")
                         # Process only the latest image
                         self.process_and_store_image(latest_image, image_timestamp=epoch)
                         
@@ -392,6 +405,7 @@ class ProcessingService:
                             p for p in self.source_dir.iterdir()
                             if p.is_file() and p.suffix.lower() in image_extensions
                         ]
+                        logging.debug(f"Checking for stale images in: {[str(p) for p in remaining_files]}")
                         self._delete_stale_images(remaining_files)
 
                 time.sleep(POLL_INTERVAL_SECONDS)
@@ -402,15 +416,18 @@ class ProcessingService:
             except Exception as e:
                 logging.error(f"An unexpected error occurred in the monitoring loop: {e}", exc_info=True)
                 time.sleep(POLL_INTERVAL_SECONDS * 2) # Wait longer after an error
-    
+        logging.info("Exiting ProcessingService.start_service_loop().")
+
     def start(self):
         """
         Starts the continuous monitoring loop.
         """
+        logging.info("ProcessingService.start() called. Starting service thread.")
         try:
             self.is_running = True
             thread = threading.Thread(target=self.start_service_loop)
             thread.start()
+            logging.debug("Service thread started.")
         except Exception as e:
             logging.error(f"An unexpected error occurred in the monitoring loop: {e}", exc_info=True)
             sys.exit(1)
@@ -423,6 +440,7 @@ class ProcessingService:
 
 def main():
     """Main function to parse arguments and run the service."""
+    logging.info("Starting main()")
     parser = argparse.ArgumentParser(
         description="A service to monitor a directory for images, process them, and store the results.",
         epilog="Example: python event_detector.py /path/to/watch --output /path/to/save"
@@ -441,22 +459,27 @@ def main():
     )
 
     args = parser.parse_args()
+    logging.info(f"Parsed arguments: source_directory={args.source_directory}, output={args.output}")
 
     if not args.source_directory.is_dir():
         logging.error(f"Source directory does not exist or is not a directory: {args.source_directory}")
         sys.exit(1)
 
+    logging.info("Instantiating EventDetector...")
     detector = EventDetector()
+    logging.info("Instantiating ProcessingService...")
     service = ProcessingService(
         detector=detector,
         source_dir=args.source_directory,
         processed_dir=args.output
     )
 
+    logging.info("Starting ProcessingService...")
     service.start()
     print("Service started")
     while service.is_running:
         time.sleep(1)
+    logging.info("Service loop exited. main() complete.")
 
 if __name__ == "__main__":
     main()
