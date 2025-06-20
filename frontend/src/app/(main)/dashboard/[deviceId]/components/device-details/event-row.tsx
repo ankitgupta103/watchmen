@@ -89,7 +89,6 @@ const EventRow: React.FC<EventRowProps> = ({
     }
   };
 
-  // Fetch images when component mounts
   useEffect(() => {
     fetchEventImages();
 
@@ -98,9 +97,8 @@ const EventRow: React.FC<EventRowProps> = ({
         controllerRef.current.abort();
       }
     };
-  }, []); // Only run once when component mounts
+  }, []);
 
-  // Update event if initialEvent changes (shouldn't happen often)
   useEffect(() => {
     setEvent(initialEvent);
   }, [initialEvent]);
