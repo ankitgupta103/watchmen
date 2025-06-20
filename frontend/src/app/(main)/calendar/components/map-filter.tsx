@@ -1,12 +1,10 @@
+'use client';
+
 import { useMemo, useState } from 'react';
 import L from 'leaflet';
 import {
-  Activity,
-  AlertTriangle,
-  Eye,
   Map as MapIcon,
   MapPin,
-  Shield,
   Wifi,
   WifiOff,
   X,
@@ -27,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { Machine } from '@/lib/types/machine';
+import { isMachineOnline } from '@/lib/utils';
 
 interface MapBounds {
   north: number;
@@ -35,38 +34,16 @@ interface MapBounds {
   west: number;
 }
 
-// Get machine type icon
-const getMachineTypeIcon = (type: string, size: number = 16) => {
-  switch (type) {
-    case 'perimeter_guard':
-      return <Shield size={size} className="text-white" />;
-    case 'mobile_patrol':
-      return <Activity size={size} className="text-white" />;
-    case 'fixed_surveillance':
-      return <Eye size={size} className="text-white" />;
-    case 'roving_sensor':
-      return <AlertTriangle size={size} className="text-white" />;
-    default:
-      return <MapPin size={size} className="text-white" />;
-  }
-};
-
-// Get machine status color
 const getMachineStatusColor = (
   machine: Machine,
   isSelected: boolean = false,
 ) => {
   if (isSelected) return 'bg-blue-500';
 
-  // You can add status logic here based on your Machine type
-  // For now, using a simple approach based on machine ID or other properties
-  const daysSinceLastUpdate = machine.last_location?.lat ? 0 : 7; // Assume online if location exists
-
-  if (daysSinceLastUpdate > 1) return 'bg-gray-500'; // Offline
-  return 'bg-green-500'; // Online
+  if (isMachineOnline(machine)) return 'bg-green-500';
+  return 'bg-gray-500';
 };
 
-// Create custom marker icon
 const createMachineIcon = (machine: Machine, isSelected: boolean = false) => {
   const bgColor = getMachineStatusColor(machine, isSelected);
 
@@ -74,20 +51,9 @@ const createMachineIcon = (machine: Machine, isSelected: boolean = false) => {
     <div className="relative">
       {/* Main marker */}
       <div
-        className={`relative h-10 w-10 ${bgColor} flex items-center justify-center rounded-full border-2 border-white shadow-lg`}
+        className={`relative h-5 w-5 ${bgColor} flex items-center justify-center rounded-full border-2 border-white shadow-lg`}
       >
-        <MapPin size={20} className="text-white" />
       </div>
-
-      {/* Machine type indicator */}
-      <div className="absolute -top-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-blue-500">
-        {getMachineTypeIcon(machine.type, 8)}
-      </div>
-
-      {/* Selection indicator */}
-      {isSelected && (
-        <div className="absolute inset-0 animate-pulse rounded-full border-2 border-blue-600" />
-      )}
     </div>,
   );
 
@@ -191,10 +157,10 @@ const MapFilter = ({
 
     const bounds = machines.reduce(
       (acc, m) => ({
-        minLat: Math.min(acc.minLat, m.last_location.lat),
-        maxLat: Math.max(acc.maxLat, m.last_location.lat),
-        minLng: Math.min(acc.minLng, m.last_location.long),
-        maxLng: Math.max(acc.maxLng, m.last_location.long),
+        minLat: Math.min(acc.minLat, m?.last_location?.lat ?? 12.9716),
+        maxLat: Math.max(acc.maxLat, m?.last_location?.lat ?? 12.9716),
+        minLng: Math.min(acc.minLng, m?.last_location?.long ?? 77.5946),
+        maxLng: Math.max(acc.maxLng, m?.last_location?.long ?? 77.5946),
       }),
       {
         minLat: machines[0]?.last_location?.lat ?? 12.9716,
@@ -215,10 +181,10 @@ const MapFilter = ({
 
     const bounds = machines.reduce(
       (acc, m) => ({
-        minLat: Math.min(acc.minLat, m.last_location.lat),
-        maxLat: Math.max(acc.maxLat, m.last_location.lat),
-        minLng: Math.min(acc.minLng, m.last_location.long),
-        maxLng: Math.max(acc.maxLng, m.last_location.long),
+        minLat: Math.min(acc.minLat, m?.last_location?.lat ?? 12.9716),
+        maxLat: Math.max(acc.maxLat, m?.last_location?.lat ?? 12.9716),
+        minLng: Math.min(acc.minLng, m?.last_location?.long ?? 77.5946),
+        maxLng: Math.max(acc.maxLng, m?.last_location?.long ?? 77.5946),
       }),
       {
         minLat: machines[0]?.last_location?.lat ?? 12.9716,
@@ -251,10 +217,10 @@ const MapFilter = ({
   const isMachineInBounds = (machine: Machine) => {
     if (!tempBounds) return false;
     return (
-      machine.last_location.lat >= tempBounds.south &&
-      machine.last_location.lat <= tempBounds.north &&
-      machine.last_location.long >= tempBounds.west &&
-      machine.last_location.long <= tempBounds.east
+      machine?.last_location?.lat >= tempBounds.south &&
+      machine?.last_location?.lat <= tempBounds.north &&
+      machine?.last_location?.long >= tempBounds.west &&
+      machine?.last_location?.long <= tempBounds.east
     );
   };
 
@@ -275,6 +241,7 @@ const MapFilter = ({
     ).length;
 
     return { total: all.length, online, offline };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [machines, tempBounds]);
 
   return (
@@ -347,8 +314,8 @@ const MapFilter = ({
                   <Marker
                     key={machine.id}
                     position={[
-                      machine.last_location.lat,
-                      machine.last_location.long,
+                      machine?.last_location?.lat ?? 12.9716,
+                      machine?.last_location?.long ?? 77.5946,
                     ]}
                     icon={createMachineIcon(
                       machine,
@@ -390,8 +357,8 @@ const MapFilter = ({
                     <Circle
                       key={`coverage-${machine.id}`}
                       center={[
-                        machine.last_location.lat,
-                        machine.last_location.long,
+                        machine?.last_location?.lat ?? 12.9716,
+                        machine?.last_location?.long ?? 77.5946,
                       ]}
                       radius={200}
                       pathOptions={{
