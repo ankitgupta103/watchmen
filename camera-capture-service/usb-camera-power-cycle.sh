@@ -205,19 +205,23 @@ move_image_files() {
                 dest_file="$DEST_DIR/$epoch.$ext"
             done
             local filename=$(basename "$source_file")
+            
             # Skip if source file is not readable
             if [ ! -r "$source_file" ]; then
                 log_message "ERROR: Cannot read source file $filename"
                 device_failed=$((device_failed + 1))
                 continue
             fi
+            
             # Check file size and available space
             local file_size=$(get_file_size "$source_file")
+            
             # Ensure we have valid numbers (no scientific notation)
             if ! [[ "$file_size" =~ ^[0-9]+$ ]]; then
                 log_message "WARNING: Invalid file size for $filename, skipping space check"
                 file_size=0
             fi
+            
             if ! [[ "$available_space" =~ ^[0-9]+$ ]]; then
                 log_message "WARNING: Invalid available space value, refreshing..."
                 available_space=$(check_available_space "$DEST_DIR")
@@ -226,12 +230,14 @@ move_image_files() {
                     available_space=999999999999  # Large fallback value
                 fi
             fi
+            
             if [ "$file_size" -gt 0 ] && [ "$file_size" -gt "$available_space" ]; then
                 log_message "ERROR: Not enough space to move $filename (${file_size} bytes needed, ${available_space} available)"
                 device_failed=$((device_failed + 1))
                 continue
             fi
-            # Move the file (atomic operation) with new name
+            
+            # Move the file (atomic operation) with new timestamp name
             log_message "Moving: $filename (${file_size} bytes) to $(basename "$dest_file")"
             if mv "$source_file" "$dest_file" 2>>"$LOG_FILE"; then
                 log_message "SUCCESS: Moved $filename to $(basename "$dest_file")"
@@ -246,6 +252,7 @@ move_image_files() {
                 log_message "ERROR: Failed to move $filename to $(basename "$dest_file")"
                 device_failed=$((device_failed + 1))
             fi
+            
         done < <(eval "find \"$mount_point\" -type f $find_expr -print0" 2>/dev/null)
         
         log_message "Transfer complete for $mount_point: $device_moved files moved, $device_failed failed."
