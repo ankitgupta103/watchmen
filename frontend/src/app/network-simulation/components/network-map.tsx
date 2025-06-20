@@ -60,7 +60,7 @@ const COLORS = {
     photo: '#FFD700',
     default: '#999999',
     activePath: '#fef08a',
-    neighbor: '#00fffb', // Light gray for permanent neighbor connections
+    neighbor: '#00fffb', 
   },
   node: {
     up: '#28a745',
@@ -89,7 +89,7 @@ const NetworkMap: React.FC = () => {
   const mapInstanceRef = useRef<L.Map | null>(null);
   const nodeLayerRef = useRef<L.LayerGroup | null>(null);
   const linkLayerRef = useRef<L.LayerGroup | null>(null);
-  const neighborLayerRef = useRef<L.LayerGroup | null>(null); // New layer for permanent neighbor connections
+  const neighborLayerRef = useRef<L.LayerGroup | null>(null); 
   const pathLayerRef = useRef<L.LayerGroup | null>(null);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
   const activePathTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -154,9 +154,9 @@ const NetworkMap: React.FC = () => {
       
       /* Pulse animation styles */
       @keyframes pulse-flow {
-        0% { stroke-dashoffset: 100%; opacity: 0.8; }
+        0% { stroke-dashoffset: 100%; opacity: 0.3; }
         50% { opacity: 1; }
-        100% { stroke-dashoffset: 0%; opacity: 0.3; }
+        100% { stroke-dashoffset: 90%; opacity: 0.3; }
       }
       
       .neighbor-pulse {
