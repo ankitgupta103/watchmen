@@ -35,7 +35,7 @@ SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
 CAMERA_IMAGE_FOLDER="$USER_HOME/images"
 
 # Path for the log file
-LOG_FILE="/var/log/usb-cycle.log"
+LOG_FILE="/var/log/camera-capture.log"
 
 # 1. Check for Root Privileges
 if [ "$(id -u)" -ne 0 ]; then
@@ -60,7 +60,10 @@ echo "Dependencies installed successfully."
 echo "[2/6] Creating required directories..."
 mkdir -p "$SCRIPT_DIR"
 mkdir -p "$IMAGE_DIR"
-chown -R "$OWNER_USER:$OWNER_USER" "$USER_HOME"
+chown -R "$OWNER_USER:$OWNER_USER" "$IMAGE_DIR"
+if [ -d "$USER_HOME/watchmen" ]; then
+    chown -R "$OWNER_USER:$OWNER_USER" "$USER_HOME/watchmen"
+fi
 echo "Directories created and permissions set."
 
 # 4. Create the main USB control script
@@ -85,7 +88,7 @@ OFF_TIME=60
 DEST_DIR="/home/$ACTUAL_USER/images"
 
 # Log file path
-LOG_FILE="/var/log/gpio-cycle.log"
+LOG_FILE="/var/log/camera-capture.log"
 
 # Time to wait for the device to stabilize after power on before checking for mount
 POWER_ON_STABILIZATION_TIME=5
@@ -260,20 +263,23 @@ move_image_files() {
         local device_failed=0
         
         # Build find expression for image files
-        local find_expr=$(build_find_expression)
+        local find_expr=\$(build_find_expression)
         
         # Find image files and process them
         while IFS= read -r -d '' source_file; do
+            # Generate a unique filename based on the current epoch timestamp
+            local ext="${source_file##*.}"
+            local base_epoch=`date +%s`
+            local epoch=$base_epoch
+            local dest_file="$DEST_DIR/$epoch.$ext"
+            # Ensure uniqueness by incrementing epoch if file exists
+            while [ -f "$dest_file" ]; do
+                epoch=$((epoch + 1))
+                dest_file="$DEST_DIR/$epoch.$ext"
+            done
             local filename=$(basename "$source_file")
-            local dest_file="$DEST_DIR/$filename"
             
-            # Skip if file already exists in destination
-            if [ -f "$dest_file" ]; then
-                log_message "SKIP: $filename already exists in destination."
-                continue
-            fi
-            
-            # Check source file permissions
+            # Skip if source file is not readable
             if [ ! -r "$source_file" ]; then
                 log_message "ERROR: Cannot read source file $filename"
                 device_failed=$((device_failed + 1))
