@@ -1,7 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
-import { usePubSub } from '@/hooks/use-pub-sub';
-import useToken from '@/hooks/use-token';
 import { Camera } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +12,6 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import { API_BASE_URL } from '@/lib/constants';
-import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
 import { toTitleCase } from '@/lib/utils';
 
@@ -30,121 +26,34 @@ interface MachineEvent {
   eventstr: string;
   image_c_key?: string;
   image_f_key?: string;
-  cropped_image_url?: string;
-  full_image_url?: string;
-  images_loaded: boolean;
-  images_requested: boolean;
   event_severity?: string;
-}
-
-interface EventMessage {
-  image_c_key: string;
-  image_f_key: string;
-  event_severity: string;
 }
 
 interface MachineDetailModalProps {
   selectedMachine: Machine | null;
   setSelectedMachine: React.Dispatch<React.SetStateAction<Machine | null>>;
   getMachineData: (machineId: number) => { buffer_size: number } | undefined;
+  token: string | null;
+  liveEvents: MachineEvent[];
+  isConnected: boolean;
+  mqttError: Error | null;
 }
-
-const fetchEventImages = async (
-  token: string,
-  imageKeys: { image_c_key: string; image_f_key: string },
-) => {
-  try {
-    const data = await fetcherClient<{
-      success: boolean;
-      cropped_image_url?: string;
-      full_image_url?: string;
-      error?: string;
-    }>(`${API_BASE_URL}/event-images/`, token, {
-      method: 'POST',
-      body: imageKeys,
-    });
-    if (data?.success) {
-      return {
-        croppedImageUrl: data.cropped_image_url,
-        fullImageUrl: data.full_image_url,
-      };
-    }
-    throw new Error(data?.error || 'Failed to fetch images');
-  } catch (error) {
-    console.error('Error fetching images:', error);
-    return null;
-  }
-};
 
 export default function MachineDetailModal({
   selectedMachine,
   setSelectedMachine,
   getMachineData,
+  token,
+  liveEvents,
+  isConnected,
+  mqttError,
 }: MachineDetailModalProps) {
-  const { token } = useToken();
   const { organizationId } = useOrganization();
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  const [liveEventsByMachine, setLiveEventsByMachine] = useState<
-    Record<number, MachineEvent[]>
-  >({});
-
-  const mqttTopics = useMemo(() => {
-    if (!selectedMachine || !organizationId) return [];
-    const today = new Date().toISOString().split('T')[0];
-    return [
-      `${organizationId}/_all_/${today}/${selectedMachine.id}/_all_/EVENT/#`,
-    ];
-  }, [organizationId, selectedMachine]);
-
-  const handleMqttMessage = useCallback(
-    async (topic: string, data: EventMessage) => {
-      if (!token || !selectedMachine) return;
-      const machineId = selectedMachine.id;
-
-      const newEvent: MachineEvent = {
-        id: `live-${Date.now()}`,
-        timestamp: new Date(),
-        eventstr: `Event - Severity ${data.event_severity}`,
-        image_c_key: data.image_c_key,
-        image_f_key: data.image_f_key,
-        images_loaded: false,
-        images_requested: true, // Immediately requested
-        event_severity: data.event_severity,
-      };
-
-      setLiveEventsByMachine((prev) => {
-        const currentEvents = prev[machineId] || [];
-        const updatedEvents = [newEvent, ...currentEvents].slice(0, 3);
-        return { ...prev, [machineId]: updatedEvents };
-      });
-
-      const imageUrls = await fetchEventImages(token, {
-        image_c_key: data.image_c_key,
-        image_f_key: data.image_f_key,
-      });
-
-      setLiveEventsByMachine((prev) => {
-        const currentEvents = prev[machineId] || [];
-        const updatedEvents = currentEvents.map((e) =>
-          e.id === newEvent.id
-            ? { ...e, ...imageUrls, images_loaded: true }
-            : e,
-        );
-        return { ...prev, [machineId]: updatedEvents };
-      });
-    },
-    [token, selectedMachine],
-  );
-
-  const { isConnected, error: mqttError } = usePubSub(
-    mqttTopics,
-    handleMqttMessage,
-  );
 
   if (!selectedMachine) return null;
 
   const machineData = getMachineData(selectedMachine.id);
-  const liveEvents = liveEventsByMachine[selectedMachine.id] || [];
 
   return (
     <>
@@ -187,6 +96,7 @@ export default function MachineDetailModal({
                   mqttConnected={isConnected}
                   mqttError={mqttError}
                   onImageClick={setSelectedImageUrl}
+                  token={token}
                 />
               </TabsContent>
               <TabsContent value="historical" className="mt-4">

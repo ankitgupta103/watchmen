@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Calendar, Camera, Clock, Loader2 } from 'lucide-react';
-import Image from 'next/image';
+import React, { useEffect, useState, memo } from 'react';
+import { Calendar, Camera, Clock } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 
 import { cn } from '@/lib/utils';
+import LiveEventImage from './live-events-image';
+
+
 
 interface MachineEvent {
   id: string;
@@ -15,27 +17,25 @@ interface MachineEvent {
   eventstr: string;
   image_c_key?: string;
   image_f_key?: string;
-  cropped_image_url?: string;
-  full_image_url?: string;
-  images_loaded: boolean;
-  images_requested: boolean;
   event_severity?: string;
 }
 
-const LiveEventsTab = ({
-  events,
-  mqttConnected,
-  mqttError,
-  onImageClick,
-}: {
+interface LiveEventsTabProps {
   events: MachineEvent[];
   mqttConnected: boolean;
   mqttError: Error | null;
   onImageClick: (url: string) => void;
-}) => {
-  const [relativeTimes, setRelativeTimes] = useState<Record<string, string>>(
-    {},
-  );
+  token: string | null;
+}
+
+const LiveEventsTab = memo(({
+  events,
+  mqttConnected,
+  mqttError,
+  onImageClick,
+  token,
+}: LiveEventsTabProps) => {
+  const [relativeTimes, setRelativeTimes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const calculateAllRelativeTimes = () => {
@@ -57,9 +57,7 @@ const LiveEventsTab = ({
     };
 
     calculateAllRelativeTimes();
-
     const intervalId = setInterval(calculateAllRelativeTimes, 5000);
-
     return () => clearInterval(intervalId);
   }, [events]);
 
@@ -70,6 +68,7 @@ const LiveEventsTab = ({
           MQTT Connection Error: {mqttError.message}
         </div>
       )}
+      
       {events.length === 0 ? (
         <div className="py-12 text-center">
           <Camera className="mx-auto mb-4 h-16 w-16 text-gray-300" />
@@ -110,6 +109,7 @@ const LiveEventsTab = ({
                     {relativeTimes[event.id] || '...'}
                   </span>
                 </div>
+                
                 <div className="flex items-center gap-2">
                   <span>Event Severity: </span>
                   <Badge
@@ -130,39 +130,16 @@ const LiveEventsTab = ({
                         : 'Critical'}
                   </Badge>
                 </div>
-                {event.images_requested && !event.images_loaded ? (
-                  <div className="flex h-48 items-center justify-center gap-2 text-sm text-gray-500">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading images...
-                  </div>
-                ) : event.images_loaded ? (
-                  <div className="flex flex-col items-center justify-center gap-2 lg:flex-row">
-                    {event.cropped_image_url && (
-                      <div className="w-full space-y-1">
-                        <Image
-                          src={event.cropped_image_url}
-                          alt="Cropped live event"
-                          width={300}
-                          height={400}
-                          className="h-80 w-fit max-w-full cursor-pointer rounded-lg border bg-slate-100 object-contain transition-transform hover:scale-105"
-                          onClick={() => onImageClick(event.cropped_image_url!)}
-                        />
-                      </div>
-                    )}
-                    {event.full_image_url && (
-                      <div className="w-full space-y-1">
-                        <Image
-                          src={event.full_image_url}
-                          alt="Full live event"
-                          width={500}
-                          height={400}
-                          className="h-80 w-fit max-w-full cursor-pointer rounded-lg border bg-slate-100 object-contain transition-transform hover:scale-105"
-                          onClick={() => onImageClick(event.full_image_url!)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : null}
+
+
+                <LiveEventImage
+                  token={token}
+                  image_c_key={event.image_c_key}
+                  image_f_key={event.image_f_key}
+                  onImageClick={onImageClick}
+                  eventId={event.id}
+                />
+
                 <div className="flex items-center gap-2 pt-1 text-xs text-gray-500">
                   <Calendar className="h-3 w-3" />
                   <span>{event.timestamp.toLocaleString()}</span>
@@ -174,5 +151,8 @@ const LiveEventsTab = ({
       )}
     </div>
   );
-};
+});
+
+LiveEventsTab.displayName = 'LiveEventsTab';
+
 export default LiveEventsTab;

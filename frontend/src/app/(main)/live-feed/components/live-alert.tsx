@@ -667,7 +667,7 @@ export default function CriticalAlertSystem({
                               Fetching images...
                             </div>
                           ) : alert.imagesFetched ? (
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="flex gap-2 items-center">
                               {alert.croppedImageUrl && (
                                 <div>
                                   <p className="mb-1 text-xs text-gray-500">
@@ -678,7 +678,7 @@ export default function CriticalAlertSystem({
                                     height={100}
                                     src={alert.croppedImageUrl}
                                     alt="Cropped event image"
-                                    className="h-full w-full rounded border object-cover"
+                                    className="h-80 w-fit rounded border object-contain"
                                   />
                                 </div>
                               )}
@@ -692,7 +692,7 @@ export default function CriticalAlertSystem({
                                     height={100}
                                     src={alert.fullImageUrl}
                                     alt="Full event image"
-                                    className="h-full w-full rounded border object-cover"
+                                    className="h-80 w-fit rounded border object-contain"
                                   />
                                 </div>
                               )}
