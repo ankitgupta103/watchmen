@@ -41,6 +41,7 @@ fcomm = IPCCommunicator(websocket_manager=manager)
 layout_instance = Layout()
 devices = []
 cc = None
+sleep_factor = 2.0
 
 async def setup_simulation():
     global devices, cc
@@ -68,38 +69,38 @@ async def simulation_loop():
 
     while True:
         if not simulation_state["running"]:
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.5 * sleep_factor)
             continue
         try:
             # This is a clean, single-instance loop.
             await fcomm.log_message("SIM_PHASE: All nodes scanning for neighbors.")
-            await asyncio.sleep(1)
+            await asyncio.sleep(1 * sleep_factor)
             for device in devices:
                 if not simulation_state["running"]: break
                 await device.send_scan_message()
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.2 * sleep_factor)
             if not simulation_state["running"]: continue
-            await asyncio.sleep(2)
+            await asyncio.sleep(2 * sleep_factor)
 
             await fcomm.log_message("SIM_PHASE: Central node broadcasting path information.")
-            await asyncio.sleep(1)
+            await asyncio.sleep(1 * sleep_factor)
             await cc.send_spath()
             if not simulation_state["running"]: continue
-            await asyncio.sleep(3)
+            await asyncio.sleep(3 * sleep_factor)
 
             await fcomm.log_message("SIM_PHASE: All nodes sending heartbeats.")
-            await asyncio.sleep(1)
+            await asyncio.sleep(1 * sleep_factor)
             for device in devices:
                  if not simulation_state["running"]: break
                  await device.send_hb()
-                 await asyncio.sleep(0.3)
+                 await asyncio.sleep(0.3 * sleep_factor)
             if not simulation_state["running"]: continue
             await fcomm.log_message("SIM_PHASE: Round complete. Waiting before next cycle.")
-            await asyncio.sleep(5)
+            await asyncio.sleep(5 * sleep_factor)
 
         except Exception as e:
             await fcomm.log_message(f"ERROR: Simulation loop crashed: {e}")
-            await asyncio.sleep(2)
+            await asyncio.sleep(2 * sleep_factor)
 
 async def start_simulation():
     """Safely start the simulation using a lock to prevent duplicates."""

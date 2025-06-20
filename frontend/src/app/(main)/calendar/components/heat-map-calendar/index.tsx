@@ -115,7 +115,7 @@ export default function HeatMapCalendar({
 
   // Pagination state
   const [detailsCurrentPage, setDetailsCurrentPage] = useState(1);
-  const eventsPerPage = 10;
+  const eventsPerPage = 5;
 
   const filteredMachines = useMemo(() => {
     if (!areaFilter) return machines;
@@ -252,7 +252,7 @@ export default function HeatMapCalendar({
     setLoadingImages({});
   }, [areaFilter]);
 
-  // OPTIMIZED: Fetch events in parallel batches of 5
+  // OPTIMIZED: Fetch events in parallel batches of 6
   useEffect(() => {
     const fetchInBatches = async () => {
       if (!token) return;
@@ -260,10 +260,13 @@ export default function HeatMapCalendar({
         (day) => day.getMonth() === currentMonth.getMonth(),
       );
 
-      const BATCH_SIZE = 5;
-      for (let i = 0; i < daysInMonth.length; i += BATCH_SIZE) {
+      const BATCH_SIZE = 6;
+      for (let i = daysInMonth.length - 1; i >= 0; i -= BATCH_SIZE) {
         const batch = daysInMonth.slice(i, i + BATCH_SIZE);
-        const promises = batch.map((day) => fetchEventsForDate(day));
+        const promises = batch.map((day) => {
+          if (day > new Date()) return Promise.resolve();
+          return fetchEventsForDate(day);
+        });
         await Promise.all(promises);
       }
     };
@@ -334,6 +337,7 @@ export default function HeatMapCalendar({
           setModalImage={setModalImage}
         />
       )}
+      {/* Main Calendar */}
       <div className="relative flex flex-col gap-4 overflow-y-auto xl:flex-row">
         <div className="mb-4 flex-1">
           <Card className="h-fit">
@@ -421,7 +425,7 @@ export default function HeatMapCalendar({
                       key={index}
                       onClick={() => setSelectedDate(date)}
                       className={cn(
-                        'text-primary relative flex h-24 w-full flex-col items-start justify-start rounded-lg border-2 p-1 text-left transition-all hover:bg-gray-50',
+                        'text-primary relative flex h-28 w-full flex-col items-start justify-start rounded-lg border-2 px-1 py-0.5 text-left transition-all hover:bg-gray-50',
                         isSelected(date) &&
                           'ring-2 ring-blue-500 ring-offset-2',
                         !isCurrentMonth(date) && 'opacity-40',
@@ -492,7 +496,9 @@ export default function HeatMapCalendar({
             </CardContent>
           </Card>
         </div>
-        <div className="sticky top-0 mb-4 h-fit w-full space-y-4 xl:w-96">
+
+        {/* Side Panel */}
+        <div className="sticky top-0 mb-4 h-fit w-full space-y-4 xl:w-[420px]">
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
@@ -539,7 +545,7 @@ export default function HeatMapCalendar({
                             <Badge
                               variant="outline"
                               className={cn(
-                                'text-xs',
+                                'text-xs' ,
                                 event.event_severity === '1' &&
                                   'border-yellow-500 bg-yellow-400 text-black',
                                 event.event_severity === '2' &&
