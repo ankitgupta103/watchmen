@@ -87,7 +87,12 @@ const LiveEventsTab = ({
           {events.map((event) => (
             <Card
               key={event.id}
-              className="border-l-4 border-l-green-500 bg-green-50/30"
+              className={cn(
+                'border-l-4',
+                event?.event_severity === '1' && 'border-l-yellow-500 bg-yellow-50/30',
+                event?.event_severity === '2' && 'border-l-orange-600 bg-orange-50/30',
+                event?.event_severity === '3' && 'border-l-red-700 bg-red-50/30',
+              )}
             >
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-start justify-between">
