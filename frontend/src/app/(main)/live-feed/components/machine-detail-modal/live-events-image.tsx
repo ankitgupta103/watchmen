@@ -12,7 +12,7 @@ interface LiveEventImageProps {
   image_c_key?: string;
   image_f_key?: string;
   onImageClick: (url: string) => void;
-  eventId: string; // For tracking specific events
+  eventId: string;
 }
 
 interface ImageUrlResponse {
@@ -41,11 +41,9 @@ const fetchEventImages = async (
         fullImageUrl: data.full_image_url,
       };
     }
-    // Return null if not successful but no hard error, allowing polling to continue
     return null;
   } catch (error) {
     console.error('Error fetching images:', error);
-    // Throw error to be caught by the polling logic
     throw error;
   }
 };
@@ -63,42 +61,46 @@ const LiveEventImage = memo(({
   const [isPolling, setIsPolling] = useState(false);
 
   useEffect(() => {
-    // Exit if we already have images or don't have the necessary data.
     if (imageUrls || !token || !image_c_key || !image_f_key) {
       return;
     }
 
+    let intervalId: NodeJS.Timeout | null = null;
+
     const attemptFetch = async () => {
-      setError(null); // Clear previous transient errors on new attempt
+      setError(null);
       try {
         const urls = await fetchEventImages(token, { image_c_key, image_f_key });
-        // If we get any URL, success!
         if (urls?.croppedImageUrl || urls?.fullImageUrl) {
           setImageUrls(urls);
           setIsPolling(false);
           setIsLoading(false);
+          // On success, immediately clear the interval
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
         } else {
-          // No URLs yet, but the request was successful. Continue polling.
           setIsPolling(true);
         }
       } catch (err) {
         setError('Network error. Retrying...');
-        setIsPolling(true); // Continue polling even on network errors
+        setIsPolling(true);
         console.error('Error fetching images for event:', eventId, err);
       }
     };
 
-    // Set initial loading state and make the first attempt
     setIsLoading(true);
     attemptFetch().finally(() => {
       setIsLoading(false);
     });
 
-    // Start polling every 5 seconds
-    const intervalId = setInterval(attemptFetch, 5000);
+    intervalId = setInterval(attemptFetch, 5000);
 
-    // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [token, image_c_key, image_f_key, eventId, imageUrls]);
 
   const hasImageKeys = image_c_key && image_f_key;
@@ -165,7 +167,6 @@ const LiveEventImage = memo(({
     );
   }
 
-  // Fallback case (should ideally not be reached if polling is active)
   return (
       <div className="flex h-48 flex-col items-center justify-center rounded border bg-gray-50 text-center text-xs text-gray-500">
         <ImageIcon className="mb-1 h-6 w-6 text-gray-400" />

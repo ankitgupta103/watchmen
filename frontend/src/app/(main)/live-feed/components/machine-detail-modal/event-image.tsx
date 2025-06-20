@@ -93,14 +93,14 @@ const EventImage = ({
       </div>
     );
   }
-  
+
   if (error) {
-     return (
-        <div className="flex h-32 flex-col items-center justify-center rounded border bg-red-50/50 text-center text-xs text-red-600">
-          <ImageIcon className="mb-1 h-6 w-6" />
-          {error}
-        </div>
-      );
+    return (
+      <div className="flex h-32 flex-col items-center justify-center rounded border bg-red-50/50 text-center text-xs text-red-600">
+        <ImageIcon className="mb-1 h-6 w-6" />
+        {error}
+      </div>
+    );
   }
 
   if (imageUrls?.croppedImageUrl || imageUrls?.fullImageUrl) {
@@ -129,7 +129,7 @@ const EventImage = ({
       </div>
     );
   }
-  
+
   return (
     <div className="flex h-32 flex-col items-center justify-center rounded border bg-blue-50/50 text-center text-xs text-blue-600">
       <ImageIcon className="mb-1 h-6 w-6" />
