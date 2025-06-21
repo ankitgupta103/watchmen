@@ -69,9 +69,9 @@ HN_ID = {
 # Last is CC
 # Everything in between is passthrough.
 NEXT_DEST_MAP = {
-        # BLR Parallel to A
-        "C" : "B",
-        "B" : "A",
+        # B->C->A
+        "B" : "C",
+        "C" : "A",
         # GUR F->E->D
         "F" : "E",
         "E" : "D"
