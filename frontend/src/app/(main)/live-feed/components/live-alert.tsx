@@ -481,11 +481,11 @@ export default function CriticalAlertSystem({
         >
           <Bell className="mr-2 h-5 w-5" />
           Events
-          {unacknowledgedCount > 0 && (
+          {/* {unacknowledgedCount > 0 && (
             <Badge className="absolute -top-2 -right-2 h-5 min-w-[20px] bg-yellow-500 px-1 text-black">
               {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
             </Badge>
-          )}
+          )} */}
         </Button>
       </div>
 
@@ -501,11 +501,11 @@ export default function CriticalAlertSystem({
                 <CardTitle className="flex items-center gap-2">
                   <Camera className="h-5 w-5 text-red-500" />
                   Event Alerts
-                  {/* {unacknowledgedCount > 0 && (
+                  {unacknowledgedCount > 0 && (
                     <Badge variant="destructive">
                       {unacknowledgedCount} New
                     </Badge>
-                  )} */}
+                  )}
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button
