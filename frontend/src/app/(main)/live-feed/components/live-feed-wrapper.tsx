@@ -2,7 +2,13 @@
 
 import 'leaflet/dist/leaflet.css';
 
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import useAllMachineStats from '@/hooks/use-all-machine-stats';
 import useOrganization from '@/hooks/use-organization';
 import { usePubSub } from '@/hooks/use-pub-sub';
@@ -32,6 +38,7 @@ import {
   PULSATING_DURATION_MS,
 } from '@/lib/utils';
 
+import { AudioManager } from './audio-manager';
 import MachineDetailModal from './machine-detail-modal';
 
 interface LiveFeedWrapperProps {
@@ -65,11 +72,16 @@ export default function LiveFeedWrapper({
   machines,
   selectedDate,
 }: LiveFeedWrapperProps) {
+  const audioManagerRef = useRef(new AudioManager());
   const { organizationId } = useOrganization();
   const { token } = useToken();
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const initAudio = async () => {
+    await audioManagerRef.current.initialize();
+  };
 
   const [machineEvents, setMachineEvents] = useState<
     Record<number, MachineEvent[]>
@@ -96,29 +108,35 @@ export default function LiveFeedWrapper({
     );
   }, [organizationId, machines]);
 
-  const extractMachineIdFromTopic = useCallback((topic: string): number | null => {
-    const topicParts = topic.split('/');
-    const machineIdPart = topicParts[3];
+  const extractMachineIdFromTopic = useCallback(
+    (topic: string): number | null => {
+      const topicParts = topic.split('/');
+      const machineIdPart = topicParts[3];
 
-    if (machineIdPart && machineIdPart !== '_all_') {
-      const machineId = parseInt(machineIdPart);
-      return !isNaN(machineId) ? machineId : null;
-    }
-    return null;
-  }, []);
+      if (machineIdPart && machineIdPart !== '_all_') {
+        const machineId = parseInt(machineIdPart);
+        return !isNaN(machineId) ? machineId : null;
+      }
+      return null;
+    },
+    [],
+  );
 
-  const createMachineEvent = useCallback((eventMessage: EventMessage): MachineEvent => {
-    return {
-      id: generateEventId(),
-      timestamp: new Date(),
-      eventstr:
-        eventMessage.eventstr ||
-        `Event - Severity ${eventMessage.event_severity}`,
-      image_c_key: eventMessage.image_c_key,
-      image_f_key: eventMessage.image_f_key,
-      event_severity: eventMessage.event_severity.toString(),
-    };
-  }, []);
+  const createMachineEvent = useCallback(
+    (eventMessage: EventMessage): MachineEvent => {
+      return {
+        id: generateEventId(),
+        timestamp: new Date(),
+        eventstr:
+          eventMessage.eventstr ||
+          `Event - Severity ${eventMessage.event_severity}`,
+        image_c_key: eventMessage.image_c_key,
+        image_f_key: eventMessage.image_f_key,
+        event_severity: eventMessage.event_severity.toString(),
+      };
+    },
+    [],
+  );
 
   const addEventToMachine = useCallback(
     (machineId: number, newEvent: MachineEvent) => {
@@ -157,18 +175,23 @@ export default function LiveFeedWrapper({
   // Stable message handler with better duplicate detection
   const handleMqttMessage = useCallback(
     async (topic: string, data: EventMessage) => {
+      await initAudio();
       try {
         const machineId = extractMachineIdFromTopic(topic);
         if (!machineId) return;
 
         // Create a more unique event key combining multiple fields
         const eventKey = `${data.image_f_key}_${data.image_c_key}_${machineId}_${data.event_severity}`;
-        
+
         // Check both local and global processed events
-        if (!eventKey || 
-            processedEventKeysRef.current.has(eventKey) || 
-            globalProcessedEvents.has(eventKey)) {
-          console.log(`[LiveFeedWrapper] Duplicate event detected: ${eventKey}`);
+        if (
+          !eventKey ||
+          processedEventKeysRef.current.has(eventKey) ||
+          globalProcessedEvents.has(eventKey)
+        ) {
+          console.log(
+            `[LiveFeedWrapper] Duplicate event detected: ${eventKey}`,
+          );
           return;
         }
 
@@ -180,15 +203,18 @@ export default function LiveFeedWrapper({
         if (globalProcessedEvents.size > 1000) {
           const entries = Array.from(globalProcessedEvents);
           const toRemove = entries.slice(0, entries.length - 800);
-          toRemove.forEach(key => globalProcessedEvents.delete(key));
+          toRemove.forEach((key) => globalProcessedEvents.delete(key));
         }
 
-        console.log(`[LiveFeedWrapper] Processing new event: ${eventKey} for machine ${machineId}`);
+        console.log(
+          `[LiveFeedWrapper] Processing new event: ${eventKey} for machine ${machineId}`,
+        );
 
         const newEvent = createMachineEvent(data);
         addEventToMachine(machineId, newEvent);
         incrementEventCount(machineId);
         startPulsatingAnimation(machineId);
+        audioManagerRef.current.playAlarm(0.5);
       } catch (error) {
         console.error('Error processing MQTT message:', error, { topic, data });
       }
@@ -275,11 +301,11 @@ export default function LiveFeedWrapper({
     setMachineEvents({});
     setMachineEventCounts({});
     setPulsatingMachines({});
-    
+
     // Clear processed keys on refresh
     processedEventKeysRef.current.clear();
     globalProcessedEvents.clear();
-    
+
     setTimeout(() => setIsRefreshing(false), 1500);
   }, []);
 

@@ -88,7 +88,7 @@ class PubSubService extends EventEmitter {
       const str = `${topic}:${dataString}`;
       for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
+        hash = (hash << 5) - hash + char;
         hash = hash & hash; // Convert to 32-bit integer
       }
       return hash.toString();
@@ -101,7 +101,7 @@ class PubSubService extends EventEmitter {
   private startMessageHashCleanup() {
     this.messageHashCleanupTimer = setInterval(() => {
       const now = Date.now();
-      
+
       // Clean up old message hashes (older than detection window)
       for (const [hash, timestamp] of this.globalProcessedMessages.entries()) {
         if (now - timestamp > CONFIG.DUPLICATE_DETECTION_WINDOW) {
@@ -354,13 +354,17 @@ class PubSubService extends EventEmitter {
 
               // Check for duplicates at global level
               if (this.globalProcessedMessages.has(messageHash)) {
-                console.log(`[PubSubService] Global duplicate detected for topic ${topic}: ${messageHash}`);
+                console.log(
+                  `[PubSubService] Global duplicate detected for topic ${topic}: ${messageHash}`,
+                );
                 return;
               }
 
               // Check for duplicates at subscription level
               if (subscriptionInfo.lastProcessedMessages.has(messageHash)) {
-                console.log(`[PubSubService] Subscription duplicate detected for topic ${topic}: ${messageHash}`);
+                console.log(
+                  `[PubSubService] Subscription duplicate detected for topic ${topic}: ${messageHash}`,
+                );
                 return;
               }
 
