@@ -123,7 +123,12 @@ const EventRow: React.FC<EventRowProps> = ({
         <div className="space-y-1">
           <div className="flex items-center gap-1">
             <span className="text-xs text-gray-500">EventStr: </span>
-            <Badge variant="outline">{event?.eventstr || 'N/A'}</Badge>{' '}
+            <Badge variant="outline">
+              {(event?.croppedImageUrl || event?.fullImageUrl)
+                ?.split('/')
+                .pop()
+                ?.split('_')[0] || 'N/A'}
+            </Badge>{' '}
           </div>
           <Separator />
           <div className="flex items-center gap-1">
