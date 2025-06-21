@@ -38,7 +38,6 @@ import {
   PULSATING_DURATION_MS,
 } from '@/lib/utils';
 
-import { AudioManager } from './audio-manager';
 import MachineDetailModal from './machine-detail-modal';
 
 interface LiveFeedWrapperProps {
@@ -66,22 +65,18 @@ const ReactLeafletMap = dynamic(() => import('./react-leaflet-map'), {
   ssr: false,
 });
 
+// Global processed events tracker for live feed
 const globalProcessedEvents = new Set<string>();
 
 export default function LiveFeedWrapper({
   machines,
   selectedDate,
 }: LiveFeedWrapperProps) {
-  const audioManagerRef = useRef(new AudioManager());
   const { organizationId } = useOrganization();
   const { token } = useToken();
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  const initAudio = async () => {
-    await audioManagerRef.current.initialize();
-  };
 
   const [machineEvents, setMachineEvents] = useState<
     Record<number, MachineEvent[]>
@@ -100,12 +95,19 @@ export default function LiveFeedWrapper({
 
   const machineStats = useAllMachineStats(machines);
 
-  // Stable topics array using useMemo
+  // FIXED: Stable topics array using useMemo - same pattern as alert system
   const mqttTopics = useMemo(() => {
-    if (machines.length === 0) return [];
-    return machines.map(
+    if (machines.length === 0) {
+      console.log('⚠️ [LiveFeed] No machines provided');
+      return [];
+    }
+    
+    const topics = machines.map(
       (machine) => `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
     );
+    
+    console.log('🎯 [LiveFeed] Generated topics:', topics);
+    return topics;
   }, [organizationId, machines]);
 
   const extractMachineIdFromTopic = useCallback(
@@ -172,16 +174,30 @@ export default function LiveFeedWrapper({
     }, PULSATING_DURATION_MS);
   }, []);
 
-  // Stable message handler with better duplicate detection
+  // FIXED: Enhanced message handler with better logging and NO AUDIO
   const handleMqttMessage = useCallback(
     async (topic: string, data: EventMessage) => {
-      await initAudio();
+      console.log('📥 [LiveFeed] MQTT message received:', {
+        topic,
+        data: JSON.stringify(data).substring(0, 100),
+        timestamp: new Date().toISOString(),
+      });
+
       try {
         const machineId = extractMachineIdFromTopic(topic);
-        if (!machineId) return;
+        if (!machineId) {
+          console.log('⚠️ [LiveFeed] Could not extract machine ID from topic:', topic);
+          return;
+        }
 
-        // Create a more unique event key combining multiple fields
-        const eventKey = `${data.image_f_key}_${data.image_c_key}_${machineId}_${data.event_severity}`;
+        // Create event key for deduplication - different prefix than alerts
+        const eventKey = `livefeed_${data.image_f_key}_${data.image_c_key}_${machineId}_${data.event_severity}`;
+
+        console.log('🔍 [LiveFeed] Processing event:', {
+          machineId,
+          eventKey,
+          severity: data.event_severity,
+        });
 
         // Check both local and global processed events
         if (
@@ -189,9 +205,7 @@ export default function LiveFeedWrapper({
           processedEventKeysRef.current.has(eventKey) ||
           globalProcessedEvents.has(eventKey)
         ) {
-          console.log(
-            `[LiveFeedWrapper] Duplicate event detected: ${eventKey}`,
-          );
+          console.log(`🔄 [LiveFeed] Duplicate event detected: ${eventKey}`);
           return;
         }
 
@@ -199,24 +213,26 @@ export default function LiveFeedWrapper({
         processedEventKeysRef.current.add(eventKey);
         globalProcessedEvents.add(eventKey);
 
-        // Clean up old entries to prevent memory leaks (keep last 1000)
+        // Clean up old entries to prevent memory leaks
         if (globalProcessedEvents.size > 1000) {
           const entries = Array.from(globalProcessedEvents);
           const toRemove = entries.slice(0, entries.length - 800);
           toRemove.forEach((key) => globalProcessedEvents.delete(key));
+          console.log('🧹 [LiveFeed] Cleaned up old processed events');
         }
 
-        console.log(
-          `[LiveFeedWrapper] Processing new event: ${eventKey} for machine ${machineId}`,
-        );
+        console.log(`✅ [LiveFeed] Processing new event: ${eventKey} for machine ${machineId}`);
 
         const newEvent = createMachineEvent(data);
         addEventToMachine(machineId, newEvent);
         incrementEventCount(machineId);
         startPulsatingAnimation(machineId);
-        audioManagerRef.current.playAlarm(0.5);
+
+        // REMOVED: Audio playing - let alert system handle audio
+        console.log('🔇 [LiveFeed] Event processed, audio handled by alert system');
+
       } catch (error) {
-        console.error('Error processing MQTT message:', error, { topic, data });
+        console.error('❌ [LiveFeed] Error processing MQTT message:', error, { topic, data });
       }
     },
     [
@@ -236,9 +252,11 @@ export default function LiveFeedWrapper({
 
   useEffect(() => {
     if (isConnected) {
-      console.log('MQTT Connected to topics:', mqttTopics);
+      console.log('✅ [LiveFeed] MQTT connected to topics:', mqttTopics);
     } else if (mqttError) {
-      console.error('MQTT Error:', mqttError);
+      console.error('❌ [LiveFeed] MQTT error:', mqttError);
+    } else {
+      console.log('🔄 [LiveFeed] MQTT connecting...');
     }
   }, [isConnected, mqttError, mqttTopics]);
 
@@ -462,22 +480,20 @@ export default function LiveFeedWrapper({
           </div>
         )}
 
-        {/* Development Debug Info */}
-        {process.env.NODE_ENV === 'development' && totalEvents > 0 && (
+        {/* Enhanced Development Debug Info */}
+        {process.env.NODE_ENV === 'development' && (
           <div className="absolute bottom-4 left-4 rounded-lg border bg-white px-3 py-2 text-xs shadow-lg">
-            <div className="font-medium">Debug Info:</div>
-            <div>Total machines: {machines.length}</div>
-            <div>Filtered machines: {filteredMachines.length}</div>
-            <div>Filter: {statusFilter}</div>
-            <div>Active machines: {Object.keys(machineEventCounts).length}</div>
-            <div>Total events: {totalEvents}</div>
+            <div className="font-medium text-blue-600">🔧 Live Feed Debug</div>
+            <div>Connection: {isConnected ? '✅' : '❌'}</div>
             <div>Topics: {mqttTopics.length}</div>
-            <div>
-              Pulsating:{' '}
-              {Object.values(pulsatingMachines).filter(Boolean).length}
-            </div>
-            <div>Processed events: {processedEventKeysRef.current.size}</div>
-            <div>Global processed: {globalProcessedEvents.size}</div>
+            <div>Machines: {machines.length}</div>
+            <div>Filtered: {filteredMachines.length}</div>
+            <div>Active: {Object.keys(machineEventCounts).length}</div>
+            <div>Events: {totalEvents}</div>
+            <div>Pulsating: {Object.values(pulsatingMachines).filter(Boolean).length}</div>
+            <div>Processed: {processedEventKeysRef.current.size}</div>
+            <div>Global: {globalProcessedEvents.size}</div>
+            <div className="mt-1 text-blue-600">Audio: Handled by Alert System</div>
           </div>
         )}
       </div>
