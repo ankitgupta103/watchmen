@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Clock, ImageIcon, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -36,49 +36,101 @@ const HistoricalEventsTab = ({
   const [events, setEvents] = useState<MachineEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const eventsPerPage = 15;
 
   const fetchHistoricalEvents = useCallback(async () => {
     if (!token || !orgId) return;
+
+    // Cancel any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setLoading(true);
     setEvents([]);
     setCurrentPage(1);
 
-    const promises = Array.from({ length: 7 }).map((_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toLocaleDateString('en-CA');
-      return fetcherClient<{
-        success: boolean;
-        events?: Array<{
-          image_c_key: string;
-          image_f_key: string;
-          eventstr: string;
-          timestamp?: string | Date;
-          event_severity?: string;
-        }>;
-      }>(`${API_BASE_URL}/s3-events/fetch-events/`, token, {
-        method: 'POST',
-        body: { org_id: orgId, date: dateStr, machine_id: machineId },
-      }).then((result) => (result?.success ? result?.events || [] : []));
-    });
+    try {
+      const promises = Array.from({ length: 7 }).map((_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-CA');
+        return fetcherClient<{
+          success: boolean;
+          events?: Array<{
+            image_c_key: string;
+            image_f_key: string;
+            eventstr: string;
+            timestamp?: string | Date;
+            event_severity?: string;
+          }>;
+        }>(`${API_BASE_URL}/s3-events/fetch-events/`, token, {
+          method: 'POST',
+          body: { org_id: orgId, date: dateStr, machine_id: machineId },
+          signal, // Pass the abort signal to each fetch request
+        }).then((result) => {
+          // Check if request was aborted before processing result
+          if (signal.aborted) {
+            return [];
+          }
+          return result?.success ? result?.events || [] : [];
+        }).catch((error) => {
+          // Don't log abort errors
+          if (error.name !== 'AbortError') {
+            console.error('Error fetching events for date:', dateStr, error);
+          }
+          return [];
+        });
+      });
 
-    const results = await Promise.all(promises);
-    const allEvents = results.flat().map((event, index) => ({
-      ...event,
-      id: `hist-${machineId}-${index}`,
-      timestamp: new Date(event.timestamp || Date.now()),
-    }));
+      const results = await Promise.all(promises);
+      
+      // Check if request was aborted before updating state
+      if (signal.aborted) {
+        return;
+      }
 
-    allEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    setEvents(allEvents);
-    setLoading(false);
+      const allEvents = results.flat().map((event, index) => ({
+        ...event,
+        id: `hist-${machineId}-${index}`,
+        timestamp: new Date(event.timestamp || Date.now()),
+      }));
+
+      allEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      setEvents(allEvents);
+      setLoading(false);
+    } catch (error) {
+      // Only update state if request wasn't aborted
+      if (!signal.aborted) {
+        console.error('Error in fetchHistoricalEvents:', error);
+        setEvents([]);
+        setLoading(false);
+      }
+    }
   }, [machineId, token, orgId]);
 
   useEffect(() => {
     fetchHistoricalEvents();
+
+    // Cleanup function to abort request on unmount or dependency change
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [fetchHistoricalEvents]);
+
+  // Handle page changes - this will automatically cancel ongoing requests
+  // due to the dependency change in useEffect
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
 
   const groupedEvents = useMemo(() => {
     return events.reduce(
@@ -215,7 +267,7 @@ const HistoricalEventsTab = ({
         <Pagination
           currentPage={currentPage}
           totalPages={paginatedKeys.totalPages}
-          onPageChange={setCurrentPage}
+          onPageChange={handlePageChange}
         />
       )}
     </div>
