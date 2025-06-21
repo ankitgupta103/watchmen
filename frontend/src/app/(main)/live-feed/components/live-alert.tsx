@@ -501,11 +501,11 @@ export default function CriticalAlertSystem({
                 <CardTitle className="flex items-center gap-2">
                   <Camera className="h-5 w-5 text-red-500" />
                   Event Alerts
-                  {unacknowledgedCount > 0 && (
+                  {/* {unacknowledgedCount > 0 && (
                     <Badge variant="destructive">
                       {unacknowledgedCount} New
                     </Badge>
-                  )}
+                  )} */}
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button
