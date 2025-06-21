@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import useAllMachineStats from '@/hooks/use-all-machine-stats';
 import useOrganization from '@/hooks/use-organization';
 import { usePubSub } from '@/hooks/use-pub-sub';
+import useToken from '@/hooks/use-token';
 import { Calendar, RefreshCw, Shield } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -19,8 +20,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { Machine } from '@/lib/types/machine';
-import { cn } from '@/lib/utils';
+import { Machine, SimpleMachineData } from '@/lib/types/machine';
+import {
+  cn,
+  countMachinesByStatus,
+  generateEventId,
+  hasCriticalEvents,
+  isMachineOnline,
+  MAX_EVENT_COUNT_FOR_COLOR,
+  MAX_EVENTS_PER_MACHINE,
+  PULSATING_DURATION_MS,
+} from '@/lib/utils';
 
 import MachineDetailModal from './machine-detail-modal';
 
@@ -29,81 +39,54 @@ interface LiveFeedWrapperProps {
   selectedDate?: Date;
 }
 
-const ReactLeafletMap = dynamic(() => import('./react-leaflet-map'), {
-  ssr: false,
-});
-
-interface EventMessage {
-  image_c_key: string;
-  image_f_key: string;
-  eventstr: string;
-  event_severity: number;
-  meta: {
-    node_id: string;
-    hb_count: string;
-    last_hb_time: string;
-    photos_taken: string;
-    events_seen: string;
-  };
-}
-
 interface MachineEvent {
   id: string;
   timestamp: Date;
   eventstr: string;
   image_c_key?: string;
   image_f_key?: string;
-  cropped_image_url?: string;
-  full_image_url?: string;
-  images_loaded?: boolean;
   event_severity?: string;
 }
 
-interface SimpleMachineData {
-  machine_id: number;
-  events: MachineEvent[];
-  event_count: number;
-  last_event?: MachineEvent;
-  last_updated: string;
-  // Status and location from useMachineStats
-  is_online: boolean;
-  location: { lat: number; lng: number; timestamp: string };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stats_data: any;
-  buffer_size: number;
-  // Add pulsating state for recent events
-  is_pulsating: boolean;
-  is_critical: boolean;
+interface EventMessage {
+  eventstr?: string;
+  image_c_key: string;
+  image_f_key: string;
+  event_severity: string;
 }
+
+const ReactLeafletMap = dynamic(() => import('./react-leaflet-map'), {
+  ssr: false,
+});
 
 export default function LiveFeedWrapper({
   machines,
   selectedDate,
 }: LiveFeedWrapperProps) {
   const { organizationId } = useOrganization();
+  const { token } = useToken();
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all'); // Add status filter state
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Track MQTT events per machine
   const [machineEvents, setMachineEvents] = useState<
     Record<number, MachineEvent[]>
   >({});
 
-  // Track event counts for color coding
+  const [processedEventKeys, setProcessedEventKeys] = useState(
+    () => new Set<string>(),
+  );
+
   const [machineEventCounts, setMachineEventCounts] = useState<
     Record<number, number>
   >({});
 
-  // Track machines that recently received events (for pulsating animation)
   const [pulsatingMachines, setPulsatingMachines] = useState<
     Record<number, boolean>
   >({});
 
-  // Use the custom hook to get all machine stats for status and location
   const machineStats = useAllMachineStats(machines);
 
-  // Create MQTT topics for all machines
   const mqttTopics = useMemo(() => {
     if (machines.length === 0) return [];
     return machines.map(
@@ -111,140 +94,102 @@ export default function LiveFeedWrapper({
     );
   }, [organizationId, machines]);
 
-  // Fetch images from Django API
-  const fetchEventImages = async (imageKeys: {
-    image_c_key: string;
-    image_f_key: string;
-  }) => {
-    try {
-      const response = await fetch('/event-images/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(imageKeys),
+  const extractMachineIdFromTopic = (topic: string): number | null => {
+    const topicParts = topic.split('/');
+    const machineIdPart = topicParts[3];
+
+    if (machineIdPart && machineIdPart !== '_all_') {
+      const machineId = parseInt(machineIdPart);
+      return !isNaN(machineId) ? machineId : null;
+    }
+    return null;
+  };
+
+  const createMachineEvent = (eventMessage: EventMessage): MachineEvent => {
+    return {
+      id: generateEventId(),
+      timestamp: new Date(),
+      eventstr:
+        eventMessage.eventstr ||
+        `Event - Severity ${eventMessage.event_severity}`,
+      image_c_key: eventMessage.image_c_key,
+      image_f_key: eventMessage.image_f_key,
+      event_severity: eventMessage.event_severity.toString(),
+    };
+  };
+
+  const addEventToMachine = useCallback(
+    (machineId: number, newEvent: MachineEvent) => {
+      setMachineEvents((prev) => {
+        const currentEvents = prev[machineId] || [];
+        const updatedEvents = [newEvent, ...currentEvents].slice(
+          0,
+          MAX_EVENTS_PER_MACHINE,
+        );
+        return { ...prev, [machineId]: updatedEvents };
       });
+    },
+    [],
+  );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  const incrementEventCount = useCallback((machineId: number) => {
+    setMachineEventCounts((prev) => ({
+      ...prev,
+      [machineId]: Math.min(
+        (prev[machineId] || 0) + 1,
+        MAX_EVENT_COUNT_FOR_COLOR,
+      ),
+    }));
+  }, []);
 
-      const data = await response.json();
+  const startPulsatingAnimation = useCallback((machineId: number) => {
+    setPulsatingMachines((prev) => ({
+      ...prev,
+      [machineId]: true,
+    }));
+    setTimeout(() => {
+      setPulsatingMachines((prev) => ({ ...prev, [machineId]: false }));
+    }, PULSATING_DURATION_MS);
+  }, []);
 
-      if (data.success) {
-        return {
-          croppedImageUrl: data.cropped_image_url,
-          fullImageUrl: data.full_image_url,
-        };
-      } else {
-        throw new Error(data.error || 'Failed to fetch images');
-      }
-    } catch (error) {
-      console.error('Error fetching images:', error);
-      return null;
-    }
-  };
+  const handleMqttMessage = useCallback(
+    async (topic: string, data: EventMessage) => {
+      try {
+        const machineId = extractMachineIdFromTopic(topic);
+        if (!machineId) return;
 
-  // MQTT message handler
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleMqttMessage = async (topic: string, data: any) => {
-    try {
-      // Extract machine ID from topic path
-      // Topic format: organization_id/_all_/2025-06-17/machine_id/EVENT/#
-      const topicParts = topic.split('/');
-      const machineIdPart = topicParts[3];
-
-      if (machineIdPart && machineIdPart !== '_all_') {
-        const machineId = parseInt(machineIdPart);
-
-        if (!isNaN(machineId)) {
-          // Parse the event message
-          const eventMessage: EventMessage = data;
-
-          // Create event object
-          const eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const newEvent: MachineEvent = {
-            id: eventId,
-            timestamp: new Date(),
-            eventstr: eventMessage.eventstr || '',
-            image_c_key: eventMessage.image_c_key,
-            image_f_key: eventMessage.image_f_key,
-            event_severity: eventMessage.event_severity.toString(),
-            images_loaded: false,
-          };
-
-          // Add event to machine events
-          setMachineEvents((prev) => ({
-            ...prev,
-            [machineId]: [...(prev[machineId] || []), newEvent].slice(-50), // Keep last 50 events
-          }));
-
-          // Update event count (cap at 20 for color gradation)
-          setMachineEventCounts((prev) => ({
-            ...prev,
-            [machineId]: Math.min((prev[machineId] || 0) + 1, 20),
-          }));
-
-          // Start pulsating animation for this machine
-          setPulsatingMachines((prev) => ({
-            ...prev,
-            [machineId]: true,
-          }));
-
-          // Stop pulsating after 30 seconds
-          setTimeout(() => {
-            setPulsatingMachines((prev) => ({
-              ...prev,
-              [machineId]: false,
-            }));
-          }, 30000);
-
-          // Fetch images if available
-          if (eventMessage.image_c_key && eventMessage.image_f_key) {
-            try {
-              const imageUrls = await fetchEventImages({
-                image_c_key: eventMessage.image_c_key,
-                image_f_key: eventMessage.image_f_key,
-              });
-
-              if (imageUrls) {
-                // Update the event with image URLs
-                setMachineEvents((prev) => ({
-                  ...prev,
-                  [machineId]: (prev[machineId] || []).map((event) =>
-                    event.id === eventId
-                      ? {
-                          ...event,
-                          cropped_image_url: imageUrls.croppedImageUrl,
-                          full_image_url: imageUrls.fullImageUrl,
-                          images_loaded: true,
-                        }
-                      : event,
-                  ),
-                }));
-              }
-            } catch (error) {
-              console.error('Error fetching images:', error);
-            }
-          }
+        // Use a unique key from the message to check for duplicates
+        const eventKey = data.image_f_key;
+        if (!eventKey || processedEventKeys.has(eventKey)) {
+          // If no key or key has been processed, ignore the event.
+          return;
         }
-      }
-    } catch (error) {
-      console.error('Error processing MQTT message:', error, { topic, data });
-    }
-  };
 
-  // Use the PubSub hook for MQTT connection
+        // Add the new key to the set of processed events
+        setProcessedEventKeys((prev) => new Set(prev).add(eventKey));
+
+        const newEvent = createMachineEvent(data);
+        addEventToMachine(machineId, newEvent);
+        incrementEventCount(machineId);
+        startPulsatingAnimation(machineId);
+      } catch (error) {
+        console.error('Error processing MQTT message:', error, { topic, data });
+      }
+    },
+    [
+      processedEventKeys,
+      addEventToMachine,
+      incrementEventCount,
+      startPulsatingAnimation,
+    ],
+  );
+
   const { isConnected, error: mqttError } = usePubSub(
     mqttTopics,
     handleMqttMessage,
-    {
-      autoReconnect: true,
-      parseJson: true,
-    },
+    { autoReconnect: true, parseJson: true },
   );
 
-  // Log MQTT connection status changes
   useEffect(() => {
     if (isConnected) {
       console.log('MQTT Connected to topics:', mqttTopics);
@@ -253,32 +198,13 @@ export default function LiveFeedWrapper({
     }
   }, [isConnected, mqttError, mqttTopics]);
 
-  // Helper to get machine data
   const getMachineData = useCallback(
     (machineId: number): SimpleMachineData => {
       const events = machineEvents[machineId] || [];
       const eventCount = machineEventCounts[machineId] || 0;
-      const lastEvent = events[events.length - 1];
+      const lastEvent = events[0];
       const stats = machineStats[machineId];
-      const is_critical = events.some((event) => event.event_severity == '3');
-
-      // Parse last_location.timestamp as Date and check if within last hour
-      const lastSeen = machines[machineId]?.last_location?.timestamp
-        ? new Date(machines[machineId].last_location.timestamp)
-        : null;
-      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-
-      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
-
-      // Get location from stats data
-      const location = {
-        lat: stats?.data?.message?.location?.lat ?? 0,
-        lng: stats?.data?.message?.location?.long ?? 0,
-        timestamp: stats?.data?.message?.location?.timestamp ?? '',
-      };
-
-      // Check if machine is currently pulsating
-      const isPulsating = pulsatingMachines[machineId] || false;
+      const machine = machines.find((m) => m.id === machineId);
 
       return {
         machine_id: machineId,
@@ -287,12 +213,16 @@ export default function LiveFeedWrapper({
         last_event: lastEvent,
         last_updated:
           lastEvent?.timestamp.toISOString() || new Date().toISOString(),
-        is_online: isOnline,
-        location: location,
+        is_online: machine ? isMachineOnline(machine) : false,
+        location: {
+          lat: stats?.data?.message?.location?.lat ?? 0,
+          lng: stats?.data?.message?.location?.long ?? 0,
+          timestamp: stats?.data?.message?.location?.timestamp ?? '',
+        },
         stats_data: stats?.data,
         buffer_size: stats?.buffer ?? 0,
-        is_pulsating: isPulsating,
-        is_critical: is_critical,
+        is_pulsating: pulsatingMachines[machineId] || false,
+        is_critical: hasCriticalEvents(events),
       };
     },
     [
@@ -304,77 +234,44 @@ export default function LiveFeedWrapper({
     ],
   );
 
-  // Calculate total events across all machines
   const totalEvents = Object.values(machineEventCounts).reduce(
     (sum, count) => sum + count,
     0,
   );
+  const { online: onlineCount, offline: offlineCount } =
+    countMachinesByStatus(machines);
 
-  // Calculate online/offline counts using proper status logic
-  const onlineCount = machines.filter((machine) => {
-    const lastSeen = machine.last_location?.timestamp
-      ? new Date(machine.last_location.timestamp)
-      : null;
-    const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-    const isOnline = !!lastSeen && lastSeen > oneHourAgo;
-
-    return isOnline;
-  }).length;
-
-  const offlineCount = machines.filter((machine) => {
-    const lastSeen = machine.last_location?.timestamp
-      ? new Date(machine.last_location.timestamp)
-      : null;
-    const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-    const isOnline = !!lastSeen && lastSeen > oneHourAgo;
-
-    return !isOnline;
-  }).length;
-
-  // Filter machines based on status filter
   const filteredMachines = useMemo(() => {
-    if (statusFilter === 'all') {
-      return machines;
-    }
-
+    if (statusFilter === 'all') return machines;
     return machines.filter((machine) => {
-      // Use the same 1-hour logic as getMachineData
-      const lastSeen = machine.last_location?.timestamp
-        ? new Date(machine.last_location.timestamp)
-        : null;
-      const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
-      const isOnline = !!lastSeen && lastSeen > oneHourAgo;
-
-      if (statusFilter === 'online') {
-        return isOnline;
-      } else if (statusFilter === 'offline') {
-        return !isOnline;
-      }
+      const isOnline = isMachineOnline(machine);
+      if (statusFilter === 'online') return isOnline;
+      if (statusFilter === 'offline') return !isOnline;
 
       return true;
     });
   }, [machines, statusFilter]);
 
-  // Refresh function
   const handleRefresh = () => {
     setIsRefreshing(true);
-
-    // Clear events and counts to force refresh
     setMachineEvents({});
     setMachineEventCounts({});
     setPulsatingMachines({});
-
+    setProcessedEventKeys(new Set()); // Clear processed keys on refresh
     setTimeout(() => setIsRefreshing(false), 1500);
   };
 
-  // Clear all filters
   const handleClearAllFilters = () => {
     setStatusFilter('all');
   };
 
+  const liveEventsForModal = selectedMachine
+    ? machineEvents[selectedMachine.id] || []
+    : [];
+
   return (
     <div className="flex h-full w-full flex-col">
-      {/* Simplified Map Controls */}
+      {/* Map Controls */}
       <div className="flex items-center justify-between border-b bg-white p-4 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -540,6 +437,10 @@ export default function LiveFeedWrapper({
         selectedMachine={selectedMachine}
         setSelectedMachine={setSelectedMachine}
         getMachineData={getMachineData}
+        token={token}
+        liveEvents={liveEventsForModal}
+        isConnected={isConnected}
+        mqttError={mqttError}
       />
     </div>
   );
