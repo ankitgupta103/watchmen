@@ -2,7 +2,7 @@
 
 import 'leaflet/dist/leaflet.css';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import useAllMachineStats from '@/hooks/use-all-machine-stats';
 import useOrganization from '@/hooks/use-organization';
 import { usePubSub } from '@/hooks/use-pub-sub';
@@ -59,6 +59,8 @@ const ReactLeafletMap = dynamic(() => import('./react-leaflet-map'), {
   ssr: false,
 });
 
+const globalProcessedEvents = new Set<string>();
+
 export default function LiveFeedWrapper({
   machines,
   selectedDate,
@@ -73,9 +75,8 @@ export default function LiveFeedWrapper({
     Record<number, MachineEvent[]>
   >({});
 
-  const [processedEventKeys, setProcessedEventKeys] = useState(
-    () => new Set<string>(),
-  );
+  // Use ref for processed events to avoid stale closures
+  const processedEventKeysRef = useRef(new Set<string>());
 
   const [machineEventCounts, setMachineEventCounts] = useState<
     Record<number, number>
@@ -87,6 +88,7 @@ export default function LiveFeedWrapper({
 
   const machineStats = useAllMachineStats(machines);
 
+  // Stable topics array using useMemo
   const mqttTopics = useMemo(() => {
     if (machines.length === 0) return [];
     return machines.map(
@@ -94,7 +96,7 @@ export default function LiveFeedWrapper({
     );
   }, [organizationId, machines]);
 
-  const extractMachineIdFromTopic = (topic: string): number | null => {
+  const extractMachineIdFromTopic = useCallback((topic: string): number | null => {
     const topicParts = topic.split('/');
     const machineIdPart = topicParts[3];
 
@@ -103,9 +105,9 @@ export default function LiveFeedWrapper({
       return !isNaN(machineId) ? machineId : null;
     }
     return null;
-  };
+  }, []);
 
-  const createMachineEvent = (eventMessage: EventMessage): MachineEvent => {
+  const createMachineEvent = useCallback((eventMessage: EventMessage): MachineEvent => {
     return {
       id: generateEventId(),
       timestamp: new Date(),
@@ -116,7 +118,7 @@ export default function LiveFeedWrapper({
       image_f_key: eventMessage.image_f_key,
       event_severity: eventMessage.event_severity.toString(),
     };
-  };
+  }, []);
 
   const addEventToMachine = useCallback(
     (machineId: number, newEvent: MachineEvent) => {
@@ -152,21 +154,36 @@ export default function LiveFeedWrapper({
     }, PULSATING_DURATION_MS);
   }, []);
 
+  // Stable message handler with better duplicate detection
   const handleMqttMessage = useCallback(
     async (topic: string, data: EventMessage) => {
       try {
         const machineId = extractMachineIdFromTopic(topic);
         if (!machineId) return;
 
-        // Use a unique key from the message to check for duplicates
-        const eventKey = data.image_f_key;
-        if (!eventKey || processedEventKeys.has(eventKey)) {
-          // If no key or key has been processed, ignore the event.
+        // Create a more unique event key combining multiple fields
+        const eventKey = `${data.image_f_key}_${data.image_c_key}_${machineId}_${data.event_severity}`;
+        
+        // Check both local and global processed events
+        if (!eventKey || 
+            processedEventKeysRef.current.has(eventKey) || 
+            globalProcessedEvents.has(eventKey)) {
+          console.log(`[LiveFeedWrapper] Duplicate event detected: ${eventKey}`);
           return;
         }
 
-        // Add the new key to the set of processed events
-        setProcessedEventKeys((prev) => new Set(prev).add(eventKey));
+        // Add to both local and global processed events
+        processedEventKeysRef.current.add(eventKey);
+        globalProcessedEvents.add(eventKey);
+
+        // Clean up old entries to prevent memory leaks (keep last 1000)
+        if (globalProcessedEvents.size > 1000) {
+          const entries = Array.from(globalProcessedEvents);
+          const toRemove = entries.slice(0, entries.length - 800);
+          toRemove.forEach(key => globalProcessedEvents.delete(key));
+        }
+
+        console.log(`[LiveFeedWrapper] Processing new event: ${eventKey} for machine ${machineId}`);
 
         const newEvent = createMachineEvent(data);
         addEventToMachine(machineId, newEvent);
@@ -177,7 +194,8 @@ export default function LiveFeedWrapper({
       }
     },
     [
-      processedEventKeys,
+      extractMachineIdFromTopic,
+      createMachineEvent,
       addEventToMachine,
       incrementEventCount,
       startPulsatingAnimation,
@@ -252,18 +270,22 @@ export default function LiveFeedWrapper({
     });
   }, [machines, statusFilter]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
     setMachineEvents({});
     setMachineEventCounts({});
     setPulsatingMachines({});
-    setProcessedEventKeys(new Set()); // Clear processed keys on refresh
+    
+    // Clear processed keys on refresh
+    processedEventKeysRef.current.clear();
+    globalProcessedEvents.clear();
+    
     setTimeout(() => setIsRefreshing(false), 1500);
-  };
+  }, []);
 
-  const handleClearAllFilters = () => {
+  const handleClearAllFilters = useCallback(() => {
     setStatusFilter('all');
-  };
+  }, []);
 
   const liveEventsForModal = selectedMachine
     ? machineEvents[selectedMachine.id] || []
@@ -428,6 +450,8 @@ export default function LiveFeedWrapper({
               Pulsating:{' '}
               {Object.values(pulsatingMachines).filter(Boolean).length}
             </div>
+            <div>Processed events: {processedEventKeysRef.current.size}</div>
+            <div>Global processed: {globalProcessedEvents.size}</div>
           </div>
         )}
       </div>

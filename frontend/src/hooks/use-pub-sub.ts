@@ -27,6 +27,7 @@ type UsePubSubCallback = (topic: string, parsedData: any) => void;
 interface UsePubSubOptions {
   autoReconnect?: boolean;
   parseJson?: boolean;
+  enableBufferedMessages?: boolean; // New option to control buffered message replay
 }
 
 interface UsePubSubReturn {
@@ -45,6 +46,7 @@ interface UsePubSubReturn {
 const DEFAULT_OPTIONS: UsePubSubOptions = {
   autoReconnect: true,
   parseJson: true,
+  enableBufferedMessages: false, // Disabled by default to prevent duplicates
 };
 
 export const usePubSub = (
@@ -59,10 +61,11 @@ export const usePubSub = (
   const [error, setError] = useState<Error | null>(null);
   const [topicData, setTopicData] = useState<AllTopicsDataState>({});
 
-  // Refs to prevent stale closures
+  // Refs to prevent stale closures and track subscriptions
   const optionsRef = useRef(mergedOptions);
   const callbackRef = useRef(callback);
-  const topicsRef = useRef<string[]>([]);
+  const subscribedTopicsRef = useRef<Set<string>>(new Set());
+  const processedMessagesRef = useRef<Set<string>>(new Set());
 
   // Update refs when values change
   useEffect(() => {
@@ -76,6 +79,17 @@ export const usePubSub = (
   // Get singleton instance of PubSubService
   const pubSubService = useMemo(() => PubSubService.getInstance(), []);
 
+  // Create a simple hash for message deduplication at hook level
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const createMessageHash = useCallback((topic: string, data: any): string => {
+    try {
+      const dataString = typeof data === 'string' ? data : JSON.stringify(data);
+      return `${topic}:${dataString}:${Date.now()}`;
+    } catch {
+      return `${topic}:${Date.now()}:${Math.random()}`;
+    }
+  }, []);
+
   /**
    * Handle incoming messages from PubSubService
    */
@@ -87,9 +101,24 @@ export const usePubSub = (
       try {
         parsedData = JSON.parse(messageData);
       } catch (e) {
-        console.error(e);
+        console.error('[usePubSub] JSON parse error:', e);
         parsedData = messageData;
       }
+    }
+
+    // Additional deduplication at hook level
+    const messageHash = createMessageHash(topic, parsedData);
+    if (processedMessagesRef.current.has(messageHash)) {
+      console.log(`[usePubSub] Hook-level duplicate detected: ${messageHash}`);
+      return;
+    }
+    processedMessagesRef.current.add(messageHash);
+
+    // Clean up old processed messages (keep last 100)
+    if (processedMessagesRef.current.size > 100) {
+      const entries = Array.from(processedMessagesRef.current);
+      const toRemove = entries.slice(0, entries.length - 80);
+      toRemove.forEach(hash => processedMessagesRef.current.delete(hash));
     }
 
     // Create message entry with timestamp
@@ -128,8 +157,9 @@ export const usePubSub = (
         );
       }
     }
-  }, []);
+  }, [createMessageHash]);
 
+  // Connection event handlers
   useEffect(() => {
     let isMounted = true;
 
@@ -153,6 +183,8 @@ export const usePubSub = (
       if (isMounted) {
         console.log('[usePubSub] Disconnected');
         setIsConnected(false);
+        // Clear subscribed topics tracking on disconnect
+        subscribedTopicsRef.current.clear();
       }
     };
 
@@ -185,30 +217,50 @@ export const usePubSub = (
     };
   }, [pubSubService]);
 
-  // Topic subscriptions
+  // Stable topics array to prevent unnecessary re-subscriptions
+  const stableTopics = useMemo(() => {
+    return topics
+      .map((t) => (typeof t === 'object' && t !== null ? t.topic : t))
+      .filter((t): t is string => typeof t === 'string' && t.length > 0)
+      .sort(); // Sort to ensure consistent ordering
+  }, [topics]);
+
+  // Topic subscriptions with improved duplicate prevention
   useEffect(() => {
-    if (!isConnected || !topics || topics.length === 0) {
+    if (!isConnected || stableTopics.length === 0) {
       return;
     }
 
-    const validTopics: string[] = topics
-      .map((t) => (typeof t === 'object' && t !== null ? t.topic : t))
-      .filter((t): t is string => typeof t === 'string' && t.length > 0);
-
-    const subscribedTopics = new Set<string>();
+    const currentSubscriptions = new Set<string>();
+    
     const setupSubscriptions = async () => {
-      for (const topicName of validTopics) {
+      for (const topicName of stableTopics) {
+        // Skip if already subscribed
+        if (subscribedTopicsRef.current.has(topicName)) {
+          console.log(`[usePubSub] Already subscribed to ${topicName}, skipping`);
+          currentSubscriptions.add(topicName);
+          continue;
+        }
+
         try {
           await pubSubService.subscribe(topicName, handleMessage);
-          subscribedTopics.add(topicName);
+          subscribedTopicsRef.current.add(topicName);
+          currentSubscriptions.add(topicName);
+          
+          console.log(`[usePubSub] Successfully subscribed to ${topicName}`);
 
-          // Get any buffered messages
-          const bufferedMessages = pubSubService.getBufferedMessages(topicName);
-          if (bufferedMessages.length > 0) {
-            console.log(
-              `[usePubSub] Processing ${bufferedMessages.length} buffered messages for ${topicName}`,
-            );
-            bufferedMessages.forEach((msg) => handleMessage(topicName, msg));
+          // Only process buffered messages if explicitly enabled
+          if (optionsRef.current.enableBufferedMessages) {
+            const bufferedMessages = pubSubService.getBufferedMessages(topicName);
+            if (bufferedMessages.length > 0) {
+              console.log(
+                `[usePubSub] Processing ${bufferedMessages.length} buffered messages for ${topicName}`,
+              );
+              // Add a small delay to prevent overwhelming the callback
+              setTimeout(() => {
+                bufferedMessages.forEach((msg) => handleMessage(topicName, msg));
+              }, 100);
+            }
           }
         } catch (subError) {
           console.error(
@@ -220,18 +272,41 @@ export const usePubSub = (
           );
         }
       }
+
+      // Unsubscribe from topics that are no longer needed
+      const topicsToUnsubscribe = Array.from(subscribedTopicsRef.current).filter(
+        topic => !stableTopics.includes(topic)
+      );
+
+      for (const topicName of topicsToUnsubscribe) {
+        pubSubService.unsubscribe(topicName, handleMessage);
+        subscribedTopicsRef.current.delete(topicName);
+        console.log(`[usePubSub] Unsubscribed from ${topicName}`);
+      }
     };
 
-    topicsRef.current = validTopics;
     setupSubscriptions();
 
     return () => {
-      // Unsubscribe from topics
-      for (const topicName of subscribedTopics) {
+      // Cleanup function - unsubscribe from current subscriptions
+      for (const topicName of currentSubscriptions) {
         pubSubService.unsubscribe(topicName, handleMessage);
+        subscribedTopicsRef.current.delete(topicName);
       }
     };
-  }, [topics, isConnected, handleMessage, pubSubService]);
+  }, [stableTopics, isConnected, handleMessage, pubSubService]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all subscriptions for this hook instance
+      for (const topicName of subscribedTopicsRef.current) {
+        pubSubService.unsubscribe(topicName, handleMessage);
+      }
+      subscribedTopicsRef.current.clear();
+      processedMessagesRef.current.clear();
+    };
+  }, [pubSubService, handleMessage]);
 
   const publish = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -270,9 +345,17 @@ export const usePubSub = (
   // Get subscription stats
   const subscriptionStats = useMemo(() => {
     try {
-      return pubSubService.getSubscriptionStats();
+      const stats = pubSubService.getSubscriptionStats();
+      return {
+        ...stats,
+        hookSubscriptions: Array.from(subscribedTopicsRef.current),
+        hookProcessedMessages: processedMessagesRef.current.size,
+      };
     } catch {
-      return {};
+      return {
+        hookSubscriptions: Array.from(subscribedTopicsRef.current),
+        hookProcessedMessages: processedMessagesRef.current.size,
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pubSubService, isConnected]);
