@@ -10,12 +10,12 @@ import {
   Clock,
   Image as ImageIcon,
   Loader2,
+  Play,
+  TestTube,
   Volume2,
   VolumeX,
   Wifi,
   X,
-  Play,
-  TestTube,
 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -82,7 +82,7 @@ export default function CriticalAlertSystem({
   },
   enableSound = true,
   severityThreshold = 1,
-  debugMode = false, 
+  debugMode = false,
 }: AlertSystemProps) {
   const { token } = useToken();
   const [alerts, setAlerts] = useState<EventAlert[]>([]);
@@ -121,8 +121,8 @@ export default function CriticalAlertSystem({
     );
 
     console.log('🎯 [AlertSystem] Generated topics:', generatedTopics);
-    
-    setDebugStats(prev => ({ ...prev, topicsCount: generatedTopics.length }));
+
+    setDebugStats((prev) => ({ ...prev, topicsCount: generatedTopics.length }));
     return generatedTopics;
   }, [organizationId, machines]);
 
@@ -169,7 +169,9 @@ export default function CriticalAlertSystem({
     console.log('🚨 [AlertSystem] Starting screen flash');
     let isRed = false;
     flashIntervalRef.current = setInterval(() => {
-      document.body.style.backgroundColor = isRed ? '' : 'rgba(239, 68, 68, 0.1)';
+      document.body.style.backgroundColor = isRed
+        ? ''
+        : 'rgba(239, 68, 68, 0.1)';
       isRed = !isRed;
     }, 500);
 
@@ -225,7 +227,7 @@ export default function CriticalAlertSystem({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (topic: string, data: any) => {
       const now = new Date();
-      
+
       console.log('📥 [AlertSystem] MQTT message received:', {
         topic,
         data: JSON.stringify(data).substring(0, 200),
@@ -233,7 +235,7 @@ export default function CriticalAlertSystem({
       });
 
       // Update debug stats
-      setDebugStats(prev => ({
+      setDebugStats((prev) => ({
         ...prev,
         messagesReceived: prev.messagesReceived + 1,
         lastMessage: { topic, data, timestamp: now },
@@ -244,34 +246,48 @@ export default function CriticalAlertSystem({
         // Extract machine ID from topic
         const topicParts = topic.split('/');
         const machineId = topicParts[3];
-        
-        console.log('🔍 [AlertSystem] Parsed topic:', { topicParts, machineId });
+
+        console.log('🔍 [AlertSystem] Parsed topic:', {
+          topicParts,
+          machineId,
+        });
 
         // Find machine info
         const machine = machines.find((m) => m.id === parseInt(machineId));
         const machineName = machine?.name || `Machine-${machineId}`;
-        
-        console.log('🏭 [AlertSystem] Machine info:', { machineId, machineName, found: !!machine });
+
+        console.log('🏭 [AlertSystem] Machine info:', {
+          machineId,
+          machineName,
+          found: !!machine,
+        });
 
         // Parse event message
         const eventMessage: EventMessage = data;
         const severity = parseInt(eventMessage.event_severity || '0');
-        
+
         console.log('📊 [AlertSystem] Event details:', {
           severity,
           severityThreshold,
           eventstr: eventMessage.eventstr,
-          hasImageKeys: !!(eventMessage.image_c_key && eventMessage.image_f_key),
+          hasImageKeys: !!(
+            eventMessage.image_c_key && eventMessage.image_f_key
+          ),
           imageKeys: {
             c_key: eventMessage.image_c_key,
             f_key: eventMessage.image_f_key,
-          }
+          },
         });
 
         // Check severity threshold
         if (severity < severityThreshold) {
-          console.log(`⚠️ [AlertSystem] Severity ${severity} < threshold ${severityThreshold}, filtering out`);
-          setDebugStats(prev => ({ ...prev, messagesFiltered: prev.messagesFiltered + 1 }));
+          console.log(
+            `⚠️ [AlertSystem] Severity ${severity} < threshold ${severityThreshold}, filtering out`,
+          );
+          setDebugStats((prev) => ({
+            ...prev,
+            messagesFiltered: prev.messagesFiltered + 1,
+          }));
           return;
         }
 
@@ -280,9 +296,15 @@ export default function CriticalAlertSystem({
         console.log('🔑 [AlertSystem] Event key:', eventKey);
 
         // Check for duplicates
-        if (processedEventKeysRef.current.has(eventKey) || globalAlertProcessedEvents.has(eventKey)) {
+        if (
+          processedEventKeysRef.current.has(eventKey) ||
+          globalAlertProcessedEvents.has(eventKey)
+        ) {
           console.log(`🔄 [AlertSystem] Duplicate detected: ${eventKey}`);
-          setDebugStats(prev => ({ ...prev, duplicatesBlocked: prev.duplicatesBlocked + 1 }));
+          setDebugStats((prev) => ({
+            ...prev,
+            duplicatesBlocked: prev.duplicatesBlocked + 1,
+          }));
           return;
         }
 
@@ -315,7 +337,10 @@ export default function CriticalAlertSystem({
         // Add to state
         setAlerts((prev) => [alert, ...prev.slice(0, 49)]);
         setUnacknowledgedCount((prev) => prev + 1);
-        setDebugStats(prev => ({ ...prev, messagesProcessed: prev.messagesProcessed + 1 }));
+        setDebugStats((prev) => ({
+          ...prev,
+          messagesProcessed: prev.messagesProcessed + 1,
+        }));
 
         // Play audio
         if (isAudioEnabled && severity >= severityThreshold) {
@@ -327,7 +352,9 @@ export default function CriticalAlertSystem({
             console.error('❌ [AlertSystem] Failed to play alarm:', error);
           }
         } else {
-          console.log('🔇 [AlertSystem] Audio disabled or severity too low, skipping sound');
+          console.log(
+            '🔇 [AlertSystem] Audio disabled or severity too low, skipping sound',
+          );
         }
 
         // Flash for critical alerts
@@ -342,13 +369,20 @@ export default function CriticalAlertSystem({
               <div className="flex items-center gap-3">
                 <Camera className="h-5 w-5 text-red-500" />
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">🚨 ALERT</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    🚨 ALERT
+                  </p>
                   <p className="text-sm text-gray-700">
                     {machineName}: Severity {severity}
                   </p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => toast.dismiss(t)} className="ml-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => toast.dismiss(t)}
+                className="ml-2"
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -366,12 +400,18 @@ export default function CriticalAlertSystem({
         }
 
         console.log('🎉 [AlertSystem] Alert processing complete');
-
       } catch (error) {
         console.error('❌ [AlertSystem] Error processing MQTT message:', error);
       }
     },
-    [machines, isAudioEnabled, volume, startFlashing, onAlertReceived, severityThreshold],
+    [
+      machines,
+      isAudioEnabled,
+      volume,
+      startFlashing,
+      onAlertReceived,
+      severityThreshold,
+    ],
   );
 
   // Use PubSub hook
@@ -383,7 +423,7 @@ export default function CriticalAlertSystem({
 
   // Update connection status in debug stats
   useEffect(() => {
-    setDebugStats(prev => ({
+    setDebugStats((prev) => ({
       ...prev,
       connectionStatus: isConnected ? 'connected' : 'disconnected',
     }));
@@ -428,9 +468,9 @@ export default function CriticalAlertSystem({
       fetchingImages: false,
     };
 
-    setAlerts(prev => [testAlert, ...prev]);
-    setUnacknowledgedCount(prev => prev + 1);
-    
+    setAlerts((prev) => [testAlert, ...prev]);
+    setUnacknowledgedCount((prev) => prev + 1);
+
     if (isAudioEnabled) {
       audioManagerRef.current.playAlarm(volume);
     }
@@ -501,7 +541,9 @@ export default function CriticalAlertSystem({
   }, []);
 
   const acknowledgeAll = useCallback(() => {
-    setAlerts((prev) => prev.map((alert) => ({ ...alert, acknowledged: true })));
+    setAlerts((prev) =>
+      prev.map((alert) => ({ ...alert, acknowledged: true })),
+    );
     setUnacknowledgedCount(0);
   }, []);
 
@@ -510,7 +552,7 @@ export default function CriticalAlertSystem({
     setUnacknowledgedCount(0);
     processedEventKeysRef.current.clear();
     globalAlertProcessedEvents.clear();
-    setDebugStats(prev => ({
+    setDebugStats((prev) => ({
       ...prev,
       messagesReceived: 0,
       messagesProcessed: 0,
@@ -522,7 +564,10 @@ export default function CriticalAlertSystem({
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
         setIsModalOpen(false);
       }
     };
@@ -553,24 +598,30 @@ export default function CriticalAlertSystem({
         <div className="flex flex-col items-end gap-2">
           {/* Debug Panel */}
           {debugMode && (
-            <div className="bg-white border rounded-lg p-3 text-xs shadow-lg max-w-xs">
-              <div className="font-medium mb-2 text-red-600">🚨 Alert System Debug</div>
-              
+            <div className="max-w-xs rounded-lg border bg-white p-3 text-xs shadow-lg">
+              <div className="mb-2 font-medium text-red-600">
+                🚨 Alert System Debug
+              </div>
+
               {/* Connection Status */}
-              <div className="mb-2 p-2 bg-gray-50 rounded">
+              <div className="mb-2 rounded bg-gray-50 p-2">
                 <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <div
+                    className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
+                  ></div>
                   <span className="font-medium">
                     {isConnected ? '✅ Connected' : '❌ Disconnected'}
                   </span>
                 </div>
                 <div>Topics: {debugStats.topicsCount}</div>
                 <div>Machines: {machines.length}</div>
-                {error && <div className="text-red-600">Error: {error.message}</div>}
+                {error && (
+                  <div className="text-red-600">Error: {error.message}</div>
+                )}
               </div>
 
               {/* Message Stats */}
-              <div className="mb-2 p-2 bg-blue-50 rounded">
+              <div className="mb-2 rounded bg-blue-50 p-2">
                 <div className="font-medium text-blue-800">Message Stats</div>
                 <div>Received: {debugStats.messagesReceived}</div>
                 <div>Processed: {debugStats.messagesProcessed}</div>
@@ -581,23 +632,48 @@ export default function CriticalAlertSystem({
 
               {/* Last Message */}
               {debugStats.lastMessage && (
-                <div className="mb-2 p-2 bg-yellow-50 rounded">
-                  <div className="font-medium text-yellow-800">Last Message</div>
-                  <div>Time: {debugStats.lastMessageTime?.toLocaleTimeString()}</div>
-                  <div>Topic: .../{debugStats.lastMessage.topic.split('/').slice(-2).join('/')}</div>
-                  <div>Severity: {debugStats.lastMessage.data.event_severity || '?'}</div>
-                  <div>Machine: {debugStats.lastMessage.topic.split('/')[3]}</div>
+                <div className="mb-2 rounded bg-yellow-50 p-2">
+                  <div className="font-medium text-yellow-800">
+                    Last Message
+                  </div>
+                  <div>
+                    Time: {debugStats.lastMessageTime?.toLocaleTimeString()}
+                  </div>
+                  <div>
+                    Topic: .../
+                    {debugStats.lastMessage.topic
+                      .split('/')
+                      .slice(-2)
+                      .join('/')}
+                  </div>
+                  <div>
+                    Severity:{' '}
+                    {debugStats.lastMessage.data.event_severity || '?'}
+                  </div>
+                  <div>
+                    Machine: {debugStats.lastMessage.topic.split('/')[3]}
+                  </div>
                 </div>
               )}
 
               {/* Test Controls */}
               <div className="flex gap-1">
-                <Button size="sm" variant="outline" onClick={testAudio} className="text-xs px-2 py-1">
-                  <Play className="h-3 w-3 mr-1" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={testAudio}
+                  className="px-2 py-1 text-xs"
+                >
+                  <Play className="mr-1 h-3 w-3" />
                   Audio
                 </Button>
-                <Button size="sm" variant="outline" onClick={createTestAlert} className="text-xs px-2 py-1">
-                  <TestTube className="h-3 w-3 mr-1" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={createTestAlert}
+                  className="px-2 py-1 text-xs"
+                >
+                  <TestTube className="mr-1 h-3 w-3" />
                   Alert
                 </Button>
               </div>
@@ -609,7 +685,9 @@ export default function CriticalAlertSystem({
             onClick={() => setIsModalOpen(!isModalOpen)}
             className={cn(
               'relative',
-              unacknowledgedCount > 0 ? 'animate-pulse bg-red-500 hover:bg-red-600' : '',
+              unacknowledgedCount > 0
+                ? 'animate-pulse bg-red-500 hover:bg-red-600'
+                : '',
             )}
             size="lg"
           >
@@ -627,14 +705,19 @@ export default function CriticalAlertSystem({
       {/* Alert Modal */}
       {isModalOpen && (
         <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4">
-          <Card className="h-full w-full max-w-4xl overflow-hidden" ref={modalRef}>
+          <Card
+            className="h-full w-full max-w-4xl overflow-hidden"
+            ref={modalRef}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Camera className="h-5 w-5 text-red-500" />
                   Critical Alert System
                   {unacknowledgedCount > 0 && (
-                    <Badge variant="destructive">{unacknowledgedCount} New</Badge>
+                    <Badge variant="destructive">
+                      {unacknowledgedCount} New
+                    </Badge>
                   )}
                 </CardTitle>
                 <div className="flex items-center gap-2">
@@ -644,12 +727,25 @@ export default function CriticalAlertSystem({
                     onClick={() => setIsAudioEnabled(!isAudioEnabled)}
                     title="Toggle Audio"
                   >
-                    {isAudioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                    {isAudioEnabled ? (
+                      <Volume2 className="h-4 w-4" />
+                    ) : (
+                      <VolumeX className="h-4 w-4" />
+                    )}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={testAudio} title="Test Audio">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={testAudio}
+                    title="Test Audio"
+                  >
                     <Play className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsModalOpen(false)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsModalOpen(false)}
+                  >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -667,7 +763,12 @@ export default function CriticalAlertSystem({
                     Acknowledge All
                   </Button>
                 )}
-                <Button size="sm" variant="outline" onClick={clearAll} className="flex-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={clearAll}
+                  className="flex-1"
+                >
                   Clear All
                 </Button>
               </div>
@@ -686,7 +787,9 @@ export default function CriticalAlertSystem({
                     className="flex-1"
                   />
                   <Volume2 className="h-4 w-4" />
-                  <span className="text-xs w-8">{Math.round(volume * 100)}%</span>
+                  <span className="w-8 text-xs">
+                    {Math.round(volume * 100)}%
+                  </span>
                 </div>
               )}
             </CardHeader>
@@ -694,9 +797,24 @@ export default function CriticalAlertSystem({
             <CardContent className="p-0">
               {/* Status */}
               <div className="px-4 pb-3">
-                <Alert className={cn(isConnected ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50')}>
-                  <Wifi className={cn('h-4 w-4', isConnected ? 'text-green-600' : 'text-red-600')} />
-                  <AlertDescription className={cn(isConnected ? 'text-green-800' : 'text-red-800')}>
+                <Alert
+                  className={cn(
+                    isConnected
+                      ? 'border-green-200 bg-green-50'
+                      : 'border-red-200 bg-red-50',
+                  )}
+                >
+                  <Wifi
+                    className={cn(
+                      'h-4 w-4',
+                      isConnected ? 'text-green-600' : 'text-red-600',
+                    )}
+                  />
+                  <AlertDescription
+                    className={cn(
+                      isConnected ? 'text-green-800' : 'text-red-800',
+                    )}
+                  >
                     {isConnected
                       ? `Connected - Monitoring ${machines.length} machines (Severity ≥ ${severityThreshold})`
                       : error
@@ -714,12 +832,20 @@ export default function CriticalAlertSystem({
                   <div className="p-8 text-center text-gray-500">
                     <Camera className="mx-auto mb-2 h-12 w-12 opacity-30" />
                     <p>No alerts detected</p>
-                    <p className="text-sm">Monitoring severity ≥ {severityThreshold}...</p>
+                    <p className="text-sm">
+                      Monitoring severity ≥ {severityThreshold}...
+                    </p>
                     {debugMode && (
-                      <div className="mt-4 p-3 bg-gray-50 rounded text-xs">
-                        <div>Debug: {debugStats.messagesReceived} messages received</div>
-                        <div>{debugStats.messagesFiltered} filtered by severity</div>
-                        <div>{debugStats.duplicatesBlocked} duplicates blocked</div>
+                      <div className="mt-4 rounded bg-gray-50 p-3 text-xs">
+                        <div>
+                          Debug: {debugStats.messagesReceived} messages received
+                        </div>
+                        <div>
+                          {debugStats.messagesFiltered} filtered by severity
+                        </div>
+                        <div>
+                          {debugStats.duplicatesBlocked} duplicates blocked
+                        </div>
                       </div>
                     )}
                   </div>
@@ -745,7 +871,12 @@ export default function CriticalAlertSystem({
                                 🚨 ALERT
                               </Badge>
                               {!alert.acknowledged && (
-                                <Badge variant="outline" className="ml-1 text-xs">NEW</Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="ml-1 text-xs"
+                                >
+                                  NEW
+                                </Badge>
                               )}
                             </div>
                           </div>
@@ -758,14 +889,20 @@ export default function CriticalAlertSystem({
                         </div>
 
                         <div className="mb-3">
-                          <div className="mb-1 font-medium text-gray-900">{alert.machineName}</div>
+                          <div className="mb-1 font-medium text-gray-900">
+                            {alert.machineName}
+                          </div>
                           <div className="text-sm text-gray-600">
                             Event: {alert.message.eventstr || 'No description'}
                           </div>
                           <div className="text-sm text-gray-600">
-                            Severity: {alert.message.event_severity} 
-                            ({alert.message.event_severity === '1' ? 'Low' : 
-                              alert.message.event_severity === '2' ? 'High' : 'Critical'})
+                            Severity: {alert.message.event_severity}(
+                            {alert.message.event_severity === '1'
+                              ? 'Low'
+                              : alert.message.event_severity === '2'
+                                ? 'High'
+                                : 'Critical'}
+                            )
                           </div>
                         </div>
 
@@ -780,7 +917,9 @@ export default function CriticalAlertSystem({
                             <div className="flex items-center gap-2">
                               {alert.croppedImageUrl && (
                                 <div>
-                                  <p className="mb-1 text-xs text-gray-500">Cropped</p>
+                                  <p className="mb-1 text-xs text-gray-500">
+                                    Cropped
+                                  </p>
                                   <Image
                                     width={100}
                                     height={100}
@@ -792,7 +931,9 @@ export default function CriticalAlertSystem({
                               )}
                               {alert.fullImageUrl && (
                                 <div>
-                                  <p className="mb-1 text-xs text-gray-500">Full</p>
+                                  <p className="mb-1 text-xs text-gray-500">
+                                    Full
+                                  </p>
                                   <Image
                                     width={100}
                                     height={100}
@@ -812,7 +953,9 @@ export default function CriticalAlertSystem({
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <div className="text-xs text-gray-500">Machine ID: {alert.machineId}</div>
+                          <div className="text-xs text-gray-500">
+                            Machine ID: {alert.machineId}
+                          </div>
                           {!alert.acknowledged && (
                             <Button
                               size="sm"

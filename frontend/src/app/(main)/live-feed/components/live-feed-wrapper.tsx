@@ -101,11 +101,11 @@ export default function LiveFeedWrapper({
       console.log('⚠️ [LiveFeed] No machines provided');
       return [];
     }
-    
+
     const topics = machines.map(
       (machine) => `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
     );
-    
+
     console.log('🎯 [LiveFeed] Generated topics:', topics);
     return topics;
   }, [organizationId, machines]);
@@ -186,7 +186,10 @@ export default function LiveFeedWrapper({
       try {
         const machineId = extractMachineIdFromTopic(topic);
         if (!machineId) {
-          console.log('⚠️ [LiveFeed] Could not extract machine ID from topic:', topic);
+          console.log(
+            '⚠️ [LiveFeed] Could not extract machine ID from topic:',
+            topic,
+          );
           return;
         }
 
@@ -221,7 +224,9 @@ export default function LiveFeedWrapper({
           console.log('🧹 [LiveFeed] Cleaned up old processed events');
         }
 
-        console.log(`✅ [LiveFeed] Processing new event: ${eventKey} for machine ${machineId}`);
+        console.log(
+          `✅ [LiveFeed] Processing new event: ${eventKey} for machine ${machineId}`,
+        );
 
         const newEvent = createMachineEvent(data);
         addEventToMachine(machineId, newEvent);
@@ -229,10 +234,14 @@ export default function LiveFeedWrapper({
         startPulsatingAnimation(machineId);
 
         // REMOVED: Audio playing - let alert system handle audio
-        console.log('🔇 [LiveFeed] Event processed, audio handled by alert system');
-
+        console.log(
+          '🔇 [LiveFeed] Event processed, audio handled by alert system',
+        );
       } catch (error) {
-        console.error('❌ [LiveFeed] Error processing MQTT message:', error, { topic, data });
+        console.error('❌ [LiveFeed] Error processing MQTT message:', error, {
+          topic,
+          data,
+        });
       }
     },
     [
@@ -490,10 +499,15 @@ export default function LiveFeedWrapper({
             <div>Filtered: {filteredMachines.length}</div>
             <div>Active: {Object.keys(machineEventCounts).length}</div>
             <div>Events: {totalEvents}</div>
-            <div>Pulsating: {Object.values(pulsatingMachines).filter(Boolean).length}</div>
+            <div>
+              Pulsating:{' '}
+              {Object.values(pulsatingMachines).filter(Boolean).length}
+            </div>
             <div>Processed: {processedEventKeysRef.current.size}</div>
             <div>Global: {globalProcessedEvents.size}</div>
-            <div className="mt-1 text-blue-600">Audio: Handled by Alert System</div>
+            <div className="mt-1 text-blue-600">
+              Audio: Handled by Alert System
+            </div>
           </div>
         )}
       </div>

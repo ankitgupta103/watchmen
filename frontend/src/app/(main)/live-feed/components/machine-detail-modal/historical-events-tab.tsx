@@ -192,9 +192,17 @@ const HistoricalEventsTab = ({
                       image_f_key={event.image_f_key}
                       onImageClick={onImageClick}
                     />
-                    <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
-                      <Clock className="h-3 w-3" />
-                      {event.timestamp.toLocaleTimeString()}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">
+                        {(event?.image_c_key || event?.image_f_key)
+                          ?.split('/')
+                          .pop()
+                          ?.split('_')[0] || 'N/A'}
+                      </span>
+                      <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
+                        <Clock className="h-3 w-3" />
+                        {event.timestamp.toLocaleTimeString()}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

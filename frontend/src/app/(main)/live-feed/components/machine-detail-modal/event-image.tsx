@@ -22,7 +22,9 @@ interface ImageUrlResponse {
 const fetchEventImages = async (
   token: string,
   imageKeys: { image_c_key: string; image_f_key: string },
-) => {
+  retries = 3,
+  backoff = 1000,
+): Promise<ImageUrlResponse | null> => {
   try {
     const data = await fetcherClient<{
       success: boolean;
@@ -41,6 +43,10 @@ const fetchEventImages = async (
     }
     throw new Error(data?.error || 'Failed to fetch images');
   } catch (error) {
+    if (retries > 0) {
+      await new Promise(res => setTimeout(res, backoff));
+      return fetchEventImages(token, imageKeys, retries - 1, backoff * 2);
+    }
     console.error('Error fetching images:', error);
     return null;
   }
