@@ -36,14 +36,24 @@ const EventRow: React.FC<EventRowProps> = ({
 }) => {
   const [event, setEvent] = useState<ProcessedEvent>(initialEvent);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchEventImages = async () => {
-    if (!token || event.imagesFetched || isLoadingImages) return;
+  const maxRetries = 3;
+  const baseDelay = 1000; // 1 second base delay
+
+  const fetchEventImages = async (retryAttempt = 0) => {
+    if (!token || event.imagesFetched) return;
 
     // Abort any previous request
     if (controllerRef.current) {
       controllerRef.current.abort();
+    }
+
+    // Clear any pending timeouts
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
 
     const controller = new AbortController();
@@ -75,32 +85,66 @@ const EventRow: React.FC<EventRowProps> = ({
           imagesFetched: true,
           fetchingImages: false,
         }));
+        setIsLoadingImages(false);
+        setRetryCount(0); // Reset retry count on success
       } else {
         throw new Error(data?.error || 'Failed to fetch images');
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Error fetching images for event:', event.id, error);
-      }
-    } finally {
-      if (!controller.signal.aborted) {
+        console.error(`Error fetching images for event ${event.id} (attempt ${retryAttempt + 1}):`, error);
+        
+        // Retry logic with exponential backoff
+        if (retryAttempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, retryAttempt);
+          setRetryCount(retryAttempt + 1);
+          
+          timeoutRef.current = setTimeout(() => {
+            if (!controller.signal.aborted) {
+              fetchEventImages(retryAttempt + 1);
+            }
+          }, delay);
+        } else {
+          // Max retries reached, but keep loading state to indicate we're still trying
+          console.error(`Max retries reached for event ${event.id}. Will retry on next render.`);
+          setIsLoadingImages(false);
+          setRetryCount(0);
+          
+          // Schedule another attempt after a longer delay
+          timeoutRef.current = setTimeout(() => {
+            if (!controller.signal.aborted && !event.imagesFetched) {
+              fetchEventImages(0);
+            }
+          }, 10000); // Try again in 10 seconds
+        }
+      } else {
         setIsLoadingImages(false);
       }
     }
   };
 
   useEffect(() => {
-    fetchEventImages();
+    // Start fetching images if not already fetched
+    if (!event.imagesFetched && !isLoadingImages) {
+      fetchEventImages();
+    }
 
     return () => {
       if (controllerRef.current) {
         controllerRef.current.abort();
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, []);
 
   useEffect(() => {
     setEvent(initialEvent);
+    // If the event changed and we don't have images, start fetching
+    if (!initialEvent.imagesFetched && !isLoadingImages) {
+      fetchEventImages();
+    }
   }, [initialEvent]);
 
   const formatTimestamp = (timestamp: string | Date) => {
@@ -110,6 +154,60 @@ const EventRow: React.FC<EventRowProps> = ({
 
   const handleViewDetails = () => {
     onViewDetails(event);
+  };
+
+  const renderImages = () => {
+    // Always show loading if we're fetching images or if we don't have images yet
+    if (isLoadingImages || (!event.imagesFetched && !event.croppedImageUrl && !event.fullImageUrl)) {
+      return (
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          <span className="text-xs text-gray-500">
+            Loading images{retryCount > 0 ? ` (retry ${retryCount})` : ''}...
+          </span>
+        </div>
+      );
+    }
+
+    // Show images if we have them
+    if (event.croppedImageUrl || event.fullImageUrl) {
+      return (
+        <div className="flex gap-2">
+          {event.croppedImageUrl && (
+            <Image
+              src={event.croppedImageUrl}
+              alt="Cropped"
+              width={40}
+              height={40}
+              className="h-40 w-40 rounded border object-cover"
+            />
+          )}
+          {event.fullImageUrl && (
+            <Image
+              src={event.fullImageUrl}
+              alt="Full"
+              width={40}
+              height={40}
+              className="h-40 w-fit rounded border object-contain"
+            />
+          )}
+        </div>
+      );
+    }
+
+    // If we get here, keep trying to fetch images (no "No image" text)
+    if (!isLoadingImages) {
+      // Trigger another fetch attempt
+      setTimeout(() => fetchEventImages(), 1000);
+      return (
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          <span className="text-xs text-gray-500">Retrying...</span>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -124,7 +222,7 @@ const EventRow: React.FC<EventRowProps> = ({
           <div className="flex items-center gap-1">
             <span className="text-xs text-gray-500">EventStr: </span>
             <Badge variant="outline">
-              {(event?.croppedImageUrl || event?.fullImageUrl)
+              {(event?.image_c_key || event?.image_f_key)
                 ?.split('/')
                 .pop()
                 ?.split('_')[0] || 'N/A'}
@@ -159,35 +257,7 @@ const EventRow: React.FC<EventRowProps> = ({
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center space-x-2">
-          {isLoadingImages ? (
-            <div className="flex items-center space-x-2">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <span className="text-xs text-gray-500">Loading images...</span>
-            </div>
-          ) : event.imagesFetched && event.croppedImageUrl ? (
-            <div className="flex gap-2">
-              {event.croppedImageUrl && (
-                <Image
-                  src={event.croppedImageUrl}
-                  alt="Cropped"
-                  width={40}
-                  height={40}
-                  className="h-40 w-40 rounded border object-cover"
-                />
-              )}
-              {event.fullImageUrl && (
-                <Image
-                  src={event.fullImageUrl}
-                  alt="Full"
-                  width={40}
-                  height={40}
-                  className="h-40 w-fit rounded border object-contain"
-                />
-              )}
-            </div>
-          ) : (
-            <span className="text-xs text-gray-400">No image</span>
-          )}
+          {renderImages()}
         </div>
       </td>
       <td className="px-4 py-3">

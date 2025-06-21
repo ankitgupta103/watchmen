@@ -22,8 +22,8 @@ interface ImageUrlResponse {
 const fetchEventImages = async (
   token: string,
   imageKeys: { image_c_key: string; image_f_key: string },
-  retries = 3,
-  backoff = 1000,
+  retries = 1000,
+  backoff = 2000,
 ): Promise<ImageUrlResponse | null> => {
   try {
     const data = await fetcherClient<{
