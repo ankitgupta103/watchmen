@@ -18,7 +18,7 @@ export default async function DeviceDetailsPage({
     data: Machine[];
   }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`);
 
-  const device = machines.find((m) => m.id === Number(deviceId));
+  const device = machines?.find((m) => m.id === Number(deviceId));
   if (!device) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
