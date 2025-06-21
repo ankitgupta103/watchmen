@@ -62,6 +62,8 @@ interface AlertSystemProps {
   machines: Machine[];
   onAlertReceived?: (alert: EventAlert) => void;
   enableSound?: boolean;
+  useAlertTopics?: boolean; // Whether to use separate alert topics
+  severityThreshold?: number; // Only process events above this severity
 }
 
 // Audio Manager
@@ -142,6 +144,8 @@ class AudioManager {
   }
 }
 
+const globalAlertProcessedEvents = new Set<string>();
+
 export default function CriticalAlertSystem({
   organizationId,
   machines,
@@ -149,6 +153,8 @@ export default function CriticalAlertSystem({
     console.log('alert received', alert);
   },
   enableSound = true,
+  useAlertTopics = false, // Default to false to avoid conflicts
+  severityThreshold = 1, 
 }: AlertSystemProps) {
   const { token } = useToken();
   const [alerts, setAlerts] = useState<EventAlert[]>([]);
@@ -160,16 +166,27 @@ export default function CriticalAlertSystem({
   const audioManagerRef = useRef(new AudioManager());
   const flashIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const processedEventKeysRef = useRef(new Set<string>());
 
-  // Generate topics for all machines
+  // Generate topics - use separate alert topics if specified
   const topics = React.useMemo(() => {
-    const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
     if (machines.length === 0) return [];
-    return machines.map(
-      (machine) =>
-        `${organizationId}/_all_/${today}/${machine.id}/_all_/EVENT/#`,
-    );
-  }, [organizationId, machines]);
+    
+    if (useAlertTopics) {
+      // Use separate alert-specific topics to avoid conflicts
+      return machines.map(
+        (machine) =>
+          `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
+      );
+    } else {
+      // Use same topics as live feed (default behavior)
+      const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
+      return machines.map(
+        (machine) =>
+          `${organizationId}/_all_/${today}/${machine.id}/_all_/EVENT/#`,
+      );
+    }
+  }, [organizationId, machines, useAlertTopics]);
 
   // Initialize audio on first user interaction
   useEffect(() => {
@@ -307,14 +324,14 @@ export default function CriticalAlertSystem({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alerts, token]);
 
-  // Handle MQTT message - simplified, just sound alarm and create alert
+  // Handle MQTT message with improved duplicate detection
   const handleMqttMessage = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (topic: string, data: any) => {
       try {
         // Extract machine ID from topic
         const topicParts = topic.split('/');
-        const machineId = topicParts[3]; // Based on pattern: {orgId}/_all_/yyyy-mm-dd/{machineId}/EVENT/#
+        const machineId = topicParts[3]; // Based on pattern: {orgId}/_all_/yyyy-mm-dd/{machineId}/EVENT/# or {orgId}/_all_/ALERT/{machineId}/EVENT/#
 
         // Find machine name
         const machine = machines.find((m) => m.id === parseInt(machineId));
@@ -322,10 +339,40 @@ export default function CriticalAlertSystem({
 
         // Parse the event message
         const eventMessage: EventMessage = data;
+        const severity = parseInt(eventMessage.event_severity);
+
+        // Filter by severity threshold
+        if (severity < severityThreshold) {
+          console.log(`[CriticalAlertSystem] Event severity ${severity} below threshold ${severityThreshold}, ignoring`);
+          return;
+        }
+
+        // Create enhanced event key for deduplication
+        const eventKey = `alert_${eventMessage.image_f_key}_${eventMessage.image_c_key}_${machineId}_${severity}`;
+        
+        // Check for duplicates using both local and global tracking
+        if (processedEventKeysRef.current.has(eventKey) || 
+            globalAlertProcessedEvents.has(eventKey)) {
+          console.log(`[CriticalAlertSystem] Duplicate alert detected: ${eventKey}`);
+          return;
+        }
+
+        // Add to both local and global processed events
+        processedEventKeysRef.current.add(eventKey);
+        globalAlertProcessedEvents.add(eventKey);
+
+        // Clean up old entries to prevent memory leaks
+        if (globalAlertProcessedEvents.size > 500) {
+          const entries = Array.from(globalAlertProcessedEvents);
+          const toRemove = entries.slice(0, entries.length - 400);
+          toRemove.forEach(key => globalAlertProcessedEvents.delete(key));
+        }
+
+        console.log(`[CriticalAlertSystem] Processing new alert: ${eventKey} for machine ${machineId}`);
 
         // Create alert (without images initially)
         const alert: EventAlert = {
-          id: `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           timestamp: new Date(),
           machineId,
           machineName,
@@ -339,20 +386,17 @@ export default function CriticalAlertSystem({
         setAlerts((prev) => [alert, ...prev.slice(0, 49)]); // Keep last 50 alerts
         setUnacknowledgedCount((prev) => prev + 1);
 
-        // Play alarm sound only for severity 2 or higher
-        if (isAudioEnabled && parseInt(eventMessage.event_severity) >= 1) {
+        // Play alarm sound only for severity threshold or higher
+        if (isAudioEnabled && severity >= severityThreshold) {
           try {
             await audioManagerRef.current.playAlarm(volume);
-            // Play alarm 3 times with intervals
-            // setTimeout(() => audioManagerRef.current.playAlarm(volume), 1000);
-            // setTimeout(() => audioManagerRef.current.playAlarm(volume), 2000);
           } catch (error) {
             console.warn('Failed to play alarm sound:', error);
           }
         }
 
-        // Flash screen only for severity 2 or higher
-        if (parseInt(eventMessage.event_severity) >= 2) {
+        // Flash screen only for critical alerts
+        if (severity >= 3) {
           startFlashing();
         }
 
@@ -364,15 +408,15 @@ export default function CriticalAlertSystem({
                 <Camera className="h-5 w-5 text-red-500" />
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
-                    EVENT DETECTED
+                    CRITICAL ALERT
                   </p>
                   <p className="text-sm text-gray-700">
                     {machineName}:{' '}
-                    {eventMessage?.event_severity === '1'
-                      ? 'High'
-                      : eventMessage?.event_severity === '2'
-                        ? 'Critical'
-                        : 'Medium'}
+                    {severity === 1
+                      ? 'Low'
+                      : severity === 2
+                        ? 'High'
+                        : 'Critical'}
                   </p>
                 </div>
               </div>
@@ -398,14 +442,22 @@ export default function CriticalAlertSystem({
           onAlertReceived(alert);
         }
       } catch (error) {
-        console.error('Error handling MQTT message:', error);
+        console.error('Error handling MQTT message in alert system:', error);
       }
     },
-    [machines, isAudioEnabled, volume, startFlashing, onAlertReceived],
+    [machines, isAudioEnabled, volume, startFlashing, onAlertReceived, severityThreshold],
   );
 
-  // Use the PubSub hook
-  const { isConnected, error } = usePubSub(topics, handleMqttMessage);
+  // Use the PubSub hook with buffered messages disabled to prevent duplicates
+  const { isConnected, error } = usePubSub(
+    topics, 
+    handleMqttMessage, 
+    { 
+      autoReconnect: true, 
+      parseJson: true,
+      enableBufferedMessages: false, // Disable buffered messages for alerts
+    }
+  );
 
   // Acknowledge alert
   const acknowledgeAlert = useCallback((alertId: string) => {
@@ -429,6 +481,9 @@ export default function CriticalAlertSystem({
   const clearAll = useCallback(() => {
     setAlerts([]);
     setUnacknowledgedCount(0);
+    // Clear processed keys
+    processedEventKeysRef.current.clear();
+    globalAlertProcessedEvents.clear();
   }, []);
 
   useEffect(() => {
@@ -480,12 +535,12 @@ export default function CriticalAlertSystem({
           size="lg"
         >
           <Bell className="mr-2 h-5 w-5" />
-          Events
-          {/* {unacknowledgedCount > 0 && (
+          Alerts
+          {unacknowledgedCount > 0 && (
             <Badge className="absolute -top-2 -right-2 h-5 min-w-[20px] bg-yellow-500 px-1 text-black">
               {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
             </Badge>
-          )} */}
+          )}
         </Button>
       </div>
 
@@ -500,7 +555,7 @@ export default function CriticalAlertSystem({
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Camera className="h-5 w-5 text-red-500" />
-                  Event Alerts
+                  Critical Alerts
                   {unacknowledgedCount > 0 && (
                     <Badge variant="destructive">
                       {unacknowledgedCount} New
@@ -586,7 +641,7 @@ export default function CriticalAlertSystem({
                     )}
                   >
                     {isConnected
-                      ? `Connected - Monitoring ${machines.length} machines`
+                      ? `Connected - Monitoring ${machines.length} machines (Severity ≥ ${severityThreshold})`
                       : error
                         ? `Connection Error: ${error.message}`
                         : 'Connecting...'}
@@ -601,8 +656,8 @@ export default function CriticalAlertSystem({
                 {alerts.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     <Camera className="mx-auto mb-2 h-12 w-12 opacity-30" />
-                    <p>No events detected</p>
-                    <p className="text-sm">System is monitoring...</p>
+                    <p>No critical alerts</p>
+                    <p className="text-sm">System is monitoring for severity ≥ {severityThreshold}...</p>
                   </div>
                 ) : (
                   <div className="grid gap-4 p-4">
@@ -613,11 +668,9 @@ export default function CriticalAlertSystem({
                           'rounded-lg border p-4 transition-all',
                           alert.acknowledged
                             ? 'border-gray-200 bg-gray-50'
-                            : alert.message.event_severity === '1'
-                              ? 'border-yellow-200 bg-orange-50'
-                              : parseInt(alert.message.event_severity) >= 2
-                                ? 'border-red-200 bg-red-50 shadow-md'
-                                : '',
+                            : parseInt(alert.message.event_severity) >= 3
+                              ? 'border-red-200 bg-red-50 shadow-md'
+                              : 'border-orange-200 bg-orange-50',
                         )}
                       >
                         <div className="mb-3 flex items-start justify-between">
@@ -625,7 +678,7 @@ export default function CriticalAlertSystem({
                             <Camera className="h-5 w-5 text-red-500" />
                             <div>
                               <Badge variant="destructive" className="text-xs">
-                                EVENT DETECTED
+                                CRITICAL ALERT
                               </Badge>
                               {!alert.acknowledged && (
                                 <Badge
@@ -651,11 +704,11 @@ export default function CriticalAlertSystem({
                           </div>
                           <div className="text-sm text-gray-600">
                             Severity:{' '}
-                            {alert.message.event_severity === '2'
-                              ? 'High'
-                              : alert.message.event_severity === '3'
-                                ? 'Critical'
-                                : 'Low'}
+                            {alert.message.event_severity === '1'
+                              ? 'Low'
+                              : alert.message.event_severity === '2'
+                                ? 'High'
+                                : 'Critical'}
                           </div>
                         </div>
 

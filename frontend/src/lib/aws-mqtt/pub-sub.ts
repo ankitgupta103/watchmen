@@ -23,6 +23,7 @@ interface SubscriptionInfo {
   callbacks: Set<PubSubSubscriptionCallback>;
   messageCount: number;
   lastMessageTime: number;
+  lastProcessedMessages: Map<string, number>; // Track recent message hashes
 }
 
 export type PubSubSubscriptionCallback = (
@@ -42,9 +43,11 @@ export interface PubSubMessageEnvelope {
 const CONFIG = {
   MAX_RECONNECT_ATTEMPTS: 5,
   RECONNECT_INTERVAL: 2000, // ms
-  MESSAGE_BUFFER_SIZE: 100,
+  MESSAGE_BUFFER_SIZE: 50, // Reduced from 100 to prevent excessive buffering
   CONNECTION_TIMEOUT: 30000, // ms
   HEALTH_CHECK_INTERVAL: 30000, // ms
+  DUPLICATE_DETECTION_WINDOW: 5000, // 5 seconds window for duplicate detection
+  MESSAGE_HASH_CLEANUP_INTERVAL: 60000, // 1 minute
 };
 
 class PubSubService extends EventEmitter {
@@ -57,12 +60,15 @@ class PubSubService extends EventEmitter {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private healthCheckTimer: NodeJS.Timeout | null = null;
   private connectionTimeout: NodeJS.Timeout | null = null;
+  private messageHashCleanupTimer: NodeJS.Timeout | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private messageBuffer: Map<string, any[]> = new Map();
+  private globalProcessedMessages = new Map<string, number>(); // Global deduplication
 
   private constructor() {
     super();
     this.setMaxListeners(100);
+    this.startMessageHashCleanup();
   }
 
   public static getInstance(): PubSubService {
@@ -70,6 +76,48 @@ class PubSubService extends EventEmitter {
       PubSubService.instance = new PubSubService();
     }
     return PubSubService.instance;
+  }
+
+  // Create a simple hash for message deduplication
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private createMessageHash(topic: string, data: any): string {
+    try {
+      const dataString = typeof data === 'string' ? data : JSON.stringify(data);
+      // Create a simple hash combining topic and data
+      let hash = 0;
+      const str = `${topic}:${dataString}`;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      return hash.toString();
+    } catch {
+      // Fallback to timestamp if hashing fails
+      return `${topic}:${Date.now()}:${Math.random()}`;
+    }
+  }
+
+  private startMessageHashCleanup() {
+    this.messageHashCleanupTimer = setInterval(() => {
+      const now = Date.now();
+      
+      // Clean up old message hashes (older than detection window)
+      for (const [hash, timestamp] of this.globalProcessedMessages.entries()) {
+        if (now - timestamp > CONFIG.DUPLICATE_DETECTION_WINDOW) {
+          this.globalProcessedMessages.delete(hash);
+        }
+      }
+
+      // Clean up subscription-level message hashes
+      this.subscriptions.forEach((info) => {
+        for (const [hash, timestamp] of info.lastProcessedMessages.entries()) {
+          if (now - timestamp > CONFIG.DUPLICATE_DETECTION_WINDOW) {
+            info.lastProcessedMessages.delete(hash);
+          }
+        }
+      });
+    }, CONFIG.MESSAGE_HASH_CLEANUP_INTERVAL);
   }
 
   public async initialize(): Promise<PubSub> {
@@ -270,15 +318,8 @@ class PubSubService extends EventEmitter {
         `[PubSubService] Added callback to existing subscription for topic: ${topic}`,
       );
 
-      // Send buffered messages to new callback
-      const bufferedMessages = this.messageBuffer.get(topic);
-      if (bufferedMessages && bufferedMessages.length > 0) {
-        console.log(
-          `[PubSubService] Sending ${bufferedMessages.length} buffered messages for topic: ${topic}`,
-        );
-        bufferedMessages.forEach((msg) => callback(topic, msg));
-      }
-
+      // Don't send buffered messages automatically to prevent duplicates
+      // Let the hook handle initial state if needed
       return;
     }
 
@@ -296,6 +337,7 @@ class PubSubService extends EventEmitter {
         callbacks,
         messageCount: 0,
         lastMessageTime: Date.now(),
+        lastProcessedMessages: new Map<string, number>(),
       };
 
       const activeSubscription = observableController.subscribe({
@@ -306,10 +348,30 @@ class PubSubService extends EventEmitter {
             );
 
             if (messageData !== undefined) {
-              subscriptionInfo.messageCount++;
-              subscriptionInfo.lastMessageTime = Date.now();
+              // Create message hash for deduplication
+              const messageHash = this.createMessageHash(topic, messageData);
+              const now = Date.now();
 
-              // Buffer messages
+              // Check for duplicates at global level
+              if (this.globalProcessedMessages.has(messageHash)) {
+                console.log(`[PubSubService] Global duplicate detected for topic ${topic}: ${messageHash}`);
+                return;
+              }
+
+              // Check for duplicates at subscription level
+              if (subscriptionInfo.lastProcessedMessages.has(messageHash)) {
+                console.log(`[PubSubService] Subscription duplicate detected for topic ${topic}: ${messageHash}`);
+                return;
+              }
+
+              // Record the message hash
+              this.globalProcessedMessages.set(messageHash, now);
+              subscriptionInfo.lastProcessedMessages.set(messageHash, now);
+
+              subscriptionInfo.messageCount++;
+              subscriptionInfo.lastMessageTime = now;
+
+              // Buffer messages (with reduced buffer size)
               this.bufferMessage(topic, messageData);
 
               // Call all callbacks
@@ -480,7 +542,7 @@ class PubSubService extends EventEmitter {
 
     buffer.push(message);
 
-    // Keep only recent messages
+    // Keep only recent messages (reduced buffer size)
     if (buffer.length > CONFIG.MESSAGE_BUFFER_SIZE) {
       buffer.shift();
     }
@@ -499,9 +561,13 @@ class PubSubService extends EventEmitter {
         callbackCount: info.callbacks.size,
         messageCount: info.messageCount,
         lastMessageTime: new Date(info.lastMessageTime).toISOString(),
+        processedMessageCount: info.lastProcessedMessages.size,
       };
     });
-    return stats;
+    return {
+      topics: stats,
+      globalProcessedMessages: this.globalProcessedMessages.size,
+    };
   }
 
   public cleanup(): void {
@@ -514,6 +580,10 @@ class PubSubService extends EventEmitter {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    if (this.messageHashCleanupTimer) {
+      clearInterval(this.messageHashCleanupTimer);
+      this.messageHashCleanupTimer = null;
+    }
 
     // Unsubscribe all topics
     const topicsToUnsubscribe = Array.from(this.subscriptions.keys());
@@ -521,8 +591,9 @@ class PubSubService extends EventEmitter {
       this.unsubscribe(topic);
     }
 
-    // Clear buffers
+    // Clear buffers and processed messages
     this.messageBuffer.clear();
+    this.globalProcessedMessages.clear();
 
     // Reset state
     this.isConnected = false;
