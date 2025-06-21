@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ImageIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -22,10 +22,16 @@ interface ImageUrlResponse {
 const fetchEventImages = async (
   token: string,
   imageKeys: { image_c_key: string; image_f_key: string },
+  signal?: AbortSignal,
   retries = 1000,
   backoff = 2000,
 ): Promise<ImageUrlResponse | null> => {
   try {
+    // Check if already aborted
+    if (signal?.aborted) {
+      return null;
+    }
+
     const data = await fetcherClient<{
       success: boolean;
       cropped_image_url?: string;
@@ -34,7 +40,9 @@ const fetchEventImages = async (
     }>(`${API_BASE_URL}/event-images/`, token, {
       method: 'POST',
       body: imageKeys,
+      signal, // Pass the abort signal to the fetch request
     });
+    
     if (data?.success) {
       return {
         croppedImageUrl: data.cropped_image_url,
@@ -43,9 +51,14 @@ const fetchEventImages = async (
     }
     throw new Error(data?.error || 'Failed to fetch images');
   } catch (error) {
-    if (retries > 0) {
+    // Don't retry if the request was aborted
+    if (error instanceof Error && error.name === 'AbortError') {
+      return null;
+    }
+    
+    if (retries > 0 && !signal?.aborted) {
       await new Promise(res => setTimeout(res, backoff));
-      return fetchEventImages(token, imageKeys, retries - 1, backoff * 2);
+      return fetchEventImages(token, imageKeys, signal, retries - 1, backoff * 2);
     }
     console.error('Error fetching images:', error);
     return null;
@@ -61,24 +74,51 @@ const EventImage = ({
   const [imageUrls, setImageUrls] = useState<ImageUrlResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const fetchImages = async () => {
       if (!token || !image_c_key || !image_f_key) {
         return;
       }
+
+      // Cancel any ongoing request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       setIsLoading(true);
       setError(null);
-      const urls = await fetchEventImages(token, { image_c_key, image_f_key });
-      if (urls) {
-        setImageUrls(urls);
-      } else {
-        setError('Failed to load images.');
+      
+      const urls = await fetchEventImages(
+        token, 
+        { image_c_key, image_f_key }, 
+        signal
+      );
+      
+      // Only update state if request wasn't aborted
+      if (!signal.aborted) {
+        if (urls) {
+          setImageUrls(urls);
+        } else {
+          setError('Failed to load images.');
+        }
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchImages();
+
+    // Cleanup function to abort request on unmount or dependency change
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [token, image_c_key, image_f_key]);
 
   const hasImageKeys = image_c_key && image_f_key;
