@@ -50,7 +50,7 @@ export const durationMs = (start: string, end: string) => {
 
 // Constants
 export const ONE_HOUR_MS = 1000 * 60 * 60;
-export const MAX_EVENTS_PER_MACHINE = 50;
+export const MAX_EVENTS_PER_MACHINE = 3;
 export const MAX_EVENT_COUNT_FOR_COLOR = 20;
 export const PULSATING_DURATION_MS = 30000;
 
