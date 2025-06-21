@@ -2,13 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import L from 'leaflet';
-import {
-  Map as MapIcon,
-  MapPin,
-  Wifi,
-  WifiOff,
-  X,
-} from 'lucide-react';
+import { Map as MapIcon, MapPin, Wifi, WifiOff, X } from 'lucide-react';
 import { renderToString } from 'react-dom/server';
 import {
   Circle,
@@ -52,8 +46,7 @@ const createMachineIcon = (machine: Machine, isSelected: boolean = false) => {
       {/* Main marker */}
       <div
         className={`relative h-5 w-5 ${bgColor} flex items-center justify-center rounded-full border-2 border-white shadow-lg`}
-      >
-      </div>
+      ></div>
     </div>,
   );
 

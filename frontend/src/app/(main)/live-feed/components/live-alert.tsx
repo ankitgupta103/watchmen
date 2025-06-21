@@ -30,6 +30,8 @@ import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
 
+import { AudioManager } from './audio-manager';
+
 // Types for alert system
 interface EventMessage {
   image_c_key: string;
@@ -66,84 +68,6 @@ interface AlertSystemProps {
   severityThreshold?: number; // Only process events above this severity
 }
 
-// Audio Manager
-class AudioManager {
-  private audioContext: AudioContext | null = null;
-  private alarmBuffer: AudioBuffer | null = null;
-  private isInitialized = false;
-
-  async initialize() {
-    if (this.isInitialized) return;
-
-    try {
-      this.audioContext = new (window.AudioContext ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).webkitAudioContext)();
-      await this.createAlarmSound();
-      this.isInitialized = true;
-    } catch (error) {
-      console.warn('Audio initialization failed:', error);
-    }
-  }
-
-  private async createAlarmSound() {
-    if (!this.audioContext) return;
-
-    // Create a more urgent alarm sound
-    const sampleRate = this.audioContext.sampleRate;
-    const duration = 30; // seconds
-    const buffer = this.audioContext.createBuffer(
-      1,
-      sampleRate * duration,
-      sampleRate,
-    );
-    const data = buffer.getChannelData(0);
-
-    for (let i = 0; i < buffer.length; i++) {
-      const time = i / sampleRate;
-
-      // Create a complex alarm sound with multiple frequencies
-      const freq1 = 800 + Math.sin(time * 4) * 200; // Wobbling frequency
-      const freq2 = 1200;
-      const freq3 = 600;
-
-      const wave1 = Math.sin(2 * Math.PI * freq1 * time);
-      const wave2 = Math.sin(2 * Math.PI * freq2 * time);
-      const wave3 = Math.sin(2 * Math.PI * freq3 * time);
-
-      // Envelope for urgency
-      const envelope = Math.pow(Math.sin((time * Math.PI) / duration), 0.5);
-
-      // Mix the waves with envelope
-      data[i] = (wave1 * 0.4 + wave2 * 0.3 + wave3 * 0.3) * envelope * 0.3;
-    }
-
-    this.alarmBuffer = buffer;
-  }
-
-  async playAlarm(volume: number = 0.5) {
-    if (!this.audioContext || !this.alarmBuffer || !this.isInitialized) {
-      await this.initialize();
-      if (!this.audioContext || !this.alarmBuffer) return;
-    }
-
-    // Resume audio context if suspended (browser autoplay policy)
-    if (this.audioContext.state === 'suspended') {
-      await this.audioContext.resume();
-    }
-
-    const source = this.audioContext.createBufferSource();
-    const gainNode = this.audioContext.createGain();
-
-    source.buffer = this.alarmBuffer;
-    source.connect(gainNode);
-    gainNode.connect(this.audioContext.destination);
-    gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
-
-    source.start();
-  }
-}
-
 const globalAlertProcessedEvents = new Set<string>();
 
 export default function CriticalAlertSystem({
@@ -153,8 +77,7 @@ export default function CriticalAlertSystem({
     console.log('alert received', alert);
   },
   enableSound = true,
-  useAlertTopics = false, // Default to false to avoid conflicts
-  severityThreshold = 1, 
+  severityThreshold = 1,
 }: AlertSystemProps) {
   const { token } = useToken();
   const [alerts, setAlerts] = useState<EventAlert[]>([]);
@@ -171,22 +94,14 @@ export default function CriticalAlertSystem({
   // Generate topics - use separate alert topics if specified
   const topics = React.useMemo(() => {
     if (machines.length === 0) return [];
-    
-    if (useAlertTopics) {
-      // Use separate alert-specific topics to avoid conflicts
-      return machines.map(
-        (machine) =>
-          `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
-      );
-    } else {
-      // Use same topics as live feed (default behavior)
-      const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
-      return machines.map(
-        (machine) =>
-          `${organizationId}/_all_/${today}/${machine.id}/_all_/EVENT/#`,
-      );
-    }
-  }, [organizationId, machines, useAlertTopics]);
+
+    // Use same topics as live feed (default behavior)
+    // const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
+    return machines.map(
+      (machine) =>
+        `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
+    );
+  }, [organizationId, machines]);
 
   // Initialize audio on first user interaction
   useEffect(() => {
@@ -343,17 +258,23 @@ export default function CriticalAlertSystem({
 
         // Filter by severity threshold
         if (severity < severityThreshold) {
-          console.log(`[CriticalAlertSystem] Event severity ${severity} below threshold ${severityThreshold}, ignoring`);
+          console.log(
+            `[CriticalAlertSystem] Event severity ${severity} below threshold ${severityThreshold}, ignoring`,
+          );
           return;
         }
 
         // Create enhanced event key for deduplication
         const eventKey = `alert_${eventMessage.image_f_key}_${eventMessage.image_c_key}_${machineId}_${severity}`;
-        
+
         // Check for duplicates using both local and global tracking
-        if (processedEventKeysRef.current.has(eventKey) || 
-            globalAlertProcessedEvents.has(eventKey)) {
-          console.log(`[CriticalAlertSystem] Duplicate alert detected: ${eventKey}`);
+        if (
+          processedEventKeysRef.current.has(eventKey) ||
+          globalAlertProcessedEvents.has(eventKey)
+        ) {
+          console.log(
+            `[CriticalAlertSystem] Duplicate alert detected: ${eventKey}`,
+          );
           return;
         }
 
@@ -365,10 +286,12 @@ export default function CriticalAlertSystem({
         if (globalAlertProcessedEvents.size > 500) {
           const entries = Array.from(globalAlertProcessedEvents);
           const toRemove = entries.slice(0, entries.length - 400);
-          toRemove.forEach(key => globalAlertProcessedEvents.delete(key));
+          toRemove.forEach((key) => globalAlertProcessedEvents.delete(key));
         }
 
-        console.log(`[CriticalAlertSystem] Processing new alert: ${eventKey} for machine ${machineId}`);
+        console.log(
+          `[CriticalAlertSystem] Processing new alert: ${eventKey} for machine ${machineId}`,
+        );
 
         // Create alert (without images initially)
         const alert: EventAlert = {
@@ -445,19 +368,22 @@ export default function CriticalAlertSystem({
         console.error('Error handling MQTT message in alert system:', error);
       }
     },
-    [machines, isAudioEnabled, volume, startFlashing, onAlertReceived, severityThreshold],
+    [
+      machines,
+      isAudioEnabled,
+      volume,
+      startFlashing,
+      onAlertReceived,
+      severityThreshold,
+    ],
   );
 
   // Use the PubSub hook with buffered messages disabled to prevent duplicates
-  const { isConnected, error } = usePubSub(
-    topics, 
-    handleMqttMessage, 
-    { 
-      autoReconnect: true, 
-      parseJson: true,
-      enableBufferedMessages: false, // Disable buffered messages for alerts
-    }
-  );
+  const { isConnected, error } = usePubSub(topics, handleMqttMessage, {
+    autoReconnect: true,
+    parseJson: true,
+    enableBufferedMessages: false, // Disable buffered messages for alerts
+  });
 
   // Acknowledge alert
   const acknowledgeAlert = useCallback((alertId: string) => {
@@ -657,7 +583,9 @@ export default function CriticalAlertSystem({
                   <div className="p-8 text-center text-gray-500">
                     <Camera className="mx-auto mb-2 h-12 w-12 opacity-30" />
                     <p>No critical alerts</p>
-                    <p className="text-sm">System is monitoring for severity ≥ {severityThreshold}...</p>
+                    <p className="text-sm">
+                      System is monitoring for severity ≥ {severityThreshold}...
+                    </p>
                   </div>
                 ) : (
                   <div className="grid gap-4 p-4">

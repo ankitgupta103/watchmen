@@ -93,71 +93,76 @@ export const usePubSub = (
   /**
    * Handle incoming messages from PubSubService
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleMessage = useCallback((topic: string, messageData: any) => {
-    let parsedData = messageData;
+  const handleMessage = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (topic: string, messageData: any) => {
+      let parsedData = messageData;
 
-    if (optionsRef.current.parseJson && typeof messageData === 'string') {
-      try {
-        parsedData = JSON.parse(messageData);
-      } catch (e) {
-        console.error('[usePubSub] JSON parse error:', e);
-        parsedData = messageData;
+      if (optionsRef.current.parseJson && typeof messageData === 'string') {
+        try {
+          parsedData = JSON.parse(messageData);
+        } catch (e) {
+          console.error('[usePubSub] JSON parse error:', e);
+          parsedData = messageData;
+        }
       }
-    }
 
-    // Additional deduplication at hook level
-    const messageHash = createMessageHash(topic, parsedData);
-    if (processedMessagesRef.current.has(messageHash)) {
-      console.log(`[usePubSub] Hook-level duplicate detected: ${messageHash}`);
-      return;
-    }
-    processedMessagesRef.current.add(messageHash);
+      // Additional deduplication at hook level
+      const messageHash = createMessageHash(topic, parsedData);
+      if (processedMessagesRef.current.has(messageHash)) {
+        console.log(
+          `[usePubSub] Hook-level duplicate detected: ${messageHash}`,
+        );
+        return;
+      }
+      processedMessagesRef.current.add(messageHash);
 
-    // Clean up old processed messages (keep last 100)
-    if (processedMessagesRef.current.size > 100) {
-      const entries = Array.from(processedMessagesRef.current);
-      const toRemove = entries.slice(0, entries.length - 80);
-      toRemove.forEach(hash => processedMessagesRef.current.delete(hash));
-    }
+      // Clean up old processed messages (keep last 100)
+      if (processedMessagesRef.current.size > 100) {
+        const entries = Array.from(processedMessagesRef.current);
+        const toRemove = entries.slice(0, entries.length - 80);
+        toRemove.forEach((hash) => processedMessagesRef.current.delete(hash));
+      }
 
-    // Create message entry with timestamp
-    const newMessageEntry: MessageEntry = {
-      timestamp: new Date().toISOString(),
-      data: parsedData,
-    };
-
-    // Update topic data state efficiently
-    setTopicData((prev) => {
-      const currentTopicData = prev[topic];
-      const newMessageCount = (currentTopicData?.messageCount || 0) + 1;
-
-      return {
-        ...prev,
-        [topic]: {
-          currentMessage: newMessageEntry,
-          messageCount: newMessageCount,
-          lastUpdate: newMessageEntry.timestamp,
-        },
+      // Create message entry with timestamp
+      const newMessageEntry: MessageEntry = {
+        timestamp: new Date().toISOString(),
+        data: parsedData,
       };
-    });
 
-    if (callbackRef.current) {
-      try {
-        callbackRef.current(topic, parsedData);
-      } catch (callbackError) {
-        console.error(
-          `[usePubSub] Error in callback for topic ${topic}:`,
-          callbackError,
-        );
-        setError(
-          callbackError instanceof Error
-            ? callbackError
-            : new Error(String(callbackError)),
-        );
+      // Update topic data state efficiently
+      setTopicData((prev) => {
+        const currentTopicData = prev[topic];
+        const newMessageCount = (currentTopicData?.messageCount || 0) + 1;
+
+        return {
+          ...prev,
+          [topic]: {
+            currentMessage: newMessageEntry,
+            messageCount: newMessageCount,
+            lastUpdate: newMessageEntry.timestamp,
+          },
+        };
+      });
+
+      if (callbackRef.current) {
+        try {
+          callbackRef.current(topic, parsedData);
+        } catch (callbackError) {
+          console.error(
+            `[usePubSub] Error in callback for topic ${topic}:`,
+            callbackError,
+          );
+          setError(
+            callbackError instanceof Error
+              ? callbackError
+              : new Error(String(callbackError)),
+          );
+        }
       }
-    }
-  }, [createMessageHash]);
+    },
+    [createMessageHash],
+  );
 
   // Connection event handlers
   useEffect(() => {
@@ -232,12 +237,14 @@ export const usePubSub = (
     }
 
     const currentSubscriptions = new Set<string>();
-    
+
     const setupSubscriptions = async () => {
       for (const topicName of stableTopics) {
         // Skip if already subscribed
         if (subscribedTopicsRef.current.has(topicName)) {
-          console.log(`[usePubSub] Already subscribed to ${topicName}, skipping`);
+          console.log(
+            `[usePubSub] Already subscribed to ${topicName}, skipping`,
+          );
           currentSubscriptions.add(topicName);
           continue;
         }
@@ -246,19 +253,22 @@ export const usePubSub = (
           await pubSubService.subscribe(topicName, handleMessage);
           subscribedTopicsRef.current.add(topicName);
           currentSubscriptions.add(topicName);
-          
+
           console.log(`[usePubSub] Successfully subscribed to ${topicName}`);
 
           // Only process buffered messages if explicitly enabled
           if (optionsRef.current.enableBufferedMessages) {
-            const bufferedMessages = pubSubService.getBufferedMessages(topicName);
+            const bufferedMessages =
+              pubSubService.getBufferedMessages(topicName);
             if (bufferedMessages.length > 0) {
               console.log(
                 `[usePubSub] Processing ${bufferedMessages.length} buffered messages for ${topicName}`,
               );
               // Add a small delay to prevent overwhelming the callback
               setTimeout(() => {
-                bufferedMessages.forEach((msg) => handleMessage(topicName, msg));
+                bufferedMessages.forEach((msg) =>
+                  handleMessage(topicName, msg),
+                );
               }, 100);
             }
           }
@@ -274,9 +284,9 @@ export const usePubSub = (
       }
 
       // Unsubscribe from topics that are no longer needed
-      const topicsToUnsubscribe = Array.from(subscribedTopicsRef.current).filter(
-        topic => !stableTopics.includes(topic)
-      );
+      const topicsToUnsubscribe = Array.from(
+        subscribedTopicsRef.current,
+      ).filter((topic) => !stableTopics.includes(topic));
 
       for (const topicName of topicsToUnsubscribe) {
         pubSubService.unsubscribe(topicName, handleMessage);
