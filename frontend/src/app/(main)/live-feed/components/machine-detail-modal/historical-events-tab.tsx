@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Clock, ImageIcon, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -74,23 +74,25 @@ const HistoricalEventsTab = ({
           method: 'POST',
           body: { org_id: orgId, date: dateStr, machine_id: machineId },
           signal, // Pass the abort signal to each fetch request
-        }).then((result) => {
-          // Check if request was aborted before processing result
-          if (signal.aborted) {
+        })
+          .then((result) => {
+            // Check if request was aborted before processing result
+            if (signal.aborted) {
+              return [];
+            }
+            return result?.success ? result?.events || [] : [];
+          })
+          .catch((error) => {
+            // Don't log abort errors
+            if (error.name !== 'AbortError') {
+              console.error('Error fetching events for date:', dateStr, error);
+            }
             return [];
-          }
-          return result?.success ? result?.events || [] : [];
-        }).catch((error) => {
-          // Don't log abort errors
-          if (error.name !== 'AbortError') {
-            console.error('Error fetching events for date:', dateStr, error);
-          }
-          return [];
-        });
+          });
       });
 
       const results = await Promise.all(promises);
-      
+
       // Check if request was aborted before updating state
       if (signal.aborted) {
         return;

@@ -33,7 +33,7 @@ export interface MQTTEvent {
   images_loaded?: boolean;
 }
 
-export interface SimpleMachineData {
+export interface MachineData {
   machine_id: number;
   events: MachineEvent[];
   event_count: number;
