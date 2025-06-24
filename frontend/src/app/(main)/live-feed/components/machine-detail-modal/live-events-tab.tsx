@@ -21,7 +21,6 @@ interface MachineEvent {
 
 interface LiveEventsTabProps {
   events: MachineEvent[];
-  mqttConnected: boolean;
   mqttError: Error | null;
   onImageClick: (url: string) => void;
   token: string | null;
@@ -30,7 +29,6 @@ interface LiveEventsTabProps {
 const LiveEventsTab = memo(
   ({
     events,
-    mqttConnected,
     mqttError,
     onImageClick,
     token,
@@ -77,11 +75,6 @@ const LiveEventsTab = memo(
             <h3 className="mb-2 text-lg font-medium text-gray-600">
               No Live Events
             </h3>
-            <p className="text-sm text-gray-500">
-              {mqttConnected
-                ? 'Waiting for live events from this machine...'
-                : 'Connecting to MQTT to receive live events...'}
-            </p>
           </div>
         ) : (
           <div className="space-y-4">

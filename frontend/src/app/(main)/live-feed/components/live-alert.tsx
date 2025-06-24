@@ -11,7 +11,6 @@ import {
   Image as ImageIcon,
   Loader2,
   Play,
-  TestTube,
   Volume2,
   VolumeX,
   Wifi,
@@ -69,7 +68,6 @@ interface AlertSystemProps {
   enableSound?: boolean;
   useAlertTopics?: boolean; // Whether to use separate alert topics
   severityThreshold?: number; // Only process events above this severity
-  debugMode?: boolean; // Show debug information
 }
 
 const globalAlertProcessedEvents = new Set<string>();
@@ -82,7 +80,6 @@ export default function CriticalAlertSystem({
   },
   enableSound = true,
   severityThreshold = 1,
-  debugMode = false,
 }: AlertSystemProps) {
   const { token } = useToken();
   const [alerts, setAlerts] = useState<EventAlert[]>([]);
@@ -90,19 +87,6 @@ export default function CriticalAlertSystem({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [volume, setVolume] = useState(0.7);
   const [unacknowledgedCount, setUnacknowledgedCount] = useState(0);
-
-  // Debug state
-  const [debugStats, setDebugStats] = useState({
-    messagesReceived: 0,
-    messagesProcessed: 0,
-    messagesFiltered: 0,
-    duplicatesBlocked: 0,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    lastMessage: null as any,
-    lastMessageTime: null as Date | null,
-    topicsCount: 0,
-    connectionStatus: 'disconnected',
-  });
 
   const audioManagerRef = useRef(new AudioManager());
   const flashIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -121,8 +105,6 @@ export default function CriticalAlertSystem({
     );
 
     console.log('🎯 [AlertSystem] Generated topics:', generatedTopics);
-
-    setDebugStats((prev) => ({ ...prev, topicsCount: generatedTopics.length }));
     return generatedTopics;
   }, [organizationId, machines]);
 
@@ -222,7 +204,6 @@ export default function CriticalAlertSystem({
     }
   };
 
-  // Enhanced MQTT message handler with extensive debugging
   const handleMqttMessage = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (topic: string, data: any) => {
@@ -233,14 +214,6 @@ export default function CriticalAlertSystem({
         data: JSON.stringify(data).substring(0, 200),
         timestamp: now.toISOString(),
       });
-
-      // Update debug stats
-      setDebugStats((prev) => ({
-        ...prev,
-        messagesReceived: prev.messagesReceived + 1,
-        lastMessage: { topic, data, timestamp: now },
-        lastMessageTime: now,
-      }));
 
       try {
         // Extract machine ID from topic
@@ -284,10 +257,6 @@ export default function CriticalAlertSystem({
           console.log(
             `⚠️ [AlertSystem] Severity ${severity} < threshold ${severityThreshold}, filtering out`,
           );
-          setDebugStats((prev) => ({
-            ...prev,
-            messagesFiltered: prev.messagesFiltered + 1,
-          }));
           return;
         }
 
@@ -301,10 +270,6 @@ export default function CriticalAlertSystem({
           globalAlertProcessedEvents.has(eventKey)
         ) {
           console.log(`🔄 [AlertSystem] Duplicate detected: ${eventKey}`);
-          setDebugStats((prev) => ({
-            ...prev,
-            duplicatesBlocked: prev.duplicatesBlocked + 1,
-          }));
           return;
         }
 
@@ -337,10 +302,6 @@ export default function CriticalAlertSystem({
         // Add to state
         setAlerts((prev) => [alert, ...prev.slice(0, 49)]);
         setUnacknowledgedCount((prev) => prev + 1);
-        setDebugStats((prev) => ({
-          ...prev,
-          messagesProcessed: prev.messagesProcessed + 1,
-        }));
 
         // Play audio
         if (isAudioEnabled && severity >= severityThreshold) {
@@ -421,12 +382,7 @@ export default function CriticalAlertSystem({
     enableBufferedMessages: false,
   });
 
-  // Update connection status in debug stats
   useEffect(() => {
-    setDebugStats((prev) => ({
-      ...prev,
-      connectionStatus: isConnected ? 'connected' : 'disconnected',
-    }));
 
     if (isConnected) {
       console.log('✅ [AlertSystem] MQTT connected to topics:', topics);
@@ -448,34 +404,6 @@ export default function CriticalAlertSystem({
       console.error('❌ [AlertSystem] Test audio failed:', error);
       toast.error('Audio test failed: ' + error);
     }
-  };
-
-  const createTestAlert = () => {
-    console.log('🧪 [AlertSystem] Creating test alert...');
-    const testAlert: EventAlert = {
-      id: `test-${Date.now()}`,
-      timestamp: new Date(),
-      machineId: '999',
-      machineName: 'Test Machine',
-      message: {
-        eventstr: 'Test Alert Event',
-        image_c_key: 'test_crop_key',
-        image_f_key: 'test_full_key',
-        event_severity: '2',
-      },
-      acknowledged: false,
-      imagesFetched: false,
-      fetchingImages: false,
-    };
-
-    setAlerts((prev) => [testAlert, ...prev]);
-    setUnacknowledgedCount((prev) => prev + 1);
-
-    if (isAudioEnabled) {
-      audioManagerRef.current.playAlarm(volume);
-    }
-
-    toast.success('Test alert created!');
   };
 
   // Polling for images
@@ -552,13 +480,6 @@ export default function CriticalAlertSystem({
     setUnacknowledgedCount(0);
     processedEventKeysRef.current.clear();
     globalAlertProcessedEvents.clear();
-    setDebugStats((prev) => ({
-      ...prev,
-      messagesReceived: 0,
-      messagesProcessed: 0,
-      messagesFiltered: 0,
-      duplicatesBlocked: 0,
-    }));
   }, []);
 
   // Click outside handler
@@ -596,90 +517,6 @@ export default function CriticalAlertSystem({
       {/* Alert Button with Debug Panel */}
       <div className="fixed top-4 right-4 z-50">
         <div className="flex flex-col items-end gap-2">
-          {/* Debug Panel */}
-          {debugMode && (
-            <div className="max-w-xs rounded-lg border bg-white p-3 text-xs shadow-lg">
-              <div className="mb-2 font-medium text-red-600">
-                🚨 Alert System Debug
-              </div>
-
-              {/* Connection Status */}
-              <div className="mb-2 rounded bg-gray-50 p-2">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
-                  ></div>
-                  <span className="font-medium">
-                    {isConnected ? '✅ Connected' : '❌ Disconnected'}
-                  </span>
-                </div>
-                <div>Topics: {debugStats.topicsCount}</div>
-                <div>Machines: {machines.length}</div>
-                {error && (
-                  <div className="text-red-600">Error: {error.message}</div>
-                )}
-              </div>
-
-              {/* Message Stats */}
-              <div className="mb-2 rounded bg-blue-50 p-2">
-                <div className="font-medium text-blue-800">Message Stats</div>
-                <div>Received: {debugStats.messagesReceived}</div>
-                <div>Processed: {debugStats.messagesProcessed}</div>
-                <div>Filtered: {debugStats.messagesFiltered}</div>
-                <div>Duplicates: {debugStats.duplicatesBlocked}</div>
-                <div>Threshold: ≥{severityThreshold}</div>
-              </div>
-
-              {/* Last Message */}
-              {debugStats.lastMessage && (
-                <div className="mb-2 rounded bg-yellow-50 p-2">
-                  <div className="font-medium text-yellow-800">
-                    Last Message
-                  </div>
-                  <div>
-                    Time: {debugStats.lastMessageTime?.toLocaleTimeString()}
-                  </div>
-                  <div>
-                    Topic: .../
-                    {debugStats.lastMessage.topic
-                      .split('/')
-                      .slice(-2)
-                      .join('/')}
-                  </div>
-                  <div>
-                    Severity:{' '}
-                    {debugStats.lastMessage.data.event_severity || '?'}
-                  </div>
-                  <div>
-                    Machine: {debugStats.lastMessage.topic.split('/')[3]}
-                  </div>
-                </div>
-              )}
-
-              {/* Test Controls */}
-              <div className="flex gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={testAudio}
-                  className="px-2 py-1 text-xs"
-                >
-                  <Play className="mr-1 h-3 w-3" />
-                  Audio
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={createTestAlert}
-                  className="px-2 py-1 text-xs"
-                >
-                  <TestTube className="mr-1 h-3 w-3" />
-                  Alert
-                </Button>
-              </div>
-            </div>
-          )}
-
           {/* Main Alert Button */}
           <Button
             onClick={() => setIsModalOpen(!isModalOpen)}
@@ -753,10 +590,6 @@ export default function CriticalAlertSystem({
 
               {/* Controls */}
               <div className="mt-2 flex gap-2">
-                {/* <Button size="sm" variant="outline" onClick={createTestAlert}>
-                  <TestTube className="mr-1 h-4 w-4" />
-                  Test Alert
-                </Button> */}
                 {unacknowledgedCount > 0 && (
                   <Button size="sm" onClick={acknowledgeAll} className="flex-1">
                     <CheckCircle className="mr-1 h-4 w-4" />
@@ -835,19 +668,6 @@ export default function CriticalAlertSystem({
                     <p className="text-sm">
                       Monitoring severity ≥ {severityThreshold}...
                     </p>
-                    {debugMode && (
-                      <div className="mt-4 rounded bg-gray-50 p-3 text-xs">
-                        <div>
-                          Debug: {debugStats.messagesReceived} messages received
-                        </div>
-                        <div>
-                          {debugStats.messagesFiltered} filtered by severity
-                        </div>
-                        <div>
-                          {debugStats.duplicatesBlocked} duplicates blocked
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <div className="grid gap-4 p-4">

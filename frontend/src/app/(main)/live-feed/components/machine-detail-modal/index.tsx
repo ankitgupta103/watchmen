@@ -35,7 +35,6 @@ interface MachineDetailModalProps {
   getMachineData: (machineId: number) => { buffer_size: number } | undefined;
   token: string | null;
   liveEvents: MachineEvent[];
-  isConnected: boolean;
   mqttError: Error | null;
 }
 
@@ -45,7 +44,6 @@ export default function MachineDetailModal({
   getMachineData,
   token,
   liveEvents,
-  isConnected,
   mqttError,
 }: MachineDetailModalProps) {
   const { organizationId } = useOrganization();
@@ -78,7 +76,6 @@ export default function MachineDetailModal({
             <MachineInfoHeader
               machine={selectedMachine}
               bufferSize={machineData?.buffer_size ?? 0}
-              mqttConnected={isConnected}
             />
 
             <Separator />
@@ -93,7 +90,6 @@ export default function MachineDetailModal({
               <TabsContent value="recent" className="mt-4">
                 <LiveEventsTab
                   events={liveEvents}
-                  mqttConnected={isConnected}
                   mqttError={mqttError}
                   onImageClick={setSelectedImageUrl}
                   token={token}
