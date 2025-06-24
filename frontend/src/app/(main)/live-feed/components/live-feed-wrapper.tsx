@@ -352,26 +352,6 @@ export default function LiveFeedWrapper({
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-blue-600" />
             <span className="font-semibold">Live Event Monitor</span>
-
-            {/* MQTT Connection Status */}
-            <div className="flex items-center gap-1 text-xs">
-              <div
-                className={cn(
-                  'h-2 w-2 rounded-full',
-                  isConnected ? 'bg-green-500' : 'bg-red-500',
-                )}
-              ></div>
-              <span className="text-gray-500">
-                {isConnected ? 'Connected' : 'Offline'}
-              </span>
-            </div>
-
-            {/* Show MQTT error if any */}
-            {mqttError && (
-              <div className="text-xs text-red-500" title={mqttError.message}>
-                Connection Error
-              </div>
-            )}
           </div>
 
           {/* Machine Stats */}
@@ -488,28 +468,6 @@ export default function LiveFeedWrapper({
             </div>
           </div>
         )}
-
-        {/* Enhanced Development Debug Info */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="absolute bottom-4 left-4 rounded-lg border bg-white px-3 py-2 text-xs shadow-lg">
-            <div className="font-medium text-blue-600">🔧 Live Feed Debug</div>
-            <div>Connection: {isConnected ? '✅' : '❌'}</div>
-            <div>Topics: {mqttTopics.length}</div>
-            <div>Machines: {machines.length}</div>
-            <div>Filtered: {filteredMachines.length}</div>
-            <div>Active: {Object.keys(machineEventCounts).length}</div>
-            <div>Events: {totalEvents}</div>
-            <div>
-              Pulsating:{' '}
-              {Object.values(pulsatingMachines).filter(Boolean).length}
-            </div>
-            <div>Processed: {processedEventKeysRef.current.size}</div>
-            <div>Global: {globalProcessedEvents.size}</div>
-            <div className="mt-1 text-blue-600">
-              Audio: Handled by Alert System
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Machine Detail Modal */}
@@ -519,7 +477,6 @@ export default function LiveFeedWrapper({
         getMachineData={getMachineData}
         token={token}
         liveEvents={liveEventsForModal}
-        isConnected={isConnected}
         mqttError={mqttError}
       />
     </div>

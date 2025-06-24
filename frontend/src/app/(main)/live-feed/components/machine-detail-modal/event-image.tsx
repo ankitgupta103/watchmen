@@ -81,8 +81,10 @@ const EventImage = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchImages = async () => {
       if (!token || !image_c_key || !image_f_key) {
         return;
@@ -91,6 +93,10 @@ const EventImage = ({
       // Cancel any ongoing request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+      }
+      // Clear any existing polling timeout
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
       }
 
       // Create new abort controller for this request
@@ -107,22 +113,29 @@ const EventImage = ({
       );
 
       // Only update state if request wasn't aborted
-      if (!signal.aborted) {
-        if (urls) {
+      if (!signal.aborted && isMounted) {
+        if (urls && (urls.croppedImageUrl || urls.fullImageUrl)) {
           setImageUrls(urls);
+          setIsLoading(false);
         } else {
-          setError('Failed to load images.');
+          setImageUrls(urls); // Might be null or missing URLs
+          setIsLoading(true); // Keep loading
+          // Poll again after 5 seconds
+          pollingTimeoutRef.current = setTimeout(fetchImages, 5000);
         }
-        setIsLoading(false);
       }
     };
 
     fetchImages();
 
-    // Cleanup function to abort request on unmount or dependency change
+    // Cleanup function to abort request and clear timeout on unmount or dependency change
     return () => {
+      isMounted = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+      }
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
       }
     };
   }, [token, image_c_key, image_f_key]);

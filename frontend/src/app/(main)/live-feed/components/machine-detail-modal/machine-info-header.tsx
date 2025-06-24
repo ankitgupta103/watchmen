@@ -10,11 +10,9 @@ import { formatBufferSize } from '@/lib/utils';
 const MachineInfoHeader = ({
   machine,
   bufferSize,
-  mqttConnected,
 }: {
   machine: Machine;
   bufferSize: number;
-  mqttConnected: boolean;
 }) => {
   const lastSeen = machine?.last_location?.timestamp
     ? new Date(machine.last_location.timestamp)
@@ -37,14 +35,6 @@ const MachineInfoHeader = ({
           <div className="text-sm">
             <Badge variant={isOnline ? 'default' : 'destructive'}>
               {isOnline ? 'Online' : 'Offline'}
-            </Badge>
-          </div>
-        </div>
-        <div>
-          <span className="text-sm font-medium text-gray-500">MQTT Status</span>
-          <div className="text-sm">
-            <Badge variant={mqttConnected ? 'default' : 'destructive'}>
-              {mqttConnected ? 'Connected' : 'Disconnected'}
             </Badge>
           </div>
         </div>
