@@ -92,13 +92,16 @@ const EventRow: React.FC<EventRowProps> = ({
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name !== 'AbortError') {
-        console.error(`Error fetching images for event ${event.id} (attempt ${retryAttempt + 1}):`, error);
-        
+        console.error(
+          `Error fetching images for event ${event.id} (attempt ${retryAttempt + 1}):`,
+          error,
+        );
+
         // Retry logic with exponential backoff
         if (retryAttempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, retryAttempt);
           setRetryCount(retryAttempt + 1);
-          
+
           timeoutRef.current = setTimeout(() => {
             if (!controller.signal.aborted) {
               fetchEventImages(retryAttempt + 1);
@@ -106,10 +109,12 @@ const EventRow: React.FC<EventRowProps> = ({
           }, delay);
         } else {
           // Max retries reached, but keep loading state to indicate we're still trying
-          console.error(`Max retries reached for event ${event.id}. Will retry on next render.`);
+          console.error(
+            `Max retries reached for event ${event.id}. Will retry on next render.`,
+          );
           setIsLoadingImages(false);
           setRetryCount(0);
-          
+
           // Schedule another attempt after a longer delay
           timeoutRef.current = setTimeout(() => {
             if (!controller.signal.aborted && !event.imagesFetched) {
@@ -158,7 +163,10 @@ const EventRow: React.FC<EventRowProps> = ({
 
   const renderImages = () => {
     // Always show loading if we're fetching images or if we don't have images yet
-    if (isLoadingImages || (!event.imagesFetched && !event.croppedImageUrl && !event.fullImageUrl)) {
+    if (
+      isLoadingImages ||
+      (!event.imagesFetched && !event.croppedImageUrl && !event.fullImageUrl)
+    ) {
       return (
         <div className="flex items-center space-x-2">
           <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
@@ -256,9 +264,7 @@ const EventRow: React.FC<EventRowProps> = ({
         </div>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center space-x-2">
-          {renderImages()}
-        </div>
+        <div className="flex items-center space-x-2">{renderImages()}</div>
       </td>
       <td className="px-4 py-3">
         <button

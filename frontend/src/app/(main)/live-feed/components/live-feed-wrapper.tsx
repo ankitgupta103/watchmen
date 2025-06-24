@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { Machine, SimpleMachineData } from '@/lib/types/machine';
+import { Machine, MachineData } from '@/lib/types/machine';
 import {
   cn,
   countMachinesByStatus,
@@ -270,7 +270,7 @@ export default function LiveFeedWrapper({
   }, [isConnected, mqttError, mqttTopics]);
 
   const getMachineData = useCallback(
-    (machineId: number): SimpleMachineData => {
+    (machineId: number): MachineData => {
       const events = machineEvents[machineId] || [];
       const eventCount = machineEventCounts[machineId] || 0;
       const lastEvent = events[0];

@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import 'leaflet/dist/leaflet.css';
 
 import { MAPS_API_KEY } from '@/lib/constants';
-import { Machine, SimpleMachineData } from '@/lib/types/machine';
+import { Machine, MachineData } from '@/lib/types/machine';
 import {
   calculateMapCenter,
   calculateOptimalZoom,
@@ -33,13 +33,13 @@ import {
 interface MapProps {
   machines: Machine[];
   onMarkerClick: (machine: Machine) => void;
-  getMachineData: (machineId: number) => SimpleMachineData;
+  getMachineData: (machineId: number) => MachineData;
 }
 
 /**
  * Creates enhanced custom icon with online/offline status and pulsating animation
  */
-const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
+const createStatusIcon = (machine: Machine, machineData: MachineData) => {
   const isOnline = isMachineOnline(machine);
   const isPulsating = machineData.is_pulsating;
   const isCritical = machineData.is_critical;
@@ -86,17 +86,13 @@ const createStatusIcon = (machine: Machine, machineData: SimpleMachineData) => {
   });
 };
 
-interface EnhancedMarkerProps {
+interface MachineMarker {
   machine: Machine;
-  machineData: SimpleMachineData;
+  machineData: MachineData;
   onMarkerClick: (machine: Machine) => void;
 }
 
-function EnhancedMarker({
-  machine,
-  machineData,
-  onMarkerClick,
-}: EnhancedMarkerProps) {
+function MachineMarker({ machine, machineData, onMarkerClick }: MachineMarker) {
   const markerRef = useRef<L.Marker>(null);
   let hoverTimeout: NodeJS.Timeout;
 
@@ -163,7 +159,7 @@ function EnhancedMarker({
  */
 interface PopupContentProps {
   machine: Machine;
-  machineData: SimpleMachineData;
+  machineData: MachineData;
   isOnline: boolean;
 }
 
@@ -220,10 +216,7 @@ function PopupContent({ machine, machineData, isOnline }: PopupContentProps) {
   );
 }
 
-/**
- * Main map component with optimized center and zoom calculation
- */
-export default function SimplifiedReactLeafletMap({
+export default function ReactLeafletMap({
   machines,
   onMarkerClick,
   getMachineData,
@@ -263,7 +256,7 @@ export default function SimplifiedReactLeafletMap({
 
       {/* Machine Markers with Status-based Coloring and Pulsating Animation */}
       {machines.map((machine) => (
-        <EnhancedMarker
+        <MachineMarker
           key={machine.id}
           machine={machine}
           machineData={getMachineData(machine.id)}

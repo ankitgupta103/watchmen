@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ImageIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -42,7 +42,7 @@ const fetchEventImages = async (
       body: imageKeys,
       signal, // Pass the abort signal to the fetch request
     });
-    
+
     if (data?.success) {
       return {
         croppedImageUrl: data.cropped_image_url,
@@ -55,10 +55,16 @@ const fetchEventImages = async (
     if (error instanceof Error && error.name === 'AbortError') {
       return null;
     }
-    
+
     if (retries > 0 && !signal?.aborted) {
-      await new Promise(res => setTimeout(res, backoff));
-      return fetchEventImages(token, imageKeys, signal, retries - 1, backoff * 2);
+      await new Promise((res) => setTimeout(res, backoff));
+      return fetchEventImages(
+        token,
+        imageKeys,
+        signal,
+        retries - 1,
+        backoff * 2,
+      );
     }
     console.error('Error fetching images:', error);
     return null;
@@ -93,13 +99,13 @@ const EventImage = ({
 
       setIsLoading(true);
       setError(null);
-      
+
       const urls = await fetchEventImages(
-        token, 
-        { image_c_key, image_f_key }, 
-        signal
+        token,
+        { image_c_key, image_f_key },
+        signal,
       );
-      
+
       // Only update state if request wasn't aborted
       if (!signal.aborted) {
         if (urls) {
