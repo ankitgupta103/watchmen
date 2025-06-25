@@ -383,7 +383,6 @@ export default function CriticalAlertSystem({
   });
 
   useEffect(() => {
-
     if (isConnected) {
       console.log('✅ [AlertSystem] MQTT connected to topics:', topics);
     } else if (error) {

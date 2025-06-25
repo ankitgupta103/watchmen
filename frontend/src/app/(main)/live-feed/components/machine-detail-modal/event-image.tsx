@@ -23,7 +23,7 @@ const fetchEventImages = async (
   token: string,
   imageKeys: { image_c_key: string; image_f_key: string },
   signal?: AbortSignal,
-  retries = 1000,
+  retries = 2,
   backoff = 2000,
 ): Promise<ImageUrlResponse | null> => {
   try {
@@ -81,7 +81,6 @@ const EventImage = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -93,10 +92,6 @@ const EventImage = ({
       // Cancel any ongoing request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
-      }
-      // Clear any existing polling timeout
-      if (pollingTimeoutRef.current) {
-        clearTimeout(pollingTimeoutRef.current);
       }
 
       // Create new abort controller for this request
@@ -118,24 +113,19 @@ const EventImage = ({
           setImageUrls(urls);
           setIsLoading(false);
         } else {
-          setImageUrls(urls); // Might be null or missing URLs
-          setIsLoading(true); // Keep loading
-          // Poll again after 5 seconds
-          pollingTimeoutRef.current = setTimeout(fetchImages, 5000);
+          setImageUrls(null);
+          setIsLoading(false);
         }
       }
     };
 
     fetchImages();
 
-    // Cleanup function to abort request and clear timeout on unmount or dependency change
+    // Cleanup function to abort request on unmount or dependency change
     return () => {
       isMounted = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
-      }
-      if (pollingTimeoutRef.current) {
-        clearTimeout(pollingTimeoutRef.current);
       }
     };
   }, [token, image_c_key, image_f_key]);
@@ -196,9 +186,9 @@ const EventImage = ({
   }
 
   return (
-    <div className="flex h-32 flex-col items-center justify-center rounded border bg-blue-50/50 text-center text-xs text-blue-600">
-      <ImageIcon className="mb-1 h-6 w-6" />
-      Images Available
+    <div className="flex h-32 flex-col items-center justify-center rounded border bg-gray-50 text-center text-xs text-gray-500">
+      <ImageIcon className="mb-1 h-6 w-6 text-gray-400" />
+      No Image Data
     </div>
   );
 };
