@@ -16,8 +16,6 @@ import logging
 import gps
 import constants
 
-
-
 ALLDIR = "../processed_images"
 CCDIR = "../command_images"
 CRITICAL_DIR = "../processed_images/critical"
@@ -126,7 +124,7 @@ class CommandCenter:
         # Initial send on startup
         self.hb_central()
         while True:
-            time.sleep(300) # Send heartbeat every 5 minutes (300 seconds)
+            time.sleep(60) # Send heartbeat every 1 minute
             self.hb_central()
 
     def _start_central_heartbeat(self):
@@ -460,7 +458,7 @@ class DevUnit:
         self.send_gps()
         while True:
             self.send_heartbeat(self.photos_taken, len(self.critical_images_processed))
-            time.sleep(300) # Every 5 mins
+            time.sleep(60) # Every 1 min
 
     # Non blocking, background thread
     def keep_beating_heart(self):
