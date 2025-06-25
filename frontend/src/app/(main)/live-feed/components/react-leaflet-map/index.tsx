@@ -15,6 +15,8 @@ import { Machine, MachineData } from '@/lib/types/machine';
 import { calculateMapCenter, calculateOptimalZoom } from '@/lib/utils';
 
 import MachineMarker from './machine-marker';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 interface MapProps {
   machines: Machine[];
@@ -27,8 +29,16 @@ export default function ReactLeafletMap({
   onMarkerClick,
   getMachineData,
 }: MapProps) {
+  const router = useRouter();
   const center = calculateMapCenter(machines);
   const zoom = calculateOptimalZoom(machines);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 60000); // 60 seconds
+    return () => clearInterval(interval);
+  }, [router]);
 
   return (
     <MapContainer
