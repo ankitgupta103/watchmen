@@ -37,7 +37,7 @@ export default function ReactLeafletMap({
   useEffect(() => {
     const interval = setInterval(() => {
       router.refresh();
-    }, 60000 / 2); // 60 seconds
+    }, 5000 ); // 5 seconds
     return () => clearInterval(interval);
   }, [router]);
 
