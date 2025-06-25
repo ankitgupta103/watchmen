@@ -61,8 +61,9 @@ export const isMachineOnline = (machine: Machine): boolean => {
   const lastSeen = machine.last_location?.timestamp
     ? new Date(machine.last_location.timestamp)
     : null;
-  const oneHourAgo = new Date(Date.now() - ONE_HOUR_MS);
-  return !!lastSeen && lastSeen > oneHourAgo;
+  // const oneHourAgo = new Date(Date.now() - ONE_HOUR_MS);
+  // return !!lastSeen && lastSeen > oneHourAgo;
+  return !!lastSeen && lastSeen > new Date(Date.now() - 120 * 1000);
 };
 
 /**
