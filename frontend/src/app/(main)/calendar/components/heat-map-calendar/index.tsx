@@ -291,7 +291,7 @@ export default function HeatMapCalendar({
         (day) => day.getMonth() === currentMonth.getMonth(),
       );
 
-      const BATCH_SIZE = 6;
+      const BATCH_SIZE = 10;
       for (let i = daysInMonth.length - 1; i >= 0; i -= BATCH_SIZE) {
         if (signal.aborted) break;
         const batchDays = daysInMonth
