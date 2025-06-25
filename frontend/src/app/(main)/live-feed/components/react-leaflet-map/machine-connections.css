@@ -1,0 +1,61 @@
+/* Machine connection line animations */
+.animated-dash-line {
+  animation: dash 2s linear infinite;
+}
+
+.animated-dash-line-slow {
+  animation: dash-slow 4s linear infinite;
+}
+
+.inactive-dash-line {
+  animation: none;
+  opacity: 0.4;
+}
+
+@keyframes dash {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -20;
+  }
+}
+
+@keyframes dash-slow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -40;
+  }
+}
+
+/* Alternative pulse animation for connections */
+.pulse-connection {
+  animation: pulse-line 2s ease-in-out infinite;
+}
+
+@keyframes pulse-line {
+  0%, 100% {
+    opacity: 0.8;
+    stroke-width: 3;
+  }
+  50% {
+    opacity: 1;
+    stroke-width: 4;
+  }
+}
+
+/* Fast dash animation for active connections */
+.fast-dash {
+  animation: fast-dash 1s linear infinite;
+}
+
+@keyframes fast-dash {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -10;
+  }
+}

@@ -17,8 +17,6 @@ export default async function LiveFeed() {
     cache: 'no-store',  
   });
 
-  console.log(machines);
-
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader />

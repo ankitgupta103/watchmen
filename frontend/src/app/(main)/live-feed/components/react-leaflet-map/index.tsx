@@ -15,6 +15,7 @@ import { Machine, MachineData } from '@/lib/types/machine';
 import { calculateMapCenter, calculateOptimalZoom } from '@/lib/utils';
 
 import MachineMarker from './machine-marker';
+import MachineConnections from './machine-connections';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -36,7 +37,7 @@ export default function ReactLeafletMap({
   useEffect(() => {
     const interval = setInterval(() => {
       router.refresh();
-    }, 60000); // 60 seconds
+    }, 60000 / 2); // 60 seconds
     return () => clearInterval(interval);
   }, [router]);
 
@@ -69,6 +70,9 @@ export default function ReactLeafletMap({
           <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'terrain'} />
         </LayersControl.BaseLayer>
       </LayersControl>
+
+      {/* Machine Connections with Animated Dashed Lines */}
+      <MachineConnections machines={machines} />
 
       {/* Machine Markers with Status-based Coloring and Pulsating Animation */}
       {machines.map((machine) => (
