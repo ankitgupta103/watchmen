@@ -11,46 +11,24 @@ export class AudioManager {
       this.audioContext = new (window.AudioContext ||
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).webkitAudioContext)();
-      await this.createAlarmSound();
+      await this.loadAlarmSound();
       this.isInitialized = true;
     } catch (error) {
       console.warn('Audio initialization failed:', error);
     }
   }
 
-  private async createAlarmSound() {
+  private async loadAlarmSound() {
     if (!this.audioContext) return;
 
-    // Create a more urgent alarm sound
-    const sampleRate = this.audioContext.sampleRate;
-    const duration = 30; // seconds
-    const buffer = this.audioContext.createBuffer(
-      1,
-      sampleRate * duration,
-      sampleRate,
-    );
-    const data = buffer.getChannelData(0);
-
-    for (let i = 0; i < buffer.length; i++) {
-      const time = i / sampleRate;
-
-      // Create a complex alarm sound with multiple frequencies
-      const freq1 = 800 + Math.sin(time * 4) * 200; // Wobbling frequency
-      const freq2 = 1200;
-      const freq3 = 600;
-
-      const wave1 = Math.sin(2 * Math.PI * freq1 * time);
-      const wave2 = Math.sin(2 * Math.PI * freq2 * time);
-      const wave3 = Math.sin(2 * Math.PI * freq3 * time);
-
-      // Envelope for urgency
-      const envelope = Math.pow(Math.sin((time * Math.PI) / duration), 0.5);
-
-      // Mix the waves with envelope
-      data[i] = (wave1 * 0.4 + wave2 * 0.3 + wave3 * 0.3) * envelope * 0.3;
+    try {
+      // Fetch the siren.mp3 file from the public assets folder
+      const response = await fetch('/assets/siren.mp3');
+      const arrayBuffer = await response.arrayBuffer();
+      this.alarmBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    } catch (error) {
+      console.warn('Failed to load siren.mp3:', error);
     }
-
-    this.alarmBuffer = buffer;
   }
 
   async playAlarm(volume: number = 0.5) {
