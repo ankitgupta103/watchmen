@@ -87,7 +87,7 @@ const LiveEventImage = memo(
             setIsPolling(true);
           }
         } catch (err) {
-          setError('Network error. Retrying...');
+          setError('Retrying...');
           setIsPolling(true);
           console.error('Error fetching images for event:', eventId, err);
         }

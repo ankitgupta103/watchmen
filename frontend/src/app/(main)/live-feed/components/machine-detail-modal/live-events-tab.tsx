@@ -27,12 +27,7 @@ interface LiveEventsTabProps {
 }
 
 const LiveEventsTab = memo(
-  ({
-    events,
-    mqttError,
-    onImageClick,
-    token,
-  }: LiveEventsTabProps) => {
+  ({ events, mqttError, onImageClick, token }: LiveEventsTabProps) => {
     const [relativeTimes, setRelativeTimes] = useState<Record<string, string>>(
       {},
     );
