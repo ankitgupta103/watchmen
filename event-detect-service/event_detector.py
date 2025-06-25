@@ -23,8 +23,12 @@ logging.basicConfig(
 
 # TODO: Old was yolo 8n.pt
 # YOLO_MODEL_NAME = "yolov11n.pt"
+<<<<<<< HEAD
 # YOLO_MODEL_NAME = "yolov8s-world.pt"
 YOLO_MODEL_NAME = "yolov8x-worldv2.pt"
+=======
+YOLO_MODEL_NAME = "yolov8x-world.pt"
+>>>>>>> ed6a71e (yolo model)
 POLL_INTERVAL_SECONDS = 60  # Time to wait between directory scans (changed from 5 to 60)
 
 SEVERITY_LOW = 0
