@@ -54,11 +54,11 @@ export default function ReactLeafletMap({
 
       {/* LayersControl for base layers */}
       <LayersControl position="topright">
-        <LayersControl.BaseLayer name="Google Maps (Satellite)">
+        <LayersControl.BaseLayer  checked name="Google Maps (Satellite)">
           <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'satellite'} />
         </LayersControl.BaseLayer>
 
-        <LayersControl.BaseLayer checked name="Google Maps (Roadmap)">
+        <LayersControl.BaseLayer name="Google Maps (Roadmap)">
           <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'roadmap'} />
         </LayersControl.BaseLayer>
 
