@@ -64,80 +64,86 @@ const LiveEventsTab = memo(
           </div>
         )}
 
-        {events.length === 0 ? (
-          <div className="py-12 text-center">
-            <Camera className="mx-auto mb-4 h-16 w-16 text-gray-300" />
-            <h3 className="mb-2 text-lg font-medium text-gray-600">
-              No Live Events
-            </h3>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {events.map((event) => (
-              <Card
-                key={event.id}
-                className={cn(
-                  'border-l-4',
-                  event?.event_severity === '1' &&
-                    'border-l-yellow-500 bg-yellow-50/30',
-                  event?.event_severity === '2' &&
-                    'border-l-orange-600 bg-orange-50/30',
-                  event?.event_severity === '3' &&
-                    'border-l-red-700 bg-red-50/30',
-                )}
-              >
-                <CardContent className="space-y-3 p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="default" className="bg-green-600">
-                        Live
-                      </Badge>
-                      <span className="font-medium">{event.eventstr}</span>
+        {(() => {
+          const now = Date.now();
+          const filteredEvents = events.filter(
+            (event) => now - event.timestamp.getTime() <= 10 * 60 * 1000
+          );
+          return filteredEvents.length === 0 ? (
+            <div className="py-12 text-center">
+              <Camera className="mx-auto mb-4 h-16 w-16 text-gray-300" />
+              <h3 className="mb-2 text-lg font-medium text-gray-600">
+                No Live Events
+              </h3>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredEvents.map((event) => (
+                <Card
+                  key={event.id}
+                  className={cn(
+                    'border-l-4',
+                    event?.event_severity === '1' &&
+                      'border-l-yellow-500 bg-yellow-50/30',
+                    event?.event_severity === '2' &&
+                      'border-l-orange-600 bg-orange-50/30',
+                    event?.event_severity === '3' &&
+                      'border-l-red-700 bg-red-50/30',
+                  )}
+                >
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="default" className="bg-green-600">
+                          Live
+                        </Badge>
+                        <span className="font-medium">{event.eventstr}</span>
+                      </div>
+                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                        <Clock className="h-3 w-3" />
+                        {relativeTimes[event.id] || '...'}
+                      </span>
                     </div>
-                    <span className="flex items-center gap-1 text-xs text-gray-500">
-                      <Clock className="h-3 w-3" />
-                      {relativeTimes[event.id] || '...'}
-                    </span>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <span>Event Severity: </span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        event?.event_severity === '1' &&
-                          'border-yellow-500 bg-yellow-400 text-black',
-                        event?.event_severity === '2' &&
-                          'border-orange-600 bg-orange-500 text-white',
-                        event?.event_severity === '3' &&
-                          'border-red-700 bg-red-600 text-white',
-                      )}
-                    >
-                      {event?.event_severity === '1'
-                        ? 'Low'
-                        : event?.event_severity === '2'
-                          ? 'High'
-                          : 'Critical'}
-                    </Badge>
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <span>Event Severity: </span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          event?.event_severity === '1' &&
+                            'border-yellow-500 bg-yellow-400 text-black',
+                          event?.event_severity === '2' &&
+                            'border-orange-600 bg-orange-500 text-white',
+                          event?.event_severity === '3' &&
+                            'border-red-700 bg-red-600 text-white',
+                        )}
+                      >
+                        {event?.event_severity === '1'
+                          ? 'Low'
+                          : event?.event_severity === '2'
+                            ? 'High'
+                            : 'Critical'}
+                      </Badge>
+                    </div>
 
-                  <LiveEventImage
-                    token={token}
-                    image_c_key={event.image_c_key}
-                    image_f_key={event.image_f_key}
-                    onImageClick={onImageClick}
-                    eventId={event.id}
-                  />
+                    <LiveEventImage
+                      token={token}
+                      image_c_key={event.image_c_key}
+                      image_f_key={event.image_f_key}
+                      onImageClick={onImageClick}
+                      eventId={event.id}
+                    />
 
-                  <div className="flex items-center gap-2 pt-1 text-xs text-gray-500">
-                    <Calendar className="h-3 w-3" />
-                    <span>{event.timestamp.toLocaleString()}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                    <div className="flex items-center gap-2 pt-1 text-xs text-gray-500">
+                      <Calendar className="h-3 w-3" />
+                      <span>{event.timestamp.toLocaleString()}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     );
   },
