@@ -124,7 +124,7 @@ class CommandCenter:
         # Initial send on startup
         self.hb_central()
         while True:
-            time.sleep(60) # Send heartbeat every 1 minute
+            time.sleep(30) # Send heartbeat every 1 minute
             self.hb_central()
 
     def _start_central_heartbeat(self):
