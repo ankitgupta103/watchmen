@@ -37,7 +37,7 @@ set -e
 
 echo "Running startup cleanup for user: $ACTUAL_USER"
 
-# Clean critical directory
+# Clean command_images directory
 echo "Cleaning $HOME_DIR/command_images..."
 cd "$HOME_DIR/command_images"
 rm -rf *
