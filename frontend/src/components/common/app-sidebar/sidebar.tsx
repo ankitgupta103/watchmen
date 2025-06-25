@@ -75,7 +75,7 @@ export default function AppSidebar() {
 
   const handleOrganizationChange = (org: Organization) => {
     setCookie('organization', JSON.stringify(org));
-    router.refresh();
+    router.push('/dashboard');
   };
 
   return (
