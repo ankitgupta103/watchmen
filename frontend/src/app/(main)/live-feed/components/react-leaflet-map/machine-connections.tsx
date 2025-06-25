@@ -66,10 +66,9 @@ export default function MachineConnections({ machines }: MachineConnectionsProps
       newConnections.push(createConnection(machine206, machine207));
       newConnections.push(createConnection(machine207, machine208));
     } else if (is206Online && !is207Online) {
-      // 207 is offline: 206 -> 208 directly
-      newConnections.push(createConnection(machine206, machine208));
-      // Show inactive connection to 207
+      // 207 is offline
       newConnections.push(createConnection(machine206, machine207, false));
+      newConnections.push(createConnection(machine206, machine208, false));
     } else if (!is206Online && is207Online) {
       // 206 is offline: 207 -> 208
       newConnections.push(createConnection(machine207, machine208));
