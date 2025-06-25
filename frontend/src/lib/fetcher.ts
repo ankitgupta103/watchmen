@@ -13,12 +13,22 @@ export type FetchMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
  * @property {T} [body] - The request payload to send (for POST/PUT requests).
  * @property {HeadersInit} [headers] - Additional headers to include in the request.
  * @property {AbortSignal} [signal] - An optional signal to abort the request.
+ * @property {RequestCache} [cache] - Next.js cache option.
+ * @property {NextFetchRequestConfig} [next] - Next.js specific fetch configuration.
  */
 export interface FetchOptions<T = unknown> {
   method?: FetchMethod;
   body?: T;
   headers?: HeadersInit;
   signal?: AbortSignal;
+  cache?: RequestCache;
+  next?: NextFetchRequestConfig;
+}
+
+// Next.js specific types
+interface NextFetchRequestConfig {
+  revalidate?: number | false;
+  tags?: string[];
 }
 
 /**
@@ -36,10 +46,11 @@ export async function fetcher<TResponse = unknown, TRequest = unknown>(
   options?: FetchOptions<TRequest>,
 ): Promise<TResponse> {
   const token = await getToken();
-  const { method = 'GET', body, headers } = options || {};
+  const { method = 'GET', body, headers, cache, next, ...restOptions } = options || {};
 
   try {
     const res = await fetch(url, {
+      ...restOptions,
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -47,6 +58,8 @@ export async function fetcher<TResponse = unknown, TRequest = unknown>(
         ...(headers || {}),
       },
       body: body ? JSON.stringify(body) : undefined,
+      cache,
+      next,
     });
 
     if (res.ok) {

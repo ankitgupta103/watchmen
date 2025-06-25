@@ -8,12 +8,16 @@ import LiveFeedWrapper from './components/live-feed-wrapper';
 import PageHeader from './components/page-header';
 
 export default async function LiveFeed() {
-  const { organization_uid } = await getOrg();
+  const { organization_uid, organization_id } = await getOrg();
 
   const { data: machines } = await fetcher<{
     status: string;
     data: Machine[];
-  }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`);
+  }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`, {
+    cache: 'no-store',  
+  });
+
+  console.log(machines);
 
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
@@ -22,7 +26,7 @@ export default async function LiveFeed() {
         <LiveFeedWrapper machines={machines ?? []} />
       </div>
       <CriticalAlertSystem
-        organizationId="20"
+        organizationId={String(organization_id)}
         machines={machines}
         enableSound={true}
       />
