@@ -262,7 +262,9 @@ class ProcessingService:
         if self.last_processed_timestamp is None:
             return
             
-        stale_threshold = 600  # 10 minutes in seconds (changed from 900 to 600)
+        # stale_threshold = 600  # 10 minutes in seconds (changed from 900 to 600)
+        stale_threshold = 5  # 5 seconds in seconds (changed from 900 to 600)
+
         
         for image_path in image_files:
             # Try to get epoch from filename first

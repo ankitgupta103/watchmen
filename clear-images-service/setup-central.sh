@@ -17,15 +17,11 @@ HOME_DIR="/home/$ACTUAL_USER"
 echo "Setting up cleanup service for user: $ACTUAL_USER"
 
 # Verify directories exist
-if [ ! -d "$HOME_DIR/processed_images" ]; then
-    echo "Warning: $HOME_DIR/processed_images does not exist. Creating it..."
-    mkdir -p "$HOME_DIR/processed_images/critical"
+if [ ! -d "$HOME_DIR/command_images" ]; then
+    echo "Warning: $HOME_DIR/command_images does not exist. Creating it..."
+    mkdir -p "$HOME_DIR/command_images"
 fi
 
-if [ ! -d "$HOME_DIR/processed_images/critical" ]; then
-    echo "Warning: $HOME_DIR/processed_images/critical does not exist. Creating it..."
-    mkdir -p "$HOME_DIR/processed_images/critical"
-fi
 
 # Create the cleanup script
 CLEANUP_SCRIPT="/usr/local/bin/startup-cleanup-$ACTUAL_USER.sh"
@@ -35,21 +31,16 @@ echo "Creating cleanup script at $CLEANUP_SCRIPT..."
 sudo tee "$CLEANUP_SCRIPT" > /dev/null << EOF
 #!/bin/bash
 # Startup cleanup script for user: $ACTUAL_USER
-# This script runs once on startup to clean processed_images directories
+# This script runs once on startup to clean command_images directories
 
 set -e
 
 echo "Running startup cleanup for user: $ACTUAL_USER"
 
 # Clean critical directory
-echo "Cleaning $HOME_DIR/processed_images/critical..."
-cd "$HOME_DIR/processed_images/critical"
+echo "Cleaning $HOME_DIR/command_images..."
+cd "$HOME_DIR/command_images"
 rm -rf *
-
-# Clean directories starting with 0
-echo "Cleaning directories starting with '0' in $HOME_DIR/processed_images..."
-cd "$HOME_DIR/processed_images"
-rm -rf 0*
 
 echo "Startup cleanup completed successfully"
 
