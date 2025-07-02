@@ -7,7 +7,7 @@ peer_addr = 2       # Set this to the other RPi's address
 
 # === LoRa Module Initialization ===
 node = sx126x.sx126x(
-    serial_num="/dev/ttyS0",  # or /dev/serial0 if that's what works
+    serial_num="/dev/ttyAMA0",  # or /dev/serial0 if that's what works
     freq=868,
     addr=my_addr,
     power=22,
