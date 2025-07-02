@@ -41,7 +41,15 @@ def send_messages(num_messages):
         time.sleep(1)
 
 def keep_receiving_bg():
-    node.receive()
+    while True:
+        try:
+            node.receive()
+        except IndexError:
+            print("[INFO ] No data received, retrying...")
+            continue
+        except Exception as e:
+            print(f"[ERROR] Receiving failed: {e}")
+            continue
 
 def receive_message(expected_seq, respond=False):
     start = time.time()
