@@ -1,5 +1,7 @@
 import sx126x
 import time
+import threading
+
 
 # === CONFIGURE YOUR DEVICE ID HERE ===
 my_addr = 1         # Set this to 1 for one RPi, and 2 on the other
