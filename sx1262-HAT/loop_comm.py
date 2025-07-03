@@ -1,11 +1,21 @@
 import sx126x
 import time
 import threading
+import socket
 
+def get_dev_addr():
+    hn = socket.gethostname()
+    if hn == "rpi7":
+        return (7, 8)
+    elif hn == "rpi8":
+        return (8, 7)
+    else:
+        print(f"Unknown host {hn}")
+        sys.exit(1)
+    return None
 
 # === CONFIGURE YOUR DEVICE ID HERE ===
-my_addr = 1         # Set this to 1 for one RPi, and 2 on the other
-peer_addr = 2       # Set this to the other RPi's address
+my_addr, peer_addr = get_dev_addr()
 
 # === LoRa Module Initialization ===
 node = sx126x.sx126x(
