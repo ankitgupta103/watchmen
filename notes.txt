@@ -1,5 +1,7 @@
 SETUP Notes.
 
+
+
 1. Git / SSH setup
 ssh-keygen -t ed25519 -C "your_email@example.com"
 eval "$(ssh-agent -s)"
