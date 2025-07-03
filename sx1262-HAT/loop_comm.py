@@ -66,18 +66,21 @@ def ack_time(msg):
 def print_status():
     print(f"{len(msgs_recd)} {sorted(msgs_recd)}")
     print(f"Num messages sent = {len(msgs_sent)}")
+    ackts = []
     for s,t in msgs_sent:
         ackt = ack_time(s)
         if ackt > 0:
-            print(f"Acktime for {s} = {ackt-t}")
+            ackts.append[ackt]
+    print(f"Actimes = {numpy.percentile(ackts, 50)}@50, {numpy.percentile(ackts, 90)}@90")
 
 def send_messages():
-    for i in range(10):
+    for i in range(10000):
         msgstr = f"CHECKACK-{i}"
         send_message(msgstr, peer_addr, True, False)
-    for i in range(10):
         msgstr = f"RSSICHECK-{i}"
         send_message(msgstr, peer_addr, False, True)
+        if i % 10 == 0:
+            print_status()
 
 def radioreceive(rssideb=False):
     if node.ser.inWaiting() > 0:
@@ -94,7 +97,7 @@ def radioreceive(rssideb=False):
         else:
             pass
         t2 = time.time()
-        printstr += f"  [time to read = {t2-t1}]"
+        # printstr += f"  [time to read = {t2-t1}]"
         msgs_recd.append((msgstr, time.time()))
         print(printstr)
         if msgstr.find("CHECKACK") == 0:
@@ -115,11 +118,9 @@ def main():
     reader_thread = threading.Thread(target=keep_receiving_bg, daemon=True)
     reader_thread.start()
     if my_addr == 7:
-        time.sleep(20)
+        time.sleep(3600)
     elif my_addr == 8:
         send_messages()
-        time.sleep(2)
-        print_status()
     else:
         print("Unknown host")
         sys.exit(1)
