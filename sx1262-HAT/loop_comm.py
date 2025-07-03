@@ -79,20 +79,15 @@ def radioreceive(rssideb=False):
         t1 = time.time()
         time.sleep(0.1)
         r_buff = node.ser.read(node.ser.inWaiting())
-        #print("message is "+str(r_buff[3:-1]),end='\r\n')
-        #print("receive message from node address with frequence\033[1;32m %d,%d.125MHz\033[0m"%((r_buff[0]<<8)+r_buff[1],r_buff[2]+node.start_freq),end='\r\n',flush = True)
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         msgstr = (r_buff[3:-1]).decode()
         printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}"
         if rssideb and node.rssi:
-            # print('\x1b[3A',end='\r')
             rssi = format(256-r_buff[-1:][0])
-            #print("the packet rssi value: -{0}dBm".format(256-r_buff[-1:][0]))
             noise_rssi = node.get_channel_rssi()
             printstr += f"    [rssi = {rssi}, noise = {noise_rssi}]"
         else:
             pass
-            #print('\x1b[2A',end='\r')
         t2 = time.time()
         printstr += f"  [time to read = {t2-t1}]"
         msgs_recd.append((msgstr, time.time()))
