@@ -91,15 +91,15 @@ def radioreceive(rssideb=False):
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         msgstr = (r_buff[3:-1]).decode()
         printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}"
+        t2 = time.time()
+        # printstr += f"  [time to read = {t2-t1}]"
+        msgs_recd.append((msgstr, time.time()))
         if (rssideb or msgstr.find("RSSICHECK") >= 0 or msgstr.find("Ack") >= 0) and node.rssi:
             rssi = format(256-r_buff[-1:][0])
             noise_rssi = node.get_channel_rssi()
             printstr += f"    [rssi = {rssi}, noise = {noise_rssi}]"
         else:
             pass
-        t2 = time.time()
-        # printstr += f"  [time to read = {t2-t1}]"
-        msgs_recd.append((msgstr, time.time()))
         print(printstr)
         if msgstr.find("CHECKACK") == 0:
             send_message(f"Ack:{msgstr}", peer_addr)
