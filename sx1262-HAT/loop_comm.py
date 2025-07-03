@@ -76,12 +76,12 @@ def print_status():
 
 def send_messages():
     for i in range(10000):
-        msgstr = f"CHECKACK-{i}"
-        send_message(msgstr, peer_addr, True, False)
-        msgstr = f"RSSICHECK-{i}"
-        send_message(msgstr, peer_addr, False, True)
         if i % 10 == 0:
             print_status()
+        msgstr = f"RSSICHECK-{i}"
+        send_message(msgstr, peer_addr, False, True)
+        msgstr = f"CHECKACK-{i}"
+        send_message(msgstr, peer_addr, True, False)
 
 def radioreceive(rssideb=False):
     if node.ser.inWaiting() > 0:
