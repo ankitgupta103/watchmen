@@ -79,7 +79,6 @@ def radioreceive(rssideb=False):
         t1 = time.time()
         time.sleep(0.1)
         r_buff = node.ser.read(node.ser.inWaiting())
-        print(r_buff)
         #print("message is "+str(r_buff[3:-1]),end='\r\n')
         #print("receive message from node address with frequence\033[1;32m %d,%d.125MHz\033[0m"%((r_buff[0]<<8)+r_buff[1],r_buff[2]+node.start_freq),end='\r\n',flush = True)
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
@@ -116,11 +115,11 @@ def main():
     reader_thread = threading.Thread(target=keep_receiving_bg, daemon=True)
     reader_thread.start()
     if my_addr == 7:
-        time.sleep(10)
+        time.sleep(20)
+    elif my_addr == 8:
+        send_messages(10)
         time.sleep(2)
         print_status()
-    elif my_addr == 8:
-        send_messages(100)
     else:
         print("Unknown host")
         sys.exit(1)
