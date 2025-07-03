@@ -31,7 +31,7 @@ node = sx126x.sx126x(
     relay=False
 )
 
-def send_message(msgstr, dest):
+def send_message(msgstr, dest, ackneeded=False, rssicheck=False):
     if len(msgstr) > 225:
         print(f"[NOT SENDING] Msg too long : {len(msgstr)} : {msgstr}")
         return
@@ -49,6 +49,10 @@ def send_message(msgstr, dest):
     msgs_sent.append((payload, time.time()))
     node.send(data)
     print(f"[SENT ] {payload} to {dest}")
+    if ackneeded or rssicheck:
+        time.sleep(1)
+    else:
+        time.sleep(0.1)
 
 msgs_sent = []
 msgs_recd = []
@@ -67,12 +71,13 @@ def print_status():
         if ackt > 0:
             print(f"Acktime for {s} = {ackt-t}")
 
-def send_messages(num_messages):
-    for i in range(num_messages):
-        msgstr = f"MSG-{i}"
-        send_message(msgstr, peer_addr)
-        # If ack needed, then 1 else 0.1
-        time.sleep(1)
+def send_messages():
+    for i in range(10):
+        msgstr = f"CHECKACK-{i}"
+        send_message(msgstr, peer_addr, True, False)
+    for i in range(10):
+        msgstr = f"RSSICHECK-{i}"
+        send_message(msgstr, peer_addr, False, True)
 
 def radioreceive(rssideb=False):
     if node.ser.inWaiting() > 0:
@@ -82,7 +87,7 @@ def radioreceive(rssideb=False):
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         msgstr = (r_buff[3:-1]).decode()
         printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}"
-        if rssideb and node.rssi:
+        if (rssideb or msgstr.find("RSSICHECK") >= 0) and node.rssi:
             rssi = format(256-r_buff[-1:][0])
             noise_rssi = node.get_channel_rssi()
             printstr += f"    [rssi = {rssi}, noise = {noise_rssi}]"
@@ -92,7 +97,7 @@ def radioreceive(rssideb=False):
         printstr += f"  [time to read = {t2-t1}]"
         msgs_recd.append((msgstr, time.time()))
         print(printstr)
-        if msgstr.find("Ack") < 0:
+        if msgstr.find("CHECKACK") >= 0:
             send_message(f"Ack:{msgstr}", peer_addr)
 
 def keep_receiving_bg():
@@ -112,7 +117,7 @@ def main():
     if my_addr == 7:
         time.sleep(20)
     elif my_addr == 8:
-        send_messages(10)
+        send_messages()
         time.sleep(2)
         print_status()
     else:
