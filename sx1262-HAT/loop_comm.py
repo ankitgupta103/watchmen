@@ -76,7 +76,7 @@ def print_status():
 
 def send_messages():
     for i in range(10000):
-        if i % 10 == 0:
+        if i > 0 and i % 10 == 0:
             print_status()
         msgstr = f"RSSICHECK-{i}"
         send_message(msgstr, peer_addr, False, True)
