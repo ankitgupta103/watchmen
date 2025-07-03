@@ -49,10 +49,11 @@ def send_message(seq_num):
 def send_messages(num_messages):
     for i in range(num_messages):
         send_message(i)
-        time.sleep(1)
+        time.sleep(0.1)
 
-def radioreceive():
+def radioreceive(rssideb=False):
     if node.ser.inWaiting() > 0:
+        t1 = time.time()
         time.sleep(0.1)
         r_buff = node.ser.read(node.ser.inWaiting())
         #print("message is "+str(r_buff[3:-1]),end='\r\n')
@@ -60,7 +61,7 @@ def radioreceive():
         peer_addr = r_buff[0]<<8 + r_buff[1]
         msgstr = str(r_buff[3:-1])
         printstr = f"## Received ## ## From @{peer_addr} : Msg = {msgstr}"
-        if node.rssi:
+        if rssideb and node.rssi:
             # print('\x1b[3A',end='\r')
             rssi = format(256-r_buff[-1:][0])
             #print("the packet rssi value: -{0}dBm".format(256-r_buff[-1:][0]))
@@ -69,6 +70,8 @@ def radioreceive():
         else:
             pass
             #print('\x1b[2A',end='\r')
+        t2 = time.time()
+        printstr += f"  [time to read = {t2-t1}]"
         print(printstr)
 
 def keep_receiving_bg():
