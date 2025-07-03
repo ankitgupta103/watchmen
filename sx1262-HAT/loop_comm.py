@@ -48,7 +48,7 @@ def send_message(msgstr, dest):
     )
     msgs_sent.append((payload, time.time()))
     node.send(data)
-    print(f"[SENT ] {payload}")
+    print(f"[SENT ] {payload} to {dest}")
 
 msgs_sent = []
 msgs_recd = []
@@ -60,7 +60,7 @@ def ack_time(msg):
     return -1
 
 def print_status():
-    print(f"{hname} : {len(msgs_recd)} {sorted(msgs_recd)}")
+    print(f"{len(msgs_recd)} {sorted(msgs_recd)}")
     print(f"Num messages sent = {len(msgs_sent)}")
     for s,t in msgs_sent:
         ackt = ack_time(s)
@@ -70,20 +70,21 @@ def print_status():
 def send_messages(num_messages):
     for i in range(num_messages):
         msgstr = f"MSG-{i}"
-        msgs_sent.append((msg, time.time()))
         send_message(msgstr, peer_addr)
-        time.sleep(0.1)
+        # If ack needed, then 1 else 0.1
+        time.sleep(1)
 
 def radioreceive(rssideb=False):
     if node.ser.inWaiting() > 0:
         t1 = time.time()
         time.sleep(0.1)
         r_buff = node.ser.read(node.ser.inWaiting())
+        print(r_buff)
         #print("message is "+str(r_buff[3:-1]),end='\r\n')
         #print("receive message from node address with frequence\033[1;32m %d,%d.125MHz\033[0m"%((r_buff[0]<<8)+r_buff[1],r_buff[2]+node.start_freq),end='\r\n',flush = True)
-        peer_addr = r_buff[0]<<8 + r_buff[1]
+        sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         msgstr = (r_buff[3:-1]).decode()
-        printstr = f"## Received ## ## From @{peer_addr} : Msg = {msgstr}"
+        printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}"
         if rssideb and node.rssi:
             # print('\x1b[3A',end='\r')
             rssi = format(256-r_buff[-1:][0])
@@ -96,9 +97,9 @@ def radioreceive(rssideb=False):
         t2 = time.time()
         printstr += f"  [time to read = {t2-t1}]"
         msgs_recd.append((msgstr, time.time()))
-        if msgstr.find("Ack") < 0:
-            send_message(f"Ack:{msgstr}")
         print(printstr)
+        if msgstr.find("Ack") < 0:
+            send_message(f"Ack:{msgstr}", peer_addr)
 
 def keep_receiving_bg():
     while True:
@@ -115,7 +116,9 @@ def main():
     reader_thread = threading.Thread(target=keep_receiving_bg, daemon=True)
     reader_thread.start()
     if my_addr == 7:
-        time.sleep(100)
+        time.sleep(10)
+        time.sleep(2)
+        print_status()
     elif my_addr == 8:
         send_messages(100)
     else:
