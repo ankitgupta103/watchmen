@@ -97,7 +97,7 @@ def radioreceive(rssideb=False):
         printstr += f"  [time to read = {t2-t1}]"
         msgs_recd.append((msgstr, time.time()))
         print(printstr)
-        if msgstr.find("CHECKACK") >= 0:
+        if msgstr.find("CHECKACK") == 0:
             send_message(f"Ack:{msgstr}", peer_addr)
 
 def keep_receiving_bg():
