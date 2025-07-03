@@ -27,7 +27,7 @@ node = sx126x.sx126x(
     addr=my_addr,
     power=22,
     rssi=True,
-    air_speed=62500,
+    air_speed=2400,
     relay=False
 )
 
