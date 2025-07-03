@@ -64,8 +64,7 @@ def ack_time(msg):
     return -1
 
 def print_status():
-    print(f"{len(msgs_recd)} {sorted(msgs_recd)}")
-    print(f"Num messages sent = {len(msgs_sent)}")
+    print(f"#### ******** Printing status after sending {len(msgs_sent)} Messages ****** ####")
     ackts = []
     for s,t in msgs_sent:
         ackt = ack_time(s)
