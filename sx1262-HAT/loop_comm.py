@@ -3,6 +3,7 @@ import time
 import threading
 import socket
 import sys
+import numpy
 
 FREQ = 915
 
