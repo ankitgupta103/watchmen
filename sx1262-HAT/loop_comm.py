@@ -70,7 +70,7 @@ def print_status():
     for s,t in msgs_sent:
         ackt = ack_time(s)
         if ackt > 0:
-            ackts.append[ackt]
+            ackts.append(ackt-t)
     print(f"Actimes = {numpy.percentile(ackts, 50)}@50, {numpy.percentile(ackts, 90)}@90")
 
 def send_messages():
