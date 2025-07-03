@@ -6,6 +6,7 @@ import sys
 import numpy
 
 FREQ = 915
+AIRSPEED = 2400
 
 def get_dev_addr():
     hn = socket.gethostname()
@@ -28,7 +29,7 @@ node = sx126x.sx126x(
     addr=my_addr,
     power=22,
     rssi=True,
-    air_speed=2400,
+    air_speed=AIRSPEED,
     relay=False
 )
 
