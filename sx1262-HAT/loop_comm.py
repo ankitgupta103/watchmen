@@ -2,13 +2,14 @@ import sx126x
 import time
 import threading
 import socket
+import sys
 
-FREQ = 868
+FREQ = 915
 
 def get_dev_addr():
     hn = socket.gethostname()
     if hn == "rpi7":
-        return (9, 8)
+        return (7, 8)
     elif hn == "rpi8":
         return (8, 7)
     else:
