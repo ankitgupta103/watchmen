@@ -94,7 +94,7 @@ class sx126x:
         GPIO.output(self.M1,GPIO.HIGH)
 
         # The hardware UART of Pi3B+,Pi4B is /dev/ttyS0
-        self.ser = serial.Serial(serial_num,9600)
+        self.ser = serial.Serial(serial_num, 115200)
         self.ser.flushInput()
         self.set(freq,addr,power,rssi,air_speed,net_id,buffer_size,crypt,relay,lbt,wor)
 
@@ -144,7 +144,7 @@ class sx126x:
             self.cfg_reg[3] = high_addr
             self.cfg_reg[4] = low_addr
             self.cfg_reg[5] = net_id_temp
-            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_9600 + air_speed_temp
+            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_115200 + air_speed_temp
             # 
             # it will enable to read noise rssi value when add 0x20 as follow
             # 
@@ -161,7 +161,7 @@ class sx126x:
             self.cfg_reg[3] = 0x01
             self.cfg_reg[4] = 0x02
             self.cfg_reg[5] = 0x03
-            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_9600 + air_speed_temp
+            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_115200 + air_speed_temp
             # 
             # it will enable to read noise rssi value when add 0x20 as follow
             # 
