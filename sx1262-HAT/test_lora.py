@@ -6,7 +6,7 @@ import sys
 import numpy
 
 FREQ = 915
-AIRSPEED = 2400
+AIRSPEED = 62500
 
 def get_dev_addr():
     hn = socket.gethostname()
