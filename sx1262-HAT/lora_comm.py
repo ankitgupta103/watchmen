@@ -589,7 +589,7 @@ def main():
         dest = int(sys.argv[1])
         # test_send_time_to_ack(rf, dest, 10)
         # test_send_types(rf, devid, dest)
-        # test_send_long_msg(rf, dest) # Assumes its an image
+        test_send_long_msg(rf, dest) # Assumes its an image
         transmission_stats(rf, dest, 20)
         test_send_img(rf, "pencil.jpg", dest)
         time.sleep(20)

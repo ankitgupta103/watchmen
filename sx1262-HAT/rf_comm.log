@@ -528,3 +528,11 @@
 2025-07-04 14:07:33,345 [INFO] 3JD from 8 : Sending ack for B87746 for 20 chunks
 2025-07-04 14:07:42,647 [INFO] E873JD;3JD
 2025-07-04 14:07:42,647 [INFO]  @@@@@@@ 3JD from 8 At Chunk End missing 1 out of 20
+2025-07-04 14:11:24,504 [INFO] Processing incoming message : Hello 0
+2025-07-04 14:11:24,504 [INFO] 7 : Sending ack for H871CQ to 8
+2025-07-04 14:11:26,802 [INFO] Processing incoming message : Hello 1
+2025-07-04 14:11:26,802 [INFO] 7 : Sending ack for H87AXO to 8
+2025-07-04 14:11:29,103 [INFO] Processing incoming message : Hello 2
+2025-07-04 14:11:29,104 [INFO] 7 : Sending ack for H87ANO to 8
+2025-07-04 14:11:31,404 [INFO] Processing incoming message : Hello 3
+2025-07-04 14:11:31,405 [INFO] 7 : Sending ack for H87794 to 8
