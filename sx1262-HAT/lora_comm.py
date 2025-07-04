@@ -288,7 +288,6 @@ class RFComm:
         orig_payload = "".join(parts)
         # TODO save intermediate file.
         # TODO image resilience in rebuilding
-        return orig_payload
         try:
             logger.info("Checking for json")
             orig_msg = json.loads(orig_payload)
@@ -595,7 +594,7 @@ def main():
         time.sleep(20)
     else:
         # Keep receiving
-        time.sleep(100)
+        time.sleep(1000)
     rf.print_status()
 
 if __name__=="__main__":
