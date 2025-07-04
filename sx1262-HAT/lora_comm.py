@@ -15,9 +15,9 @@ import sx126x
 import constants
 import image
 
-MAX_DATA_SIZE = 220
-MAX_CHUNK_SIZE = 200
-ANOTHER = 220
+MAX_DATA_SIZE = 120
+MAX_CHUNK_SIZE = 100
+ANOTHER = 120
 
 FREQ = 915
 AIRSPEED = 62500
