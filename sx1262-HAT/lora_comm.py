@@ -37,7 +37,7 @@ loranode = sx126x.sx126x(
     freq=FREQ,
     addr=my_addr,
     power=22,
-    rssi=True,
+    rssi=False,
     air_speed=AIRSPEED,
     relay=False
 )
