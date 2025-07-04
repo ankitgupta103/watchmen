@@ -25,7 +25,7 @@ AIRSPEED = 62500
 hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
-ACKING_ENABLED = TRUE
+ACKING_ENABLED = True
 FLAKINESS = 0  # 0-100 %
 
 my_addr = 7
@@ -590,7 +590,7 @@ def main():
         # test_send_types(rf, devid, dest)
         #test_send_long_msg(rf, dest) # Assumes its an image
         #test_send_img(rf, "pencil.jpg", dest)
-        transmission_stats(rf, dest, 1000)
+        transmission_stats(rf, dest, 100)
         time.sleep(20)
     else:
         # Keep receiving
