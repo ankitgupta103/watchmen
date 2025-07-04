@@ -310,13 +310,12 @@ class RFComm:
 
     def _read_from_rf(self):
         if loranode.ser.inWaiting() > 0:
-            t1 = time.time()
             time.sleep(0.1)
             r_buff = loranode.ser.read(loranode.ser.inWaiting())
             sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
             msgstr = (r_buff[3:-1]).decode()
             printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}"
-            t2 = time.time()
+            print(printstr)
             self._process_read_message(msgstr)
 
     def _keep_reading_from_rf(self):
