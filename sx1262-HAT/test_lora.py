@@ -90,7 +90,7 @@ def radioreceive(rssideb=False):
         r_buff = node.ser.read(node.ser.inWaiting())
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         msgstr = (r_buff[3:-1]).decode()
-        printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}"
+        printstr = f"## Received ## ## Totalsofar={len(msgs_recd)} From @{sender_addr} : Msg = {msgstr}"
         t2 = time.time()
         # printstr += f"  [time to read = {t2-t1}]"
         msgs_recd.append((msgstr, time.time()))
