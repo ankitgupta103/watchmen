@@ -20,12 +20,12 @@ MAX_CHUNK_SIZE = 19
 ANOTHER = 30
 
 FREQ = 915
-AIRSPEED = 2400
+AIRSPEED = 62500
 
 hname = socket.gethostname()
 
 # This controls the manual acking on unicast (non chunked) messages
-ACKING_ENABLED = False
+ACKING_ENABLED = TRUE
 FLAKINESS = 0  # 0-100 %
 
 my_addr = 7
