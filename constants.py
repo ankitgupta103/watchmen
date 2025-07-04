@@ -55,26 +55,16 @@ NO_DEST = "X"
 
 # 0 is an error here
 HN_ID = {
-        # BLR
-        "rpi1" : "A",
-        "rpi2" : "B",
-        "rpi3" : "C",
-        # GUR
-        "rpi6" : "D",
-        "rpi7" : "E",
-        "rpi8" : "F",
+        "rpi6" : 6,
+        "rpi7" : 7,
+        "rpi8" : 8,
         }
 
 # First has camera,
 # Last is CC
 # Everything in between is passthrough.
 NEXT_DEST_MAP = {
-        # B->C->A
-        "B" : "C",
-        "C" : "A",
-        # GUR F->E->D
-        "F" : "E",
-        "E" : "D"
+        8 : 7
         }
 
 # PATH_DEMOB = ["C", "D", "A"]
