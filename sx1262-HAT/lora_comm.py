@@ -15,21 +15,22 @@ import sx126x
 import constants
 import image
 
-MAX_DATA_SIZE = 32
-MAX_CHUNK_SIZE = 19
-ANOTHER = 30
+MAX_DATA_SIZE = 220
+MAX_CHUNK_SIZE = 200
+ANOTHER = 220
 
 FREQ = 915
 AIRSPEED = 62500
 
 hname = socket.gethostname()
+my_addr = constants.HN_ID[hname]
+print(f"Running with my_addr = {my_addr}")
 
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = True
 FLAKINESS = 0  # 0-100 %
 
-my_addr = 7
-
+        
 # === LoRa Module Initialization ===
 loranode = sx126x.sx126x(
     serial_num="/dev/ttyAMA0",  # or /dev/serial0 if that's what works
@@ -361,10 +362,10 @@ class RFComm:
             logger.error(f"Failed Parsing Key : {msgid}")
             return None
         msgtype = msgid[0]
-        src = msgid[1]
+        src = int(msgid[1])
         dest = None
         if msgid[2] != constants.NO_DEST:
-            dest = msgid[2]
+            dest = int(msgid[2])
         rid = None
         if len(msgid) > 3:
             rid = msgid[3:]
