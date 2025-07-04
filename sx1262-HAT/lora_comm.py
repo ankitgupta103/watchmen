@@ -422,6 +422,7 @@ class RFComm:
         payload = f"{cidstr};{i};{msg_chunks[i]}"
         msgstr = f"{msgid};{payload}"
         self._actual_send(msgstr, dest)
+        time.sleep(0.05) # Small delay to avoid flooding
 
     def _send_chunk_end(self, cidstr, dest, alldone):
         payload = cidstr
