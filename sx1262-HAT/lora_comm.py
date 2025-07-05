@@ -15,9 +15,8 @@ import sx126x
 import constants
 import image
 
-MAX_DATA_SIZE = 120
-MAX_CHUNK_SIZE = 100
-ANOTHER = 120
+MAX_DATA_SIZE = 230
+MAX_CHUNK_SIZE = 210
 
 FREQ = 915
 AIRSPEED = 62500
@@ -112,7 +111,7 @@ class RFComm:
             return
         self.msg_processed.append(msgid)
         if len(msgstr) > 100:
-            logger.info(f"Processing incoming message : {msgstr[0:100]}...")
+            logger.info(f"Processing incoming message : {msgstr[0:100]}... of len {len(msgstr)}")
         else:
             logger.info(f"Processing incoming message : {msgstr}")
         self.msg_received.append(msgstr)
@@ -311,7 +310,7 @@ class RFComm:
 
     def _read_from_rf(self):
         if loranode.ser.inWaiting() > 0:
-            time.sleep(0.1)
+            time.sleep(0.3) # Too long :-(
             print(loranode.ser.in_waiting)
             print(loranode.ser.inWaiting())
             r_buff = loranode.ser.read(loranode.ser.inWaiting())
@@ -375,7 +374,7 @@ class RFComm:
         return (msgtype, src, dest, rid)
 
     def _actual_send(self, msgstr, dest, ackneeded=False, rssicheck=False):
-        if len(msgstr) > 225:
+        if len(msgstr) > MAX_DATA_SIZE:
             print(f"[NOT SENDING] Msg too long : {len(msgstr)} : {msgstr}")
             return
         payload = msgstr
@@ -517,14 +516,14 @@ class RFComm:
         if acking_enabled is None:
             acking_enabled = ACKING_ENABLED
         if dest is None:
-            if len(payload) < ANOTHER:
+            if len(payload) < MAX_CHUNK_SIZE:
                 msg = payload
                 self._send_broadcast(msg, mst)
                 return True
             else:
                 logger.warning(f"Please dont broadcast big messages, this one is of size {len(payload)}")
                 return False
-        if len(payload) < ANOTHER:
+        if len(payload) < MAX_CHUNK_SIZE:
             msg = payload
             if acking_enabled:
                 sent = self._send_unicast(msg, mst, dest)
@@ -544,10 +543,10 @@ def test_send_img(rf, imgfile, dest):
     msgstr = json.dumps(im)
     rf.send_message(msgstr, mst, dest)
 
-def test_send_long_msg(rf, dest):
+def test_send_long_msg(rf, dest, msglen):
     mst = constants.MESSAGE_TYPE_SPATH
     long_string = ""
-    for i in range(100):
+    for i in range(msglen):
         long_string = long_string + str(i) + "_"
     rf.send_message(long_string, mst, dest)
 
@@ -593,8 +592,8 @@ def main():
         dest = int(sys.argv[1])
         # test_send_time_to_ack(rf, dest, 10)
         # test_send_types(rf, devid, dest)
-        test_send_long_msg(rf, dest) # Assumes its an image
-        transmission_stats(rf, dest, 20)
+        test_send_long_msg(rf, dest, 500) # Assumes its an image
+        transmission_stats(rf, dest, 10)
         test_send_img(rf, "pencil.jpg", dest)
         time.sleep(20)
     else:
