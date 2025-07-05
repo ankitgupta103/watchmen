@@ -39,6 +39,7 @@ loranode = sx126x.sx126x(
     power=22,
     rssi=False,
     air_speed=AIRSPEED,
+    buffer_size=240,
     relay=False
 )
 
@@ -302,8 +303,8 @@ class RFComm:
                 im.save(fname)
                 # im.show()
         except:
-            if len(orig_payload) > 100:
-                logger.info(f"Recompiled message =\n{orig_payload[0:100]}")
+            if len(orig_payload) > 400:
+                logger.info(f"Recompiled message =\n{orig_payload[0:200]} ... {orig_payload[-10:]}")
             else:
                 logger.info(f"Recompiled message =\n{orig_payload}")
         return orig_payload
@@ -311,11 +312,13 @@ class RFComm:
     def _read_from_rf(self):
         if loranode.ser.inWaiting() > 0:
             time.sleep(0.1)
+            print(loranode.ser.in_waiting)
+            print(loranode.ser.inWaiting())
             r_buff = loranode.ser.read(loranode.ser.inWaiting())
             print(r_buff)
             sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
             msgstr = (r_buff[3:]).decode()
-            printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}"
+            printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}##"
             print(printstr)
             self._process_read_message(msgstr)
 
@@ -323,8 +326,8 @@ class RFComm:
         while True:
             try:
                 self._read_from_rf()
-            except IndexError:
-                print("[INFO ] No data received, retrying...")
+            except IndexError as i:
+                print(f"[INFO ] No data received .. {i}")
                 continue
             except Exception as e:
                 print(f"[ERROR] Receiving failed: {e}")
