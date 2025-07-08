@@ -20,6 +20,7 @@ MAX_CHUNK_SIZE = 210
 
 FREQ = 915
 AIRSPEED = 62500
+MIN_SLEEP = 0.2
 
 hname = socket.gethostname()
 my_addr = constants.HN_ID[hname]
@@ -301,16 +302,41 @@ class RFComm:
                 logger.info(f"Saving image to {fname}")
                 im.save(fname)
                 # im.show()
-        except:
-            if len(orig_payload) > 400:
+        except Exception as e:
+            print(e)
+            if len(orig_payload) > 100:
+                print(orig_payload)
                 logger.info(f"Recompiled message =\n{orig_payload[0:200]} ... {orig_payload[-10:]}")
             else:
                 logger.info(f"Recompiled message =\n{orig_payload}")
         return orig_payload
 
+    def _actual_send(self, msgstr, dest, ackneeded=False, rssicheck=False):
+        if len(msgstr) > MAX_DATA_SIZE:
+            print(f"[NOT SENDING] Msg too long : {len(msgstr)} : {msgstr}")
+            return
+        payload = msgstr
+        offset_freq = FREQ - 850
+        data = (
+            bytes([dest >> 8]) +
+            bytes([dest & 0xFF]) +
+            bytes([offset_freq]) +
+            bytes([my_addr >> 8]) +
+            bytes([my_addr & 0xFF]) +
+            bytes([loranode.offset_freq]) +
+            payload.encode()
+        )
+        loranode.send(data)
+        print(f"[SENT ] {payload} to {dest}")
+        if ackneeded or rssicheck:
+            time.sleep(1)
+        else:
+            time.sleep(MIN_SLEEP)
+        return True
+  
     def _read_from_rf(self):
         if loranode.ser.inWaiting() > 0:
-            time.sleep(0.3) # Too long :-(
+            time.sleep(MIN_SLEEP) # Too long :-(
             print(loranode.ser.in_waiting)
             print(loranode.ser.inWaiting())
             r_buff = loranode.ser.read(loranode.ser.inWaiting())
@@ -373,29 +399,7 @@ class RFComm:
             rid = msgid[3:]
         return (msgtype, src, dest, rid)
 
-    def _actual_send(self, msgstr, dest, ackneeded=False, rssicheck=False):
-        if len(msgstr) > MAX_DATA_SIZE:
-            print(f"[NOT SENDING] Msg too long : {len(msgstr)} : {msgstr}")
-            return
-        payload = msgstr
-        offset_freq = FREQ - 850
-        data = (
-            bytes([dest >> 8]) +
-            bytes([dest & 0xFF]) +
-            bytes([offset_freq]) +
-            bytes([my_addr >> 8]) +
-            bytes([my_addr & 0xFF]) +
-            bytes([loranode.offset_freq]) +
-            payload.encode()
-        )
-        loranode.send(data)
-        print(f"[SENT ] {payload} to {dest}")
-        if ackneeded or rssicheck:
-            time.sleep(1)
-        else:
-            time.sleep(0.1)
-        return True
-  
+
     # No ack, no retry
     def _send_broadcast(self, payload, mst):
         msgid = self._get_msg_id(mst, constants.NO_DEST) # Message type has to improve
