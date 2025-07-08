@@ -460,8 +460,9 @@ class RFComm:
         for r in range(retry_count):
             for i in chunks_undelivered:
                 self._send_chunk_i(msg_chunks, cidstr, i, dest)
+            time.sleep(0.3)
             sent = self._send_chunk_end(cidstr, dest, alldone)
-            time.sleep(0.5)
+            time.sleep(0.3)
             with self.all_chunks_done_lock:
                 chunks_undelivered = self.msg_cunks_missing[cidstr]
                 if cidstr in self.all_chunks_done and self.all_chunks_done[cidstr]:
