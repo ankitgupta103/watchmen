@@ -5,10 +5,7 @@ from vyomcloudbridge.services.queue_writer_json import QueueWriterJson
 from vyomcloudbridge.utils.logger_setup import setup_logger
 from vyomcloudbridge.utils.configs import Configs
 from vyomcloudbridge.utils.common import (
-    get_mission_upload_dir,
-    get_mission_dir_for_s3,
-    get_data_upload_dir,
-    get_data_dir_for_s3,
+    get_mission_upload_dir
 )
 from vyomcloudbridge.constants.constants import default_mission_id
 import json
@@ -120,7 +117,7 @@ class VyomClient:
                 )
                 return
             vyom_machine_id = self.HN_TO_VYOM_ID[node_hn]
-            file_s3_dir: str = get_mission_dir_for_s3(
+            file_s3_dir: str = get_mission_upload_dir(
                 organization_id=self.organization_id,  # assuming same organisation for all machines
                 machine_id=vyom_machine_id,
                 mission_id=default_mission_id,
