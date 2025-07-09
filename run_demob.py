@@ -7,7 +7,7 @@ import image
 import json
 import socket
 import random
-from rf_comm import RFComm
+from lora_comm import RFComm
 from vyom_client import VyomClient
 from PIL import Image # Import Pillow for image manipulation
 import io # For handling image bytes
