@@ -20,7 +20,8 @@ MAX_CHUNK_SIZE = 210
 
 FREQ = 915
 AIRSPEED = 62500
-MIN_SLEEP = 0.3
+MIN_SLEEP_READ = 0.1
+MIN_SLEEP_WRITE = 0.6
 
 hname = socket.gethostname()
 my_addr = constants.HN_ID[hname]
@@ -335,14 +336,14 @@ class RFComm:
         loranode.send(data)
         print(f"[SENT ] {payload} to {dest}")
         if ackneeded or rssicheck:
-            time.sleep(2*MIN_SLEEP) # was 1
+            time.sleep(MIN_SLEEP_WRITE) # was 1
         else:
-            time.sleep(2*MIN_SLEEP)
+            time.sleep(MIN_SLEEP_WRITE)
         return True
   
     def _read_from_rf(self):
         if loranode.ser.inWaiting() > 0:
-            time.sleep(MIN_SLEEP) # Too long :-(
+            time.sleep(MIN_SLEEP_READ) # Too long :-(
             print(loranode.ser.in_waiting)
             print(loranode.ser.inWaiting())
             r_buff = loranode.ser.read(loranode.ser.inWaiting())
@@ -434,7 +435,7 @@ class RFComm:
         payload = f"{cidstr};{i};{msg_chunks[i]}"
         msgstr = f"{msgid};{payload}"
         self._actual_send(msgstr, dest)
-        time.sleep(0.05) # Small delay to avoid flooding
+        time.sleep(0.5) # Small delay to avoid flooding
 
     def _send_chunk_end(self, cidstr, dest, alldone):
         payload = cidstr
