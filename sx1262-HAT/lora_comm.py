@@ -329,7 +329,7 @@ class RFComm:
         loranode.send(data)
         print(f"[SENT ] {payload} to {dest}")
         if ackneeded or rssicheck:
-            time.sleep(1)
+            time.sleep(MIN_SLEEP) # was 1
         else:
             time.sleep(MIN_SLEEP)
         return True
@@ -517,9 +517,7 @@ class RFComm:
         logger.info(f" ********* **  Time taken to deliver {len(msg_chunks)} chunks = {t2-t1}")
         return sent
 
-    def send_message(self, payload, mst, dest, acking_enabled=None):
-        if acking_enabled is None:
-            acking_enabled = ACKING_ENABLED
+    def send_message(self, payload, mst, dest, acking_enabled=ACKING_ENABLED):
         if dest is None:
             if len(payload) < MAX_CHUNK_SIZE:
                 msg = payload
@@ -597,10 +595,11 @@ def main():
         dest = int(sys.argv[1])
         # test_send_time_to_ack(rf, dest, 10)
         # test_send_types(rf, devid, dest)
-        test_send_long_msg(rf, dest, 500) # Assumes its an image
+        #test_send_long_msg(rf, dest, 500) # Assumes its an image
         transmission_stats(rf, dest, 10)
-        test_send_img(rf, "pencil.jpg", dest)
+        #test_send_img(rf, "pencil.jpg", dest)
         time.sleep(20)
+        rf.print_status()
     else:
         # Keep receiving
         time.sleep(1000)
