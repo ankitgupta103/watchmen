@@ -347,9 +347,8 @@ class RFComm:
             print(loranode.ser.in_waiting)
             print(loranode.ser.inWaiting())
             r_buff = loranode.ser.read(loranode.ser.inWaiting())
-            print(r_buff)
-            sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
-            msgstr = (r_buff[3:]).decode()
+            sender_addr = int(r_buff[3]<<8) + int(r_buff[4])
+            msgstr = (r_buff[6:]).decode()
             printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}##"
             print(printstr)
             self._process_read_message(msgstr)
