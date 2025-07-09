@@ -126,6 +126,12 @@ class RFComm:
             logger.info(self.msg_unacked)
             for mi in self.msg_received:
                 logger.info(f"Message received at receiver = {mi}")
+        times = []
+        for msgid, (_, t1) in self.msg_acked:
+            times.append(t1)
+        print(f"10%ile = {np.percentile(times, 10)}")
+        print(f"50%ile = {np.percentile(times, 50)}")
+        print(f"90%ile = {np.percentile(times, 90)}")
 
     # Four kinds of messages:
     # 1. Has a dest, but not for me, ignore
@@ -567,21 +573,8 @@ def test_send_time_to_ack(rf, dest, msgsize):
     rf.send_message(x, mst, dest)
 
 def transmission_stats(rf, dest, num_messages):
-    succ_count = 0
-    times = []
     for i in range(num_messages):
-        t1 = time.time()
         succ = rf.send_message(f"Hello {i}", constants.MESSAGE_TYPE_HEARTBEAT, dest)
-        if i % 100 == 0:
-            print(f"Done {i}")
-        if succ:
-            succ_count += 1
-            t2 = time.time()
-            times.append(t2-t1)
-    print(f"Sent {num_messages} messages and got an ack for {succ_count}")
-    print(f"10%ile = {np.percentile(times, 10)}")
-    print(f"50%ile = {np.percentile(times, 50)}")
-    print(f"90%ile = {np.percentile(times, 90)}")
 
 def main():
     if hname not in constants.HN_ID:
@@ -598,12 +591,11 @@ def main():
         #test_send_long_msg(rf, dest, 500) # Assumes its an image
         transmission_stats(rf, dest, 10)
         #test_send_img(rf, "pencil.jpg", dest)
-        time.sleep(20)
         rf.print_status()
+        time.sleep(20)
     else:
         # Keep receiving
         time.sleep(1000)
-    rf.print_status()
 
 if __name__=="__main__":
     main()
