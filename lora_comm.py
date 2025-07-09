@@ -28,7 +28,7 @@ my_addr = constants.HN_ID[hname]
 print(f"Running with my_addr = {my_addr}")
 
 # This controls the manual acking on unicast (non chunked) messages
-ACKING_ENABLED = False
+ACKING_ENABLED = True
 FLAKINESS = 0  # 0-100 %
         
 # === LoRa Module Initialization ===
