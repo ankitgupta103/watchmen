@@ -6,7 +6,10 @@ import sys
 import numpy
 
 FREQ = 915
-AIRSPEED = 62500
+AIRSPEED = 2400
+
+MIN_SLEEP = 0.3
+ACK_SLEEP = 1.5
 
 def get_dev_addr():
     hn = socket.gethostname()
@@ -52,9 +55,9 @@ def send_message(msgstr, dest, ackneeded=False, rssicheck=False):
     node.send(data)
     print(f"[SENT ] {payload} to {dest}")
     if ackneeded or rssicheck:
-        time.sleep(1)
+        time.sleep(ACK_SLEEP)
     else:
-        time.sleep(0.3)
+        time.sleep(MIN_SLEEP)
 
 msgs_sent = []
 msgs_recd = []
@@ -75,21 +78,21 @@ def print_status():
     print(f"Actimes = {numpy.percentile(ackts, 50)}@50, {numpy.percentile(ackts, 90)}@90")
 
 def send_messages():
+    c180=""
+    for i in range(18):
+        c180 += "0123456789"
     for i in range(10000):
         if i > 0 and i % 10 == 0:
             print_status()
-        c180=""
-        for i in range(18):
-            c180 += "0123456789"
-        msgstr = f"{c180}-RSSICHECK-{i}"
+        msgstr = f"RSSICHECK-{i}"
         send_message(msgstr, peer_addr, False, True)
-        msgstr = f"{c180}-CHECKACK-{i}"
+        msgstr = f"CHECKACK-{i}-{c180}"
         send_message(msgstr, peer_addr, True, False)
 
 def radioreceive(rssideb=False):
     if node.ser.inWaiting() > 0:
         t1 = time.time()
-        time.sleep(0.3)
+        time.sleep(MIN_SLEEP)
         r_buff = node.ser.read(node.ser.inWaiting())
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         msgstr = (r_buff[3:-1]).decode()
