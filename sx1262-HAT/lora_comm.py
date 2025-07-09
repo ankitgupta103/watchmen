@@ -126,12 +126,13 @@ class RFComm:
             logger.info(self.msg_unacked)
             for mi in self.msg_received:
                 logger.info(f"Message received at receiver = {mi}")
-        times = []
-        for msgid, (_, t1) in self.msg_acked:
-            times.append(t1)
-        print(f"10%ile = {np.percentile(times, 10)}")
-        print(f"50%ile = {np.percentile(times, 50)}")
-        print(f"90%ile = {np.percentile(times, 90)}")
+        #times = []
+        #for msgid, v in self.msg_acked:
+        #    (_, t1) = v
+        #    times.append(t1)
+        #print(f"10%ile = {np.percentile(times, 10)}")
+        #print(f"50%ile = {np.percentile(times, 50)}")
+        #print(f"90%ile = {np.percentile(times, 90)}")
 
     # Four kinds of messages:
     # 1. Has a dest, but not for me, ignore
@@ -252,7 +253,7 @@ class RFComm:
         if ACKING_ENABLED or msgtype == constants.MESSAGE_TYPE_EVENT:
             logger.info(f"{self.devid} : Sending ack for {msgid} to {src}")
             msg_to_send = msgid
-            time.sleep(0.5)
+            #time.sleep(0.5)
             self._send_unicast(msg_to_send, constants.MESSAGE_TYPE_ACK, src, False, 0)
 
     def _missing_chunk_helper(self, missing_chunks, strlimit):

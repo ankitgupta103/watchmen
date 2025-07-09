@@ -54,7 +54,7 @@ def send_message(msgstr, dest, ackneeded=False, rssicheck=False):
     if ackneeded or rssicheck:
         time.sleep(1)
     else:
-        time.sleep(0.1)
+        time.sleep(0.3)
 
 msgs_sent = []
 msgs_recd = []
@@ -78,15 +78,18 @@ def send_messages():
     for i in range(10000):
         if i > 0 and i % 10 == 0:
             print_status()
-        msgstr = f"RSSICHECK-{i}"
+        c180=""
+        for i in range(18):
+            c180 += "0123456789"
+        msgstr = f"{c180}-RSSICHECK-{i}"
         send_message(msgstr, peer_addr, False, True)
-        msgstr = f"CHECKACK-{i}"
+        msgstr = f"{c180}-CHECKACK-{i}"
         send_message(msgstr, peer_addr, True, False)
 
 def radioreceive(rssideb=False):
     if node.ser.inWaiting() > 0:
         t1 = time.time()
-        time.sleep(0.1)
+        time.sleep(0.3)
         r_buff = node.ser.read(node.ser.inWaiting())
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         msgstr = (r_buff[3:-1]).decode()
