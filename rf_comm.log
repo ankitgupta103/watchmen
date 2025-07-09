@@ -17,3 +17,61 @@
 2025-07-09 12:52:01,560 [INFO] ######### Command Center printing status ##############
 2025-07-09 12:52:01,560 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
 2025-07-09 12:52:01,560 [INFO] #######################################################
+2025-07-09 12:52:11,560 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:52:11,560 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:52:11,561 [INFO] #######################################################
+2025-07-09 12:52:21,561 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:52:21,561 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:52:21,561 [INFO] #######################################################
+2025-07-09 12:52:31,561 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:52:31,561 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:52:31,561 [INFO] #######################################################
+2025-07-09 12:52:41,561 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:52:41,562 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:52:41,562 [INFO] #######################################################
+2025-07-09 12:52:51,562 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:52:51,562 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:52:51,562 [INFO] #######################################################
+2025-07-09 12:53:01,563 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:53:01,563 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:53:01,563 [INFO] #######################################################
+2025-07-09 12:53:11,563 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:53:11,563 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:53:11,563 [INFO] #######################################################
+2025-07-09 12:53:11,664 [WARNING] Could not obtain central unit GPS, using random Srinagar location.
+2025-07-09 12:53:11,664 [INFO] Using fallback Srinagar location: Lat=34.1426, Long=74.8629
+2025-07-09 12:53:11,664 [INFO] [on_central_unit_hb_arrive] Called with lat=34.1426, long=74.8629
+2025-07-09 12:53:11,664 [INFO] Storing central unit location: {'lat': 34.1426, 'long': 74.8629, 'timestamp': 1752045791664}
+2025-07-09 12:53:11,664 [INFO] Successfully sent central unit heartbeat to VyomClient with Lat=34.1426, Long=74.8629
+2025-07-09 12:53:11,666 [INFO] Pika version 1.3.2 connecting to ('::1', 5672, 0, 0)
+2025-07-09 12:53:11,667 [INFO] Socket connected: <socket.socket fd=22, family=10, type=1, proto=6, laddr=('::1', 48824, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:53:11,668 [INFO] Streaming transport linked up: (<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7fff4eebf750>, _StreamingProtocolShim: <SelectConnection PROTOCOL transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7fff4eebf750> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>).
+2025-07-09 12:53:11,670 [INFO] AMQPConnector - reporting success: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7fff4eebf750> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:53:11,670 [INFO] AMQPConnectionWorkflow - reporting success: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7fff4eebf750> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:53:11,670 [INFO] Connection workflow succeeded: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7fff4eebf750> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:53:11,671 [INFO] Created channel=1
+2025-07-09 12:53:11,673 [INFO] Storing central unit health: {'status': 1, 'message': 'Healthy'}
+2025-07-09 12:53:11,675 [ERROR] Error sending central unit heartbeat to RootStore: 'RootStore' object has no attribute 'cleanup'
+Traceback (most recent call last):
+  File "/home/vyom/watchmen/vyom_client.py", line 268, in _send_central_unit_hb
+    store.cleanup()
+    ^^^^^^^^^^^^^
+AttributeError: 'RootStore' object has no attribute 'cleanup'
+2025-07-09 12:53:21,563 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:53:21,564 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:53:21,564 [INFO] #######################################################
+2025-07-09 12:53:31,564 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:53:31,564 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:53:31,564 [INFO] #######################################################
+2025-07-09 12:53:41,565 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:53:41,565 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:53:41,565 [INFO] #######################################################
+2025-07-09 12:53:51,565 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:53:51,565 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:53:51,571 [INFO] #######################################################
+2025-07-09 12:54:01,571 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:54:01,571 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:54:01,571 [INFO] #######################################################
+2025-07-09 12:54:11,572 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:54:11,572 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:54:11,572 [INFO] #######################################################

@@ -455,7 +455,7 @@ class DevUnit:
         propogation_thread.start()
 
     def _keep_beating_heart(self):
-        self.send_gps()
+        #self.send_gps() # Temporatily turning off gps
         while True:
             self.send_heartbeat(self.photos_taken, len(self.critical_images_processed))
             time.sleep(60) # Every 1 min
