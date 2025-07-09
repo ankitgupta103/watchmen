@@ -2,9 +2,6 @@ import json
 import time
 import constants
 
-from detect import Detector
-from camera import Camera
-
 class Device:
     def __init__(self, devid, fcomm, ncomm):
         self.devid = devid
@@ -19,10 +16,7 @@ class Device:
             print("At most one communicator")
             return None
         self.cam = None
-        if self.devid == "AAAaaa":
-            self.cam = Camera(devid, o_dir="/tmp/camera_captures_test")
-            self.cam.start()
-            self.detector = Detector()
+        self.detector = None
         self.image_count = 0
         self.event_count = 0
 
