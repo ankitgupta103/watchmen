@@ -29,7 +29,6 @@ print(f"Running with my_addr = {my_addr}")
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = False
 FLAKINESS = 0  # 0-100 %
-
         
 # === LoRa Module Initialization ===
 loranode = lorahat.sx126x.sx126x(
@@ -336,9 +335,9 @@ class RFComm:
         loranode.send(data)
         print(f"[SENT ] {payload} to {dest}")
         if ackneeded or rssicheck:
-            time.sleep(MIN_SLEEP) # was 1
+            time.sleep(2*MIN_SLEEP) # was 1
         else:
-            time.sleep(MIN_SLEEP)
+            time.sleep(2*MIN_SLEEP)
         return True
   
     def _read_from_rf(self):
