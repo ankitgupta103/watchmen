@@ -19,7 +19,7 @@ MAX_DATA_SIZE = 230
 MAX_CHUNK_SIZE = 210
 
 FREQ = 915
-AIRSPEED = 62500
+AIRSPEED = 2400
 MIN_SLEEP = 0.3
 
 hname = socket.gethostname()
@@ -28,7 +28,7 @@ print(f"Running with my_addr = {my_addr}")
 
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = True
-FLAKINESS = 0  # 0-100 %
+FLAKINESS = 10  # 0-100 %
 
         
 # === LoRa Module Initialization ===
