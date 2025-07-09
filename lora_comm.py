@@ -342,11 +342,11 @@ class RFComm:
         return True
   
     def _read_from_rf(self):
-        if loranode.ser.inWaiting() > 0:
+        bytecount = loranode.ser.inWaiting()
+        if bytecount > 0:
             time.sleep(MIN_SLEEP_READ) # Too long :-(
-            print(loranode.ser.in_waiting)
-            print(loranode.ser.inWaiting())
-            r_buff = loranode.ser.read(loranode.ser.inWaiting())
+            print(bytecount)
+            r_buff = loranode.ser.read(bytecount)
             sender_addr = int(r_buff[3]<<8) + int(r_buff[4])
             msgstr = (r_buff[6:]).decode()
             printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}##"
