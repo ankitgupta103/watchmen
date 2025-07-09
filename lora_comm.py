@@ -27,8 +27,8 @@ my_addr = constants.HN_ID[hname]
 print(f"Running with my_addr = {my_addr}")
 
 # This controls the manual acking on unicast (non chunked) messages
-ACKING_ENABLED = True
-FLAKINESS = 10  # 0-100 %
+ACKING_ENABLED = False
+FLAKINESS = 0  # 0-100 %
 
         
 # === LoRa Module Initialization ===
@@ -590,7 +590,7 @@ def main():
         # test_send_types(rf, devid, dest)
         #test_send_long_msg(rf, dest, 500) # Assumes its an image
         transmission_stats(rf, dest, 10)
-        #test_send_img(rf, "pencil.jpg", dest)
+        test_send_img(rf, "pencil.jpg", dest)
         rf.print_status()
         time.sleep(20)
     else:
