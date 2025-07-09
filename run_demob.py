@@ -13,7 +13,7 @@ from PIL import Image # Import Pillow for image manipulation
 import io # For handling image bytes
 import logging
 
-import gps
+#import gps
 import constants
 
 ALLDIR = "../processed_images"
@@ -136,8 +136,8 @@ class CommandCenter:
         Sends heartbeat data for the central unit to the VyomClient.
         This function will be run in a separate thread, periodically.
         """
-        gpsgetter= gps.Gps()
-        loc = gpsgetter.get_lat_lng()
+        #gpsgetter= gps.Gps()
+        loc = None # gpsgetter.get_lat_lng()
         
         lat = None
         long = None

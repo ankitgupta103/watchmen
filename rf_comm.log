@@ -75,3 +75,148 @@ AttributeError: 'RootStore' object has no attribute 'cleanup'
 2025-07-09 12:54:11,572 [INFO] ######### Command Center printing status ##############
 2025-07-09 12:54:11,572 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
 2025-07-09 12:54:11,572 [INFO] #######################################################
+2025-07-09 12:54:21,572 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:54:21,573 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:54:21,573 [INFO] #######################################################
+2025-07-09 12:54:31,573 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:54:31,573 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:54:31,573 [INFO] #######################################################
+2025-07-09 12:54:41,573 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:54:41,574 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:54:41,574 [INFO] #######################################################
+2025-07-09 12:54:44,630 [INFO] ### Running as host rpi7 and devid 7
+2025-07-09 12:54:45,136 [INFO] RootStore instantiated successfully in VyomClient __init__.
+2025-07-09 12:54:45,136 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:54:45,136 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:54:45,136 [INFO] #######################################################
+2025-07-09 12:54:51,574 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:54:51,574 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:54:51,574 [INFO] #######################################################
+2025-07-09 12:55:01,575 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:55:01,575 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:55:01,575 [INFO] #######################################################
+2025-07-09 12:55:11,575 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:55:11,575 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:55:11,575 [INFO] #######################################################
+2025-07-09 12:55:21,576 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:55:21,576 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:55:21,576 [INFO] #######################################################
+2025-07-09 12:55:23,056 [WARNING] Could not obtain central unit GPS, using random Srinagar location.
+2025-07-09 12:55:23,056 [INFO] Using fallback Srinagar location: Lat=34.083656, Long=74.797371
+2025-07-09 12:55:23,056 [INFO] [on_central_unit_hb_arrive] Called with lat=34.083656, long=74.797371
+2025-07-09 12:55:23,057 [INFO] Storing central unit location: {'lat': 34.083656, 'long': 74.797371, 'timestamp': 1752045923057}
+2025-07-09 12:55:23,057 [INFO] Successfully sent central unit heartbeat to VyomClient with Lat=34.083656, Long=74.797371
+2025-07-09 12:55:23,059 [INFO] Storing central unit health: {'status': 1, 'message': 'Healthy'}
+2025-07-09 12:55:23,060 [ERROR] Error sending central unit heartbeat to RootStore: 'RootStore' object has no attribute 'cleanup'
+Traceback (most recent call last):
+  File "/home/vyom/watchmen/vyom_client.py", line 268, in _send_central_unit_hb
+    store.cleanup()
+    ^^^^^^^^^^^^^
+AttributeError: 'RootStore' object has no attribute 'cleanup'
+2025-07-09 12:55:31,576 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:55:31,576 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:55:31,576 [INFO] #######################################################
+2025-07-09 12:55:41,576 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:55:41,577 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:55:41,577 [INFO] #######################################################
+2025-07-09 12:55:51,421 [INFO] ### Running as host rpi7 and devid 7
+2025-07-09 12:55:51,577 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:55:51,577 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:55:51,577 [INFO] #######################################################
+2025-07-09 12:55:51,927 [INFO] RootStore instantiated successfully in VyomClient __init__.
+2025-07-09 12:55:51,931 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:55:51,931 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:55:51,932 [INFO] #######################################################
+2025-07-09 12:56:01,577 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:56:01,578 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:56:01,578 [INFO] #######################################################
+2025-07-09 12:56:11,578 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:56:11,578 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:56:11,578 [INFO] #######################################################
+2025-07-09 12:56:21,578 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:56:21,578 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:56:21,578 [INFO] #######################################################
+2025-07-09 12:56:28,946 [INFO] ### Running as host rpi7 and devid 7
+2025-07-09 12:56:29,452 [INFO] RootStore instantiated successfully in VyomClient __init__.
+2025-07-09 12:56:29,452 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:56:29,453 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:56:29,454 [INFO] #######################################################
+2025-07-09 12:56:31,578 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:56:31,579 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:56:31,583 [INFO] #######################################################
+2025-07-09 12:56:41,583 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:56:41,583 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:56:41,583 [INFO] #######################################################
+2025-07-09 12:56:47,176 [INFO] ### Running as host rpi7 and devid 7
+2025-07-09 12:56:47,681 [INFO] RootStore instantiated successfully in VyomClient __init__.
+2025-07-09 12:56:47,682 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:56:47,682 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:56:47,682 [INFO] #######################################################
+2025-07-09 12:56:51,583 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:56:51,584 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:56:51,584 [INFO] #######################################################
+2025-07-09 12:57:01,584 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:57:01,584 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:57:01,584 [INFO] #######################################################
+2025-07-09 12:57:11,584 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:57:11,584 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:57:11,584 [INFO] #######################################################
+2025-07-09 12:57:18,731 [INFO] ### Running as host rpi7 and devid 7
+2025-07-09 12:57:19,236 [INFO] RootStore instantiated successfully in VyomClient __init__.
+2025-07-09 12:57:19,236 [WARNING] Could not obtain central unit GPS, using random Srinagar location.
+2025-07-09 12:57:19,236 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:57:19,236 [INFO] Using fallback Srinagar location: Lat=34.1426, Long=74.8629
+2025-07-09 12:57:19,236 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:57:19,236 [INFO] [on_central_unit_hb_arrive] Called with lat=34.1426, long=74.8629
+2025-07-09 12:57:19,237 [INFO] #######################################################
+2025-07-09 12:57:19,237 [INFO] Storing central unit location: {'lat': 34.1426, 'long': 74.8629, 'timestamp': 1752046039237}
+2025-07-09 12:57:19,237 [INFO] Successfully sent central unit heartbeat to VyomClient with Lat=34.1426, Long=74.8629
+2025-07-09 12:57:19,244 [INFO] Pika version 1.3.2 connecting to ('::1', 5672, 0, 0)
+2025-07-09 12:57:19,245 [INFO] Socket connected: <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 52780, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:57:19,245 [INFO] Streaming transport linked up: (<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffedfc27890>, _StreamingProtocolShim: <SelectConnection PROTOCOL transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffedfc27890> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>).
+2025-07-09 12:57:19,248 [INFO] AMQPConnector - reporting success: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffedfc27890> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:57:19,248 [INFO] AMQPConnectionWorkflow - reporting success: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffedfc27890> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:57:19,249 [INFO] Connection workflow succeeded: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffedfc27890> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:57:19,249 [INFO] Created channel=1
+2025-07-09 12:57:19,252 [INFO] Storing central unit health: {'status': 1, 'message': 'Healthy'}
+2025-07-09 12:57:19,253 [ERROR] Error sending central unit heartbeat to RootStore: 'RootStore' object has no attribute 'cleanup'
+Traceback (most recent call last):
+  File "/home/vyom/watchmen/vyom_client.py", line 268, in _send_central_unit_hb
+    store.cleanup()
+    ^^^^^^^^^^^^^
+AttributeError: 'RootStore' object has no attribute 'cleanup'
+2025-07-09 12:57:21,585 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:57:21,585 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:57:21,585 [INFO] #######################################################
+2025-07-09 12:57:23,654 [INFO] Closing connection (200): Normal shutdown
+2025-07-09 12:57:23,654 [INFO] Closing channel (200): 'Normal shutdown' on <Channel number=1 OPEN conn=<SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffedfc27890> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>>
+2025-07-09 12:57:23,655 [INFO] Received <Channel.CloseOk> on <Channel number=1 CLOSING conn=<SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffedfc27890> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>>
+2025-07-09 12:57:23,655 [INFO] Closing connection (200): 'Normal shutdown'
+2025-07-09 12:57:23,656 [INFO] Aborting transport connection: state=1; <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 52780, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:57:23,656 [INFO] _AsyncTransportBase._initate_abort(): Initiating abrupt asynchronous transport shutdown: state=1; error=None; <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 52780, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:57:23,656 [INFO] Deactivating transport: state=1; <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 52780, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:57:23,656 [INFO] AMQP stack terminated, failed to connect, or aborted: opened=True, error-arg=None; pending-error=ConnectionClosedByClient: (200) 'Normal shutdown'
+2025-07-09 12:57:23,657 [INFO] Stack terminated due to ConnectionClosedByClient: (200) 'Normal shutdown'
+2025-07-09 12:57:23,657 [INFO] Closing transport socket and unlinking: state=3; <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 52780, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:57:23,657 [INFO] User-initiated close: result=BlockingConnection__OnClosedArgs(connection=<SelectConnection CLOSED transport=None params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>, error=ConnectionClosedByClient: (200) 'Normal shutdown')
+2025-07-09 12:57:31,585 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:57:31,585 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:57:31,585 [INFO] #######################################################
+2025-07-09 12:57:36,149 [WARNING] Could not obtain central unit GPS, using random Srinagar location.
+2025-07-09 12:57:36,150 [INFO] Using fallback Srinagar location: Lat=34.083656, Long=74.797371
+2025-07-09 12:57:36,150 [INFO] [on_central_unit_hb_arrive] Called with lat=34.083656, long=74.797371
+2025-07-09 12:57:36,150 [INFO] Storing central unit location: {'lat': 34.083656, 'long': 74.797371, 'timestamp': 1752046056150}
+2025-07-09 12:57:36,150 [INFO] Successfully sent central unit heartbeat to VyomClient with Lat=34.083656, Long=74.797371
+2025-07-09 12:57:36,153 [INFO] Storing central unit health: {'status': 1, 'message': 'Healthy'}
+2025-07-09 12:57:36,155 [ERROR] Error sending central unit heartbeat to RootStore: 'RootStore' object has no attribute 'cleanup'
+Traceback (most recent call last):
+  File "/home/vyom/watchmen/vyom_client.py", line 268, in _send_central_unit_hb
+    store.cleanup()
+    ^^^^^^^^^^^^^
+AttributeError: 'RootStore' object has no attribute 'cleanup'
+2025-07-09 12:57:41,585 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:57:41,586 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:57:41,586 [INFO] #######################################################
+2025-07-09 12:57:51,586 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:57:51,586 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:57:51,586 [INFO] #######################################################
