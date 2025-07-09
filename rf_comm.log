@@ -220,3 +220,53 @@ AttributeError: 'RootStore' object has no attribute 'cleanup'
 2025-07-09 12:57:51,586 [INFO] ######### Command Center printing status ##############
 2025-07-09 12:57:51,586 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
 2025-07-09 12:57:51,586 [INFO] #######################################################
+2025-07-09 12:58:01,586 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:58:01,587 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:58:01,587 [INFO] #######################################################
+2025-07-09 12:58:08,463 [INFO] ### Running as host rpi7 and devid 7
+2025-07-09 12:58:08,968 [INFO] RootStore instantiated successfully in VyomClient __init__.
+2025-07-09 12:58:08,969 [WARNING] Could not obtain central unit GPS, using random Srinagar location.
+2025-07-09 12:58:08,969 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:58:08,969 [INFO] Using fallback Srinagar location: Lat=34.083656, Long=74.797371
+2025-07-09 12:58:08,969 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:58:08,969 [INFO] [on_central_unit_hb_arrive] Called with lat=34.083656, long=74.797371
+2025-07-09 12:58:08,969 [INFO] #######################################################
+2025-07-09 12:58:08,969 [INFO] Storing central unit location: {'lat': 34.083656, 'long': 74.797371, 'timestamp': 1752046088969}
+2025-07-09 12:58:08,969 [INFO] Successfully sent central unit heartbeat to VyomClient with Lat=34.083656, Long=74.797371
+2025-07-09 12:58:08,972 [INFO] Pika version 1.3.2 connecting to ('::1', 5672, 0, 0)
+2025-07-09 12:58:08,973 [INFO] Socket connected: <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 58732, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:58:08,973 [INFO] Streaming transport linked up: (<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffee5e07190>, _StreamingProtocolShim: <SelectConnection PROTOCOL transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffee5e07190> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>).
+2025-07-09 12:58:08,976 [INFO] AMQPConnector - reporting success: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffee5e07190> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:58:08,976 [INFO] AMQPConnectionWorkflow - reporting success: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffee5e07190> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:58:08,976 [INFO] Connection workflow succeeded: <SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffee5e07190> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>
+2025-07-09 12:58:08,976 [INFO] Created channel=1
+2025-07-09 12:58:08,981 [INFO] Storing central unit health: {'status': 1, 'message': 'Healthy'}
+2025-07-09 12:58:08,982 [ERROR] Error sending central unit heartbeat to RootStore: 'RootStore' object has no attribute 'cleanup'
+Traceback (most recent call last):
+  File "/home/vyom/watchmen/vyom_client.py", line 268, in _send_central_unit_hb
+    store.cleanup()
+    ^^^^^^^^^^^^^
+AttributeError: 'RootStore' object has no attribute 'cleanup'
+2025-07-09 12:58:11,587 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:58:11,587 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:58:11,587 [INFO] #######################################################
+2025-07-09 12:58:18,970 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:58:18,970 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:58:18,970 [INFO] #######################################################
+2025-07-09 12:58:21,587 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:58:21,587 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:58:21,588 [INFO] #######################################################
+2025-07-09 12:58:22,457 [INFO] Closing connection (200): Normal shutdown
+2025-07-09 12:58:22,459 [INFO] Closing channel (200): 'Normal shutdown' on <Channel number=1 OPEN conn=<SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffee5e07190> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>>
+2025-07-09 12:58:22,460 [INFO] Received <Channel.CloseOk> on <Channel number=1 CLOSING conn=<SelectConnection OPEN transport=<pika.adapters.utils.io_services_utils._AsyncPlaintextTransport object at 0x7ffee5e07190> params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>>
+2025-07-09 12:58:22,460 [INFO] Closing connection (200): 'Normal shutdown'
+2025-07-09 12:58:22,461 [INFO] Aborting transport connection: state=1; <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 58732, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:58:22,461 [INFO] _AsyncTransportBase._initate_abort(): Initiating abrupt asynchronous transport shutdown: state=1; error=None; <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 58732, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:58:22,461 [INFO] Deactivating transport: state=1; <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 58732, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:58:22,461 [INFO] AMQP stack terminated, failed to connect, or aborted: opened=True, error-arg=None; pending-error=ConnectionClosedByClient: (200) 'Normal shutdown'
+2025-07-09 12:58:22,462 [INFO] Stack terminated due to ConnectionClosedByClient: (200) 'Normal shutdown'
+2025-07-09 12:58:22,462 [INFO] Closing transport socket and unlinking: state=3; <socket.socket fd=24, family=10, type=1, proto=6, laddr=('::1', 58732, 0, 0), raddr=('::1', 5672, 0, 0)>
+2025-07-09 12:58:22,462 [INFO] User-initiated close: result=BlockingConnection__OnClosedArgs(connection=<SelectConnection CLOSED transport=None params=<URLParameters host=localhost port=5672 virtual_host=/ ssl=False>>, error=ConnectionClosedByClient: (200) 'Normal shutdown')
+2025-07-09 12:58:31,588 [INFO] ######### Command Center printing status ##############
+2025-07-09 12:58:31,588 [INFO] ### Num HB, LastHB, GPS, NumPhotos, NumEvents, List of event TS&EVID ###
+2025-07-09 12:58:31,588 [INFO] #######################################################
