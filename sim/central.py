@@ -4,8 +4,8 @@ import io
 import base64
 from PIL import Image
 
-import image
-import constants
+from .. import image
+from .. import constants
 
 class NodeInfo:
     def __init__(self, devid):
