@@ -9,7 +9,7 @@ import string
 import logging
 import numpy as np
 
-import sx126x
+import lorahat.sx126x
 
 # Local
 import constants
@@ -32,7 +32,7 @@ FLAKINESS = 10  # 0-100 %
 
         
 # === LoRa Module Initialization ===
-loranode = sx126x.sx126x(
+loranode = lorahat.sx126x.sx126x(
     serial_num="/dev/ttyAMA0",  # or /dev/serial0 if that's what works
     freq=FREQ,
     addr=my_addr,
