@@ -9,7 +9,7 @@ FREQ = 915
 AIRSPEED = 2400
 
 MIN_SLEEP = 0.3
-ACK_SLEEP = 1.5
+ACK_SLEEP = 1
 
 def get_dev_addr():
     hn = socket.gethostname()
@@ -79,7 +79,7 @@ def print_status():
 
 def send_messages():
     c180=""
-    for i in range(18):
+    for i in range(1):
         c180 += "0123456789"
     for i in range(10000):
         if i > 0 and i % 10 == 0:
