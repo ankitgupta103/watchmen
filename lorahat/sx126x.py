@@ -95,7 +95,14 @@ class sx126x:
         GPIO.output(self.M1,GPIO.HIGH)
 
         # The hardware UART of Pi3B+,Pi4B is /dev/ttyS0
-        self.ser = serial.Serial(serial_num, 115200)
+        # self.ser = serial.Serial(serial_num, 115200)
+        self.ser = serial.Serial(
+            serial_num,
+            115200,             # Set the baud rate to 115200
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_TWO # Crucial: set stop bits to 2
+        )
         self.ser.flushInput()
         self.set(freq,addr,power,rssi,air_speed,net_id,buffer_size,crypt,relay,lbt,wor)
 
