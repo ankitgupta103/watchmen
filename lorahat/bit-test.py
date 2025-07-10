@@ -122,7 +122,7 @@ try:
     print("Press \033[1;32ms\033[0m   to send cpu temperature every 10 seconds")
     
     # it will send rpi cpu temperature every 10 seconds 
-    seconds = 1
+    seconds = 0.1
     
     while True:
 
