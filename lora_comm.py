@@ -22,7 +22,7 @@ MAX_CHUNK_SIZE = 210
 FREQ = 868
 AIRSPEED = 2400
 MIN_SLEEP_READ = 0.03
-MIN_SLEEP_WRITE = 0.5
+MIN_SLEEP_WRITE = 1.0
 
 hname = socket.gethostname()
 my_addr = constants.HN_ID[hname]
