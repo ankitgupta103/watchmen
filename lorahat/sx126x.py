@@ -105,6 +105,14 @@ class sx126x:
 
         self.set(freq,addr,power,rssi,air_speed,net_id,buffer_size,crypt,relay,lbt,wor)
 
+        # read ACK reseponse @ 9600 baud for get settings()
+        time.sleep(0.2)
+        if self.ser.in_waiting > 0:
+            resp = self.ser.read(self.ser.in_waiting)
+            print("[ACK @9600] Got response:", resp)
+        else:
+            print("[WARN] No ACK received @9600 — proceed with caution.")
+
         print("[INFO ] Reopening serial at 115200")
         self.ser.close()
         time.sleep(0.2)
