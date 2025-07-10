@@ -220,29 +220,77 @@ class sx126x:
         GPIO.output(self.M1,GPIO.LOW)
         time.sleep(0.1)
 
-    def get_settings(self):
-        # the pin M1 of lora HAT must be high when enter setting mode and get parameters
-        GPIO.output(M1,GPIO.HIGH)
-        time.sleep(0.1)
+    # def get_settings(self):
+    #     # the pin M1 of lora HAT must be high when enter setting mode and get parameters
+    #     GPIO.output(M1,GPIO.HIGH)
+    #     time.sleep(0.1)
         
-        # send command to get setting parameters
-        self.ser.write(bytes([0xC1,0x00,0x09]))
-        if self.ser.inWaiting() > 0:
-            time.sleep(0.1)
-            self.get_reg = self.ser.read(self.ser.inWaiting())
+    #     # send command to get setting parameters
+    #     self.ser.write(bytes([0xC1,0x00,0x09]))
+    #     if self.ser.inWaiting() > 0:
+    #         time.sleep(0.1)
+    #         self.get_reg = self.ser.read(self.ser.inWaiting())
         
-        # check the return characters from hat and print the setting parameters
-        if self.get_reg[0] == 0xC1 and self.get_reg[2] == 0x09:
-            fre_temp = self.get_reg[8]
-            addr_temp = self.get_reg[3] + self.get_reg[4]
-            air_speed_temp = self.get_reg[6] & 0x03
-            power_temp = self.get_reg[7] & 0x03
+    #     # check the return characters from hat and print the setting parameters
+    #     if self.get_reg[0] == 0xC1 and self.get_reg[2] == 0x09:
+    #         fre_temp = self.get_reg[8]
+    #         addr_temp = self.get_reg[3] + self.get_reg[4]
+    #         air_speed_temp = self.get_reg[6] & 0x03
+    #         power_temp = self.get_reg[7] & 0x03
             
-            print("Frequence is {0}.125MHz.",fre_temp)
-            print("Node address is {0}.",addr_temp)
-            print("Air speed is {0} bps"+ lora_air_speed_dic.get(None,air_speed_temp))
-            print("Power is {0} dBm" + lora_power_dic.get(None,power_temp))
-            GPIO.output(M1,GPIO.LOW)
+    #         print("Frequence is {0}.125MHz.",fre_temp)
+    #         print("Node address is {0}.",addr_temp)
+    #         print("Air speed is {0} bps"+ lora_air_speed_dic.get(None,air_speed_temp))
+    #         print("Power is {0} dBm" + lora_power_dic.get(None,power_temp))
+    #         GPIO.output(M1,GPIO.LOW)
+
+    def get_settings(self):
+        GPIO.output(self.M0, GPIO.LOW)
+        GPIO.output(self.M1, GPIO.HIGH)
+        time.sleep(0.1)
+
+        # Send command to read parameters
+        self.ser.flushInput()
+        self.ser.write(bytes([0xC1, 0x00, 0x09]))
+        time.sleep(0.5)
+
+        if self.ser.inWaiting() > 0:
+            self.get_reg = self.ser.read(self.ser.inWaiting())
+            reg = self.get_reg
+
+            if len(reg) >= 12 and reg[0] == 0xC1 and reg[2] == 0x09:
+                high_addr = reg[3]
+                low_addr = reg[4]
+                addr = (high_addr << 8) | low_addr
+                net_id = reg[5]
+                baud_air = reg[6]
+                buffer_power = reg[7]
+                freq = reg[8] + self.start_freq
+                rssi_en = reg[9] & 0x80
+
+                air_speed_val = baud_air & 0x07
+                power_val = buffer_power & 0x03
+                buffer_size_val = buffer_power & 0xC0
+
+                # Reverse lookup
+                air_speed = next((k for k, v in self.lora_air_speed_dic.items() if v == air_speed_val), "Unknown")
+                power = next((k for k, v in self.lora_power_dic.items() if v == power_val), "Unknown")
+                buffer_size = next((k for k, v in self.lora_buffer_size_dic.items() if v == buffer_size_val), "Unknown")
+
+                print(f"[LoRa Config] Address     : {addr}")
+                print(f"[LoRa Config] Network ID  : {net_id}")
+                print(f"[LoRa Config] Frequency   : {freq}.125 MHz")
+                print(f"[LoRa Config] Air Speed   : {air_speed} bps")
+                print(f"[LoRa Config] Power       : {power} dBm")
+                print(f"[LoRa Config] Buffer Size : {buffer_size} bytes")
+                print(f"[LoRa Config] RSSI Enable : {'Yes' if rssi_en else 'No'}")
+            else:
+                print("[LoRa Config] Failed to parse settings response:", reg)
+        else:
+            print("[LoRa Config] No data returned from device.")
+
+        GPIO.output(self.M1, GPIO.LOW)
+
 
 #
 # the data format like as following
