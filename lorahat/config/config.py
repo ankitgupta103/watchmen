@@ -12,6 +12,18 @@ CONFIG_BAUD = 9600  # Always use 9600 to configure
 STOP_BITS = serial.STOPBITS_TWO
 TIMEOUT = 1
 
+# # Lookup Tables
+# UART_BAUD_TABLE = {
+#     0x00: "1200", 0x20: "2400", 0x40: "4800", 0x60: "9600",
+#     0x80: "19200", 0xA0: "38400", 0xC0: "57600", 0xE0: "115200"
+# }
+# AIR_SPEED_TABLE = {
+#     0x01: "1200 bps", 0x02: "2400 bps", 0x03: "4800 bps",
+#     0x04: "9600 bps", 0x05: "19200 bps", 0x06: "38400 bps", 0x07: "62500 bps"
+# }
+# PACKET_SIZE_TABLE = { 0x00: "240 bytes", 0x40: "128 bytes", 0x80: "64 bytes", 0xC0: "32 bytes" }
+# POWER_TABLE = { 0x00: "22 dBm", 0x01: "17 dBm", 0x02: "13 dBm", 0x03: "10 dBm" }
+
 # === DEFAULT CONFIG FRAME (volatile - lost after power off) ===
 # Format: [0xC2, 0x00, 0x09, ADDH, ADDL, NETID, UART+AIR, PACKET+POWER, FREQ, OPTION, CRYPT_H, CRYPT_L]
 # Address: 0x0000, NetID: 0x00, Baud: 9600, Air speed: 2400bps, Packet: 240, Power: 22dBm, Freq: 868MHz (offset 18)
