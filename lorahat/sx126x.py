@@ -107,7 +107,7 @@ class sx126x:
 
         print("[INFO ] Reopening serial at 115200")
         self.ser.close()
-        time.sleep(0.2)
+        time.sleep(0.3)
         # self.ser = serial.Serial(serial_num, self.target_baud)
         # self.ser.flushInput()
         
@@ -115,19 +115,23 @@ class sx126x:
         # time.sleep(0.2)
         # self.get_settings()
 
-
-        # Keep M1 HIGH (config mode) here
+        # IMPORTANT: Put LoRa module into config mode again
         GPIO.output(self.M0, GPIO.LOW)
         GPIO.output(self.M1, GPIO.HIGH)
+        
+        print(f"[DEBUG] M0={GPIO.input(self.M0)}, M1={GPIO.input(self.M1)}")
+
+        time.sleep(0.5)  # give it enough time to switch modes
+
         self.ser = serial.Serial(serial_num, self.target_baud)
         self.ser.flushInput()
         time.sleep(0.3)
 
         self.get_settings()
 
-        # Now move to normal mode
-        GPIO.output(self.M1, GPIO.LOW)
+        # Restore normal working mode
         GPIO.output(self.M0, GPIO.LOW)
+        GPIO.output(self.M1, GPIO.LOW)
         time.sleep(0.1)
 
     def set(self,freq,addr,power,rssi,air_speed=2400,\
