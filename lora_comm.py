@@ -361,7 +361,7 @@ class RFComm:
         t2 = time.time()
         print(f"Time taken to read = {t2-t1} secs")
 
-    def _read_from_rf_old(self):
+    def _read_from_rf(self):
         bytecount = loranode.ser.inWaiting()
         if bytecount > 0:
             t1 = time.time()
