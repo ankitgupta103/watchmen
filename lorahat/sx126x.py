@@ -127,7 +127,7 @@ class sx126x:
         self.ser.flushInput()
         time.sleep(0.3)
 
-        self.get_settings()
+        # self.get_settings()
 
         # Restore normal working mode
         GPIO.output(self.M0, GPIO.LOW)
