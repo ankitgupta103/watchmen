@@ -5,8 +5,8 @@ import socket
 import sys
 import numpy
 
-FREQ = 915
-AIRSPEED = 62500
+FREQ = 868
+AIRSPEED = 2400
 
 MIN_SLEEP = 0.3
 ACK_SLEEP = 1
@@ -94,6 +94,7 @@ def radioreceive(rssideb=False):
         t1 = time.time()
         time.sleep(MIN_SLEEP)
         r_buff = node.ser.read(node.ser.inWaiting())
+        print(r_buff)
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         msgstr = (r_buff[3:-1]).decode()
         printstr = f"## Received ## ## Totalsofar={len(msgs_recd)} From @{sender_addr} : Msg = {msgstr}"
