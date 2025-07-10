@@ -120,6 +120,7 @@ class sx126x:
         self.ser.flushInput()
         
         # calling get_settings() to read the current settings @115200 baud
+        time.sleep(2)
         self.get_settings()
 
     def set(self,freq,addr,power,rssi,air_speed=2400,\
