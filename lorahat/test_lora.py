@@ -125,9 +125,9 @@ def keep_receiving_bg():
 def main():
     reader_thread = threading.Thread(target=keep_receiving_bg, daemon=True)
     reader_thread.start()
-    if my_addr == 8:
+    if my_addr == 7:
         time.sleep(3600)
-    elif my_addr == 7:
+    elif my_addr == 8:
         send_messages()
     else:
         print("Unknown host")
