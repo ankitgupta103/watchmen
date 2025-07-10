@@ -22,7 +22,7 @@ MAX_CHUNK_SIZE = 210
 FREQ = 868
 AIRSPEED = 2400
 MIN_SLEEP_READ = 0.1
-MIN_SLEEP_WRITE = 0.6
+MIN_SLEEP_WRITE = 0.5
 
 hname = socket.gethostname()
 my_addr = constants.HN_ID[hname]
@@ -604,8 +604,8 @@ def main():
         dest = int(sys.argv[1])
         # test_send_time_to_ack(rf, dest, 10)
         # test_send_types(rf, devid, dest)
-        test_send_long_msg(rf, dest, 500) # Assumes its an image
-        #transmission_stats(rf, dest, 10)
+        #test_send_long_msg(rf, dest, 500) # Assumes its an image
+        transmission_stats(rf, dest, 3)
         test_send_img(rf, "pencil.jpg", dest)
         rf.print_status()
         time.sleep(20)
