@@ -8,6 +8,7 @@ import threading
 import string
 import logging
 import numpy as np
+import queue
 
 import lorahat.sx126x
 
@@ -98,6 +99,9 @@ class RFComm:
         # Sender
         self.msg_cunks_missing = {} # CID -> List of ChunkIDs : Sender gets this from ack.
         self.node = None
+
+        self.mq = queue.Queue()
+
         self.setup_rf()
         time.sleep(0.5)
 
@@ -354,7 +358,13 @@ class RFComm:
             msgstr = (r_buff[3:]).decode()
             printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}##"
             print(printstr)
+            self.mq.put(msgstr)
+
+    def _keep_processing(self):
+        while True:
+            msgstr = self.mq.get()
             self._process_read_message(msgstr)
+            self.mq.task_done()
 
     def _keep_reading_from_rf(self):
         while True:
@@ -373,6 +383,9 @@ class RFComm:
         reader_thread = threading.Thread(target=self._keep_reading_from_rf, daemon=True)
         # TODO fix and make it a clean exit on self deletion
         reader_thread.start()
+
+        processor_thread = threading.Thread(target=self._keep_processing, daemon=True)
+        processor_thread.start()
 
     def _get_msg_id(self, msgtype, dest, override_idstr = None):
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
@@ -591,8 +604,8 @@ def main():
         dest = int(sys.argv[1])
         # test_send_time_to_ack(rf, dest, 10)
         # test_send_types(rf, devid, dest)
-        #test_send_long_msg(rf, dest, 500) # Assumes its an image
-        transmission_stats(rf, dest, 10)
+        test_send_long_msg(rf, dest, 500) # Assumes its an image
+        #transmission_stats(rf, dest, 10)
         test_send_img(rf, "pencil.jpg", dest)
         rf.print_status()
         time.sleep(20)
