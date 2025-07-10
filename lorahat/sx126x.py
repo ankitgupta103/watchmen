@@ -249,7 +249,6 @@ class sx126x:
         GPIO.output(self.M1, GPIO.HIGH)
         time.sleep(0.1)
 
-        # Send command to read parameters
         self.ser.flushInput()
         self.ser.write(bytes([0xC1, 0x00, 0x09]))
         time.sleep(0.5)
@@ -268,18 +267,29 @@ class sx126x:
                 freq = reg[8] + self.start_freq
                 rssi_en = reg[9] & 0x80
 
-                air_speed_val = baud_air & 0x07
-                power_val = buffer_power & 0x03
-                buffer_size_val = buffer_power & 0xC0
+                uart_baud_raw = baud_air & 0xE0
+                air_speed_raw = baud_air & 0x07
+                power_raw = buffer_power & 0x03
+                buffer_raw = buffer_power & 0xC0
 
-                # Reverse lookup
-                air_speed = next((k for k, v in self.lora_air_speed_dic.items() if v == air_speed_val), "Unknown")
-                power = next((k for k, v in self.lora_power_dic.items() if v == power_val), "Unknown")
-                buffer_size = next((k for k, v in self.lora_buffer_size_dic.items() if v == buffer_size_val), "Unknown")
+                air_speed = next((k for k, v in self.lora_air_speed_dic.items() if v == air_speed_raw), "Unknown")
+                power = next((k for k, v in self.lora_power_dic.items() if v == power_raw), "Unknown")
+                buffer_size = next((k for k, v in self.lora_buffer_size_dic.items() if v == buffer_raw), "Unknown")
+                uart_baud = {
+                    0x00: 1200,
+                    0x20: 2400,
+                    0x40: 4800,
+                    0x60: 9600,
+                    0x80: 19200,
+                    0xA0: 38400,
+                    0xC0: 57600,
+                    0xE0: 115200
+                }.get(uart_baud_raw, "Unknown")
 
                 print(f"[LoRa Config] Address     : {addr}")
                 print(f"[LoRa Config] Network ID  : {net_id}")
                 print(f"[LoRa Config] Frequency   : {freq}.125 MHz")
+                print(f"[LoRa Config] UART Baud   : {uart_baud} bps")
                 print(f"[LoRa Config] Air Speed   : {air_speed} bps")
                 print(f"[LoRa Config] Power       : {power} dBm")
                 print(f"[LoRa Config] Buffer Size : {buffer_size} bytes")
