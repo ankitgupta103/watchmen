@@ -220,6 +220,52 @@ class sx126x:
         GPIO.output(self.M1,GPIO.LOW)
         time.sleep(0.1)
 
+    def describe_config(self):
+        print("[LoRa Configuration Register Breakdown]")
+        cfg = self.cfg_reg
+        if len(cfg) != 12:
+            print("Invalid configuration length.")
+            return
+
+        baud_lookup = {
+            0x00: 1200, 0x20: 2400, 0x40: 4800, 0x60: 9600,
+            0x80: 19200, 0xA0: 38400, 0xC0: 57600, 0xE0: 115200
+        }
+        air_lookup = {
+            0x00: 300, 0x01: 1200, 0x02: 2400, 0x03: 4800,
+            0x04: 9600, 0x05: 19200, 0x06: 38400, 0x07: 62500
+        }
+        buf_lookup = {
+            0x00: 240, 0x40: 128, 0x80: 64, 0xC0: 32
+        }
+        power_lookup = { 0x00: 22, 0x01: 17, 0x02: 13, 0x03: 10 }
+
+        reg3 = cfg[6]
+        reg4 = cfg[7]
+        reg5 = cfg[8]
+        reg6 = cfg[9]
+
+        baud = baud_lookup.get(reg3 & 0xE0, "Unknown")
+        air_speed = air_lookup.get(reg3 & 0x07, "Unknown")
+        buffer = buf_lookup.get(reg4 & 0xC0, "Unknown")
+        power = power_lookup.get(reg4 & 0x03, "Unknown")
+        noise_enable = bool(reg4 & 0x20)
+        rssi_byte_enable = bool(reg6 & 0x80)
+        relay_enable = bool(reg6 & 0x20)
+
+        print(f"Address         : {cfg[3] << 8 | cfg[4]}")
+        print(f"Network ID      : {cfg[5]}")
+        print(f"UART Baudrate   : {baud} bps")
+        print(f"Air Speed       : {air_speed} bps")
+        print(f"Buffer Size     : {buffer} bytes")
+        print(f"Power           : {power} dBm")
+        print(f"RSSI Enabled    : {'Yes' if rssi_byte_enable else 'No'}")
+        print(f"Noise Enabled   : {'Yes' if noise_enable else 'No'}")
+        print(f"Relay Enabled   : {'Yes' if relay_enable else 'No'}")
+        print(f"Frequency (MHz) : {self.start_freq + self.offset_freq}.125")
+        print(f"Encrypt Key     : 0x{cfg[10]:02X}{cfg[11]:02X}")
+
+
     # def get_settings(self):
     #     # the pin M1 of lora HAT must be high when enter setting mode and get parameters
     #     GPIO.output(M1,GPIO.HIGH)
