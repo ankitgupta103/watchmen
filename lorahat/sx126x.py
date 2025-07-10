@@ -108,12 +108,27 @@ class sx126x:
         print("[INFO ] Reopening serial at 115200")
         self.ser.close()
         time.sleep(0.2)
+        # self.ser = serial.Serial(serial_num, self.target_baud)
+        # self.ser.flushInput()
+        
+        # # calling get_settings() to read the current settings @115200 baud
+        # time.sleep(0.2)
+        # self.get_settings()
+
+
+        # Keep M1 HIGH (config mode) here
+        GPIO.output(self.M0, GPIO.LOW)
+        GPIO.output(self.M1, GPIO.HIGH)
         self.ser = serial.Serial(serial_num, self.target_baud)
         self.ser.flushInput()
-        
-        # calling get_settings() to read the current settings @115200 baud
-        time.sleep(0.2)
+        time.sleep(0.3)
+
         self.get_settings()
+
+        # Now move to normal mode
+        GPIO.output(self.M1, GPIO.LOW)
+        GPIO.output(self.M0, GPIO.LOW)
+        time.sleep(0.1)
 
     def set(self,freq,addr,power,rssi,air_speed=2400,\
             net_id=0,buffer_size = 240,crypt=0,\
