@@ -105,14 +105,6 @@ class sx126x:
 
         self.set(freq,addr,power,rssi,air_speed,net_id,buffer_size,crypt,relay,lbt,wor)
 
-        # # read ACK reseponse @ 9600 baud for get settings()
-        # time.sleep(0.2)
-        # if self.ser.in_waiting > 0:
-        #     resp = self.ser.read(self.ser.in_waiting)
-        #     print("[ACK @9600] Got response:", resp)
-        # else:
-        #     print("[WARN] No ACK received @9600 — proceed with caution.")
-
         print("[INFO ] Reopening serial at 115200")
         self.ser.close()
         time.sleep(0.2)
@@ -120,7 +112,7 @@ class sx126x:
         self.ser.flushInput()
         
         # calling get_settings() to read the current settings @115200 baud
-        time.sleep(2)
+        time.sleep(0.2)
         self.get_settings()
 
     def set(self,freq,addr,power,rssi,air_speed=2400,\
@@ -308,17 +300,20 @@ class sx126x:
     #         GPIO.output(M1,GPIO.LOW)
 
     def get_settings(self):
+        # Set module in configuration mode: M1 = HIGH, M0 = LOW
         GPIO.output(self.M0, GPIO.LOW)
         GPIO.output(self.M1, GPIO.HIGH)
-        time.sleep(0.1)
+        time.sleep(0.2)
 
-        self.ser.flushInput()
+        print("[INFO ] Sending get_settings command: C1 00 09 at", self.ser.baudrate)
+        self.ser.reset_input_buffer()
         self.ser.write(bytes([0xC1, 0x00, 0x09]))
         time.sleep(0.5)
 
-        if self.ser.inWaiting() > 0:
-            self.get_reg = self.ser.read(self.ser.inWaiting())
+        if self.ser.in_waiting > 0:
+            self.get_reg = self.ser.read(self.ser.in_waiting)
             reg = self.get_reg
+            print("[DEBUG] Raw get_settings response:", reg)
 
             if len(reg) >= 12 and reg[0] == 0xC1 and reg[2] == 0x09:
                 high_addr = reg[3]
