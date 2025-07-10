@@ -6,7 +6,7 @@ import sys
 import numpy
 
 FREQ = 915
-AIRSPEED = 2400
+AIRSPEED = 62500
 
 MIN_SLEEP = 0.3
 ACK_SLEEP = 1
