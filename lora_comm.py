@@ -21,7 +21,7 @@ MAX_CHUNK_SIZE = 210
 
 FREQ = 868
 AIRSPEED = 2400
-MIN_SLEEP_READ = 0.1
+MIN_SLEEP_READ = 0.03
 MIN_SLEEP_WRITE = 0.5
 
 hname = socket.gethostname()
@@ -328,6 +328,7 @@ class RFComm:
             return
         payload = msgstr
         offset_freq = FREQ - 850
+        payload_len = len(payload)
         data = (
             bytes([dest >> 8]) +
             bytes([dest & 0xFF]) +
@@ -335,30 +336,59 @@ class RFComm:
             bytes([my_addr >> 8]) +
             bytes([my_addr & 0xFF]) +
             bytes([loranode.offset_freq]) +
+            bytes([payload_len]) +
             payload.encode()
         )
         loranode.send(data)
-        print(f"[SENT ] {payload} to {dest}")
+        print(f"[SENT len {payload_len}] {payload} to {dest}")
         if ackneeded or rssicheck:
-            time.sleep(MIN_SLEEP_WRITE) # was 1
+            time.sleep(MIN_SLEEP_WRITE)
         else:
             time.sleep(MIN_SLEEP_WRITE)
         return True
-  
-    def _read_from_rf(self):
+ 
+    def _read_from_rf_exp(self):
+        t1 = time.time()
+        r_buff = loranode.ser.read(4)
+        sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
+        payload_len = int(r_buff[3])
+        r_buff = loranode.ser.read(payload_len)
+        msgstr = r_buff.decode()
+        printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}##"
+        print(printstr)
+        if len(msgstr) > 0:
+            self.mq.put(msgstr)
+        t2 = time.time()
+        print(f"Time taken to read = {t2-t1} secs")
+
+    def _read_from_rf_old(self):
         bytecount = loranode.ser.inWaiting()
         if bytecount > 0:
-            print(bytecount)
+            t1 = time.time()
+            print(f"Reading at time {t1}")
             time.sleep(MIN_SLEEP_READ) # Too long :-(
             bytecount = loranode.ser.inWaiting()
-            print(bytecount)
-            r_buff = loranode.ser.read(bytecount)
-            print(r_buff)
-            sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
-            msgstr = (r_buff[3:]).decode()
+            print(f"Going to read {bytecount} bytes from buffer")
+            r_buff = b''
+            if bytecount < 4:
+                r_buff = loranode.ser.read(bytecount)
+                print(f"Reading too few bytes, seems like an error")
+            else:
+                r_buff = loranode.ser.read(4)
+                sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
+                payload_len = int(r_buff[3])
+                r_buff = loranode.ser.read(payload_len)
+                msgstr = r_buff.decode()
+                if bytecount > payload_len + 4:
+                    print(f" ===========> We seem to have dangling data of size : {bytecount - payload_len - 4}")
+                    loranode.ser.read(bytecount - payload_len - 4)
+                    loranode.ser.cancel_read()
+                    loranode.ser.reset_input_buffer()
             printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}##"
             print(printstr)
             self.mq.put(msgstr)
+            t2 = time.time()
+            print(f"Time taken to read = {t2-t1} secs")
 
     def _keep_processing(self):
         while True:
@@ -380,11 +410,11 @@ class RFComm:
     # Non blocking, background thread
     def keep_reading(self):
         # Start background thread to read incoming data
-        reader_thread = threading.Thread(target=self._keep_reading_from_rf, daemon=True)
+        reader_thread = threading.Thread(target=self._keep_reading_from_rf)
         # TODO fix and make it a clean exit on self deletion
         reader_thread.start()
 
-        processor_thread = threading.Thread(target=self._keep_processing, daemon=True)
+        processor_thread = threading.Thread(target=self._keep_processing)
         processor_thread.start()
 
     def _get_msg_id(self, msgtype, dest, override_idstr = None):
@@ -451,7 +481,6 @@ class RFComm:
         payload = f"{cidstr};{i};{msg_chunks[i]}"
         msgstr = f"{msgid};{payload}"
         self._actual_send(msgstr, dest)
-        time.sleep(0.5) # Small delay to avoid flooding
 
     def _send_chunk_end(self, cidstr, dest, alldone):
         payload = cidstr
@@ -482,9 +511,9 @@ class RFComm:
         for r in range(retry_count):
             for i in chunks_undelivered:
                 self._send_chunk_i(msg_chunks, cidstr, i, dest)
-            time.sleep(0.3)
+            time.sleep(0.1)
             sent = self._send_chunk_end(cidstr, dest, alldone)
-            time.sleep(0.3)
+            time.sleep(0.1)
             with self.all_chunks_done_lock:
                 chunks_undelivered = self.msg_cunks_missing[cidstr]
                 if cidstr in self.all_chunks_done and self.all_chunks_done[cidstr]:
