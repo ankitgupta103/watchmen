@@ -86,6 +86,10 @@ class sx126x:
         self.freq = freq
         self.serial_n = serial_num
         self.power = power
+
+        self.target_baud = 115200   # <- CHANGE TO YOUR TARGET BAUD
+
+
         # Initial the GPIO for M0 and M1 Pin
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
@@ -95,16 +99,17 @@ class sx126x:
         GPIO.output(self.M1,GPIO.HIGH)
 
         # The hardware UART of Pi3B+,Pi4B is /dev/ttyS0
-        self.ser = serial.Serial(serial_num, 115200)
-        #self.ser = serial.Serial(
-        #    serial_num,
-        #    115200,             # Set the baud rate to 115200
-        #    bytesize=serial.EIGHTBITS,
-        #    parity=serial.PARITY_NONE,
-        #    stopbits=serial.STOPBITS_TWO # Crucial: set stop bits to 2
-        #)
+        print("[INFO ] Opening serial at 9600 to configure")
+        self.ser = serial.Serial(serial_num, 9600)
         self.ser.flushInput()
+
         self.set(freq,addr,power,rssi,air_speed,net_id,buffer_size,crypt,relay,lbt,wor)
+
+        print("[INFO ] Reopening serial at 115200")
+        self.ser.close()
+        time.sleep(0.2)
+        self.ser = serial.Serial(serial_num, self.target_baud)
+        self.ser.flushInput()
 
     def set(self,freq,addr,power,rssi,air_speed=2400,\
             net_id=0,buffer_size = 240,crypt=0,\
