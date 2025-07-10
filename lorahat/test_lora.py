@@ -6,7 +6,7 @@ import sys
 import numpy
 
 FREQ = 868
-AIRSPEED = 2400
+AIRSPEED = 62500  # 62500 bps is the maximum speed for SX126x
 
 MIN_SLEEP = 0.3
 ACK_SLEEP = 1
