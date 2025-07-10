@@ -39,8 +39,8 @@ node = sx126x.sx126x(
 print("\nPrinting config being sent to module...")
 node.describe_config()
 
-print("Reading Lora settings...")
-node.get_settings()
+# print("Reading Lora settings...")
+# node.get_settings()
 
 def send_message(msgstr, dest, ackneeded=False, rssicheck=False):
     if len(msgstr) > 225:
