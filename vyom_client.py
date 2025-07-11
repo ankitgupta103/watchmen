@@ -4,15 +4,14 @@ from typing import Union
 from vyomcloudbridge.services.queue_writer_json import QueueWriterJson
 from vyomcloudbridge.utils.logger_setup import setup_logger
 from vyomcloudbridge.utils.configs import Configs
-from vyomcloudbridge.utils.common import (
-    get_mission_upload_dir
-)
+from vyomcloudbridge.utils.common import get_mission_upload_dir
 from vyomcloudbridge.constants.constants import default_mission_id
 import json
 import logging
 
 import threading
 from vyomcloudbridge.services.root_store import RootStore
+from constants import HN_TO_MACHINE_ID
 
 
 class VyomClient:
@@ -32,20 +31,21 @@ class VyomClient:
         self.machine_config = Configs.get_machine_config()
         self.machine_id = self.machine_config.get("machine_id", "-") or "-"
         self.organization_id = self.machine_config.get("organization_id", "-") or "-"
-        self.HN_TO_VYOM_ID = {
-            6: 201,
-            7: 202,
-            8: 203,
-        }
+        self.HN_TO_VYOM_ID = HN_TO_MACHINE_ID
         self.expiration_time = 5000  # milisecond
         self.location_cache = {}  # Cache for last known location per node
 
         try:
             self.root_store = RootStore()
-            self.logger.info("RootStore instantiated successfully in VyomClient __init__.")
+            self.logger.info(
+                "RootStore instantiated successfully in VyomClient __init__."
+            )
         except Exception as e:
-            self.logger.error(f"Error instantiating RootStore in VyomClient __init__: {e}", exc_info=True)
-            self.root_store = None # Handle case where it fails
+            self.logger.error(
+                f"Error instantiating RootStore in VyomClient __init__: {e}",
+                exc_info=True,
+            )
+            self.root_store = None  # Handle case where it fails
 
     def on_image_arrive(
         self,
@@ -141,7 +141,7 @@ class VyomClient:
             }
 
             self.logger.info(f"[on_event_arrive] Payload: {payload}")
-            
+
             epoch_ms = int(time.time() * 1000)
             filename = f"{epoch_ms}.json"
             self.writer.write_message(
@@ -170,9 +170,8 @@ class VyomClient:
         timestamp: str = None, lat: int=None, long: int=None
         """
         location = None
-        health_status = 0 # 0: Offline, 1: Healthy, 2: Maintenance 
+        health_status = 0  # 0: Offline, 1: Healthy, 2: Maintenance
 
-        self.logger.info(f"[on_hb_arrive] Called with node_hn={node_hn}, lat={lat}, long={long}, timestamp={timestamp}")
         try:
             if not node_hn in self.HN_TO_VYOM_ID:
                 self.logger.error(
@@ -184,29 +183,33 @@ class VyomClient:
 
             if timestamp is None:
                 timestamp = datetime.now(timezone.utc).isoformat()
-            self.logger.debug(f"[on_hb_arrive] Using timestamp: {timestamp}")
 
             cached_location = self.location_cache.get(node_hn)
-            self.logger.debug(f"[on_hb_arrive] Cached location for {node_hn}: {cached_location}")
             if cached_location is None:
-                cached_location =  {"lat": None, "long": None, "timestamp": epoch_ms}
-                            
+                cached_location = {"lat": None, "long": None, "timestamp": epoch_ms}
+
             new_location = None
             if lat is not None and long is not None:
                 new_location = {"lat": lat, "long": long, "timestamp": epoch_ms}
-                self.logger.debug(f"[on_hb_arrive] New location provided: {new_location}")
+                self.logger.debug(
+                    f"[on_hb_arrive] New location provided: {new_location}"
+                )
 
             if new_location:
                 self.location_cache[node_hn] = new_location
                 location = new_location
-                health_status = 1 # Healthy
+                health_status = 1  # Healthy
             elif cached_location:
-                self.logger.info(f"[on_hb_arrive] No new location, using cached for {node_hn}.")
+                self.logger.info(
+                    f"[on_hb_arrive] No new location, using cached for {node_hn}."
+                )
                 location = cached_location
                 health_status = 1
             else:
-                self.logger.info(f"[on_hb_arrive] No location data available for {node_hn}, setting to Maintenance.")
-                health_status = 2 # Maintenance
+                self.logger.info(
+                    f"[on_hb_arrive] No location data available for {node_hn}, setting to Maintenance."
+                )
+                health_status = 2  # Maintenance
 
             payload = {
                 "machine_id": vyom_machine_id,
@@ -239,19 +242,20 @@ class VyomClient:
         except Exception as e:
             self.logger.error(f"Error setting location in VyomClient: {e}")
 
-
     def _send_central_unit_hb(self, lat: Union[int, float], long: Union[int, float]):
         """
         Helper function to send central unit heartbeat data to RootStore.
         This function will be run in a separate thread.
         """
         if self.root_store is None:
-            self.logger.error("RootStore instance is not available. Cannot send central unit heartbeat.")
+            self.logger.error(
+                "RootStore instance is not available. Cannot send central unit heartbeat."
+            )
             return
 
         try:
             # --- CHANGE: Use the pre-instantiated self.root_store ---
-            store = self.root_store 
+            store = self.root_store
             # --------------------------------------------------------
 
             epoch_ms = int(time.time() * 1000)
@@ -265,18 +269,29 @@ class VyomClient:
             store.cleanup()
             self.logger.info("Central unit heartbeat data sent to RootStore.")
         except Exception as e:
-            self.logger.error(f"Error sending central unit heartbeat to RootStore: {e}", exc_info=True)
+            self.logger.error(
+                f"Error sending central unit heartbeat to RootStore: {e}", exc_info=True
+            )
 
-    def on_central_unit_hb_arrive(self, lat: Union[int, float], long: Union[int, float]):
+    def on_central_unit_hb_arrive(
+        self, lat: Union[int, float], long: Union[int, float]
+    ):
         """
         Function to handle heartbeat from the central unit.
         It will send the GPS lat and long to the RootStore on a different thread.
         """
-        self.logger.info(f"[on_central_unit_hb_arrive] Called with lat={lat}, long={long}")
+        self.logger.info(
+            f"[on_central_unit_hb_arrive] Called with lat={lat}, long={long}"
+        )
         # Make sure the target is correct: self._send_central_unit_hb
-        hb_thread = threading.Thread(target=self._send_central_unit_hb, args=(lat, long,))
+        hb_thread = threading.Thread(
+            target=self._send_central_unit_hb,
+            args=(
+                lat,
+                long,
+            ),
+        )
         hb_thread.start()
-
 
     def cleanup(self):
         try:
@@ -312,12 +327,10 @@ if __name__ == "__main__":
         # test on_hb_arrive
         client.on_hb_arrive(node_hn="rpi4", lat=75.66666, long=73.0589455)
 
-
         # test on_central_unit_hb_arrive
         client.on_central_unit_hb_arrive(lat=76.987934, long=76.937954)
         # Give the thread some time to execute
-        time.sleep(2) 
-
+        time.sleep(2)
 
     except Exception as e:
         client.logger.error(f"Getting Error in running examples: {str(e)}")
