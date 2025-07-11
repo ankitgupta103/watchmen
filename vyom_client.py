@@ -33,12 +33,12 @@ class VyomClient:
         self.machine_id = self.machine_config.get("machine_id", "-") or "-"
         self.organization_id = self.machine_config.get("organization_id", "-") or "-"
         self.HN_TO_VYOM_ID = {
-            "rpi1": 208,
-            "rpi2": 206,
-            "rpi3": 207,
-            "A": 208,
-            "B": 206,
-            "C": 207,
+            "rpi6": 201,
+            "rpi7": 202,
+            "rpi8": 203,
+            6: 201,
+            7: 202,
+            8: 203,
         }
         self.expiration_time = 5000  # milisecond
         self.location_cache = {}  # Cache for last known location per node

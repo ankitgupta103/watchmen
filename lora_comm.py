@@ -373,7 +373,8 @@ class RFComm:
             r_buff = b''
             if bytecount < 4:
                 r_buff = loranode.ser.read(bytecount)
-                print(f"Reading too few bytes, seems like an error")
+                print(f"Reading too few bytes, seems like an error : {r_buff}")
+                return
             else:
                 r_buff = loranode.ser.read(4)
                 sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
