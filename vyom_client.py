@@ -49,7 +49,7 @@ class VyomClient:
 
     def on_image_arrive(
         self,
-        node_hn: str,
+        node_hn: int,
         image: bytes,
         filename: str = None,
         timestamp: str = None,
@@ -93,7 +93,7 @@ class VyomClient:
     # TODO: Add event severity to the payload
     def on_event_arrive(
         self,
-        node_hn: str,
+        node_hn: int,
         event_id: str = None,
         timestamp: str = None,
         eventstr: str = None,
@@ -161,7 +161,7 @@ class VyomClient:
 
     def on_hb_arrive(
         self,
-        node_hn: str,
+        node_hn: int,
         lat: Union[int, float] = None,
         long: Union[int, float] = None,
         timestamp: str = None,
