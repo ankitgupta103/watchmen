@@ -21,7 +21,7 @@ MAX_CHUNK_SIZE = 210
 
 FREQ = 868
 AIRSPEED = 62500
-MIN_SLEEP_READ = 0.03
+MIN_SLEEP_READ = 0.05
 MIN_SLEEP_WRITE = 0.1
 
 hname = socket.gethostname()
