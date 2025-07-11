@@ -20,9 +20,9 @@ MAX_DATA_SIZE = 230
 MAX_CHUNK_SIZE = 210
 
 FREQ = 868
-AIRSPEED = 2400
+AIRSPEED = 62500
 MIN_SLEEP_READ = 0.03
-MIN_SLEEP_WRITE = 1.0
+MIN_SLEEP_WRITE = 0.1
 
 hname = socket.gethostname()
 my_addr = constants.HN_ID[hname]
@@ -104,6 +104,7 @@ class RFComm:
 
         self.setup_rf()
         time.sleep(0.5)
+        loranode.describe_config()
 
     def setup_rf(self):
         pass
@@ -635,6 +636,7 @@ def main():
         # test_send_types(rf, devid, dest)
         #test_send_long_msg(rf, dest, 500) # Assumes its an image
         transmission_stats(rf, dest, 3)
+        rf.print_status()
         test_send_img(rf, "pencil.jpg", dest)
         rf.print_status()
         time.sleep(20)
