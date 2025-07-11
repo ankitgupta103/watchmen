@@ -1,4 +1,4 @@
-YOLOMODELNAME="yolov8n.pt"
+YOLOMODELNAME = "yolov8n.pt"
 
 DEVICE_TYPE_CAM = "CAMUNIT"
 DEVICE_TYPE_COMMAND = "COMMAND"
@@ -44,29 +44,32 @@ PRIORITY_HIGH = 2
 RPI_SERIAL_FILENAME = "/sys/firmware/devicetree/base/serial-number"
 
 node_layout = [
-        ["R", "Q", "P", "O", "N"],
-        ["S", "F", "E", "D", "M"],
-        ["T", "G", "A", "C", "L"],
-        ["U", "H", "I", "B", "K"],
-        ["V", "W", "X", "Y", "J", "Z"]
-        ]
+    ["R", "Q", "P", "O", "N"],
+    ["S", "F", "E", "D", "M"],
+    ["T", "G", "A", "C", "L"],
+    ["U", "H", "I", "B", "K"],
+    ["V", "W", "X", "Y", "J", "Z"],
+]
 
 NO_DEST = "X"
 
 # 0 is an error here
 HN_ID = {
-        "rpi6" : 6,
-        "rpi7" : 7,
-        "rpi8" : 8,
-        }
+    "rpi6": 6,
+    "rpi7": 7,
+    "rpi8": 8,
+}
+
+HN_TO_MACHINE_ID = {
+    6: 201,
+    7: 202,
+    8: 203,
+}
 
 # 7 is CC
 # First has camera,
 # Last is CC
 # Everything in between is passthrough.
-NEXT_DEST_MAP = {
-        8 : 7,
-        6 : 8
-        }
+NEXT_DEST_MAP = {8: 7, 6: 8}
 
 # PATH_DEMOB = ["C", "D", "A"]
