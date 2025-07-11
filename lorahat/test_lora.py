@@ -85,7 +85,7 @@ def print_status():
 
 def send_messages():
     c180=""
-    for i in range(1):
+    for i in range(15):
         c180 += "0123456789"
     for i in range(10000):
         if i > 0 and i % 10 == 0:
