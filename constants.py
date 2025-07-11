@@ -60,12 +60,13 @@ HN_ID = {
         "rpi8" : 8,
         }
 
+# 7 is CC
 # First has camera,
 # Last is CC
 # Everything in between is passthrough.
 NEXT_DEST_MAP = {
-        7 : 8,
-        6 : 7
+        8 : 7,
+        6 : 8
         }
 
 # PATH_DEMOB = ["C", "D", "A"]
