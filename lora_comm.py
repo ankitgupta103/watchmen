@@ -408,8 +408,11 @@ class RFComm:
     def _keep_monitoring_read(self):
         while True:
             time_since_last_msg = time.time() - self.last_receive_ts
-            if time_since_last_msg > 10:#(5*constants.HB_TIME_SEC):
-                sys.exit(f"Havent received anything in {time_since_last_msg} secs, killing to get respawned")
+            print(time_since_last_msg)
+            if time_since_last_msg > (5*constants.HB_TIME_SEC):
+                print(f"Havent received anything in {time_since_last_msg} secs, killing to get respawned")
+                sys.exit(1)
+                print("Exiting2")
                 # Ideally can reset lora but that code isnt working for now
                 self.setup_rf()
                 print("reset lora node")
@@ -444,8 +447,8 @@ class RFComm:
         processor_thread = threading.Thread(target=self._keep_processing)
         processor_thread.start()
         
-        monitor_thread = threading.Thread(target=self._keep_monitoring_read)
-        monitor_thread.start()
+        #monitor_thread = threading.Thread(target=self._keep_monitoring_read)
+        #monitor_thread.start()
 
     def _get_msg_id(self, msgtype, dest, override_idstr = None):
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:
