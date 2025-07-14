@@ -30,20 +30,8 @@ print(f"Running with my_addr = {my_addr}")
 
 # This controls the manual acking on unicast (non chunked) messages
 ACKING_ENABLED = True
-FLAKINESS = 0  # 0-100 %
+FLAKINESS = 5  # 0-100 %
         
-# === LoRa Module Initialization ===
-loranode = lorahat.sx126x.sx126x(
-    serial_num="/dev/ttyAMA0",  # or /dev/serial0 if that's what works
-    freq=FREQ,
-    addr=my_addr,
-    power=22,
-    rssi=False,
-    air_speed=AIRSPEED,
-    buffer_size=240,
-    relay=False
-)
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -87,6 +75,7 @@ class RFComm:
     all_chunks_done = {} # cid -> True
     all_chunks_done_lock = threading.Lock()
 
+
     def __init__(self, devid):
         self.devid = devid
 
@@ -102,12 +91,28 @@ class RFComm:
 
         self.mq = queue.Queue()
 
+        self.last_receive_ts = time.time()
+        self.loranode_read_lock = threading.Lock()
+        self.loranode_write_lock = threading.Lock()
+
+        self.loranode = None
         self.setup_rf()
         time.sleep(0.5)
-        loranode.describe_config()
+        self.loranode.describe_config()
 
     def setup_rf(self):
-        pass
+        with self.loranode_read_lock:
+            del self.loranode
+            self.loranode = lorahat.sx126x.sx126x(
+                serial_num="/dev/ttyAMA0",  # or /dev/serial0 if that's what works
+                freq=FREQ,
+                addr=my_addr,
+                power=22,
+                rssi=False,
+                air_speed=AIRSPEED,
+                buffer_size=240,
+                relay=False
+            )
 
     def add_node(self, node):
         self.node = node
@@ -336,11 +341,12 @@ class RFComm:
             bytes([offset_freq]) +
             bytes([my_addr >> 8]) +
             bytes([my_addr & 0xFF]) +
-            bytes([loranode.offset_freq]) +
+            bytes([self.loranode.offset_freq]) +
             bytes([payload_len]) +
             payload.encode()
         )
-        loranode.send(data)
+        with self.loranode_write_lock:
+            self.loranode.send(data)
         print(f"[SENT len {payload_len}] {payload} to {dest}")
         if ackneeded or rssicheck:
             time.sleep(MIN_SLEEP_WRITE)
@@ -350,10 +356,10 @@ class RFComm:
  
     def _read_from_rf_exp(self):
         t1 = time.time()
-        r_buff = loranode.ser.read(4)
+        r_buff = self.loranode.ser.read(4)
         sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
         payload_len = int(r_buff[3])
-        r_buff = loranode.ser.read(payload_len)
+        r_buff = self.loranode.ser.read(payload_len)
         msgstr = r_buff.decode()
         printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}##"
         print(printstr)
@@ -363,29 +369,30 @@ class RFComm:
         print(f"Time taken to read = {t2-t1} secs")
 
     def _read_from_rf(self):
-        bytecount = loranode.ser.inWaiting()
+        bytecount = self.loranode.ser.inWaiting()
         if bytecount > 0:
             t1 = time.time()
             print(f"Reading at time {t1}")
             time.sleep(MIN_SLEEP_READ) # Too long :-(
-            bytecount = loranode.ser.inWaiting()
+            bytecount = self.loranode.ser.inWaiting()
             print(f"Going to read {bytecount} bytes from buffer")
             r_buff = b''
             if bytecount < 4:
-                r_buff = loranode.ser.read(bytecount)
+                r_buff = self.loranode.ser.read(bytecount)
                 print(f"Reading too few bytes, seems like an error : {r_buff}")
                 return
             else:
-                r_buff = loranode.ser.read(4)
+                r_buff = self.loranode.ser.read(4)
                 sender_addr = int(r_buff[0]<<8) + int(r_buff[1])
                 payload_len = int(r_buff[3])
-                r_buff = loranode.ser.read(payload_len)
+                r_buff = self.loranode.ser.read(payload_len)
                 msgstr = r_buff.decode()
                 if bytecount > payload_len + 4:
                     print(f" ===========> We seem to have dangling data of size : {bytecount - payload_len - 4}")
-                    loranode.ser.read(bytecount - payload_len - 4)
-                    loranode.ser.cancel_read()
-                    loranode.ser.reset_input_buffer()
+                    self.loranode.ser.read(bytecount - payload_len - 4)
+                    self.loranode.ser.cancel_read()
+                    self.loranode.ser.reset_input_buffer()
+            self.last_receive_ts = time.time()
             printstr = f"## Received ## ## From @{sender_addr} : Msg = {msgstr}##"
             print(printstr)
             self.mq.put(msgstr)
@@ -397,17 +404,35 @@ class RFComm:
             msgstr = self.mq.get()
             self._process_read_message(msgstr)
             self.mq.task_done()
+    
+    def _keep_monitoring_read(self):
+        while True:
+            time_since_last_msg = time.time() - self.last_receive_ts
+            if time_since_last_msg > 10:#(5*constants.HB_TIME_SEC):
+                sys.exit(f"Havent received anything in {time_since_last_msg} secs, killing to get respawned")
+                # Ideally can reset lora but that code isnt working for now
+                self.setup_rf()
+                print("reset lora node")
+                time.sleep(1)
+                self.loranode.describe_config()
+
+    def _keep_processing(self):
+        while True:
+            msgstr = self.mq.get()
+            self._process_read_message(msgstr)
+            self.mq.task_done()
 
     def _keep_reading_from_rf(self):
         while True:
-            try:
-                self._read_from_rf()
-            except IndexError as i:
-                print(f"[INFO ] No data received .. {i}")
-                continue
-            except Exception as e:
-                print(f"[ERROR] Receiving failed: {e}")
-                continue
+            with self.loranode_read_lock:
+                try:
+                    self._read_from_rf()
+                except IndexError as i:
+                    print(f"[INFO ] No data received .. {i}")
+                    continue
+                except Exception as e:
+                    print(f"[ERROR] Receiving failed: {e}")
+                    continue
 
     # Non blocking, background thread
     def keep_reading(self):
@@ -418,6 +443,9 @@ class RFComm:
 
         processor_thread = threading.Thread(target=self._keep_processing)
         processor_thread.start()
+        
+        monitor_thread = threading.Thread(target=self._keep_monitoring_read)
+        monitor_thread.start()
 
     def _get_msg_id(self, msgtype, dest, override_idstr = None):
         if msgtype == constants.MESSAGE_TYPE_CHUNK_ITEM:

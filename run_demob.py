@@ -128,7 +128,7 @@ class CommandCenter:
         # Initial send on startup
         self.hb_central()
         while True:
-            time.sleep(30)  # Send heartbeat every 1 minute
+            time.sleep(constants.HB_TIME_SEC)  # Send heartbeat every 1 minute
             self.hb_central()
 
     def _start_central_heartbeat(self):
@@ -528,7 +528,7 @@ class DevUnit:
         # self.send_gps() # Temporatily turning off gps
         while True:
             self.send_heartbeat(self.photos_taken, len(self.critical_images_processed))
-            time.sleep(60)  # Every 1 min
+            time.sleep(HB_TIME_SEC)  # Every 1 min
 
     # Non blocking, background thread
     def keep_beating_heart(self):

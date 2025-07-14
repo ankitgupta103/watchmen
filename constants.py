@@ -66,6 +66,8 @@ HN_TO_MACHINE_ID = {
     8: 203,
 }
 
+HB_TIME_SEC = 60
+
 # 7 is CC
 # First has camera,
 # Last is CC
