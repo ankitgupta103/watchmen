@@ -528,7 +528,7 @@ class DevUnit:
         # self.send_gps() # Temporatily turning off gps
         while True:
             self.send_heartbeat(self.photos_taken, len(self.critical_images_processed))
-            time.sleep(HB_TIME_SEC)  # Every 1 min
+            time.sleep(constants.HB_TIME_SEC)  # Every 1 min
 
     # Non blocking, background thread
     def keep_beating_heart(self):
