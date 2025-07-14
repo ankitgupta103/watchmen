@@ -55,12 +55,14 @@ NO_DEST = "X"
 
 # 0 is an error here
 HN_ID = {
+    "rpi1": 1,
     "rpi6": 6,
     "rpi7": 7,
     "rpi8": 8,
 }
 
 HN_TO_MACHINE_ID = {
+    1: 208,
     6: 201,
     7: 202,
     8: 203,
@@ -72,6 +74,6 @@ HB_TIME_SEC = 60
 # First has camera,
 # Last is CC
 # Everything in between is passthrough.
-NEXT_DEST_MAP = {8: 7, 6: 8}
+NEXT_DEST_MAP = {8: 7, 1: 8}
 
 # PATH_DEMOB = ["C", "D", "A"]
