@@ -8,11 +8,11 @@ print_lock = asyncio.Lock()
 event = asyncio.Event()
 
 # A task that prints a message every `delay_ms`
-async def print_task(name, delay_ms, max_count=5):
+async def print_task(name, delay_ms, max_count=5):    # async def: defines an asynchronous coroutine.
     for i in range(max_count):
-        async with print_lock:  # Only one task can print at a time
+        async with print_lock:  # Only one task can print at a time...  # async with print_lock: ensures exclusive access to printing.
             print(f"[{name}] Count: {i}")
-        await asyncio.sleep_ms(delay_ms)
+        await asyncio.sleep_ms(delay_ms)  # await asyncio.sleep_ms: async sleep in milliseconds.
 
     # After finishing, signal the event if it's Task A
     if name == "Task A":
@@ -22,7 +22,8 @@ async def print_task(name, delay_ms, max_count=5):
 # A task that waits for an event
 async def event_waiting_task():
     print("[Task B] Waiting for event from Task A...")
-    await event.wait()
+    # Pauses here until event is set 
+    await event.wait()       # event.wait() suspends execution until event.set() is called.
     print("[Task B] Got event! Continuing...")
 
 # A task demonstrating wait_for_ms with timeout

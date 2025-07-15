@@ -1,4 +1,5 @@
 # import uasyncio as asyncio
+import asyncio
 import sys
 import time
 # from machine import UART
@@ -17,7 +18,7 @@ MIN_SLEEP = 0.3
 ACK_SLEEP = 1.0
 
 # === Simulated sys.argv for MicroPython ===
-# argv = sys.argv if hasattr(sys, "argv") else ["main.py", "7"]
+# argv = sys.argv if hasattr(sys, "argv") else ["main.py", "1"]
 # if len(argv) < 2:
 #     print("Usage: main.py <device_id>")
 #     sys.exit()
@@ -41,7 +42,11 @@ else:
 # uart.init(UART_BAUDRATE, bits=8, parity=None, stop=1)
 
 # === UART Init in Rpi ===
-uart = serial.Serial(USBA_PORT, USBA_BAUDRATE, timeout=1)
+try:
+    uart = serial.Serial(USBA_PORT, USBA_BAUDRATE, timeout=0.1)
+except serial.SerialException as e:
+    print(f"[ERROR] Could not open serial port {USBA_PORT}: {e}")
+    sys.exit(1)
 
 
 msgs_sent = []
@@ -94,18 +99,31 @@ async def send_messages():
         msg2 = f"CHECKACK-{i}-{long_string}"
         await send_message(msg2, peer_addr, ackneeded=True)
 
-# === Async Receiver ===
+# # === Async Receiver for openmv ===
+# async def uart_receiver():
+#     buffer = b""
+#     while True:
+#         if uart.any():
+#             byte = uart.read(1)
+#             if byte == b'\n':
+#                 process_message(buffer)
+#                 buffer = b""
+#             else:
+#                 buffer += byte
+#         await asyncio.sleep(0.01)
+
+# === Async Receiver for rpi ===
 async def uart_receiver():
     buffer = b""
     while True:
-        if uart.any():
+        await asyncio.sleep(0.01)
+        while uart.in_waiting > 0:
             byte = uart.read(1)
             if byte == b'\n':
                 process_message(buffer)
                 buffer = b""
             else:
                 buffer += byte
-        await asyncio.sleep(0.01)
 
 def process_message(data):
     if len(data) < 2:
@@ -132,3 +150,7 @@ try:
     asyncio.run(main())
 except KeyboardInterrupt:
     print("Stopped.")
+
+
+
+
