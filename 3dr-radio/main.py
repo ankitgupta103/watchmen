@@ -94,7 +94,7 @@ async def send_messages():
     for i in range(10000):
         if i > 0 and i % 10 == 0:
             print_status()
-        msg1 = f"RSSICHECK-{i}"
+        msg1 = f"CHECK-{i}"
         await send_message(msg1, peer_addr, ackneeded=False)
         msg2 = f"CHECKACK-{i}-{long_string}"
         await send_message(msg2, peer_addr, ackneeded=True)
