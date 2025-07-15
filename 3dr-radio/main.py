@@ -14,7 +14,7 @@ USBA_PORT = "/dev/ttyUSB0"
 USBA_BAUDRATE = 57600
 
 # === Constants ===
-MIN_SLEEP = 0.3
+MIN_SLEEP = 0.1
 ACK_SLEEP = 0.3
 
 # === Simulated sys.argv for MicroPython ===
