@@ -1,8 +1,8 @@
 import serial
+import base64
 
-PORT = "/dev/ttyUSB0"  # Adjust to your 3DR USB port
-BAUD = 57600
-CHUNK_SIZE = 240
+PORT = "/dev/ttyUSB0"  # Change to the correct port
+BAUD = 56700
 
 ser = serial.Serial(PORT, BAUD, timeout=1)
 image_count = 1
@@ -14,30 +14,23 @@ while True:
     while True:
         line = ser.readline()
         if b"<START>" in line:
-            print("Image start detected.")
+            print("Start of image detected.")
             break
 
-    filename = f"image_{image_count}.jpg"
+    filename = f"test_image_{image_count}.jpg"
     with open(filename, "wb") as f:
-        buffer = b""
         while True:
-            byte = ser.read(1)
-            if not byte:
+            line = ser.readline()
+            if not line:
                 continue
-
-            buffer += byte
-
-            # Check if <END> marker is received
-            if b"<END>" in buffer:
-                end_index = buffer.find(b"<END>")
-                f.write(buffer[:end_index])  # Write only up to <END>
-                print("Image end detected.")
+            if b"<END>" in line:
+                print("End of image detected.")
                 break
-
-            # Write data in chunks or flush as needed
-            if len(buffer) >= CHUNK_SIZE:
-                f.write(buffer[:CHUNK_SIZE])
-                buffer = buffer[CHUNK_SIZE:]
+            try:
+                decoded = base64.b64decode(line.strip())
+                f.write(decoded)
+            except Exception as e:
+                print("[ERROR] Base64 decode failed:", e)
 
     print(f"Image saved as {filename}\n")
     image_count += 1
