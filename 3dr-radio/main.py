@@ -15,7 +15,7 @@ USBA_BAUDRATE = 57600
 
 # === Constants ===
 MIN_SLEEP = 0.3
-ACK_SLEEP = 1.0
+ACK_SLEEP = 0.3
 
 # === Simulated sys.argv for MicroPython ===
 # argv = sys.argv if hasattr(sys, "argv") else ["main.py", "1"]
