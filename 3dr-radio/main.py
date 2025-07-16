@@ -1,11 +1,11 @@
-import uasyncio as asyncio
 #import asyncio
+#import serial
+from machine import UART
+import uasyncio as asyncio
 import sys
 import utime
 import random
-from machine import UART
 import omv
-#import serial
 
 print_lock = asyncio.Lock() 
 
@@ -107,6 +107,7 @@ async def send_msg(msgtype, msgstr, dest):
             return
         else:
             print(f"Still waiting for ack for {mid} # {i}")
+            await asyncio.sleep(ACK_SLEEP)
     print(f"Failed to get ack for message {mid} # {i}")
     # Retry
 
@@ -182,17 +183,18 @@ async def uart_receiver():
 def process_message(data):
     if len(data) < 8:
         return
-    mid = data[0:6]
-    sender = mid[1]
-    receiver = mid[2]
+    mid = data[0:6].decode()
+    msgtype = mid[0]
+    sender = int(mid[1])
+    receiver = int(mid[2])
     msg = data[7:].decode().strip()
     if my_addr != receiver:
         print(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
     print(f"[RECV ] MID: {mid}: {msg} at {time_msec()}")
     msgs_recd.append((mid, msg, time_msec()))
-    if not msg.startswith("Ack"):
-        asyncio.create_task(send_msg("A", f"{msgid}", peer_addr))
+    if msgtype != "A":
+        asyncio.create_task(send_msg("A", f"{mid}", peer_addr))
 
 # === Main Entry ===
 async def main():
