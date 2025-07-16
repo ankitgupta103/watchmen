@@ -68,11 +68,18 @@ def get_msg_id(msgtype, dest):
     mid = f"{msgtype}{my_addr}{dest}{rrr}"
     return mid
 
+def ack_needed(msgtype):
+    if msgtype == "A":
+        return False
+    if msgtype == "H":
+        return True
+    return False
+
 def radio_send(data):
     uart.write(data)
 
 # === Send Function ===
-async def send_msg(msgtype, msgstr, dest, ackneeded=False):
+async def send_msg(msgtype, msgstr, dest):
     if len(msgstr) > 225:
         async with print_lock:
             print("[NOT SENDING] Msg too long")
@@ -81,15 +88,32 @@ async def send_msg(msgtype, msgstr, dest, ackneeded=False):
     datastr = f"{mid};{msgstr}\n"
     data = datastr.encode()
     radio_send(data)
-    msgs_sent.append((datastr, time_msec()))
+    ackneeded == ack_needed(msgtype)
+    unackedid = 0
+    if ackneeded:
+        unackedid = len(msgs_unacked)
+        msgs_unacked.append((mid, msgstr, time_msec()))
+    else:
+        msgs_sent.append((mid, msgstr, time_msec()))
     async with print_lock:
         print(f"[SENT ] {datastr} to {dest} at {time_msec()}")
     await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
+    if not ackneeded:
+        return
+    for i in range(3):
+        if ack_time(mid) > 0:
+            print(f"Msg {mid} : was acked in {ack_time} msecs")
+            msgs_sent.append(msgs_unacked.pop(unackedid))
+            return
+        else:
+            print(f"Still waiting for ack for {mid} # {i}")
+    print(f"Failed to get ack for message {mid} # {i}")
+    # Retry
 
 # === Message Handling ===
-def ack_time(msg):
+def ack_time(mid):
     for (mid, msg, t) in msgs_recd:
-        if mid == f"Ack:{msg}":
+        if mid[0] == "A" and mid == msg:
             return t
     return -1
 
@@ -124,7 +148,9 @@ async def send_messages():
     long_string = ""
     for i in range(18):
         long_string += "_0123456789"
-    for i in range(10000):
+    i = 0
+    while True:
+        i = i + 1
         if i > 0 and i % 10 == 0:
             asyncio.create_task(print_status())
         msg = f"MSG-{i}-{long_string}"
@@ -172,13 +198,8 @@ def process_message(data):
 async def main():
     print(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(uart_receiver())
-    print(get_msg_id("H", 2))
-    if my_addr == 1:
-        await send_messages()        
-        await asyncio.sleep(3600)
-    elif my_addr == 2:
-        await asyncio.sleep(2)
-        await send_messages()
+    await send_messages() 
+    # await asyncio.sleep(3600000)
 
 try:
     asyncio.run(main())
