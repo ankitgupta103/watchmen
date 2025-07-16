@@ -88,7 +88,7 @@ async def send_msg(msgtype, msgstr, dest):
     datastr = f"{mid};{msgstr}\n"
     data = datastr.encode()
     radio_send(data)
-    ackneeded == ack_needed(msgtype)
+    ackneeded = ack_needed(msgtype)
     unackedid = 0
     if ackneeded:
         unackedid = len(msgs_unacked)
