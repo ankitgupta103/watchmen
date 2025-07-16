@@ -2,6 +2,7 @@ import sensor
 import image     
 import machine   
 import time      
+import os 
 
 # === CAMERA CONFIGURATION ===
 sensor.reset()  # Resets and initializes the camera sensor. Always call this first.
@@ -34,7 +35,7 @@ sensor.set_auto_gain(False)
 # - False : Manual control (recommended for consistent lighting)
 
 
-sensor.set_auto_whitebal(False)
+sensor.set_auto_whitebal(True)
 # Disable automatic white balance. Fixes color in consistent lighting.
 # Options:
 # - True  : Automatic white balance (default, can cause color shifts)   
@@ -129,3 +130,67 @@ while True:
     # if stats[5] > threshold:            # If lighting difference > threshold
     #     print("Motion detected!")
 
+
+
+# import sensor       # Controls the camera sensor
+# import image        # Image processing (detection, drawing, etc.)
+# import machine      # Access to hardware like LEDs
+# import time         # Timing utilities
+# import os           # File system (SD card)
+# import random       # Generate random filenames
+
+# # === CAMERA INITIALIZATION ===
+# sensor.reset()
+# sensor.set_pixformat(sensor.RGB565)       # Use RGB565 for color (alternatively GRAYSCALE for speed)
+# sensor.set_framesize(sensor.QVGA)         # 320x240 resolution (QVGA)
+# sensor.set_auto_gain(False)               # Turn off auto gain for stable brightness
+
+# # Step 1: Let auto white balance run for a moment
+# sensor.set_auto_whitebal(True)
+# sensor.skip_frames(time=2000)             # Allow AWB and other settings to stabilize
+
+# # Step 2: Lock white balance to prevent blue tint when LED is turned on
+# sensor.set_auto_whitebal(False)
+
+# # === FPS CLOCK ===
+# clock = time.clock()
+
+# # === LED SETUP ===
+# led = machine.LED("LED_RED")  # Use red LED to indicate face detected and image saved
+
+# # === LOAD FACE DETECTION CASCADE ===
+# face_cascade = image.HaarCascade("/rom/haarcascade_frontalface.cascade", stages=25)
+
+# # === ENSURE DIRECTORY EXISTS ===
+# if "people" not in os.listdir():
+#     os.mkdir("people")  # Folder to save face images
+
+# # === MAIN LOOP ===
+# while True:
+#     clock.tick()  # Start measuring time
+#     img = sensor.snapshot()  # Capture image
+
+#     # === FACE DETECTION ===
+#     faces = img.find_features(face_cascade, threshold=0.6, scale_factor=1.5)
+
+#     if faces:
+#         for r in faces:
+#             img.draw_rectangle(r)  # Draw a box around face
+#             img.draw_string(r[0], r[1] - 10, "Face")  # Label the face
+
+#         # Indicate face detected with RED LED
+#         led.on()
+
+#         # Save image with unique filename
+#         filename = "/people/face_%d.jpg" % time.ticks_ms()
+
+#         try:
+#             img.save(filename)
+#             print("[INFO] Saved image:", filename)
+#         except Exception as e:
+#             print("[ERROR] Could not save image:", e)
+
+#         led.off()
+
+#     # Optional: Show FPS
+#     # print("FPS:", clock.fps())
