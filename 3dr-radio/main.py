@@ -1,4 +1,10 @@
-run_omv = False
+run_omv = True
+try:
+    import omv
+    print("The 'omv' library IS installed.")
+except ImportError:
+    print("The 'omv' library is NOT installed.")
+    run_omv = False
 
 if run_omv:
     from machine import UART
@@ -78,6 +84,7 @@ def ack_needed(msgtype):
 
 def radio_send(data):
     uart.write(data)
+    print(f"[SENT ] {data.decode()} at {time_msec()}")
 
 # === Send Function ===
 async def send_msg(msgtype, msgstr, dest):
@@ -87,7 +94,6 @@ async def send_msg(msgtype, msgstr, dest):
         return
     mid = get_msg_id(msgtype, dest)
     datastr = f"{mid};{msgstr}\n"
-    radio_send(datastr.encode())
     ackneeded = ack_needed(msgtype)
     unackedid = 0
     timesent = time_msec()
@@ -96,22 +102,24 @@ async def send_msg(msgtype, msgstr, dest):
         msgs_unacked.append((mid, msgstr, timesent))
     else:
         msgs_sent.append((mid, msgstr, timesent))
-    async with print_lock:
-        print(f"[SENT ] {datastr} to {dest} at {time_msec()}")
-    await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
     if not ackneeded:
+        radio_send(datastr.encode())
         return
-    for i in range(3):
-        at = ack_time(mid)
-        if at > 0:
-            print(f"Msg {mid} : was acked in {at - timesent} msecs")
-            msgs_sent.append(msgs_unacked.pop(unackedid))
-            return
-        else:
-            print(f"Still waiting for ack for {mid} # {i}")
-            await asyncio.sleep(ACK_SLEEP * 4)
-    print(f"Failed to get ack for message {mid} # {i}")
-    # Retry
+    for retry_i in range(3):
+        radio_send(datastr.encode())
+        await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
+        for i in range(3):
+            at = ack_time(mid)
+            if at > 0:
+                print(f"Msg {mid} : was acked in {at - timesent} msecs")
+                msgs_sent.append(msgs_unacked.pop(unackedid))
+                return
+            else:
+                print(f"Still waiting for ack for {mid} # {i}")
+                await asyncio.sleep(ACK_SLEEP * (i+1)) # progressively more sleep
+        print(f"Failed to get ack for message {mid} for retry # {retry_i}")
+    print(f"Failed to send message {mid}")
+
 
 # === Message Handling ===
 def ack_time(smid):
