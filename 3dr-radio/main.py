@@ -64,29 +64,27 @@ def time_msec():
         delta = int(utime.time() * 1000) - clock_start
     return delta
 
+def get_rand():
+    return(str(random.randint(100,999)))
+
 # TypeSourceDestRRRandom
 def get_msg_id(msgtype, dest):
-    rrr = random.randint(100,999)
+    rrr = get_rand()
     mid = f"{msgtype}{my_addr}{dest}{rrr}"
     return mid
 
 def ack_needed(msgtype):
     if msgtype == "A":
         return False
-    if msgtype == "H":
+    if msgtype in ["H", "B", "E"]:
         return True
     return False
 
 def radio_send(data):
     uart.write(data)
-    print(f"[SENT ] {data.decode()} at {time_msec()}")
+    print(f"[SENT ] {data.decode().strip()} at {time_msec()}")
 
-# === Send Function ===
-async def send_msg(msgtype, msgstr, dest):
-    if len(msgstr) > 225:
-        async with print_lock:
-            print("[NOT SENDING] Msg too long")
-        return
+async def send_single_msg(msgtype, msgstr, dest):
     mid = get_msg_id(msgtype, dest)
     datastr = f"{mid};{msgstr}\n"
     ackneeded = ack_needed(msgtype)
@@ -99,7 +97,7 @@ async def send_msg(msgtype, msgstr, dest):
         msgs_sent.append((mid, msgstr, timesent))
     if not ackneeded:
         radio_send(datastr.encode())
-        return
+        return (True, [])
     for retry_i in range(3):
         radio_send(datastr.encode())
         await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
@@ -108,12 +106,49 @@ async def send_msg(msgtype, msgstr, dest):
             if at > 0:
                 print(f"Msg {mid} : was acked in {at - timesent} msecs")
                 msgs_sent.append(msgs_unacked.pop(unackedid))
-                return
+                return (True, [])
             else:
                 print(f"Still waiting for ack for {mid} # {i}")
                 await asyncio.sleep(ACK_SLEEP * (i+1)) # progressively more sleep
         print(f"Failed to get ack for message {mid} for retry # {retry_i}")
     print(f"Failed to send message {mid}")
+    return (False, [])
+
+def make_chunks(msg):
+    chunks = []
+    while len(msg) > 200:
+        chunks.append(msg[0:200])
+        msg = msg[200:]
+    if len(msg) > 0:
+        chunks.append(msg)
+    return chunks
+
+# === Send Function ===
+async def send_msg(msgtype, msgstr, dest):
+    if len(msgstr) < 225:
+        succ, _ = await send_single_msg(msgtype, msgstr, dest)
+        return succ
+    imid = get_rand()
+    chunks = make_chunks(msgstr)
+    print(f"Chunking {len(msgstr)} long message with id {imid} into {len(chunks)} chunks")
+    succ, _ = await send_single_msg("B", f"{imid}:{len(chunks)}", dest)
+    if not succ:
+        print(f"Failed sending chunk begin")
+        return False
+    for i in range(len(chunks)):
+        _ = await send_single_msg("I", f"{imid}:{i}:{chunks[i]}", dest)
+    for retry_i in range(5):
+        succ, missing_chunks = await send_single_msg("E", f"", dest)
+        if not succ:
+            print(f"Failed sending chunk end")
+            break
+        if len(missing_chunks) == 1 and missing_chunks[0] == -1:
+            print(f"Successfully sent all chunks")
+            return True
+        print(f"Receiver still missing {len(missing_chunks)} chunks : {missing_chunks}")
+        for mc in missing_chunks:
+            _ = await send_single_msg("I", f"{imid}:{mc}:{chunks[mc]}", dest)
+    return False
 
 def ack_time(smid):
     for (rmid, msg, t) in msgs_recd:
@@ -187,7 +222,7 @@ def process_message(data):
 # === Async Sender ===
 async def send_messages():
     long_string = ""
-    for i in range(18):
+    for i in range(50):
         long_string += "_0123456789"
     i = 0
     while True:
