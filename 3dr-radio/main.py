@@ -20,13 +20,8 @@ import random
 
 print_lock = asyncio.Lock() 
 
-# === Constants for openmv system ===
 UART_BAUDRATE = 57600
-
-# === Constants for Rpi system ===
 USBA_BAUDRATE = 57600
-
-# === Constants ===
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.3
 
@@ -120,8 +115,6 @@ async def send_msg(msgtype, msgstr, dest):
         print(f"Failed to get ack for message {mid} for retry # {retry_i}")
     print(f"Failed to send message {mid}")
 
-
-# === Message Handling ===
 def ack_time(smid):
     for (rmid, msg, t) in msgs_recd:
         if rmid[0] == "A" and smid == msg:
@@ -153,20 +146,6 @@ async def print_status():
             print(f"[ACK Times] 50% = {mid:.2f}s, 90% = {p90:.2f}s")
             print(f"So far {len(msgs_not_acked)} messsages havent been acked")
             print(msgs_not_acked)
-
-# === Async Sender ===
-async def send_messages():
-    long_string = ""
-    for i in range(18):
-        long_string += "_0123456789"
-    i = 0
-    while True:
-        i = i + 1
-        if i > 0 and i % 10 == 0:
-            asyncio.create_task(print_status())
-        msg = f"MSG-{i}-{long_string}"
-        await send_msg("H", msg, peer_addr)
-        await asyncio.sleep(2)
 
 # === Async Receiver for openmv ===
 async def uart_receiver():
@@ -204,6 +183,20 @@ def process_message(data):
     msgs_recd.append((mid, msg, time_msec()))
     if msgtype != "A":
         asyncio.create_task(send_msg("A", f"{mid}", peer_addr))
+
+# === Async Sender ===
+async def send_messages():
+    long_string = ""
+    for i in range(18):
+        long_string += "_0123456789"
+    i = 0
+    while True:
+        i = i + 1
+        if i > 0 and i % 10 == 0:
+            asyncio.create_task(print_status())
+        msg = f"MSG-{i}-{long_string}"
+        await send_msg("H", msg, peer_addr)
+        await asyncio.sleep(2)
 
 # === Main Entry ===
 async def main():
