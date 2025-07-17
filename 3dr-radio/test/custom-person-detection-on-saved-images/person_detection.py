@@ -69,12 +69,16 @@ print(model)
 # print("Labels:", model.labels)
 
 # Ensure /processed directory exists
-if not "processed" in os.listdir("/"):
-    os.mkdir("/processed")
+# if not "processed" in os.listdir("/"):
+#     os.mkdir("/processed")
 
 
 # List all image files in /people directory
-image_files = [f for f in os.listdir("/people") if f.endswith(".jpg") or f.endswith(".bmp")]
+if "people" not in os.listdir("/"):
+    raise OSError("Directory /people not found. Please create it on the SD card.")
+
+image_files = [f for f in os.listdir("/people") if f.endswith((".jpg", ".bmp", ".png"))]
+
 
 
 for filename in image_files:
