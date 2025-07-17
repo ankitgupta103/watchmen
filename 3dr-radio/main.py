@@ -1,56 +1,54 @@
-#import asyncio
-#import serial
-from machine import UART
-import uasyncio as asyncio
+run_omv = False
+
+if run_omv:
+    from machine import UART
+    import uasyncio as asyncio
+    import omv
+    import utime
+else:
+    import asyncio
+    import serial
+    import time as utime
 import sys
-import utime
 import random
-import omv
 
 print_lock = asyncio.Lock() 
 
 # === Constants for openmv system ===
-UART_PORT = 1
 UART_BAUDRATE = 57600
 
 # === Constants for Rpi system ===
-USBA_PORT = "/dev/ttyUSB0"
 USBA_BAUDRATE = 57600
 
 # === Constants ===
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.3
 
-clock_start = utime.ticks_ms() # get millisecond counter
-
-# === Simulated sys.argv for MicroPython ===
-# argv = sys.argv if hasattr(sys, "argv") else ["main.py", "1"]
-# if len(argv) < 2:
-#     print("Usage: main.py <device_id>")
-#     sys.exit()
-
-# device_id = int(argv[1])
 my_addr = None
 peer_addr = None
 
-print("Running on device : " + omv.board_id())
-if omv.board_id() == "5D4676E05D4676E05D4676E0":
-    my_addr = 1
-    peer_addr = 2
+if run_omv:
+    print("Running on device : " + omv.board_id())
+    if omv.board_id() == "5D4676E05D4676E05D4676E0":
+        my_addr = 1
+        peer_addr = 2
+    else:
+        print("Unknown device ID for " + omv.board_id())
+        sys.exit()
+    clock_start = utime.ticks_ms() # get millisecond counter
+    UART_PORT = 1
+    uart = UART(UART_PORT, baudrate=UART_BAUDRATE, timeout=1000)
+    uart.init(UART_BAUDRATE, bits=8, parity=None, stop=1)
 else:
-    print("Unknown device ID for " + omv.board_id())
-    sys.exit()
-
-# === UART Init in Openmv ===
-uart = UART(UART_PORT, baudrate=UART_BAUDRATE, timeout=1000)
-uart.init(UART_BAUDRATE, bits=8, parity=None, stop=1)
-
-# === UART Init in Rpi ===
-#try:
-#    uart = serial.Serial(USBA_PORT, USBA_BAUDRATE, timeout=0.1)
-#except serial.SerialException as e:
-#    print(f"[ERROR] Could not open serial port {USBA_PORT}: {e}")
-#    sys.exit(1)
+    my_addr = 2
+    peer_addr = 1
+    USBA_PORT = "/dev/tty.usbserial-0001"
+    try:
+        uart = serial.Serial(USBA_PORT, USBA_BAUDRATE, timeout=0.1)
+    except serial.SerialException as e:
+        print(f"[ERROR] Could not open serial port {USBA_PORT}: {e}")
+        sys.exit(1)
+    clock_start = int(utime.time() * 1000)
 
 msgs_sent = []
 msgs_unacked = []
@@ -59,7 +57,10 @@ msgs_recd = []
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), N(ack), C(hunk), e(V)ent
 
 def time_msec():
-    delta = utime.ticks_diff(utime.ticks_ms(), clock_start) # compute time difference
+    if run_omv:
+        delta = utime.ticks_diff(utime.ticks_ms(), clock_start) # compute time difference
+    else:
+        delta = int(utime.time() * 1000) - clock_start
     return delta
 
 # TypeSourceDestRRRandom
@@ -160,25 +161,24 @@ async def send_messages():
 
 # === Async Receiver for openmv ===
 async def uart_receiver():
-    buffer = b""
-    while True:
-        if uart.any():
-            buffer = uart.readline()
-            process_message(buffer)
-        await asyncio.sleep(0.01)
-
-# === Async Receiver for rpi ===
-# async def uart_receiver():
-#     buffer = b""
-#     while True:
-#         await asyncio.sleep(0.01)
-#         while uart.in_waiting > 0:
-#             byte = uart.read(1)
-#             if byte == b'\n':
-#                 process_message(buffer)
-#                 buffer = b""
-#             else:
-#                 buffer += byte
+    if run_omv:
+        buffer = b""
+        while True:
+            if uart.any():
+                buffer = uart.readline()
+                process_message(buffer)
+            await asyncio.sleep(0.01)
+    else:
+        buffer = b""
+        while True:
+            await asyncio.sleep(0.01)
+            while uart.in_waiting > 0:
+                byte = uart.read(1)
+                if byte == b'\n':
+                    process_message(buffer)
+                    buffer = b""
+                else:
+                    buffer += byte
 
 def process_message(data):
     if len(data) < 8:
