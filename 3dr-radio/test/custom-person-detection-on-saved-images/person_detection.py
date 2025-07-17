@@ -64,7 +64,9 @@ sensor.skip_frames(time=2000)
 model = ml.Model("/rom/person_detect.tflite")
 print(model)
 
-
+# # List of clsses this model can predict
+# print("Model classes:", model.classes)
+# print("Labels:", model.labels)
 
 # Ensure /processed directory exists
 if not "processed" in os.listdir("/"):
