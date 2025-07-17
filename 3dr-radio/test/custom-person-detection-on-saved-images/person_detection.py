@@ -51,7 +51,6 @@
 
 import sensor, image, time, os
 import ml
-import tf
 
 # Dummy sensor setup (required for OpenMV runtime)
 # sensor.reset()
@@ -96,12 +95,12 @@ for filename in image_files:
 
     # Resize to model input shape
     # resized = img.resize(w, h)
-    gray_img = img.to_grayscale()
+    # gray_img = img.to_grayscale()
     # resized = img.copy(roi=(0, 0, 96, 96))  # Crop to top-left 96x96
 
-    x_offset = (gray_img.width() - w) // 2
-    y_offset = (gray_img.height() - h) // 2
-    resized = gray_img.copy(roi=(x_offset, y_offset, w, h))
+    x_offset = (img.width() - w) // 2
+    y_offset = (img.height() - h) // 2
+    resized = img.copy(roi=(x_offset, y_offset, w, h))
 
     # Run model (classification)
     result = model.predict([resized])[0].flatten().tolist()
@@ -114,11 +113,35 @@ for filename in image_files:
     print("Detected:", label, "Confidence:", confidence)
 
     # If person detected with high confidence, draw text and save
+    # if label == "person" and confidence > 0.5:
+    #     # Ensure image is in RGB565 so we can draw colored text
+    #     if img.format() != image.RGB565:
+    #         img = img.to_rgb565()
+    #     # img.draw_string(10, 10, "PERSON", color=(255, 0, 0), scale=2)
+
+    #     # Draw bounding box around the detected person
+    #     x, y, w, h = out.rect()
+    #     img.draw_rectangle(x, y, w, h, color=(255, 0, 0), thickness=2)
+
+        # If person detected with high confidence, use sliding window to locate
     if label == "person" and confidence > 0.5:
-        # Ensure image is in RGB565 so we can draw colored text
         if img.format() != image.RGB565:
             img = img.to_rgb565()
-        img.draw_string(10, 10, "PERSON", color=(255, 0, 0), scale=2)
+
+        tile_w = 96
+        tile_h = 96
+        stride = 16  # Smaller = more accurate, but slower
+
+        for y in range(0, img.height() - tile_h + 1, stride):
+            for x in range(0, img.width() - tile_w + 1, stride):
+                tile = img.copy(roi=(x, y, tile_w, tile_h))
+                tile_result = model.predict([tile])[0].flatten().tolist()
+                tile_label, tile_conf = sorted(zip(model.labels, tile_result), key=lambda x: x[1], reverse=True)[0]
+
+                if tile_label == "person" and tile_conf > 0.7:
+                    img.draw_rectangle(x, y, tile_w, tile_h, color=(255, 0, 0), thickness=2)
+
+
 
     # Save to /processed folder regardless
     save_path = "processed/" + filename
