@@ -87,35 +87,36 @@ async def send_msg(msgtype, msgstr, dest):
         return
     mid = get_msg_id(msgtype, dest)
     datastr = f"{mid};{msgstr}\n"
-    data = datastr.encode()
-    radio_send(data)
+    radio_send(datastr.encode())
     ackneeded = ack_needed(msgtype)
     unackedid = 0
+    timesent = time_msec()
     if ackneeded:
         unackedid = len(msgs_unacked)
-        msgs_unacked.append((mid, msgstr, time_msec()))
+        msgs_unacked.append((mid, msgstr, timesent))
     else:
-        msgs_sent.append((mid, msgstr, time_msec()))
+        msgs_sent.append((mid, msgstr, timesent))
     async with print_lock:
         print(f"[SENT ] {datastr} to {dest} at {time_msec()}")
     await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
     if not ackneeded:
         return
     for i in range(3):
-        if ack_time(mid) > 0:
-            print(f"Msg {mid} : was acked in {ack_time} msecs")
+        at = ack_time(mid)
+        if at > 0:
+            print(f"Msg {mid} : was acked in {at - timesent} msecs")
             msgs_sent.append(msgs_unacked.pop(unackedid))
             return
         else:
             print(f"Still waiting for ack for {mid} # {i}")
-            await asyncio.sleep(ACK_SLEEP)
+            await asyncio.sleep(ACK_SLEEP * 4)
     print(f"Failed to get ack for message {mid} # {i}")
     # Retry
 
 # === Message Handling ===
-def ack_time(mid):
-    for (mid, msg, t) in msgs_recd:
-        if mid[0] == "A" and mid == msg:
+def ack_time(smid):
+    for (rmid, msg, t) in msgs_recd:
+        if rmid[0] == "A" and smid == msg:
             return t
     return -1
 
@@ -126,16 +127,16 @@ async def print_status():
         print(f"So far sent {len(msgs_sent)} messages and received {len(msgs_recd)} messages")
     ackts = []
     msgs_not_acked = []
-    for s, t in msgs_sent:
-        if s.startswith("Ack"):
+    for mid, msg, t in msgs_sent:
+        if mid[0] == "A":
             continue
         #print("Getting ackt for " + s + "which was sent at " + str(t))
-        ackt = ack_time(s)
+        ackt = ack_time(mid)
         if ackt > 0:
             time_to_ack = ackt - t
             ackts.append(time_to_ack)
         else:
-            msgs_not_acked.append(s)
+            msgs_not_acked.append(mid)
     if ackts:
         ackts.sort()
         mid = ackts[len(ackts)//2]
