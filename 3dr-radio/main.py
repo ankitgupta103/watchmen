@@ -18,7 +18,7 @@ else:
 import sys
 import random
 
-print_lock = asyncio.Lock() 
+print_lock = asyncio.Lock()
 
 UART_BAUDRATE = 57600
 USBA_BAUDRATE = 57600
@@ -43,7 +43,7 @@ if run_omv:
 else:
     my_addr = 2
     peer_addr = 1
-    USBA_PORT = "/dev/tty.usbserial-0001"
+    USBA_PORT = "/dev/ttyUSB0"
     try:
         uart = serial.Serial(USBA_PORT, USBA_BAUDRATE, timeout=0.1)
     except serial.SerialException as e:
@@ -237,7 +237,7 @@ async def send_messages():
 async def main():
     print(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(uart_receiver())
-    await send_messages() 
+    await send_messages()
     # await asyncio.sleep(3600000)
 
 try:
