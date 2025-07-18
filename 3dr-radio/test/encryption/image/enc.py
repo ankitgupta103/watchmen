@@ -1,89 +1,100 @@
+import ucryptolib
 import os
+
 import time
 from rsa.key import newkeys
-from rsa.pkcs1 import encrypt as rsa_encrypt, decrypt as rsa_decrypt, sign, verify
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
+from rsa.pkcs1 import encrypt, decrypt, sign, verify
 
-# Load Image
-image_path = "image.jpg"
-with open(image_path, "rb") as f:
-    image_data = f.read()
+# Generate AES-256 key (32 bytes) and IV (16 bytes)
+key = os.urandom(32)
+iv = os.urandom(16)
 
-print(f"Original Image Size: {len(image_data)} bytes")
+# Load the image file
+with open("image.jpg", "rb") as f:
+    data = f.read()
 
-# AES-256 CBC Encryption
-aes_key = os.urandom(32)  # 256-bit key
-iv = os.urandom(16)       # 128-bit IV
+# PKCS7 padding
+def pad(data):
+    pad_len = 16 - (len(data) % 16)
+    return data + bytes([pad_len] * pad_len)
 
-cipher_aes = AES.new(aes_key, AES.MODE_CBC, iv)
+padded_data = pad(data)
 
+# AES-CBC Encryption
+aes = ucryptolib.aes(key, 2, iv)  # mode 2 = CBC
+encrypted_data = aes.encrypt(padded_data)
 
-start_aes = time.time()
-encrypted_image = cipher_aes.encrypt(pad(image_data, AES.block_size))
-end_aes = time.time()
-print(f"AES Encryption Time: {end_aes - start_aes:.3f} seconds")
-print(f"Encrypted Image Size: {len(encrypted_image)} bytes")
-
-# Save Encrypted Image (with IV prepended)
+# Save encrypted image (IV + encrypted data)
 with open("encrypted_image.bin", "wb") as f:
-    f.write(iv + encrypted_image)
+    f.write(iv + encrypted_data)
 
-# RSA Key Generation and AES Key Encryption
-try:
-    print("\nTesting RSA KeyGen + AES Key Encryption/Decryption:")
-    start_key = time.time()
-    (public_key, private_key) = newkeys(256)
-    end_key = time.time()
-    print(f"RSA Key Generation Time: {end_key - start_key:.3f} seconds")
+# Save AES key to transfer to PC
+with open("aes_key.bin", "wb") as f:
+    f.write(key)
 
-    # Encrypt AES key using RSA
-    start_enc = time.time()
-    rsa_encrypted_aes_key = rsa_encrypt(aes_key, public_key)
-    end_enc = time.time()
-    print(f"RSA Encryption of AES Key Time: {end_enc - start_enc:.3f} seconds")
+print("AES encryption done. Files saved:")
+print("- encrypted_image.bin")
+print("- aes_key.bin")
 
-    # Decrypt AES key
-    start_dec = time.time()
-    decrypted_aes_key = rsa_decrypt(rsa_encrypted_aes_key, private_key)
-    end_dec = time.time()
-    print(f"RSA Decryption of AES Key Time: {end_dec - start_dec:.3f} seconds")
 
-    assert decrypted_aes_key == aes_key, "AES key mismatch after RSA decrypt!"
+# Load AES key from file
+with open("aes_key.bin", "rb") as f:
+    aes_key = f.read()
 
-except Exception as test_error:
-    print("Error during RSA operations:")
-    print(test_error)
-    exit()
+# RSA Key Generation
+print("\nGenerating RSA Keys...")
+start_key = time.time()
+(public_key, private_key) = newkeys(2048)
+keygen_time = time.time() - start_key
+print(f"RSA Key Generation Time: {keygen_time:.3f} seconds")
 
-# === Step 4: Decrypt the AES-Encrypted Image ===
+# Encrypt the AES key with RSA
+print("\nEncrypting AES key using RSA...")
+start_enc = time.time()
+rsa_encrypted_key = encrypt(aes_key, public_key)
+enc_time = time.time() - start_enc
+print(f"RSA Encryption Time: {enc_time:.3f} seconds")
+
+# Decrypt the AES key using RSA
+print("Decrypting AES key using RSA...")
+start_dec = time.time()
+decrypted_aes_key = decrypt(rsa_encrypted_key, private_key)
+dec_time = time.time() - start_dec
+print(f"RSA Decryption Time: {dec_time:.3f} seconds")
+
+# Confirm decryption success
+assert decrypted_aes_key == aes_key, "AES key mismatch!"
+print("AES key verified!")
+
+# Load encrypted image (IV + encrypted data)
 with open("encrypted_image.bin", "rb") as f:
-    iv2 = f.read(16)
-    encrypted_data = f.read()
+    iv = f.read(16)
+    encrypted_image = f.read()
 
-cipher_aes_dec = AES.new(decrypted_aes_key, AES.MODE_CBC, iv2)
-decrypted_image = unpad(cipher_aes_dec.decrypt(encrypted_data), AES.block_size)
+# Use PyCryptodome to decrypt AES data
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Util.Padding import unpad
+except ImportError:
+    print("PyCryptodome not found. Please install it with: pip install pycryptodome")
+    exit(1)
 
-# Save Decrypted Image
+cipher = AES.new(decrypted_aes_key, AES.MODE_CBC, iv)
+decrypted_image = unpad(cipher.decrypt(encrypted_image), AES.block_size)
+
+# Save the decrypted image
 with open("decrypted_image.jpg", "wb") as f:
     f.write(decrypted_image)
 
-print("Decrypted image saved as decrypted_image.jpg")
+print("\nImage decryption complete. Saved as 'decrypted_image.jpg'.")
 
-# === Step 5: Optional RSA Sign/Verify of the Original Image Data ===
-print("\nTesting RSA Signature/Verification:")
-message_str = b"legit data"
+# Test signature (optional)
+print("\nTesting Signature:")
+message = b"legit data"
 hash_method = "SHA-256"
+signature = sign(message, private_key, hash_method)
 
-signature = sign(message_str, private_key, hash_method)
-
-if verify(message_str, signature, public_key) == hash_method:
+if verify(message, signature, public_key) == hash_method:
     print("Signature verified successfully!")
 else:
     print("Signature verification failed!")
-
-# === Final Confirmation ===
-if decrypted_image == image_data:
-    print("\n✅ Success: Decrypted image matches the original!")
-else:
-    print("\n❌ Failure: Decrypted image does not match the original.")
