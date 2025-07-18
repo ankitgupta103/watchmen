@@ -6,7 +6,7 @@ print("Generating RSA key pair...")
 (public_key, private_key) = newkeys(512)  # 512-bit key size
 
 # data
-data = "long string to be encrypted "
+data = "long string to be encrypted"
 print("Original Message:", data)
 
 # data to bytes
