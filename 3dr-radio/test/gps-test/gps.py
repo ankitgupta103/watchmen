@@ -15,6 +15,7 @@ print("Listening to GPS...")
 while True:
     if uart.any():
         data = uart.readline()
-        if data:
-            print(data.decode('utf-8', 'ignore'))
+        print(data)
+        # if data:
+        #     print(data.decode('utf-8', 'ignore'))
     time.sleep(0.1)
