@@ -38,26 +38,28 @@ print("- encrypted_image.bin")
 print("- aes_key.bin")
 
 
+
+
 # Load AES key
 with open("aes_key.bin", "rb") as f:
     aes_key = f.read()
 
 # RSA Key Generation
-print("\nGenerating RSA Keys...")
+print("\nGenerating RSA Keys")
 start_key = time.time()
 (public_key, private_key) = newkeys(2048)
 keygen_time = time.time() - start_key
 print(f"RSA Key Generation Time: {keygen_time:.3f} seconds")
 
 # Encrypt the AES key with RSA
-print("\nEncrypting AES key using RSA...")
+print("\nEncrypting AES key using RSA")
 start_enc = time.time()
 rsa_encrypted_key = encrypt(aes_key, public_key)
 enc_time = time.time() - start_enc
 print(f"RSA Encryption Time: {enc_time:.3f} seconds")
 
 # Decrypt the AES key using RSA
-print("Decrypting AES key using RSA...")
+print("Decrypting AES key using RSA")
 start_dec = time.time()
 decrypted_aes_key = decrypt(rsa_encrypted_key, private_key)
 dec_time = time.time() - start_dec
@@ -77,7 +79,7 @@ try:
     from Crypto.Cipher import AES
     from Crypto.Util.Padding import unpad
 except ImportError:
-    print("PyCryptodome not found. Please install it with: pip install pycryptodome")
+    print("PyCryptodome not found")
     exit(1)
 
 cipher = AES.new(decrypted_aes_key, AES.MODE_CBC, iv)
@@ -89,7 +91,7 @@ with open("decrypted_image.jpg", "wb") as f:
 
 print("\nImage decryption complete. Saved as 'decrypted_image.jpg'.")
 
-# Test signature (optional)
+# Test signature
 print("\nTesting Signature:")
 message = b"legit data"
 hash_method = "SHA-256"
