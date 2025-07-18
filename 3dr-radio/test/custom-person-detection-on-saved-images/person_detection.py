@@ -158,8 +158,6 @@
 
 
 
-# print("Finished all images.")
-
 
 import sensor, image, time, os
 import ml
