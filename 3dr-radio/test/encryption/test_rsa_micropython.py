@@ -30,7 +30,7 @@ else:
         encrypted_message = encrypt(message, public_key)
         end_enc = time.ticks_ms()
         enc_time = time.ticks_diff(end_enc, start_enc) / 1000
-        print(f" Encryption Time: {enc_time:.3f} seconds")
+        print(f" Encryption Time: {enc_time:.3f} seconds") 
         print(f" Encrypted Size: {len(encrypted_message)} bytes")
 
         # --- Decryption Timing ---
