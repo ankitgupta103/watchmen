@@ -10,7 +10,7 @@ key = os.urandom(32)
 iv = os.urandom(16)
 
 # Load the image file
-with open("image.jpg", "rb") as f:
+with open("image.png", "rb") as f:
     data = f.read()
 
 # PKCS7 padding

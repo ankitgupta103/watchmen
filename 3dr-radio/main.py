@@ -7,14 +7,14 @@ except ImportError:
     run_omv = False
 
 if run_omv:
-    from machine import UART
+    from machine import RTC, UART
     import uasyncio as asyncio
-    import omv
     import utime
 else:
     import asyncio
     import serial
     import time as utime
+    from time import gmtime, strftime
 import sys
 import random
 
@@ -25,10 +25,13 @@ USBA_BAUDRATE = 57600
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.3
 
+MIDLEN = 6
+
 my_addr = None
 peer_addr = None
 
 if run_omv:
+    rtc = RTC()
     print("Running on device : " + omv.board_id())
     if omv.board_id() == "5D4676E05D4676E05D4676E0":
         my_addr = 1
@@ -43,13 +46,23 @@ if run_omv:
 else:
     my_addr = 2
     peer_addr = 1
-    USBA_PORT = "/dev/ttyUSB0"
+    #USBA_PORT = "/dev/ttyUSB0"
+    USBA_PORT = "/dev/tty.usbserial-0001"
     try:
         uart = serial.Serial(USBA_PORT, USBA_BAUDRATE, timeout=0.1)
     except serial.SerialException as e:
         print(f"[ERROR] Could not open serial port {USBA_PORT}: {e}")
         sys.exit(1)
     clock_start = int(utime.time() * 1000)
+
+def log(msg):
+    if run_omv:
+        _,_,_,_,h,m,s,_ = rtc.datetime()
+        t=f"{m}:{s}"
+    else:
+        t = strftime("%M:%S", gmtime())
+    
+    print(f"{t} : {msg}")
 
 msgs_sent = []
 msgs_unacked = []
@@ -82,7 +95,7 @@ def ack_needed(msgtype):
 
 def radio_send(data):
     uart.write(data)
-    print(f"[SENT ] {data.decode().strip()} at {time_msec()}")
+    log(f"[SENT ] {data.decode().strip()} at {time_msec()}")
 
 async def send_single_msg(msgtype, msgstr, dest):
     mid = get_msg_id(msgtype, dest)
@@ -102,16 +115,17 @@ async def send_single_msg(msgtype, msgstr, dest):
         radio_send(datastr.encode())
         await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
         for i in range(3):
-            at = ack_time(mid)
+            at, missing_chunks = ack_time(mid)
+            print(missing_chunks)
             if at > 0:
-                print(f"Msg {mid} : was acked in {at - timesent} msecs")
+                log(f"Msg {mid} : was acked in {at - timesent} msecs")
                 msgs_sent.append(msgs_unacked.pop(unackedid))
-                return (True, [])
+                return (True, missing_chunks)
             else:
-                print(f"Still waiting for ack for {mid} # {i}")
+                log(f"Still waiting for ack for {mid} # {i}")
                 await asyncio.sleep(ACK_SLEEP * (i+1)) # progressively more sleep
-        print(f"Failed to get ack for message {mid} for retry # {retry_i}")
-    print(f"Failed to send message {mid}")
+        log(f"Failed to get ack for message {mid} for retry # {retry_i}")
+    log(f"Failed to send message {mid}")
     return (False, [])
 
 def make_chunks(msg):
@@ -130,44 +144,49 @@ async def send_msg(msgtype, msgstr, dest):
         return succ
     imid = get_rand()
     chunks = make_chunks(msgstr)
-    print(f"Chunking {len(msgstr)} long message with id {imid} into {len(chunks)} chunks")
+    log(f"Chunking {len(msgstr)} long message with id {imid} into {len(chunks)} chunks")
     succ, _ = await send_single_msg("B", f"{imid}:{len(chunks)}", dest)
     if not succ:
-        print(f"Failed sending chunk begin")
+        log(f"Failed sending chunk begin")
         return False
     for i in range(len(chunks)):
         _ = await send_single_msg("I", f"{imid}:{i}:{chunks[i]}", dest)
     for retry_i in range(5):
-        succ, missing_chunks = await send_single_msg("E", f"", dest)
+        succ, missing_chunks = await send_single_msg("E", imid, dest)
+        log(missing_chunks)
         if not succ:
-            print(f"Failed sending chunk end")
+            log(f"Failed sending chunk end")
             break
         if len(missing_chunks) == 1 and missing_chunks[0] == -1:
-            print(f"Successfully sent all chunks")
+            log(f"Successfully sent all chunks")
             return True
-        print(f"Receiver still missing {len(missing_chunks)} chunks : {missing_chunks}")
+        log(f"Receiver still missing {len(missing_chunks)} chunks : {missing_chunks}")
         for mc in missing_chunks:
-            _ = await send_single_msg("I", f"{imid}:{mc}:{chunks[mc]}", dest)
+            _, _ = await send_single_msg("I", f"{imid}:{mc}:{chunks[mc]}", dest)
     return False
 
 def ack_time(smid):
     for (rmid, msg, t) in msgs_recd:
-        if rmid[0] == "A" and smid == msg:
-            return t
-    return -1
+        if rmid[0] == "A":
+            if smid == msg[:MIDLEN]:
+                missingids = []
+                if msg[0] == "E" and len(msg) > MIDLEN+1:
+                    missingids = [int(i) for i in msg[MIDLEN+1:].split(',')]
+                return (t, missingids)
+    return (-1, None)
 
-async def print_status():
+async def log_status():
     await asyncio.sleep(1)
     async with print_lock:
-        print("$$$$ %%%%% ###### Printing status ###### $$$$$$ %%%%%%%%")
-        print(f"So far sent {len(msgs_sent)} messages and received {len(msgs_recd)} messages")
+        log("$$$$ %%%%% ###### Printing status ###### $$$$$$ %%%%%%%%")
+        log(f"So far sent {len(msgs_sent)} messages and received {len(msgs_recd)} messages")
     ackts = []
     msgs_not_acked = []
     for mid, msg, t in msgs_sent:
         if mid[0] == "A":
             continue
-        #print("Getting ackt for " + s + "which was sent at " + str(t))
-        ackt = ack_time(mid)
+        #log("Getting ackt for " + s + "which was sent at " + str(t))
+        ackt, _ = ack_time(mid)
         if ackt > 0:
             time_to_ack = ackt - t
             ackts.append(time_to_ack)
@@ -178,9 +197,9 @@ async def print_status():
         mid = ackts[len(ackts)//2]
         p90 = ackts[int(len(ackts) * 0.9)]
         async with print_lock:
-            print(f"[ACK Times] 50% = {mid:.2f}s, 90% = {p90:.2f}s")
-            print(f"So far {len(msgs_not_acked)} messsages havent been acked")
-            print(msgs_not_acked)
+            log(f"[ACK Times] 50% = {mid:.2f}s, 90% = {p90:.2f}s")
+            log(f"So far {len(msgs_not_acked)} messsages havent been acked")
+            log(msgs_not_acked)
 
 # === Async Receiver for openmv ===
 async def uart_receiver():
@@ -203,21 +222,100 @@ async def uart_receiver():
                 else:
                     buffer += byte
 
+chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
+
+def begin_chunk(msg):
+    parts = msg.split(":")  
+    if len(parts) != 2:
+        log(f"ERROR : begin message unparsable {msg}")
+        return
+    cid = parts[0]
+    numchunks = int(parts[1])
+    chunk_map[cid] = (numchunks, [])
+
+def add_chunk(msg):
+    parts = msg.split(":")  
+    if len(parts) != 3:
+        log(f"ERROR : add chunk message unparsable {msg}")
+        return
+    cid = parts[0]
+    citer = int(parts[1])
+    cdata = parts[2]
+    if cid not in chunk_map:
+        chunk_map[cid] = []
+    chunk_map[cid][1].append((citer, cdata))
+
+def get_data_for_iter(list_chunks, chunkiter):
+    for citer, chunk_data in list_chunks:
+        if citer == chunkiter:
+            return chunk_data
+    return None
+
+def get_missing_chunks(cid):
+    if cid not in chunk_map:
+        #log(f"Should never happen, have no entry in chunk_map for {cid}")
+        return []
+    expected_chunks, list_chunks = chunk_map[cid]
+    missing_chunks = []
+    for i in range(expected_chunks):
+        if not get_data_for_iter(list_chunks, i):
+            missing_chunks.append(i)
+    return missing_chunks
+
+def recompile_msg(cid):
+    if len(get_missing_chunks(cid)) > 0:
+        return None
+    if cid not in chunk_map:
+        #log(f"Should never happen, have no entry in chunk_map for {cid}")
+        return []
+    expected_chunks, list_chunks = chunk_map[cid]
+    recompiled = ""
+    for i in range(expected_chunks):
+        recompiled += get_data_for_iter(list_chunks, i)
+    return recompiled
+
+def clear_chunkid(cid):
+    if cid in chunk_map:
+        chunk_map.pop(cid)
+
+def end_chunk(msg):
+    print(chunk_map)
+    cid = msg
+    missing = get_missing_chunks(cid)
+    if len(missing) > 0:
+        return (False, ",".join(missing))
+    else:
+        recompiled = recompile_msg(cid)
+        clear_chunkid(msg)
+        return (True, recompiled)
+
 def process_message(data):
     if len(data) < 8:
         return
-    mid = data[0:6].decode()
+    mid = data[:MIDLEN].decode()
     msgtype = mid[0]
     sender = int(mid[1])
     receiver = int(mid[2])
     msg = data[7:].decode().strip()
     if my_addr != receiver:
-        print(f"Skipping message as it is not for me but for {receiver} : {mid}")
+        log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
-    print(f"[RECV ] MID: {mid}: {msg} at {time_msec()}")
+    log(f"[RECV ] MID: {mid}: {msg} at {time_msec()}")
     msgs_recd.append((mid, msg, time_msec()))
-    if msgtype != "A":
-        asyncio.create_task(send_msg("A", f"{mid}", peer_addr))
+    ackmessage = mid
+    if msgtype == "B":
+        begin_chunk(msg)
+    elif msgtype == "I":
+        add_chunk(msg)
+    elif msgtype == "E":
+        alldone, retval = end_chunk(msg)
+        if alldone:
+            ackmessage += ":-1"
+            log(f"Alldone , {len(retval)} = {retval}")
+        else:
+            ackmessage += f":{retval}"
+    if ack_needed(msgtype):
+        asyncio.create_task(send_msg("A", ackmessage, peer_addr))
 
 # === Async Sender ===
 async def send_messages():
@@ -225,22 +323,25 @@ async def send_messages():
     for i in range(50):
         long_string += "_0123456789"
     i = 0
-    while True:
+    for i in range(1):
+    #while True:
         i = i + 1
         if i > 0 and i % 10 == 0:
-            asyncio.create_task(print_status())
+            asyncio.create_task(log_status())
         msg = f"MSG-{i}-{long_string}"
         await send_msg("H", msg, peer_addr)
         await asyncio.sleep(2)
 
 # === Main Entry ===
 async def main():
-    print(f"[INFO] Started device {my_addr} listening for {peer_addr}")
+    log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(uart_receiver())
-    await send_messages()
-    # await asyncio.sleep(3600000)
+    if run_omv:
+        await send_messages()
+    else:
+        await asyncio.sleep(3600000)
 
 try:
     asyncio.run(main())
 except KeyboardInterrupt:
-    print("Stopped.")
+    log("Stopped.")
