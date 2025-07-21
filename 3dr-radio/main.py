@@ -26,7 +26,7 @@ MIN_SLEEP = 0.1
 ACK_SLEEP = 0.3
 
 MIDLEN = 6
-FLAKINESS = 5
+FLAKINESS = 0
 
 FRAME_SIZE = 225
 
@@ -38,7 +38,6 @@ if run_omv:
     print("Running on device : " + omv.board_id())
     if omv.board_id() == "5D4676E05D4676E05D4676E0":
         my_addr = 'A'
-        peer_addr = 'B'
     else:
         print("Unknown device ID for " + omv.board_id())
         sys.exit()
@@ -48,7 +47,6 @@ if run_omv:
     uart.init(UART_BAUDRATE, bits=8, parity=None, stop=1)
 else:
     my_addr = 'B'
-    peer_addr = 'A'
     #USBA_PORT = "/dev/ttyUSB0"
     USBA_PORT = "/dev/tty.usbserial-0001"
     try:
@@ -58,13 +56,16 @@ else:
         sys.exit(1)
     clock_start = int(utime.time() * 1000)
 
-def log(msg):
+def get_human_ts():
     if run_omv:
         _,_,_,_,h,m,s,_ = rtc.datetime()
         t=f"{m}:{s}"
     else:
         t = strftime("%M:%S", gmtime())
-    
+    return t
+
+def log(msg):
+    t = get_human_ts()
     print(f"{t} : {msg}")
 
 msgs_sent = []
@@ -83,7 +84,7 @@ def time_msec():
 def get_rand():
     rstr = ""
     for i in range(3):
-        rstr += chr(65+random.randint(0,26))
+        rstr += chr(65+random.randint(0,25))
     return rstr
 
 # TypeSourceDestRRRandom
@@ -111,7 +112,7 @@ def radio_send(data):
 async def send_single_msg(msgtype, msgstr, dest):
     mid = get_msg_id(msgtype, dest)
     datastr = f"{mid};{msgstr}\n"
-    ackneeded = ack_needed(msgtype)
+    ackneeded = dest != "*" and ack_needed(msgtype)
     unackedid = 0
     timesent = time_msec()
     if ackneeded:
@@ -122,7 +123,7 @@ async def send_single_msg(msgtype, msgstr, dest):
     if not ackneeded:
         radio_send(datastr.encode())
         return (True, [])
-    for retry_i in range(3):
+    for retry_i in range(5):
         radio_send(datastr.encode())
         await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
         for i in range(3):
@@ -155,13 +156,13 @@ async def send_msg(msgtype, msgstr, dest):
     imid = get_rand()
     chunks = make_chunks(msgstr)
     log(f"Chunking {len(msgstr)} long message with id {imid} into {len(chunks)} chunks")
-    succ, _ = await send_single_msg("B", f"{imid}:{len(chunks)}", dest)
+    succ, _ = await send_single_msg("B", f"{msgtype}:{imid}:{len(chunks)}", dest)
     if not succ:
         log(f"Failed sending chunk begin")
         return False
     for i in range(len(chunks)):
         _ = await send_single_msg("I", f"{imid}:{i}:{chunks[i]}", dest)
-    for retry_i in range(5):
+    for retry_i in range(50):
         succ, missing_chunks = await send_single_msg("E", imid, dest)
         if not succ:
             log(f"Failed sending chunk end")
@@ -235,12 +236,13 @@ chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
 def begin_chunk(msg):
     parts = msg.split(":")  
-    if len(parts) != 2:
+    if len(parts) != 3:
         log(f"ERROR : begin message unparsable {msg}")
         return
-    cid = parts[0]
-    numchunks = int(parts[1])
-    chunk_map[cid] = (numchunks, [])
+    mst = parts[0]
+    cid = parts[1]
+    numchunks = int(parts[2])
+    chunk_map[cid] = (mst, numchunks, [])
 
 def add_chunk(msg):
     parts = msg.split(":")  
@@ -251,8 +253,8 @@ def add_chunk(msg):
     citer = int(parts[1])
     cdata = parts[2]
     if cid not in chunk_map:
-        chunk_map[cid] = []
-    chunk_map[cid][1].append((citer, cdata))
+        log(f"ERROR : no entry yet for {cid}")
+    chunk_map[cid][2].append((citer, cdata))
 
 def get_data_for_iter(list_chunks, chunkiter):
     for citer, chunk_data in list_chunks:
@@ -264,7 +266,7 @@ def get_missing_chunks(cid):
     if cid not in chunk_map:
         #log(f"Should never happen, have no entry in chunk_map for {cid}")
         return []
-    expected_chunks, list_chunks = chunk_map[cid]
+    mst, expected_chunks, list_chunks = chunk_map[cid]
     missing_chunks = []
     for i in range(expected_chunks):
         if not get_data_for_iter(list_chunks, i):
@@ -277,10 +279,11 @@ def recompile_msg(cid):
     if cid not in chunk_map:
         #log(f"Should never happen, have no entry in chunk_map for {cid}")
         return []
-    expected_chunks, list_chunks = chunk_map[cid]
+    mst, expected_chunks, list_chunks = chunk_map[cid]
     recompiled = ""
     for i in range(expected_chunks):
         recompiled += get_data_for_iter(list_chunks, i)
+    # Ignoring message type for now
     return recompiled
 
 def clear_chunkid(cid):
@@ -296,7 +299,7 @@ def end_chunk(msg):
     if len(missing) > 0:
         missing_str = str(missing[0])
         for i in range(1, len(missing)):
-            if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN < FRAME_SIZE:
+            if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < FRAME_SIZE:
                 missing_str += "," + str(missing[i])
         return (False, missing_str)
     else:
@@ -312,7 +315,7 @@ def parse_header(data):
     sender = mid[1]
     receiver = mid[2]
     for i in range(MIDLEN):
-        if mid[i] < 'A' or mid[i] > 'Z':
+        if (mid[i] < 'A' or mid[i] > 'Z') and (i == 3 and mid[i] == "*"):
             return None
     if chr(data[MIDLEN]) != ';':
         return None
@@ -324,10 +327,11 @@ def process_message(data):
     if not parsed:
         log(f"Failure parsing incoming data : {data}")
         return
-    if random.randint(0,100) < FLAKINESS:
+    if random.randint(1,100) <= FLAKINESS:
+        log(f"Flakiness dropping {data}")
         return
     mst, sender, receiver, mid, msg = parsed
-    if my_addr != receiver:
+    if receiver != "*" and my_addr != receiver:
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
     log(f"[RECV ] MID: {mid}: {msg} at {time_msec()}")
@@ -344,16 +348,16 @@ def process_message(data):
             log(f"Alldone, Len={len(retval)}, Data={ellepsis(retval)}")
         else:
             ackmessage += f":{retval}"
-    if ack_needed(mst):
-        asyncio.create_task(send_msg("A", ackmessage, peer_addr))
+    if ack_needed(mst) and receiver != "*":
+        asyncio.create_task(send_msg("A", ackmessage, sender))
 
-async def send_messages():
+async def send_long_message():
+    peer_addr = "B"
     long_string = ""
-    for i in range(1000):
+    for i in range(5000):
         long_string += "_0123456789"
     i = 0
-    for i in range(1):
-    #while True:
+    for i in range(1): #while True:
         i = i + 1
         if i > 0 and i % 10 == 0:
             asyncio.create_task(log_status())
@@ -361,11 +365,28 @@ async def send_messages():
         await send_msg("H", msg, peer_addr)
         await asyncio.sleep(2)
 
+shortest_path_to_cc = None
+neighbours = []
+
+async def send_heartbeat():
+    while True:
+        hb = f"{my_addr}:{get_human_ts()}"
+        if shortest_path_to_cc:
+            peer_addr = shortest_path_to_cc
+        else:
+            peer_addr = "*"
+        await send_msg("H", hb, peer_addr)
+        await asyncio.sleep(30)
+
 async def main():
     log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(radio_read())
     if run_omv:
-        await send_messages()
+        asyncio.create_task(send_heartbeat())
+        t1 = time_msec()
+        await send_long_message()
+        log(f"Took {time_msec()-t1} milliseconds")
+        await asyncio.sleep(36000)
     else:
         await asyncio.sleep(3600000)
 
