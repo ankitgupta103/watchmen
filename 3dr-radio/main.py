@@ -3,7 +3,7 @@ try:
     import omv
     print("The 'omv' library IS installed.")
 except ImportError:
-    print("The 'omv' library is NOT installed.")
+    print("The 'omv' library IS NOT installed.")
     run_omv = False
 
 if run_omv:
@@ -37,8 +37,8 @@ if run_omv:
     rtc = RTC()
     print("Running on device : " + omv.board_id())
     if omv.board_id() == "5D4676E05D4676E05D4676E0":
-        my_addr = 1
-        peer_addr = 2
+        my_addr = 'A'
+        peer_addr = 'B'
     else:
         print("Unknown device ID for " + omv.board_id())
         sys.exit()
@@ -47,8 +47,8 @@ if run_omv:
     uart = UART(UART_PORT, baudrate=UART_BAUDRATE, timeout=1000)
     uart.init(UART_BAUDRATE, bits=8, parity=None, stop=1)
 else:
-    my_addr = 2
-    peer_addr = 1
+    my_addr = 'B'
+    peer_addr = 'A'
     #USBA_PORT = "/dev/ttyUSB0"
     USBA_PORT = "/dev/tty.usbserial-0001"
     try:
@@ -81,7 +81,10 @@ def time_msec():
     return delta
 
 def get_rand():
-    return(str(random.randint(100,999)))
+    rstr = ""
+    for i in range(3):
+        rstr += chr(65+random.randint(0,26))
+    return rstr
 
 # TypeSourceDestRRRandom
 def get_msg_id(msgtype, dest):
@@ -306,10 +309,12 @@ def parse_header(data):
         return None
     mid = data[:MIDLEN].decode()
     mst = mid[0]
-    try:
-        sender = int(mid[1])
-        receiver = int(mid[2])
-    except:
+    sender = mid[1]
+    receiver = mid[2]
+    for i in range(MIDLEN):
+        if mid[i] < 'A' or mid[i] > 'Z':
+            return None
+    if chr(data[MIDLEN]) != ';':
         return None
     msg = data[7:].decode().strip()
     return (mst, sender, receiver, mid, msg)
@@ -342,10 +347,9 @@ def process_message(data):
     if ack_needed(mst):
         asyncio.create_task(send_msg("A", ackmessage, peer_addr))
 
-# === Async Sender ===
 async def send_messages():
     long_string = ""
-    for i in range(5000):
+    for i in range(1000):
         long_string += "_0123456789"
     i = 0
     for i in range(1):
@@ -357,7 +361,6 @@ async def send_messages():
         await send_msg("H", msg, peer_addr)
         await asyncio.sleep(2)
 
-# === Main Entry ===
 async def main():
     log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(radio_read())
