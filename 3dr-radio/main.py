@@ -10,6 +10,11 @@ if run_omv:
     from machine import RTC, UART
     import uasyncio as asyncio
     import utime
+    import sensor
+    import ml
+    import os                   # file system access
+    import image                # image drawing and manipulation
+
 else:
     import asyncio
     import serial
@@ -17,6 +22,7 @@ else:
     from time import gmtime, strftime
 import sys
 import random
+
 
 print_lock = asyncio.Lock()
 
@@ -29,6 +35,26 @@ MIDLEN = 6
 FLAKINESS = 0
 
 FRAME_SIZE = 225
+
+# ------ Configuration for tensorflow model ------
+MODEL_PATH = "/rom/person_detect.tflite"
+SAVE_DIR = ""                                # TODO(anand): finalize the save directory
+CONFIDENCE_THRESHOLD = 0.5
+MAX_IMAGES = 1000
+
+# ------- Camera Setup ----------
+sensor.reset()
+sensor.set_pixformat(sensor.RGB565)
+sensor.set_framesize(sensor.HD)  # Use HD resolution
+sensor.skip_frames(time=2000)
+
+# ------- Load tflite model ---------
+model = ml.Model(MODEL_PATH)       
+print(" Model loaded:", model) 
+
+# -------- Start FPS clock -----------
+clock = time.clock()            # measure frame/sec
+image_count = 0                 # Counter to keep tranck of saved images
 
 my_addr = None
 peer_addr = None
@@ -56,8 +82,52 @@ else:
         sys.exit(1)
     clock_start = int(utime.time() * 1000)
 
+<<<<<<< HEAD
 shortest_path_to_cc = []
 seen_neighbours = []
+=======
+
+
+# ------- Person Detection + snapshot ---------
+def detect_person(img, prediction):
+    global image_count
+
+    # Zip the model label with predictin val and sort by confidence
+    scores = zip(model.labels, prediction[0].flatten().tolist())
+    scores = sorted(scores, key=lambda x: x[1], reverse=True)  # Highest confidence first
+ 
+    label, confidence = scores[0]   # Take the top prediction
+
+    # If the top label is "person" and above confidence threshold
+    if label == "person" and confidence >= CONFIDENCE_THRESHOLD:
+        print(f" Person detected with confidence: {confidence:.2f}")
+
+        # File paths to save raw and annotated images
+        raw_path = f"{SAVE_DIR}/raw_{image_count}.jpg"
+        processed_path = f"{SAVE_DIR}/processed_{image_count}.jpg"
+
+        img.save(raw_path)  # Save raw image before drawing
+
+        # Draw visual annotations on the image
+        img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
+        img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
+
+        img.save(processed_path)  # Save image with annotations
+
+        image_count += 1  # Increment image counter
+
+        print(f"Image count: {image_count}")
+
+# ------- Person det loop ---------
+def person_detection_loop():
+    while True:
+        clock.tick()
+        img = sensor.snapshot()
+        prediction = model.predict([img])
+        detect_person(img, prediction)
+        print(f"FPS: {clock.fps():.2f}")
+
+>>>>>>> d658e5d (Integrated persondet in main.py)
 
 def get_human_ts():
     if run_omv:
@@ -417,8 +487,12 @@ async def main():
     asyncio.create_task(radio_read())
     if run_omv:
         asyncio.create_task(send_heartbeat())
+<<<<<<< HEAD
         asyncio.create_task(send_scan())
         await asyncio.sleep(30)
+=======
+        asyncio.create_task(asyncio.to_thread(person_detection_loop)) # Backfround thread
+>>>>>>> d658e5d (Integrated persondet in main.py)
         t1 = time_msec()
         await send_long_message()
         log(f"Took {time_msec()-t1} milliseconds")
