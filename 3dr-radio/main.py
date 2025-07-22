@@ -40,7 +40,6 @@ FRAME_SIZE = 225
 MODEL_PATH = "/rom/person_detect.tflite"
 SAVE_DIR = ""                                # TODO(anand): finalize the save directory
 CONFIDENCE_THRESHOLD = 0.5
-MAX_IMAGES = 1000
 
 # ------- Camera Setup ----------
 sensor.reset()
@@ -88,6 +87,7 @@ seen_neighbours = []
 
 # ------- Person Detection + snapshot ---------
 # TODO(anand): Test with IR lense for person detection in Night
+# TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
 def detect_person(img, prediction):
     global image_count
 
