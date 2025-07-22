@@ -87,6 +87,7 @@ seen_neighbours = []
 
 
 # ------- Person Detection + snapshot ---------
+# TODO(anand): Test with IR lense for person detection in Night
 def detect_person(img, prediction):
     global image_count
 
