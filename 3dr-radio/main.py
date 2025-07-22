@@ -56,6 +56,9 @@ else:
         sys.exit(1)
     clock_start = int(utime.time() * 1000)
 
+shortest_path_to_cc = []
+seen_neighbours = []
+
 def get_human_ts():
     if run_omv:
         _,_,_,_,h,m,s,_ = rtc.datetime()
@@ -320,7 +323,25 @@ def parse_header(data):
     if chr(data[MIDLEN]) != ';':
         return None
     msg = data[7:].decode().strip()
-    return (mst, sender, receiver, mid, msg)
+    return (mid, mst, sender, receiver, msg)
+
+def hb_process(mid, msg):
+    # if cc stats
+    # if intermediate forward. asyncio.create
+    pass
+
+def img_process(mid, msg):
+    # if intermediate forward. asyncio.create
+    # if cc stats
+    pass
+
+def scan_process(mid, msg):
+    pass
+    # Update neighbours (same for cc or not)
+
+def spath_process(mid, msg):
+    # Update spath and propagate (only not cc)
+    pass
 
 def process_message(data):
     parsed = parse_header(data)
@@ -330,13 +351,15 @@ def process_message(data):
     if random.randint(1,100) <= FLAKINESS:
         log(f"Flakiness dropping {data}")
         return
-    mst, sender, receiver, mid, msg = parsed
+    mid, mst, sender, receiver, msg = parsed
     if receiver != "*" and my_addr != receiver:
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
     log(f"[RECV ] MID: {mid}: {msg} at {time_msec()}")
     msgs_recd.append((mid, msg, time_msec()))
     ackmessage = mid
+    if mst == "H":
+        hb_process(mid, msg)
     if mst == "B":
         begin_chunk(msg)
     elif mst == "I":
@@ -354,7 +377,7 @@ def process_message(data):
 async def send_long_message():
     peer_addr = "B"
     long_string = ""
-    for i in range(5000):
+    for i in range(500):
         long_string += "_0123456789"
     i = 0
     for i in range(1): #while True:
@@ -365,29 +388,43 @@ async def send_long_message():
         await send_msg("H", msg, peer_addr)
         await asyncio.sleep(2)
 
-shortest_path_to_cc = None
-neighbours = []
-
 async def send_heartbeat():
     while True:
         hb = f"{my_addr}:{get_human_ts()}"
-        if shortest_path_to_cc:
-            peer_addr = shortest_path_to_cc
-        else:
-            peer_addr = "*"
-        await send_msg("H", hb, peer_addr)
+        if len(shortest_path_to_cc) > 0:
+            peer_addr = shortest_path_to_cc[0]
+            await send_msg("H", hb, peer_addr)
         await asyncio.sleep(30)
+
+async def send_scan():
+    while True:
+        hb = f"{my_addr}:{get_human_ts()}"
+        await send_msg("N", hb, "*")
+        if len(shortest_path_to_cc) > 0:
+            await asyncio.sleep(300)
+        else:
+            await asyncio.sleep(10)
+
+async def send_spath():
+    while True:
+        sp = f"{my_addr}"
+        for n in seen_neighbours:
+            await send_msg("S", sp, n)
+        await asyncio.sleep(300)
 
 async def main():
     log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(radio_read())
     if run_omv:
         asyncio.create_task(send_heartbeat())
+        asyncio.create_task(send_scan())
+        await asyncio.sleep(30)
         t1 = time_msec()
         await send_long_message()
         log(f"Took {time_msec()-t1} milliseconds")
         await asyncio.sleep(36000)
     else:
+        asyncio.create_task(send_scan())
         await asyncio.sleep(3600000)
 
 try:
