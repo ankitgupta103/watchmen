@@ -85,50 +85,40 @@ else:
 shortest_path_to_cc = []
 seen_neighbours = []
 
-
 # ------- Person Detection + snapshot ---------
 # TODO(anand): Test with IR lense for person detection in Night
-# TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
-def detect_person(img, prediction):
-    global image_count
-
-    # Zip the model label with predictin val and sort by confidence
+def detect_person(img):
+    prediction = model.predict([img])
     scores = zip(model.labels, prediction[0].flatten().tolist())
     scores = sorted(scores, key=lambda x: x[1], reverse=True)  # Highest confidence first
-
     label, confidence = scores[0]   # Take the top prediction
-
     # If the top label is "person" and above confidence threshold
     if label == "person" and confidence >= CONFIDENCE_THRESHOLD:
         print(f" Person detected with confidence: {confidence:.2f}")
+        return True
+    return False
 
-        # # File paths to save raw and annotated images
-        # raw_path = f"{SAVE_DIR}/raw_{image_count}.jpg"
-        # processed_path = f"{SAVE_DIR}/processed_{image_count}.jpg"
-
-        # img.save(raw_path)  # Save raw image before drawing
-
-        # Draw visual annotations on the image
-        img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
-        img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
-
-        # img.save(processed_path)  # Save image with annotations
-
-        image_count += 1  # Increment image counter
-
-        print(f"Image count: {image_count}")
-
-# ------- Person det loop ---------
+# ------- Person detection loop ---------
 def person_detection_loop():
+    global image_count
     while True:
-        clock.tick()
         img = sensor.snapshot()
-        prediction = model.predict([img])
-        detect_person(img, prediction)
-        print(f"FPS: {clock.fps():.2f}")
-        await asyncio.sleep_ms(0)
-
-
+        print(len(img.bytearray())) 
+        image_count += 1  # Increment image counter
+        #print(f"FPS: {clock.fps():.2f}")
+        print(f"Image count: {image_count}")
+        person_detected = detect_person(img)
+        if person_detected:
+            # # File paths to save raw and annotated images
+            # raw_path = f"{SAVE_DIR}/raw_{image_count}.jpg"
+            # processed_path = f"{SAVE_DIR}/processed_{image_count}.jpg"
+            # img.save(raw_path)  # Save raw image before drawing
+            # Draw visual annotations on the image
+            img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
+            img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
+            # TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
+            # img.save(processed_path)  # Save image with annotations
+        await asyncio.sleep_ms(10000)
 
 def get_human_ts():
     if run_omv:
@@ -487,13 +477,13 @@ async def main():
     log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(radio_read())
     if run_omv:
-        asyncio.create_task(send_heartbeat())
-        asyncio.create_task(send_scan())
-        await asyncio.sleep(30)
+        #asyncio.create_task(send_heartbeat())
+        #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
-        t1 = time_msec()
-        await send_long_message()
-        log(f"Took {time_msec()-t1} milliseconds")
+        #await asyncio.sleep(30)
+        #t1 = time_msec()
+        #await send_long_message()
+        #log(f"Took {time_msec()-t1} milliseconds")
         await asyncio.sleep(36000)
     else:
         asyncio.create_task(send_scan())
