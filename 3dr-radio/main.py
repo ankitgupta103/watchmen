@@ -14,6 +14,7 @@ if run_omv:
     import ml
     import os                   # file system access
     import image                # image drawing and manipulation
+    import time
 
 else:
     import asyncio
@@ -48,8 +49,8 @@ sensor.set_framesize(sensor.HD)  # Use HD resolution
 sensor.skip_frames(time=2000)
 
 # ------- Load tflite model ---------
-model = ml.Model(MODEL_PATH)       
-print(" Model loaded:", model) 
+model = ml.Model(MODEL_PATH)
+print(" Model loaded:", model)
 
 # -------- Start FPS clock -----------
 clock = time.clock()            # measure frame/sec
@@ -94,24 +95,24 @@ def detect_person(img, prediction):
     # Zip the model label with predictin val and sort by confidence
     scores = zip(model.labels, prediction[0].flatten().tolist())
     scores = sorted(scores, key=lambda x: x[1], reverse=True)  # Highest confidence first
- 
+
     label, confidence = scores[0]   # Take the top prediction
 
     # If the top label is "person" and above confidence threshold
     if label == "person" and confidence >= CONFIDENCE_THRESHOLD:
         print(f" Person detected with confidence: {confidence:.2f}")
 
-        # File paths to save raw and annotated images
-        raw_path = f"{SAVE_DIR}/raw_{image_count}.jpg"
-        processed_path = f"{SAVE_DIR}/processed_{image_count}.jpg"
+        # # File paths to save raw and annotated images
+        # raw_path = f"{SAVE_DIR}/raw_{image_count}.jpg"
+        # processed_path = f"{SAVE_DIR}/processed_{image_count}.jpg"
 
-        img.save(raw_path)  # Save raw image before drawing
+        # img.save(raw_path)  # Save raw image before drawing
 
         # Draw visual annotations on the image
         img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
         img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
 
-        img.save(processed_path)  # Save image with annotations
+        # img.save(processed_path)  # Save image with annotations
 
         image_count += 1  # Increment image counter
 
@@ -125,6 +126,8 @@ def person_detection_loop():
         prediction = model.predict([img])
         detect_person(img, prediction)
         print(f"FPS: {clock.fps():.2f}")
+        await asyncio.sleep_ms(0)
+
 
 
 def get_human_ts():
@@ -306,7 +309,7 @@ async def radio_read():
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
 def begin_chunk(msg):
-    parts = msg.split(":")  
+    parts = msg.split(":")
     if len(parts) != 3:
         log(f"ERROR : begin message unparsable {msg}")
         return
@@ -316,7 +319,7 @@ def begin_chunk(msg):
     chunk_map[cid] = (mst, numchunks, [])
 
 def add_chunk(msg):
-    parts = msg.split(":")  
+    parts = msg.split(":")
     if len(parts) != 3:
         log(f"ERROR : add chunk message unparsable {msg}")
         return
@@ -487,7 +490,7 @@ async def main():
         asyncio.create_task(send_heartbeat())
         asyncio.create_task(send_scan())
         await asyncio.sleep(30)
-        asyncio.create_task(asyncio.to_thread(person_detection_loop)) # Backfround thread
+        asyncio.create_task(person_detection_loop())
         t1 = time_msec()
         await send_long_message()
         log(f"Took {time_msec()-t1} milliseconds")
