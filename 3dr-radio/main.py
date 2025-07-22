@@ -37,23 +37,9 @@ FLAKINESS = 0
 
 FRAME_SIZE = 225
 
-# ------ Configuration for tensorflow model ------
-MODEL_PATH = "/rom/person_detect.tflite"
-SAVE_DIR = ""                                # TODO(anand): finalize the save directory
-CONFIDENCE_THRESHOLD = 0.5
-
-# ------- Camera Setup ----------
-sensor.reset()
-sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.HD)  # Use HD resolution
-sensor.skip_frames(time=2000)
-
-# ------- Load tflite model ---------
-model = ml.Model(MODEL_PATH)
-print(" Model loaded:", model)
 
 # -------- Start FPS clock -----------
-clock = time.clock()            # measure frame/sec
+#clock = time.clock()            # measure frame/sec
 image_count = 0                 # Counter to keep tranck of saved images
 
 my_addr = None
@@ -71,6 +57,19 @@ if run_omv:
     UART_PORT = 1
     uart = UART(UART_PORT, baudrate=UART_BAUDRATE, timeout=1000)
     uart.init(UART_BAUDRATE, bits=8, parity=None, stop=1)
+
+    # ------ Configuration for tensorflow model ------
+    MODEL_PATH = "/rom/person_detect.tflite"
+    model = ml.Model(MODEL_PATH)
+    print(" Model loaded:", model)
+
+    IMG_DIR = "/sdcard/images/"
+    CONFIDENCE_THRESHOLD = 0.5
+
+    sensor.reset()
+    sensor.set_pixformat(sensor.RGB565)
+    sensor.set_framesize(sensor.HD)  # Use HD resolution
+    sensor.skip_frames(time=2000)
 else:
     my_addr = 'B'
     #USBA_PORT = "/dev/ttyUSB0"
@@ -91,34 +90,35 @@ def detect_person(img):
     prediction = model.predict([img])
     scores = zip(model.labels, prediction[0].flatten().tolist())
     scores = sorted(scores, key=lambda x: x[1], reverse=True)  # Highest confidence first
-    label, confidence = scores[0]   # Take the top prediction
-    # If the top label is "person" and above confidence threshold
-    if label == "person" and confidence >= CONFIDENCE_THRESHOLD:
-        print(f" Person detected with confidence: {confidence:.2f}")
-        return True
-    return False
+    p_conf = 0.0
+    for label, conf in scores:
+        if label == "person":
+            p_conf = conf
+            if conf >= CONFIDENCE_THRESHOLD:
+                return (True, p_conf)
+    return (False, p_conf)
 
 # ------- Person detection loop ---------
-def person_detection_loop():
+async def person_detection_loop():
     global image_count
-    while True:
+    for i in range(5): #    while True:
         img = sensor.snapshot()
-        print(len(img.bytearray())) 
-        image_count += 1  # Increment image counter
-        #print(f"FPS: {clock.fps():.2f}")
+        print(len(img.bytearray()))
+        image_count += 1
         print(f"Image count: {image_count}")
-        person_detected = detect_person(img)
+        person_detected, confidence = detect_person(img)
         if person_detected:
-            # # File paths to save raw and annotated images
-            # raw_path = f"{SAVE_DIR}/raw_{image_count}.jpg"
-            # processed_path = f"{SAVE_DIR}/processed_{image_count}.jpg"
-            # img.save(raw_path)  # Save raw image before drawing
+            r = get_rand()
+            raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+            print(f"Saving image to {raw_path}")
+            img.save(raw_path)
             # Draw visual annotations on the image
-            img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
-            img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
+            # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
+            # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
             # TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
+            # processed_path = f"{IMG_DIR}/processed_{image_count}.jpg"
             # img.save(processed_path)  # Save image with annotations
-        await asyncio.sleep_ms(10000)
+        await asyncio.sleep(30)
 
 def get_human_ts():
     if run_omv:
@@ -397,12 +397,27 @@ def img_process(mid, msg):
     pass
 
 def scan_process(mid, msg):
-    pass
-    # Update neighbours (same for cc or not)
+    print(msg)
+    if msg not in seen_neighbours:
+        seen_neighbours.append(msg)
 
 def spath_process(mid, msg):
-    # Update spath and propagate (only not cc)
-    pass
+    if not run_omv:
+        print(f"Ignoting shortest path since I am cc")
+        return
+    if len(msg) == 0:
+        print(f"Empty spath")
+        return
+    spath = msg.split(",")
+    if my_addr in spath:
+        print(f"Cyclic, ignoring")
+        return
+    if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
+        print(f"Updating spath from {shortest_path_to_cc} to {spath}")
+        shortest_path_to_cc = spath
+    for n in seen_neighbours:
+        nmsg = my_addr + "," + shortest_path_to_cc
+        asyncio.create_task(send_msg("S", nmsg, n))
 
 def process_message(data):
     parsed = parse_header(data)
@@ -459,12 +474,9 @@ async def send_heartbeat():
 
 async def send_scan():
     while True:
-        hb = f"{my_addr}:{get_human_ts()}"
-        await send_msg("N", hb, "*")
-        if len(shortest_path_to_cc) > 0:
-            await asyncio.sleep(300)
-        else:
-            await asyncio.sleep(10)
+        scanmsg = f"{my_addr}"
+        await send_msg("N", scanmsg, "*")
+        await asyncio.sleep(10) # reduce after setup
 
 async def send_spath():
     while True:
@@ -477,16 +489,14 @@ async def main():
     log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(radio_read())
     if run_omv:
-        #asyncio.create_task(send_heartbeat())
-        #asyncio.create_task(send_scan())
-        asyncio.create_task(person_detection_loop())
-        #await asyncio.sleep(30)
-        #t1 = time_msec()
-        #await send_long_message()
-        #log(f"Took {time_msec()-t1} milliseconds")
+        asyncio.create_task(send_heartbeat())
+        asyncio.create_task(send_scan())
+        # asyncio.create_task(person_detection_loop())
+        # asyncio.create_task(send_long_message())
         await asyncio.sleep(36000)
     else:
         asyncio.create_task(send_scan())
+        asyncio.create_task(send_spath())
         await asyncio.sleep(3600000)
 
 try:
