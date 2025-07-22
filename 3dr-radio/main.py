@@ -82,10 +82,8 @@ else:
         sys.exit(1)
     clock_start = int(utime.time() * 1000)
 
-<<<<<<< HEAD
 shortest_path_to_cc = []
 seen_neighbours = []
-=======
 
 
 # ------- Person Detection + snapshot ---------
@@ -127,7 +125,6 @@ def person_detection_loop():
         detect_person(img, prediction)
         print(f"FPS: {clock.fps():.2f}")
 
->>>>>>> d658e5d (Integrated persondet in main.py)
 
 def get_human_ts():
     if run_omv:
@@ -487,12 +484,9 @@ async def main():
     asyncio.create_task(radio_read())
     if run_omv:
         asyncio.create_task(send_heartbeat())
-<<<<<<< HEAD
         asyncio.create_task(send_scan())
         await asyncio.sleep(30)
-=======
         asyncio.create_task(asyncio.to_thread(person_detection_loop)) # Backfround thread
->>>>>>> d658e5d (Integrated persondet in main.py)
         t1 = time_msec()
         await send_long_message()
         log(f"Took {time_msec()-t1} milliseconds")
