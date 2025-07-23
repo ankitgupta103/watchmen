@@ -472,9 +472,12 @@ async def send_heartbeat():
             await send_msg("H", hb, peer_addr)
         await asyncio.sleep(30)
 
+import constants
+
 async def send_scan():
     while True:
-        scanmsg = f"{my_addr}"
+        scanmsg = constants.msg
+        #f"{my_addr}"
         await send_msg("N", scanmsg, "*")
         await asyncio.sleep(10) # reduce after setup
 
