@@ -23,3 +23,6 @@ import binascii
 import machine
 unique_id = binascii.hexlify(machine.unique_id())
 print(f"{unique_id}")
+
+
+# D: b'e076465dd7091027'
