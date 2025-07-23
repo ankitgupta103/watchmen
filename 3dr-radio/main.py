@@ -24,7 +24,6 @@ else:
 import sys
 import random
 
-
 print_lock = asyncio.Lock()
 
 UART_BAUDRATE = 57600
@@ -403,6 +402,7 @@ def scan_process(mid, msg):
         print(f"Neighbours = {seen_neighbours}")
 
 def spath_process(mid, msg):
+    global shortest_path_to_cc
     if not run_omv:
         print(f"Ignoring shortest path since I am cc")
         return
@@ -411,13 +411,13 @@ def spath_process(mid, msg):
         return
     spath = msg.split(",")
     if my_addr in spath:
-        print(f"Cyclic, ignoring")
+        print(f"Cyclic, ignoring {my_addr} already in {spath}")
         return
     if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
-        print(f"Updating spath from {shortest_path_to_cc} to {spath}")
+        print(f"Updating spath to {spath}")
         shortest_path_to_cc = spath
     for n in seen_neighbours:
-        nmsg = my_addr + "," + shortest_path_to_cc
+        nmsg = my_addr + "," + ",".join(shortest_path_to_cc)
         asyncio.create_task(send_msg("S", nmsg, n))
 
 def process_message(data):
@@ -437,6 +437,8 @@ def process_message(data):
     ackmessage = mid
     if mst == "N":
         scan_process(mid, msg)
+    if mst == "N":
+        spath_process(mid, msg)
     if mst == "H":
         hb_process(mid, msg)
     if mst == "B":
