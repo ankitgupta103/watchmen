@@ -7,3 +7,6 @@ def get_unique_id():
     return uid_hex
 
 print("Unique ID:", get_unique_id())
+
+
+#  for d : Unique ID: 354434363736453035443436373645303544343637364530
