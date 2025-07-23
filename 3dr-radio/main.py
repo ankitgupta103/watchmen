@@ -136,7 +136,7 @@ msgs_sent = []
 msgs_unacked = []
 msgs_recd = []
 
-# MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), N(ack), C(hunk), e(V)ent
+# MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
 def time_msec():
     if run_omv:
@@ -400,10 +400,11 @@ def scan_process(mid, msg):
     print(msg)
     if msg not in seen_neighbours:
         seen_neighbours.append(msg)
+        print(f"Neighbours = {seen_neighbours}")
 
 def spath_process(mid, msg):
     if not run_omv:
-        print(f"Ignoting shortest path since I am cc")
+        print(f"Ignoring shortest path since I am cc")
         return
     if len(msg) == 0:
         print(f"Empty spath")
@@ -434,6 +435,8 @@ def process_message(data):
     log(f"[RECV ] MID: {mid}: {msg} at {time_msec()}")
     msgs_recd.append((mid, msg, time_msec()))
     ackmessage = mid
+    if mst == "N":
+        scan_process(mid, msg)
     if mst == "H":
         hb_process(mid, msg)
     if mst == "B":
@@ -448,7 +451,10 @@ def process_message(data):
         else:
             ackmessage += f":{retval}"
     if ack_needed(mst) and receiver != "*":
+        print(f"Sending ack for {mst}")
         asyncio.create_task(send_msg("A", ackmessage, sender))
+    else:
+        print(f"NOT Sending ack for {mst}")
 
 async def send_long_message():
     peer_addr = "B"
@@ -477,13 +483,16 @@ async def send_scan():
         scanmsg = f"{my_addr}"
         await send_msg("N", scanmsg, "*")
         await asyncio.sleep(10) # reduce after setup
+        print(f"Seen neighbours = {seen_neighbours}")
+        print(f"Shortest path = {shortest_path_to_cc}")
 
 async def send_spath():
     while True:
         sp = f"{my_addr}"
         for n in seen_neighbours:
+            print(f"Sending shortest path to {n}")
             await send_msg("S", sp, n)
-        await asyncio.sleep(300)
+        await asyncio.sleep(5)
 
 async def main():
     log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
@@ -495,8 +504,8 @@ async def main():
         # asyncio.create_task(send_long_message())
         await asyncio.sleep(36000)
     else:
-        asyncio.create_task(send_scan())
         asyncio.create_task(send_spath())
+        asyncio.create_task(send_scan())
         await asyncio.sleep(3600000)
 
 try:
