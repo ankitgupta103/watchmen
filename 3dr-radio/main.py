@@ -15,6 +15,8 @@ if run_omv:
     import os                   # file system access
     import image                # image drawing and manipulation
     import time
+    import binascii
+    import machine
 
 else:
     import asyncio
@@ -46,9 +48,14 @@ peer_addr = None
 
 if run_omv:
     rtc = RTC()
-    print("Running on device : " + omv.board_id())
-    if omv.board_id() == "5D4676E05D4676E05D4676E0":
+    uid = binascii.hexlify(machine.unique_id())
+    print("Running on device : " + uid.decode())
+    if uid == b'':                       # Add unique machine ID for A
         my_addr = 'A'
+    elif uid == b'e076465dd7194211':
+        my_addr = 'C'
+    elif uid == b'e076465dd7091027':
+        my_addr = 'D'
     else:
         print("Unknown device ID for " + omv.board_id())
         sys.exit()
