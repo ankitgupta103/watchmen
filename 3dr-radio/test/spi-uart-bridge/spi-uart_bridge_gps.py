@@ -85,7 +85,7 @@ class SC16IS750:
             return False
         return True
 
-# === USAGE EXAMPLE ===
+# ----- usage exampele -------
 print("Initializing SC16IS750...")
 uart_bridge = SC16IS750(spi_bus=1, cs_pin="P3")
 
