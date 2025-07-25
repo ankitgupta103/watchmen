@@ -80,7 +80,9 @@ def send_at(command, delay=500):
     uart_write(command.encode('utf-8') + b"\r\n")
     time.sleep_ms(delay)
     response = uart_read_all()
-    print("<< Received:", response.decode(errors='replace'))
+    # print("<< Received:", response.decode(errors='replace'))
+    print("<< Received:", response.decode('utf-8', 'ignore'))
+
 
 # --- MAIN ---
 
