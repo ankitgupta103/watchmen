@@ -38,13 +38,45 @@ FLAKINESS = 0
 
 FRAME_SIZE = 225
 
-
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 image_count = 0                 # Counter to keep tranck of saved images
 
 my_addr = None
 peer_addr = None
+my_rsa_public_key = None
+
+def should_encrypt(mst):
+    if mst in ["H"]:
+        return "RSA"
+    if mst in ["P"]:
+        return "HYBRID"
+
+def pad(data):
+    pad_len = 16 - (len(data) % 16)
+    return data + bytes([pad_len] * pad_len)
+
+def unpad(data):
+    num_bytes_to_remove = 0 - int(data[-1])
+    return data[:num_bytes_to_remove]
+
+def encrypt_aes(msgstr, aes_key):
+    iv = os.urandom(16)
+    aes = ucryptolib.aes(aes_key, 2, iv)  # mode 2 = CBC
+    msg = msgstr.encode()
+    padded_data = pad(msg)
+    encrypted_data = aes.encrypt(padded_data)
+    return (iv, encrypted_data)
+
+def decrypt_aes(encrypted_msg, iv, aes_key):
+    aes = ucryptolib.aes(aes_key, 2, iv)  # mode 2 = CBC
+    decrypted_msg = unpad(aes.decrypt(encrypted_msg))
+    return decrypted_msg.decode()
+
+def encrypt_rsa(msgstr, public_key):
+    return encrypt(msg.encode(), public_key)
+def decrypt_rsa(msg, private_key):
+    return decrypt(msg, private_key)
 
 if run_omv:
     rtc = RTC()
@@ -52,10 +84,11 @@ if run_omv:
     print("Running on device : " + uid.decode())
     if uid == b'':                                   # Add unique machine ID for A
         my_addr = 'A'
+        my_rsa_public_key = None # TODO
     elif uid == b'e076465dd7194211':
-        my_addr = 'C'
+        my_addr = 'B'
     elif uid == b'e076465dd7091027':
-        my_addr = 'D'
+        my_addr = 'C'
     else:
         print("Unknown device ID for " + omv.board_id())
         sys.exit()
@@ -77,7 +110,7 @@ if run_omv:
     sensor.set_framesize(sensor.HD)  # Use HD resolution
     sensor.skip_frames(time=2000)
 else:
-    my_addr = 'B'
+    my_addr = 'Z'
     #USBA_PORT = "/dev/ttyUSB0"
     USBA_PORT = "/dev/tty.usbserial-0001"
     try:
@@ -89,6 +122,7 @@ else:
 
 shortest_path_to_cc = []
 seen_neighbours = []
+
 
 # ------- Person Detection + snapshot ---------
 # TODO(anand): Test with IR lense for person detection in Night
