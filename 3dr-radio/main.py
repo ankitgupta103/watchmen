@@ -33,7 +33,7 @@ USBA_BAUDRATE = 57600
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.3
 
-MIDLEN = 6
+MIDLEN = 7
 FLAKINESS = 0
 
 FRAME_SIZE = 225
@@ -192,9 +192,9 @@ def get_rand():
     return rstr
 
 # TypeSourceDestRRRandom
-def get_msg_id(msgtype, dest):
+def get_msg_id(msgtype, creator, dest):
     rrr = get_rand()
-    mid = f"{msgtype}{my_addr}{dest}{rrr}"
+    mid = f"{msgtype}{creator}{my_addr}{dest}{rrr}"
     return mid
 
 def ellepsis(msg):
@@ -213,8 +213,8 @@ def radio_send(data):
     uart.write(data)
     log(f"[SENT ] {data.decode().strip()} at {time_msec()}")
 
-async def send_single_msg(msgtype, msgstr, dest):
-    mid = get_msg_id(msgtype, dest)
+async def send_single_msg(msgtype, creator, msgstr, dest):
+    mid = get_msg_id(msgtype, creator, dest)
     datastr = f"{mid};{msgstr}\n"
     ackneeded = dest != "*" and ack_needed(msgtype)
     unackedid = 0
@@ -253,21 +253,21 @@ def make_chunks(msg):
     return chunks
 
 # === Send Function ===
-async def send_msg(msgtype, msgstr, dest):
+async def send_msg(msgtype, creator, msgstr, dest):
     if len(msgstr) < FRAME_SIZE:
-        succ, _ = await send_single_msg(msgtype, msgstr, dest)
+        succ, _ = await send_single_msg(msgtype, creator, msgstr, dest)
         return succ
     imid = get_rand()
     chunks = make_chunks(msgstr)
     log(f"Chunking {len(msgstr)} long message with id {imid} into {len(chunks)} chunks")
-    succ, _ = await send_single_msg("B", f"{msgtype}:{imid}:{len(chunks)}", dest)
+    succ, _ = await send_single_msg("B", creator, f"{msgtype}:{imid}:{len(chunks)}", dest)
     if not succ:
         log(f"Failed sending chunk begin")
         return False
     for i in range(len(chunks)):
-        _ = await send_single_msg("I", f"{imid}:{i}:{chunks[i]}", dest)
+        _ = await send_single_msg("I", creator, f"{imid}:{i}:{chunks[i]}", dest)
     for retry_i in range(50):
-        succ, missing_chunks = await send_single_msg("E", imid, dest)
+        succ, missing_chunks = await send_single_msg("E", creator, imid, dest)
         if not succ:
             log(f"Failed sending chunk end")
             break
@@ -276,7 +276,7 @@ async def send_msg(msgtype, msgstr, dest):
             return True
         log(f"Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}")
         for mc in missing_chunks:
-            _, _ = await send_single_msg("I", f"{imid}:{mc}:{chunks[mc]}", dest)
+            _, _ = await send_single_msg("I", creator, f"{imid}:{mc}:{chunks[mc]}", dest)
     return False
 
 def ack_time(smid):
@@ -412,19 +412,20 @@ def end_chunk(msg):
         return (True, recompiled)
 
 def parse_header(data):
-    if len(data) < 8:
+    if len(data) < 9:
         return None
     mid = data[:MIDLEN].decode()
     mst = mid[0]
-    sender = mid[1]
-    receiver = mid[2]
+    creator = mid[1]
+    sender = mid[2]
+    receiver = mid[3]
     for i in range(MIDLEN):
         if (mid[i] < 'A' or mid[i] > 'Z') and (i == 3 and mid[i] == "*"):
             return None
     if chr(data[MIDLEN]) != ';':
         return None
-    msg = data[7:].decode().strip()
-    return (mid, mst, sender, receiver, msg)
+    msg = data[MIDLEN+1:].decode().strip()
+    return (mid, mst, creator, sender, receiver, msg)
 
 def hb_process(mid, msg):
     # if cc stats
@@ -436,6 +437,7 @@ def img_process(mid, msg):
     # if cc stats
     pass
 
+# If N messages seen in the last M minutes.
 def scan_process(mid, msg):
     print(msg)
     if msg not in seen_neighbours:
@@ -459,7 +461,7 @@ def spath_process(mid, msg):
         shortest_path_to_cc = spath
     for n in seen_neighbours:
         nmsg = my_addr + "," + ",".join(shortest_path_to_cc)
-        asyncio.create_task(send_msg("S", nmsg, n))
+        asyncio.create_task(send_msg("S", mid[1], nmsg, n))
 
 def process_message(data):
     parsed = parse_header(data)
@@ -469,7 +471,7 @@ def process_message(data):
     if random.randint(1,100) <= FLAKINESS:
         log(f"Flakiness dropping {data}")
         return
-    mid, mst, sender, receiver, msg = parsed
+    mid, mst, creator, sender, receiver, msg = parsed
     if receiver != "*" and my_addr != receiver:
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
@@ -495,7 +497,7 @@ def process_message(data):
             ackmessage += f":{retval}"
     if ack_needed(mst) and receiver != "*":
         print(f"Sending ack for {mst}")
-        asyncio.create_task(send_msg("A", ackmessage, sender))
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     else:
         print(f"NOT Sending ack for {mst}")
 
@@ -510,21 +512,22 @@ async def send_long_message():
         if i > 0 and i % 10 == 0:
             asyncio.create_task(log_status())
         msg = f"MSG-{i}-{long_string}"
-        await send_msg("H", msg, peer_addr)
+        await send_msg("H", my_addr, msg, peer_addr)
         await asyncio.sleep(2)
 
 async def send_heartbeat():
     while True:
+        # TODO add last known GPS here also.
         hb = f"{my_addr}:{get_human_ts()}"
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
-            await send_msg("H", hb, peer_addr)
+            await send_msg("H", my_addr, hb, peer_addr)
         await asyncio.sleep(30)
 
 async def send_scan():
     while True:
         scanmsg = f"{my_addr}"
-        await send_msg("N", scanmsg, "*")
+        await send_msg("N", my_addr, scanmsg, "*")
         await asyncio.sleep(10) # reduce after setup
         print(f"Seen neighbours = {seen_neighbours}")
         print(f"Shortest path = {shortest_path_to_cc}")
@@ -534,7 +537,7 @@ async def send_spath():
         sp = f"{my_addr}"
         for n in seen_neighbours:
             print(f"Sending shortest path to {n}")
-            await send_msg("S", sp, n)
+            await send_msg("S", my_addr, sp, n)
         await asyncio.sleep(5)
 
 async def main():
