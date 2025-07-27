@@ -13,6 +13,7 @@ while True:
     # Wait for <START>
     while True:
         line = ser.readline()
+        print(f"{line}")
         if b"<START>" in line:
             print("Start of image detected.")
             break
