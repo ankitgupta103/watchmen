@@ -82,10 +82,10 @@ def encrypt_hybrid(msgstr, public_key):
     (iv, msg_aes) = encrypt_aes(msgstr, aes_key)
     iv_rsa = encrypt_rsa(iv, public_key)
     aes_key_rsa = encrypt_rsa(aes_key, public_key)
-    msg_rsa = encrypt_rsa(msg.encode(), public_key)
+    msg_rsa = encrypt_rsa(msg, public_key)
     print(f"{len(aes_key)} -> {len(aes_key_rsa)}")
     print(f"{len(iv)} -> {len(iv_rsa)}")
-    print(f"{len(msg.encode())} -> {len(msg_rsa)}")
+    print(f"{len(msg)} -> {len(msg_rsa)}")
 
 # Debugging only
 def decrypt_rsa(msg, private_key):
@@ -164,6 +164,10 @@ async def person_detection_loop():
         person_detected, confidence = detect_person(img)
         if person_detected:
             r = get_rand()
+            if len(shortest_path_to_cc) > 0:
+                peer_addr = shortest_path_to_cc[0]
+                # Make it async
+                await send_msg("P", my_addr, img.bytearray(), peer_addr)
             raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             print(f"Saving image to {raw_path}")
             img.save(raw_path)
@@ -268,14 +272,14 @@ def make_chunks(msg):
     return chunks
 
 # === Send Function ===
-async def send_msg(msgtype, creator, msgstr, dest):
+async def send_msg(msgtype, creator, msg, dest):
     enctype = should_encrypt(msgtype)
     if enctype == "RSA":
-        msgbytes = encrypt_rsa(msgstr, public_key)
+        msgbytes = encrypt_rsa(msg, public_key)
     elif enctype == "HYBRID":
-        msgbytes = encrypt_hybrid(msgstr, public_key)
+        msgbytes = encrypt_hybrid(msg, public_key)
     else:
-        msgbytes = msgstr.encode()
+        msgbytes = msg
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
