@@ -27,7 +27,7 @@ class SC16IS750:
     def __init__(self, spi_bus, cs_pin):
         self.cs = Pin(cs_pin, Pin.OUT)
         self.cs.value(1)
-        self.spi = SPI(spi_bus, baudrate=1000000, polarity=0, phase=0)
+        self.spi = SPI(spi_bus, baudrate=4000000, polarity=0, phase=0)
 
     def _write_register(self, reg, val):
         self.cs.value(0)
@@ -90,7 +90,7 @@ print("Initializing SC16IS750...")
 uart_bridge = SC16IS750(spi_bus=1, cs_pin="P3")
 
 uart_bridge.reset_device()
-uart_bridge.set_baudrate(921600)
+uart_bridge.set_baudrate(9600)
 uart_bridge.set_line()
 uart_bridge.enable_fifo()
 
@@ -105,3 +105,5 @@ while True:
     if val != -1:
         print(chr(val), end='')
     time.sleep_ms(10)
+
+
