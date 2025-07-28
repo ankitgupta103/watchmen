@@ -1,33 +1,42 @@
-import ucryptolib
+# import ucryptolib
 import os
 
-import utime
-from rsa.key import newkeys
-from rsa.pkcs1 import encrypt, decrypt, sign, verify
-import rsa
+import time as utime 
+# from rsa.key import newkeys
+# from rsa.pkcs1 import encrypt, decrypt, sign, verify
+# import rsa
 
 import random
+
+# --- Your RSA Keys ---
+n = 17137440455843848950481875150631737022736154257065297701812475847978114399732264735927775853371799030685286724310264465564309364089427386220887191257573292508281307329069584113167081903408457599506928088154361712265501112905423351175920217555974170362922297976183581700680237046563837134255012986832036203123759951600299568186862408890553036610966636967628186560798496806787496514526440241699655625593229083632980910855617738004743818057471515437942887009896231377488967374719942108774184891163446147523843438432365782085999110091159141885308918643274317353722487770773019656768635161675703118510899416835513918095843
+e = 65537
+d = 12615187450009533620978944762377388180537105601776113600386640711872807314742567521481967293196449343689065526967973642556402896863851647061267082225904578337076996345214214052695721993166214809542895337852371516621520212855277762649799640745729311699016745064086310511404499379547113765777433297009134539523777624900684374282201690134310128956793708925693155974317133931947830198369788194144628762425198047535927171705756461275458808811907690456799727302086389080155967585204568108550975572684331157770719110820487517512655378445684085939335175115951599496571067753599254778933192794939648200859515974319007877278793
+
+# ---------- Helper function to RSA encryption ------------
+
+
 
 def setup_aes():
     aes_key = os.urandom(32)
     return aes_key
 
-def load_rsa():
-    private_bytes = b'-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEApj9jaQGz+zyT/xjrYzAdsEOdEF1ec7ruqtgNVAuylU6uJY/I\n+LeVSvaEY3Seu4L+x99SUkp+fq05Z1nMKqKaOpXgfvLudDrXzLOFITkl5Ecag19Q\nCyjQWxm0yB2x9t3mM+VjCDJ9+Lzp8ynzHFFD18EiwRb/IarYFfiYfGRfaMzQLNri\n6zKu1xT/e+/AMFX3U9D/V/qgo4/zvW+hyFQvB3snsHX6+3f/FIt/YrsnrHmAoO7e\nUmeFhbBPw67UJMuHJs8jOPbziro2LHbrPpp8hC/gHuiHK1ll2iop9mUXAg5uBSLD\neBZ7s1A2psNTS2wR0/nMTjETxnZ2fGiF2i1gqwIDAQABAoIBAEKhARyivBmjK8V/\nnUeBj0SHtLlMUoCbmPAL6zuV/Jruj8kqGWflXAZRSrn5kWyhka9Vh87HYG8wyeLs\nEHG9/YYhb3oxrvQSaU73XBH2r4MQJEYmuxPd5bO9V8EkdaD1Sj/eXZR5eBdqz3DP\njUn6H/CmzWEJ8HLz3+reWW7xY3PCi9DgZrOt40NCTzR7rLB4dnFv1hIQx9QE1fGr\n9yvPGzq2fekY3OrntQQM54pAsEZF5aLbyMHzw/CBdXG1nxs6uK8zMxn2owQBabF5\nmGi1pQoVBB5/igQudTqGTXC3W7RmSHBCPOePzXu5OXiOiJE1CN9fl5qxtMIuamwj\nbfkHWFECgYEA6NdTc7UQ30sQZnMnE06hbGdzvNV7yKBQ9+p4jCMRKAJSUer3abTL\nnvsMFZfkBpZPLXm6VbwApm2brhol393Rl+jxfEQ4ToRvaE6pVeJ4mxytqqFBUbUK\npWmaF8J9/Emej+/KLlVOAjT3fv6MBozzHzwZCeTIKZJNekKjlgDd2+0CgYEAtshv\n/RRxUCFbaiBwjlq5rgzqKL253oj18bjJgIH6HSpzvXfEzNk79fGYuBCBc/ECnmNn\npcpYY6mZzq3uE0g5vE66cfGM6KOddPhg+GF5DhqqyonC9jDji++QPzOuOFUe8cQS\n2F5nqapB0jViJ1b4GVJXoxB9cjnmKGQg9jL3C/cCgYEAmGfA/v6okY/fpz9+dzvD\nm2JHtnWCNXsCJJQ73XZil26VlXsYAP/PPDuU2Fl4bvtZzilcVxvczRL3kMkau2LE\n+wsFbdJ1jKdRCNRcMJQxX04xOnucdq/qzQTHUQAEWOuTNyG8lAFQM0+aJGzXGL6P\nsIU02m3+un9B6WHPE7NzhK0CgYA6T0kCmIHpiSqreXvOvfycHLyakKP57QFgwo1t\ntIlAwqk3mTysCOUK+a65kXJqtUkblCSdjCaUbKeHeo8HkbPxccAi12cXVBLIHPB6\nbEX9DN7NTBNpDIGaw6rlrqv2hpkfkWhdpAg35PuofqU4XZM6KL2SZJFQXk4hNogZ\nYnrTUwKBgEtMHa26G6zgit6V1dzrMTeiCn8aL/y4BFvB0WinoRDlJxmHzA3SCFxY\nuhXJ2icxTYZ695xadA/ot1DubGFi01q2jEMKHIOERJZcq8bG3QE6NDDmILJ7vxx+\nl+oGHyCnM/zJdSR7Rb1JOsJN1d8JET4R4r0ljh3fHiEN2UmocSWY\n-----END RSA PRIVATE KEY-----\n'
-    public_bytes = b'-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApj9jaQGz+zyT/xjrYzAd\nsEOdEF1ec7ruqtgNVAuylU6uJY/I+LeVSvaEY3Seu4L+x99SUkp+fq05Z1nMKqKa\nOpXgfvLudDrXzLOFITkl5Ecag19QCyjQWxm0yB2x9t3mM+VjCDJ9+Lzp8ynzHFFD\n18EiwRb/IarYFfiYfGRfaMzQLNri6zKu1xT/e+/AMFX3U9D/V/qgo4/zvW+hyFQv\nB3snsHX6+3f/FIt/YrsnrHmAoO7eUmeFhbBPw67UJMuHJs8jOPbziro2LHbrPpp8\nhC/gHuiHK1ll2iop9mUXAg5uBSLDeBZ7s1A2psNTS2wR0/nMTjETxnZ2fGiF2i1g\nqwIDAQAB\n-----END PUBLIC KEY-----\n'
+# def load_rsa():
+#     private_bytes = b'-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEApj9jaQGz+zyT/xjrYzAdsEOdEF1ec7ruqtgNVAuylU6uJY/I\n+LeVSvaEY3Seu4L+x99SUkp+fq05Z1nMKqKaOpXgfvLudDrXzLOFITkl5Ecag19Q\nCyjQWxm0yB2x9t3mM+VjCDJ9+Lzp8ynzHFFD18EiwRb/IarYFfiYfGRfaMzQLNri\n6zKu1xT/e+/AMFX3U9D/V/qgo4/zvW+hyFQvB3snsHX6+3f/FIt/YrsnrHmAoO7e\nUmeFhbBPw67UJMuHJs8jOPbziro2LHbrPpp8hC/gHuiHK1ll2iop9mUXAg5uBSLD\neBZ7s1A2psNTS2wR0/nMTjETxnZ2fGiF2i1gqwIDAQABAoIBAEKhARyivBmjK8V/\nnUeBj0SHtLlMUoCbmPAL6zuV/Jruj8kqGWflXAZRSrn5kWyhka9Vh87HYG8wyeLs\nEHG9/YYhb3oxrvQSaU73XBH2r4MQJEYmuxPd5bO9V8EkdaD1Sj/eXZR5eBdqz3DP\njUn6H/CmzWEJ8HLz3+reWW7xY3PCi9DgZrOt40NCTzR7rLB4dnFv1hIQx9QE1fGr\n9yvPGzq2fekY3OrntQQM54pAsEZF5aLbyMHzw/CBdXG1nxs6uK8zMxn2owQBabF5\nmGi1pQoVBB5/igQudTqGTXC3W7RmSHBCPOePzXu5OXiOiJE1CN9fl5qxtMIuamwj\nbfkHWFECgYEA6NdTc7UQ30sQZnMnE06hbGdzvNV7yKBQ9+p4jCMRKAJSUer3abTL\nnvsMFZfkBpZPLXm6VbwApm2brhol393Rl+jxfEQ4ToRvaE6pVeJ4mxytqqFBUbUK\npWmaF8J9/Emej+/KLlVOAjT3fv6MBozzHzwZCeTIKZJNekKjlgDd2+0CgYEAtshv\n/RRxUCFbaiBwjlq5rgzqKL253oj18bjJgIH6HSpzvXfEzNk79fGYuBCBc/ECnmNn\npcpYY6mZzq3uE0g5vE66cfGM6KOddPhg+GF5DhqqyonC9jDji++QPzOuOFUe8cQS\n2F5nqapB0jViJ1b4GVJXoxB9cjnmKGQg9jL3C/cCgYEAmGfA/v6okY/fpz9+dzvD\nm2JHtnWCNXsCJJQ73XZil26VlXsYAP/PPDuU2Fl4bvtZzilcVxvczRL3kMkau2LE\n+wsFbdJ1jKdRCNRcMJQxX04xOnucdq/qzQTHUQAEWOuTNyG8lAFQM0+aJGzXGL6P\nsIU02m3+un9B6WHPE7NzhK0CgYA6T0kCmIHpiSqreXvOvfycHLyakKP57QFgwo1t\ntIlAwqk3mTysCOUK+a65kXJqtUkblCSdjCaUbKeHeo8HkbPxccAi12cXVBLIHPB6\nbEX9DN7NTBNpDIGaw6rlrqv2hpkfkWhdpAg35PuofqU4XZM6KL2SZJFQXk4hNogZ\nYnrTUwKBgEtMHa26G6zgit6V1dzrMTeiCn8aL/y4BFvB0WinoRDlJxmHzA3SCFxY\nuhXJ2icxTYZ695xadA/ot1DubGFi01q2jEMKHIOERJZcq8bG3QE6NDDmILJ7vxx+\nl+oGHyCnM/zJdSR7Rb1JOsJN1d8JET4R4r0ljh3fHiEN2UmocSWY\n-----END RSA PRIVATE KEY-----\n'
+#     public_bytes = b'-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApj9jaQGz+zyT/xjrYzAd\nsEOdEF1ec7ruqtgNVAuylU6uJY/I+LeVSvaEY3Seu4L+x99SUkp+fq05Z1nMKqKa\nOpXgfvLudDrXzLOFITkl5Ecag19QCyjQWxm0yB2x9t3mM+VjCDJ9+Lzp8ynzHFFD\n18EiwRb/IarYFfiYfGRfaMzQLNri6zKu1xT/e+/AMFX3U9D/V/qgo4/zvW+hyFQv\nB3snsHX6+3f/FIt/YrsnrHmAoO7eUmeFhbBPw67UJMuHJs8jOPbziro2LHbrPpp8\nhC/gHuiHK1ll2iop9mUXAg5uBSLDeBZ7s1A2psNTS2wR0/nMTjETxnZ2fGiF2i1g\nqwIDAQAB\n-----END PUBLIC KEY-----\n'
 
-    priv_key = rsa.PrivateKey.load_pkcs1(private_bytes)
-    #priv_key = serialization.load_pem_private_key(private_bytes)
-    print(priv_key)
+#     priv_key = rsa.PrivateKey.load_pkcs1(private_bytes)
+#     #priv_key = serialization.load_pem_private_key(private_bytes)
+#     print(priv_key)
 
-load_rsa()
+# load_rsa()
 
 def setup_rsa():
-    print("\nGenerating RSA Keys...")
-    (public_key, private_key) = newkeys(1024)
-    print(public_key)
-    print(private_key)
-    return (public_key, private_key)
+    print("\nGeneration RSA Keys...")
+    (public_key, private_key) = newkeys(2048)
+    print("Modulus n =", public_key.n)
+    print("Public exponent e =", public_key.e)
+    print("Private exponent d =", private_key.d)
 
 def pad(data):
     pad_len = 16 - (len(data) % 16)
@@ -49,8 +58,14 @@ def decrypt_aes(encrypted_msg, iv, aes_key):
     decrypted_msg = unpad(aes.decrypt(encrypted_msg))
     return decrypted_msg
 
-def encrypt_rsa(msg, public_key):
-    return encrypt(msg, public_key)
+
+def encrypt_rsa(msg: bytes) -> int:    
+    m = int.from_bytes(msg, 'big')
+    if m >= n:
+        raise ValueError("Message too large for this key size (max: 256 bytes)")
+    return mod_exp(m, e, n)
+
+
 def decrypt_rsa(msg, private_key):
     return decrypt(msg, private_key)
 
@@ -76,24 +91,24 @@ def get_rand(n):
 
 # Debugging only
 def test_encryption(n2, enctype):
-    clock_start = utime.ticks_ms()
-    t0 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-    if enctype == "RSA" or enctype == "HYBRID":
-        public_key, private_key = setup_rsa()
-    elif enctype == "AES":
-        aes_key = setup_aes()
-    else:
-        print("WRONG INPUT")
-        return
-    t1 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-    print(f"Setup key in time {t1-t0} mili seconds")
+    # clock_start = utime.ticks_ms()
+    # t0 = utime.ticks_diff(utime.ticks_ms(), clock_start)
+    # if enctype == "RSA" or enctype == "HYBRID":
+    #     # public_key, private_key = setup_rsa()
+    # elif enctype == "AES":
+    #     aes_key = setup_aes()
+    # else:
+    #     print("WRONG INPUT")
+    #     return
+    # t1 = utime.ticks_diff(utime.ticks_ms(), clock_start)
+    # print(f"Setup key in time {t1-t0} mili seconds")
     lenstr = 1
     for i in range(1,n2):
-        t2 = utime.ticks_diff(utime.ticks_ms(), clock_start)
+        # t2 = utime.ticks_diff(utime.ticks_ms(), clock_start)
         teststr = get_rand(lenstr)
-        t3 = utime.ticks_diff(utime.ticks_ms(), clock_start)
+        # t3 = utime.ticks_diff(utime.ticks_ms(), clock_start)
         if enctype == "RSA":
-            teststr_enc = encrypt_rsa(teststr.encode(), public_key)
+            teststr_enc = encrypt_rsa(teststr.encode())
         elif enctype == "AES":
             iv, teststr_enc = encrypt_aes(teststr.encode(), aes_key)
         elif enctype == "HYBRID":
@@ -109,7 +124,7 @@ def test_encryption(n2, enctype):
             teststr_decrypt = decrypt_hybrid(teststr_enc, private_key)
         else:
             return
-        t5 = utime.ticks_diff(utime.ticks_ms(), clock_start)
+        # t5 = utime.ticks_diff(utime.ticks_ms(), clock_start)
         print(f"Encrypting {len(teststr)} to {len(teststr_enc)}, creation time = {t3-t2}, enc time = {t4-t3}, decrypt time = {t5-t4} : {teststr_enc}")
         if teststr.encode() != teststr_decrypt:
             print(f"Strings DONT match {teststr} != {teststr_decrypt}")
@@ -117,4 +132,4 @@ def test_encryption(n2, enctype):
 
 #test_encryption(7, "HYBRID")
 #test_encryption(7, "AES")
-#test_encryption(7, "RSA")
+test_encryption(7, "RSA")
