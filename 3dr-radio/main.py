@@ -45,6 +45,7 @@ image_count = 0                 # Counter to keep tranck of saved images
 my_addr = None
 peer_addr = None
 my_rsa_public_key = None
+my_rsa_private = None # Only for debugging.
 
 def should_encrypt(mst):
     if mst in ["H"]:
@@ -60,10 +61,9 @@ def unpad(data):
     num_bytes_to_remove = 0 - int(data[-1])
     return data[:num_bytes_to_remove]
 
-def encrypt_aes(msgstr, aes_key):
+def encrypt_aes(msg, aes_key):
     iv = os.urandom(16)
     aes = ucryptolib.aes(aes_key, 2, iv)  # mode 2 = CBC
-    msg = msgstr.encode()
     padded_data = pad(msg)
     encrypted_data = aes.encrypt(padded_data)
     return (iv, encrypted_data)
@@ -73,10 +73,25 @@ def decrypt_aes(encrypted_msg, iv, aes_key):
     decrypted_msg = unpad(aes.decrypt(encrypted_msg))
     return decrypted_msg.decode()
 
-def encrypt_rsa(msgstr, public_key):
-    return encrypt(msg.encode(), public_key)
+def encrypt_rsa(msg, public_key):
+    return encrypt(msg, public_key)
+
+def encrypt_hybrid(msgstr, public_key):
+    # AES key 32 bytes, IV 16bytes, Message encrypted.
+    aes_key = os.urandom(32)
+    (iv, msg_aes) = encrypt_aes(msgstr, aes_key)
+    iv_rsa = encrypt_rsa(iv, public_key)
+    aes_key_rsa = encrypt_rsa(aes_key, public_key)
+    msg_rsa = encrypt_rsa(msg.encode(), public_key)
+    print(f"{len(aes_key)} -> {len(aes_key_rsa)}")
+    print(f"{len(iv)} -> {len(iv_rsa)}")
+    print(f"{len(msg.encode())} -> {len(msg_rsa)}")
+
+# Debugging only
 def decrypt_rsa(msg, private_key):
     return decrypt(msg, private_key)
+def decrypt_hybrid(msg, private_key):
+    return ""
 
 if run_omv:
     rtc = RTC()
@@ -254,12 +269,19 @@ def make_chunks(msg):
 
 # === Send Function ===
 async def send_msg(msgtype, creator, msgstr, dest):
-    if len(msgstr) < FRAME_SIZE:
-        succ, _ = await send_single_msg(msgtype, creator, msgstr, dest)
+    enctype = should_encrypt(msgtype)
+    if enctype == "RSA":
+        msgbytes = encrypt_rsa(msgstr, public_key)
+    elif enctype == "HYBRID":
+        msgbytes = encrypt_hybrid(msgstr, public_key)
+    else:
+        msgbytes = msgstr.encode()
+    if len(msgbytes) < FRAME_SIZE:
+        succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
     imid = get_rand()
-    chunks = make_chunks(msgstr)
-    log(f"Chunking {len(msgstr)} long message with id {imid} into {len(chunks)} chunks")
+    chunks = make_chunks(msgbytes)
+    log(f"Chunking {len(msgbytes)} long message with id {imid} into {len(chunks)} chunks")
     succ, _ = await send_single_msg("B", creator, f"{msgtype}:{imid}:{len(chunks)}", dest)
     if not succ:
         log(f"Failed sending chunk begin")
@@ -518,10 +540,10 @@ async def send_long_message():
 async def send_heartbeat():
     while True:
         # TODO add last known GPS here also.
-        hb = f"{my_addr}:{get_human_ts()}"
+        hbmsg = f"{my_addr}:{get_human_ts()}"
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
-            await send_msg("H", my_addr, hb, peer_addr)
+            await send_msg("H", my_addr, hbmsg, peer_addr)
         await asyncio.sleep(30)
 
 async def send_scan():
