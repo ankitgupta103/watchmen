@@ -1,2 +1,2 @@
-requests>=2.25.1
-configparser 
+micropython-umqtt.simple
+micropython-umqtt.robust
