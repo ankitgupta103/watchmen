@@ -116,12 +116,6 @@ def encrypt_hybrid(msg, n, e):
     aes_key_rsa_bytes = aes_key_rsa.to_bytes((get_bit_length(aes_key_rsa) + 7) // 8, 'big')
     iv_rsa_bytes = iv_rsa.to_bytes((get_bit_length(iv_rsa) + 7) // 8, 'big')
 
-
-    # print(f"{len(aes_key)} -> {len(aes_key_rsa)}")
-    # print(f"{len(iv)} -> {len(iv_rsa)}")
-    # print(f"{len(msg)} -> {len(msg_aes)}")
-    # return aes_key_rsa + iv_rsa + msg_aes
-
     print(f"{len(aes_key)} -> {len(aes_key_rsa_bytes)}")
     print(f"{len(iv)} -> {len(iv_rsa_bytes)}")
     print(f"{len(msg)} -> {len(msg_aes)}")
