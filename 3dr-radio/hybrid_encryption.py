@@ -164,7 +164,7 @@ def test_encryption(n2, enctype):
         # t4 = utime.ticks_diff(utime.ticks_ms(), clock_start)
         if enctype == "RSA":
             teststr_decrypt = decrypt_rsa(teststr_enc, d, n)
-            print(f"decripted_text: {teststr_decrypt.}")
+            print(f"decripted_text: {teststr_decrypt}")
         elif enctype == "AES":
             teststr_decrypt = decrypt_aes(teststr_enc, iv, aes_key)
         elif enctype == "HYBRID":
@@ -177,6 +177,6 @@ def test_encryption(n2, enctype):
             print(f"Strings DONT match {teststr} != {teststr_decrypt}")
         lenstr = lenstr*2
 
-# test_encryption(7, "HYBRID")
-# test_encryption(7, "AES")
+test_encryption(7, "HYBRID")
+test_encryption(7, "AES")
 test_encryption(7, "RSA")
