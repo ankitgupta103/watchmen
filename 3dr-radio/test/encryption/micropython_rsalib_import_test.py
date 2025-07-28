@@ -1,24 +1,29 @@
-from rsa.key import newkeys
-from rsa.pkcs1 import encrypt, decrypt
+import rsa
 
-# Generate a public/private key pair
-print("Generating RSA key pair...")
-(public_key, private_key) = newkeys(512)  # 512-bit key size
+# Generate RSA key pair
+(pubkey, privkey) = rsa.newkeys(2048)
 
-# data
-data = "long string to be encrypted"
-print("Original Message:", data)
+# Save public key in DER format
+with open("pubkey.der", "wb") as f:
+    f.write(pubkey.save_pkcs1(format='DER'))
 
-# data to bytes
-message_bytes = data.encode("utf-8")
+# Save private key in DER format
+with open("privkey.der", "wb") as f:
+    f.write(privkey.save_pkcs1(format='DER'))
 
-# encrypt with public key
-encrypted_message = encrypt(message_bytes, public_key)
-print("Encrypted Message (bytes):", encrypted_message)
+# Print components for use in custom encryption
+print("----- PUBLIC KEY -----")
+print("n =", pubkey.n)
+print("e =", pubkey.e)
 
-# decript with private key
-decrypted_bytes = decrypt(encrypted_message, private_key)
+print("\n----- PRIVATE KEY -----")
+print("n =", privkey.n)
+print("e =", privkey.e)
+print("d =", privkey.d)
+print("p =", privkey.p)
+print("q =", privkey.q)
 
-# decode to string
-decrypted_message = decrypted_bytes.decode("utf-8")
-print("Decrypted Message:", decrypted_message)
+
+
+# Public Key: PublicKey(7697071855362940996665223194653075214494363015019424906600380485491708839779410629463169517518847799932056092639029220642602735135117570242020637287678859, 65537)
+# Private Key: PrivateKey(7697071855362940996665223194653075214494363015019424906600380485491708839779410629463169517518847799932056092639029220642602735135117570242020637287678859, 65537, 4571006250068292164581999278818036946276463807384470106426702603038547809397888817111228837839874654420977511523503144228040636929288075885024702977746113, 6672796049506519112862542854248021598914188762404869430407300871182822890582516533, 1153500241616431738418165964107270428348907528200716169016112855670924223)
