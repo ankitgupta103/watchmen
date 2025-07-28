@@ -2,8 +2,8 @@ import ucryptolib
 import os
 
 import time as utime
-# from rsa.key import newkeys
-# from rsa.pkcs1 import encrypt, decrypt, sign, verify
+from rsa.key import newkeys
+from rsa.pkcs1 import encrypt, decrypt, sign, verify
 import rsa
 
 import random
@@ -63,7 +63,6 @@ def load_rsa():
     d = 12615187450009533620978944762377388180537105601776113600386640711872807314742567521481967293196449343689065526967973642556402896863851647061267082225904578337076996345214214052695721993166214809542895337852371516621520212855277762649799640745729311699016745064086310511404499379547113765777433297009134539523777624900684374282201690134310128956793708925693155974317133931947830198369788194144628762425198047535927171705756461275458808811907690456799727302086389080155967585204568108550975572684331157770719110820487517512655378445684085939335175115951599496571067753599254778933192794939648200859515974319007877278793
     return n, e, d
 
-n, e, d = load_rsa()
 
 
 def setup_rsa():
@@ -112,12 +111,24 @@ def encrypt_hybrid(msg, n, e):
     (iv, msg_aes) = encrypt_aes(msg, aes_key)
     iv_rsa = encrypt_rsa(iv, n, e)
     aes_key_rsa = encrypt_rsa(aes_key, n, e)
-    print(f"{len(aes_key)} -> {len(aes_key_rsa)}")
-    print(f"{len(iv)} -> {len(iv_rsa)}")
-    print(f"{len(msg)} -> {len(msg_aes)}")
-    return aes_key_rsa + iv_rsa + msg_aes
 
-def decrypt_hybrid(msg, private_key):
+    # Convert RSA-encrypted ints to bytes
+    aes_key_rsa_bytes = aes_key_rsa.to_bytes((get_bit_length(aes_key_rsa) + 7) // 8, 'big')
+    iv_rsa_bytes = iv_rsa.to_bytes((get_bit_length(iv_rsa) + 7) // 8, 'big')
+
+
+    # print(f"{len(aes_key)} -> {len(aes_key_rsa)}")
+    # print(f"{len(iv)} -> {len(iv_rsa)}")
+    # print(f"{len(msg)} -> {len(msg_aes)}")
+    # return aes_key_rsa + iv_rsa + msg_aes
+
+    print(f"{len(aes_key)} -> {len(aes_key_rsa_bytes)}")
+    print(f"{len(iv)} -> {len(iv_rsa_bytes)}")
+    print(f"{len(msg)} -> {len(msg_aes)}")
+
+    return aes_key_rsa_bytes + iv_rsa_bytes + msg_aes
+
+def decrypt_hybrid(msg, d, n):
     return ""
 
 def get_rand(n):
@@ -128,17 +139,18 @@ def get_rand(n):
 
 # Debugging only
 def test_encryption(n2, enctype):
-    # clock_start = utime.ticks_ms()
-    # t0 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-    # if enctype == "RSA" or enctype == "HYBRID":
-    #     # public_key, private_key = setup_rsa()
-    # elif enctype == "AES":
-    #     aes_key = setup_aes()
-    # else:
-    #     print("WRONG INPUT")
-    #     return
-    # t1 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-    # print(f"Setup key in time {t1-t0} mili seconds")
+    clock_start = utime.ticks_ms()
+    t0 = utime.ticks_diff(utime.ticks_ms(), clock_start)
+    if enctype == "RSA" or enctype == "HYBRID":
+        # public_key, private_key = setup_rsa()
+        n, e, d = load_rsa()
+    elif enctype == "AES":
+        aes_key = setup_aes()
+    else:
+        print("WRONG INPUT")
+        return
+    t1 = utime.ticks_diff(utime.ticks_ms(), clock_start)
+    print(f"Setup key in time {t1-t0} mili seconds")
     lenstr = 1
     for i in range(1,n2):
         # t2 = utime.ticks_diff(utime.ticks_ms(), clock_start)
@@ -158,7 +170,7 @@ def test_encryption(n2, enctype):
         # t4 = utime.ticks_diff(utime.ticks_ms(), clock_start)
         if enctype == "RSA":
             teststr_decrypt = decrypt_rsa(teststr_enc, d, n)
-            print(f"decripted_text: {teststr_decrypt}")
+            print(f"decripted_text: {teststr_decrypt.}")
         elif enctype == "AES":
             teststr_decrypt = decrypt_aes(teststr_enc, iv, aes_key)
         elif enctype == "HYBRID":
@@ -171,6 +183,6 @@ def test_encryption(n2, enctype):
             print(f"Strings DONT match {teststr} != {teststr_decrypt}")
         lenstr = lenstr*2
 
-test_encryption(7, "HYBRID")
-test_encryption(7, "AES")
+# test_encryption(7, "HYBRID")
+# test_encryption(7, "AES")
 test_encryption(7, "RSA")
