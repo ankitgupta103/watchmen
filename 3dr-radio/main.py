@@ -579,7 +579,7 @@ async def send_spath():
         await asyncio.sleep(60)
 
 async def main():
-    log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
+    log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
     asyncio.create_task(radio_read())
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
