@@ -117,7 +117,13 @@ def register_machine():
         config_file_to_use = FALLBACK_CONFIG_FILE
 
     if config_file_to_use:
-        print(f"Configuration file exists at: {config_file_to_use}")
+        # Get absolute path
+        if config_file_to_use.startswith("/"):
+            abs_path = config_file_to_use
+        else:
+            abs_path = os.getcwd() + "/" + config_file_to_use
+
+        print(f"Config file path: {abs_path}")
         try:
             with open(config_file_to_use, "r") as f:
                 config = json.load(f)
@@ -132,14 +138,8 @@ def register_machine():
                 print(f"Machine ID: {machine_id}")
                 print(f"Machine UID: {machine_uid}")
                 print(f"Machine Name: {machine_name}")
-
                 print("Device already registered. Skipping registration.")
-                print(f"Config file path: {config_file_to_use}")
                 return True, ""
-            else:
-                print(
-                    "Warning: Configuration file exists but appears to be invalid. Re-registering..."
-                )
         except Exception as e:
             print(f"Error reading config: {e}. Re-registering...")
 
