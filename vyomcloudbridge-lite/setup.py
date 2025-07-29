@@ -1,7 +1,7 @@
 import os
 import sys
-import configparser
-import requests
+import ujson as json  # MicroPython uses 'ujson' for JSON operations
+import urequests  # MicroPython uses 'urequests' for HTTP requests
 
 from constants import (
     VYOM_ROOT_DIR,
@@ -13,28 +13,36 @@ from constants import (
 
 def register_machine(interactive=True):
     """
-    Register a watchmen device with VyomIQ
+    Register a watchmen device with VyomIQ using MicroPython libraries.
 
     Args:
-        interactive (bool): Whether to run in interactive mode and prompt for input
+        interactive (bool): Whether to run in interactive mode and prompt for input.
 
     Returns:
         tuple: (success: bool, error: str)
     """
-    print("\n=== Watchmen Device Registration ===\n")
+    print("\n=== Watchmen Device Registration (MicroPython) ===\n")
 
     # Check if config file already exists
-    if os.path.exists(MACHINE_CONFIG_FILE):
+    try:
+        # In MicroPython, os.stat is a reliable way to check for file existence.
+        os.stat(MACHINE_CONFIG_FILE)
+        config_exists = True
+    except OSError:
+        config_exists = False
+
+    if config_exists:
         print(f"Configuration file already exists at: {MACHINE_CONFIG_FILE}")
         try:
             # Read existing configuration
-            config = configparser.ConfigParser()
-            config.read(MACHINE_CONFIG_FILE)
+            with open(MACHINE_CONFIG_FILE, "r") as f:
+                config = json.load(f)
 
-            if "MACHINE" in config:
-                machine_id = config["MACHINE"].get("machine_id", "Unknown")
-                machine_uid = config["MACHINE"].get("machine_uid", "Unknown")
-                machine_name = config["MACHINE"].get("machine_name", "Unknown")
+            machine_info = config.get("MACHINE")
+            if machine_info:
+                machine_id = machine_info.get("machine_id", "Unknown")
+                machine_uid = machine_info.get("machine_uid", "Unknown")
+                machine_name = machine_info.get("machine_name", "Unknown")
 
                 print("\n--- Existing Device Details ---")
                 print(f"Machine ID: {machine_id}")
@@ -68,9 +76,13 @@ def register_machine(interactive=True):
         machine_uid = input("Device UID: ").strip()
         machine_name = input("Device Name: ").strip()
     else:
-        # For non-interactive mode, generate a default name or use environment variables
-        machine_uid = os.environ.get("DEVICE_UID", "watchmen-device")
-        machine_name = os.environ.get("DEVICE_NAME", "Watchmen Device")
+        # For non-interactive mode on microcontrollers, we use hardcoded defaults
+        # as there are no environment variables.
+        machine_uid = "watchmen-device-01"
+        machine_name = "Watchmen Device (Auto)"
+        print(
+            f"Non-interactive mode: Using default UID '{machine_uid}' and Name '{machine_name}'"
+        )
 
     if not machine_uid or not machine_name:
         return False, "Device UID and Device Name are required"
@@ -84,57 +96,72 @@ def register_machine(interactive=True):
 
     # Make API call to register device
     print("Registering device with VyomIQ...")
+    response = None
     try:
-        response = requests.post(
+        # urequests.post is the equivalent of requests.post
+        response = urequests.post(
             MACHINE_REGISTER_API_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=30,
         )
 
         # Check response
         if response.status_code == 200:
-            data = response.json()
+            data = response.json()  # .json() is also available in urequests
             if data.get("status") == 200:
                 print("Device registration successful!")
 
-                # Create directory if it doesn't exist
-                os.makedirs(VYOM_ROOT_DIR, exist_ok=True)
+                # Create directory if it doesn't exist.
+                # os.makedirs is not in MicroPython, so we create one level.
+                try:
+                    os.mkdir(VYOM_ROOT_DIR)
+                except OSError as e:
+                    # Error code 17 means directory already exists, which is fine.
+                    if e.args[0] != 17:
+                        raise
 
-                # Save configuration
-                config = configparser.ConfigParser()
-                config["MACHINE"] = {
-                    "machine_id": str(data["data"].get("id", "")),
-                    "machine_uid": data["data"].get("machine_uid", ""),
-                    "machine_name": data["data"].get("name", ""),
-                    "machine_model_id": str(data["data"].get("machine_model", "")),
-                    "machine_model_name": data["data"].get("machine_model_name", ""),
-                    "machine_model_type": data["data"].get("machine_model_type", ""),
-                    "organization_id": str(data["data"].get("current_owner", "")),
-                    "organization_name": data["data"].get("current_owner_name", ""),
-                    "created_at": data["data"].get("created_at", ""),
-                    "updated_at": data["data"].get("updated_at", ""),
-                    "session_id": data["data"].get("session_id", ""),
+                # Prepare configuration data using a standard Python dictionary
+                config_data = {}
+                machine_data = data.get("data", {})
+                config_data["MACHINE"] = {
+                    "machine_id": str(machine_data.get("id", "")),
+                    "machine_uid": machine_data.get("machine_uid", ""),
+                    "machine_name": machine_data.get("name", ""),
+                    "machine_model_id": str(machine_data.get("machine_model", "")),
+                    "machine_model_name": machine_data.get("machine_model_name", ""),
+                    "machine_model_type": machine_data.get("machine_model_type", ""),
+                    "organization_id": str(machine_data.get("current_owner", "")),
+                    "organization_name": machine_data.get("current_owner_name", ""),
+                    "created_at": machine_data.get("created_at", ""),
+                    "updated_at": machine_data.get("updated_at", ""),
+                    "session_id": machine_data.get("session_id", ""),
                 }
 
                 # Save IoT credentials if present
-                if "iot_data" in data["data"]:
-                    iot_data = data["data"]["iot_data"]
-                    config["IOT"] = {
-                        "thing_name": iot_data["thing_name"],
-                        "thing_arn": iot_data["thing_arn"],
-                        "policy_name": iot_data["policy_name"],
-                        "certificate": iot_data["certificate"]["certificatePem"],
-                        "private_key": iot_data["certificate"]["keyPair"]["PrivateKey"],
-                        "public_key": iot_data["certificate"]["keyPair"]["PublicKey"],
-                        "root_ca": iot_data["root_ca"],
+                if "iot_data" in machine_data:
+                    iot_data = machine_data["iot_data"]
+                    config_data["IOT"] = {
+                        "thing_name": iot_data.get("thing_name"),
+                        "thing_arn": iot_data.get("thing_arn"),
+                        "policy_name": iot_data.get("policy_name"),
+                        "certificate": iot_data.get("certificate", {}).get(
+                            "certificatePem"
+                        ),
+                        "private_key": iot_data.get("certificate", {})
+                        .get("keyPair", {})
+                        .get("PrivateKey"),
+                        "public_key": iot_data.get("certificate", {})
+                        .get("keyPair", {})
+                        .get("PublicKey"),
+                        "root_ca": iot_data.get("root_ca"),
                     }
 
+                # Save configuration as a JSON file
                 with open(MACHINE_CONFIG_FILE, "w") as f:
-                    config.write(f)
+                    json.dump(config_data, f)
 
                 print(f"Configuration saved to {MACHINE_CONFIG_FILE}")
-                print(f"Device Model ID: {data['data'].get('machine_model', 'N/A')}")
+                print(f"Device Model ID: {machine_data.get('machine_model', 'N/A')}")
 
                 return True, ""
             else:
@@ -147,18 +174,19 @@ def register_machine(interactive=True):
             print(f"Error: {error_msg}")
             return False, error_msg
 
-    except requests.exceptions.Timeout:
-        error_msg = "Registration request timed out"
-        print(f"Error: {error_msg}")
-        return False, error_msg
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Network error during registration: {str(e)}"
+    except OSError as e:
+        # OSError is the common exception for network errors in MicroPython
+        error_msg = f"Network or File I/O error during registration: {e}"
         print(f"Error: {error_msg}")
         return False, error_msg
     except Exception as e:
         error_msg = f"Unexpected error during registration: {str(e)}"
         print(f"Error: {error_msg}")
         return False, error_msg
+    finally:
+        # Ensure the response is closed to free up memory
+        if response:
+            response.close()
 
 
 def setup(interactive=True):
@@ -171,7 +199,7 @@ def setup(interactive=True):
     Returns:
         bool: True if setup completed successfully, False otherwise
     """
-    print("\n=== Starting Watchmen Device Setup ===\n")
+    print("\n=== Starting Watchmen Device Setup (MicroPython) ===\n")
 
     # Register the device
     registration_success, error = register_machine(interactive=interactive)
@@ -191,4 +219,7 @@ if __name__ == "__main__":
 
     # Exit with appropriate status code
     if not success:
+        print("Setup failed. Exiting.")
         sys.exit(1)
+    else:
+        print("Setup successful.")
