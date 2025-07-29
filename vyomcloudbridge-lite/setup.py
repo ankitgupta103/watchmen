@@ -43,8 +43,8 @@ AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
 S3_BUCKET_NAME = "vyomos"
 
 # Device UID and Device Name.
-DEVICE_UID = "watchmen-device-01"
-DEVICE_NAME = "Watchmen Device MicroPython"  # Make sure this matches your curl test
+DEVICE_UID = "watchmenOPENMV02"
+DEVICE_NAME = "WatchmenMP03"  # Make sure this matches your curl test
 
 # --- Wi-Fi Configuration ---
 # TODO: IMPORTANT: Replace with your network credentials
@@ -495,6 +495,9 @@ def register_machine():
                     "session_id": machine_data.get("session_id", ""),
                 }
 
+                print(f"Machine Data: {machine_data}")
+                print(f"Config Data: {config_data}")
+
                 # Save IoT credentials if present
                 if "iot_data" in machine_data:
                     iot_data = machine_data["iot_data"]
@@ -518,6 +521,7 @@ def register_machine():
                 print("\n=== DEVICE CONFIGURATION ===")
                 print(json.dumps(config_data, indent=2))
                 print("=== END CONFIGURATION ===\n")
+                print(f"Data: {json.dumps(config_data, indent=2)}")
 
                 # Try to create directory and save to original location first
                 config_saved = False
