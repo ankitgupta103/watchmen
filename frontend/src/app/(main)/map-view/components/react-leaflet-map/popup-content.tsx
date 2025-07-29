@@ -59,8 +59,6 @@ export default function PopupContent({
           <strong>Location:</strong> {machine?.last_location?.lat ?? '0.0000'},{' '}
           {machine?.last_location?.long ?? '0.0000'}
         </div>
-
-        <div className="text-xs text-gray-400">Click to view details</div>
       </div>
     </>
   );

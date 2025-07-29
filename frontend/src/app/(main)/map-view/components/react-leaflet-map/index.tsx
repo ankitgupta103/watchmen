@@ -21,13 +21,11 @@ import { useEffect } from 'react';
 
 interface MapProps {
   machines: Machine[];
-  onMarkerClick: (machine: Machine) => void;
   getMachineData: (machineId: number) => MachineData;
 }
 
 export default function ReactLeafletMap({
   machines,
-  onMarkerClick,
   getMachineData,
 }: MapProps) {
   const router = useRouter();
@@ -80,7 +78,6 @@ export default function ReactLeafletMap({
           key={machine.id}
           machine={machine}
           machineData={getMachineData(machine.id)}
-          onMarkerClick={onMarkerClick}
         />
       ))}
     </MapContainer>
