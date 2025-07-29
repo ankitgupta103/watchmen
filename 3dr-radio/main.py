@@ -439,7 +439,6 @@ def end_chunk(msg):
         return (True, recompiled)
 
 def parse_header(data):
-    print(data)
     if len(data) < 9:
         return None
     mid = data[:MIDLEN].decode()
@@ -467,26 +466,6 @@ def img_process(mid, msg):
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
-    print(msg)
-    if chr(data[MIDLEN]) != ';':
-        print("Failure 3")
-        return None
-    msg = data[MIDLEN+1:].decode().strip()
-    return (mid, mst, creator, sender, receiver, msg)
-
-def hb_process(mid, msg):
-    # if cc stats
-    # if intermediate forward. asyncio.create
-    pass
-
-def img_process(mid, msg):
-    # if intermediate forward. asyncio.create
-    # if cc stats
-    pass
-
-# If N messages seen in the last M minutes.
-def scan_process(mid, msg):
-    print(msg)
     if msg not in seen_neighbours:
         seen_neighbours.append(msg)
         print(f"Neighbours = {seen_neighbours}")
@@ -506,9 +485,10 @@ def spath_process(mid, msg):
     if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
         print(f"Updating spath to {spath}")
         shortest_path_to_cc = spath
-    for n in seen_neighbours:
-        nmsg = my_addr + "," + ",".join(shortest_path_to_cc)
-        asyncio.create_task(send_msg("S", mid[1], nmsg, n))
+        for n in seen_neighbours:
+            nmsg = my_addr + "," + ",".join(spath)
+            print(f"Propogating spath from {spath} to {nmsg}")
+            asyncio.create_task(send_msg("S", mid[1], nmsg, n))
 
 def process_message(data):
     parsed = parse_header(data)
