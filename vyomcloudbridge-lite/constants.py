@@ -1,13 +1,16 @@
-import os
+VYOM_ROOT_DIR = "/vyom/vyomcloudbridge"
 
-# API endpoints
-# BASE_API_URL = "https://api.vyomiq.com"
-BASE_API_URL = "http://localhost:8001"
+# The full path to the machine configuration file.
+MACHINE_CONFIG_FILE = f"{VYOM_ROOT_DIR}/machine_config.json"
+
+
+# --- API Configuration ---
+BASE_API_URL = "https://api.vyomiq.io"
 MACHINE_REGISTER_API_URL = f"{BASE_API_URL}/device/register/watchmen/"
 
-# Directory structure
-VYOM_ROOT_DIR = "/opt/vyomcloudbridge"
-MACHINE_CONFIG_FILE = os.path.join(VYOM_ROOT_DIR, "machine_config.ini")
-
-# Organization ID for watchmen devices
+# Organization ID for watchmen devices.
 WATCHMEN_ORGANIZATION_ID = 20
+
+# AWS IoT endpoint and S3 bucket name.
+AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
+S3_BUCKET_NAME = "vyomos"
