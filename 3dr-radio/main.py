@@ -98,7 +98,7 @@ if run_omv:
     rtc = RTC()
     uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
     print("Running on device : " + uid.decode())
-    if uid == b'':                                   # Add unique machine ID for A
+    if uid == b'e076465dd7194025':                                  
         my_addr = 'A'
         my_rsa_public_key = None # TODO
     elif uid == b'e076465dd7194211':
