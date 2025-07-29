@@ -134,6 +134,8 @@ const EventPost: React.FC<EventPostProps> = ({
   const severity = getSeverity();
   const hasImages = event.croppedImageUrl || event.fullImageUrl;
 
+  console.log(event);
+
   return (
     <Card className="flex flex-col justify-between shadow-md hover:shadow-lg transition-shadow">
       <CardHeader>
