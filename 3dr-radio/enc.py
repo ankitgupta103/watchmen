@@ -80,8 +80,7 @@ def decrypt_aes(encrypted_msg, iv, aes_key):
     decrypted_msg = unpad(aes.decrypt(encrypted_msg))
     return decrypted_msg
 
-
-def encrypt_rsa(msgstr, public_key):
+def encrypt_rsa(msgstr, public_key): # Max 117 bytes
     return encrypt(msgstr, public_key)
 
 def decrypt_rsa(msgstr, private_key):
@@ -93,7 +92,6 @@ def encrypt_hybrid(msg, public_key):
     (iv, msg_aes) = encrypt_aes(msg, aes_key)
     iv_rsa = encrypt_rsa(iv, public_key)
     aes_key_rsa = encrypt_rsa(aes_key, public_key)
-
     return aes_key_rsa + iv_rsa + msg_aes
 
 def decrypt_hybrid(msg, private_key):
@@ -102,6 +100,7 @@ def decrypt_hybrid(msg, private_key):
     msg_decrypt = decrypt_aes(msg[512:], iv, aes_key)
     return msg_decrypt
 
+# Debugging only
 def get_rand(n):
     rstr = ""
     for i in range(n):
@@ -124,12 +123,9 @@ def test_encryption(n1,n2, enctype):
     print(f"Setup key in time {t1-t0} mili seconds")
     lenstr = n1
     laststr = ""
-    for i in range(0,n2):
+    for i in range(n1, n2):
         t2 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-        if len(laststr) > 0:
-            teststr = laststr + laststr
-        else:
-            teststr = get_rand(lenstr)
+        teststr = get_rand(lenstr)
         t3 = utime.ticks_diff(utime.ticks_ms(), clock_start)
         if enctype == "RSA":
             teststr_enc = encrypt_rsa(teststr.encode(), public_key)
@@ -155,5 +151,4 @@ def test_encryption(n1,n2, enctype):
         lenstr = lenstr*2
 
 test_encryption(1024, 10, "HYBRID")
-test_encryption(1, 9, "RSA")
 test_encryption(1024, 10, "AES")
