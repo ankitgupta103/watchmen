@@ -139,6 +139,8 @@ else:
 shortest_path_to_cc = []
 seen_neighbours = []
 
+sent_count = 0
+recv_msg_count = {}
 
 # ------- Person Detection + snapshot ---------
 # TODO(anand): Test with IR lense for person detection in Night
@@ -230,6 +232,7 @@ def ack_needed(msgtype):
     return False
 
 def radio_send(data):
+    sent_count = sent_count + 1
     uart.write(data)
     log(f"[SENT ] {data.decode().strip()} at {time_msec()}")
 
@@ -499,6 +502,9 @@ def process_message(data):
         log(f"Flakiness dropping {data}")
         return
     mid, mst, creator, sender, receiver, msg = parsed
+    if sender not in recv_msg_count:
+        recv_msg_count[sender] = 0
+    recv_msg_count[sender] += 1
     if receiver != "*" and my_addr != receiver:
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
@@ -559,6 +565,8 @@ async def send_scan():
             await asyncio.sleep(300)
         print(f"Seen neighbours = {seen_neighbours}")
         print(f"Shortest path = {shortest_path_to_cc}")
+        print(f"Sent messages = {sent_count}")
+        print(f"Received messages = {recv_msg_count}")
         i = i + 1
 
 async def send_spath():
@@ -572,13 +580,13 @@ async def send_spath():
 async def main():
     log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
     asyncio.create_task(radio_read())
-    if run_omv:
+    if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
         asyncio.create_task(send_scan())
         # asyncio.create_task(person_detection_loop())
         # asyncio.create_task(send_long_message())
         await asyncio.sleep(36000)
-    else:
+    else if my_addr == "Z":
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
         await asyncio.sleep(3600000)
