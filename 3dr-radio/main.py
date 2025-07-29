@@ -232,6 +232,7 @@ def ack_needed(msgtype):
     return False
 
 def radio_send(data):
+    global sent_count
     sent_count = sent_count + 1
     uart.write(data)
     log(f"[SENT ] {data.decode().strip()} at {time_msec()}")
