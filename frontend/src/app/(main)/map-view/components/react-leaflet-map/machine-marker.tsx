@@ -12,6 +12,7 @@ import {
 } from '@/lib/utils';
 
 import PopupContent from './popup-content';
+import { useRouter } from 'next/navigation';
 
 const createStatusIcon = (machine: Machine, machineData: MachineData) => {
   const isOnline = isMachineOnline(machine);
@@ -63,14 +64,13 @@ const createStatusIcon = (machine: Machine, machineData: MachineData) => {
 interface MachineMarker {
   machine: Machine;
   machineData: MachineData;
-  onMarkerClick: (machine: Machine) => void;
 }
 
 export default function MachineMarker({
   machine,
   machineData,
-  onMarkerClick,
 }: MachineMarker) {
+  const router = useRouter();
   const markerRef = useRef<L.Marker>(null);
   let hoverTimeout: NodeJS.Timeout;
 
@@ -98,7 +98,7 @@ export default function MachineMarker({
     if (markerRef.current) {
       markerRef.current.closePopup();
     }
-    onMarkerClick(machine);
+    router.push(`/dashboard/${machine.id}`);
   };
 
   return (

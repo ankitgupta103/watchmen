@@ -1,22 +1,327 @@
+# TODO - Important
+# Note: This script is only for the MicroPython version of the Watchmen device.
+# Update the constants below to match your setup.
+
 import os
 import sys
+import time
+import network
 import ujson as json  # MicroPython uses 'ujson' for JSON operations
-import urequests  # MicroPython uses 'urequests' for HTTP requests
 
-from constants import (
-    VYOM_ROOT_DIR,
-    MACHINE_CONFIG_FILE,
-    MACHINE_REGISTER_API_URL,
-    WATCHMEN_ORGANIZATION_ID,
-)
+# Try different HTTP libraries based on what's available
+try:
+    import requests as http_lib
+
+    print("Using 'requests' library")
+except ImportError:
+    try:
+        import urequests as http_lib
+
+        print("Using 'urequests' library")
+    except ImportError:
+        print("Error: No HTTP library available. Using socket implementation.")
+        http_lib = None
+
+VYOM_ROOT_DIR = "/vyom/vyomcloudbridge"
+
+# The full path to the machine configuration file.
+MACHINE_CONFIG_FILE = f"{VYOM_ROOT_DIR}/machine_config.json"
 
 
-def register_machine(interactive=True):
+# --- API Configuration ---
+BASE_API_URL = "https://api.vyomiq.io"
+MACHINE_REGISTER_API_URL = f"{BASE_API_URL}/device/register/watchmen/"
+
+# Organization ID for watchmen devices.
+WATCHMEN_ORGANIZATION_ID = 20
+
+# AWS IoT endpoint and S3 bucket name.
+AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
+S3_BUCKET_NAME = "vyomos"
+
+# Device UID and Device Name.
+DEVICE_UID = "watchmen-mp-02"
+DEVICE_NAME = "Watchmen MP Test"  # Make sure this is less than 20 characters
+
+# --- Wi-Fi Configuration ---
+# TODO: IMPORTANT: Replace with your network credentials
+WIFI_SSID = "A"
+WIFI_KEY = "123456789"
+
+
+def create_directory_recursive(path):
     """
-    Register a watchmen device with VyomIQ using MicroPython libraries.
+    Create directory recursively, handling nested paths for MicroPython.
 
     Args:
-        interactive (bool): Whether to run in interactive mode and prompt for input.
+        path (str): Directory path to create
+
+    Returns:
+        bool: True if directory exists or was created successfully
+    """
+    try:
+        # Check if directory already exists
+        os.stat(path)
+        return True
+    except OSError:
+        pass
+
+    # Split path into components
+    path_parts = path.strip("/").split("/")
+    current_path = ""
+
+    for part in path_parts:
+        if part:
+            if current_path:
+                current_path = current_path + "/" + part
+            else:
+                current_path = "/" + part
+
+            try:
+                os.mkdir(current_path)
+            except OSError as e:
+                # Error code 17 means directory already exists, which is fine
+                if e.args[0] != 17:
+                    print(f"Warning: Could not create directory {current_path}: {e}")
+                    return False
+
+    return True
+
+
+def connect_wifi(ssid=None, password=None, timeout=30):
+    """
+    Connect to WiFi network.
+
+    Args:
+        ssid (str): WiFi network name. If None, uses WIFI_SSID from constants
+        password (str): WiFi password. If None, uses WIFI_KEY from constants
+        timeout (int): Connection timeout in seconds
+
+    Returns:
+        bool: True if connected successfully, False otherwise
+    """
+    if ssid is None:
+        ssid = WIFI_SSID
+    if password is None:
+        password = WIFI_KEY
+
+    if ssid == "YOUR_WIFI_SSID" or password == "YOUR_WIFI_PASSWORD":
+        print(
+            "Error: Please update WIFI_SSID and WIFI_KEY in the script with your actual WiFi credentials!"
+        )
+        return False
+
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+
+    if wlan.isconnected():
+        print(f"Already connected to WiFi. IP: {wlan.ifconfig()[0]}")
+        return True
+
+    print(f'Connecting to WiFi network "{ssid}"...')
+    wlan.connect(ssid, password)
+
+    # Wait for connection
+    start_time = time.time()
+    while not wlan.isconnected() and (time.time() - start_time) < timeout:
+        time.sleep_ms(500)
+        print(".", end="")
+
+    print()  # New line after dots
+
+    if wlan.isconnected():
+        ip_info = wlan.ifconfig()
+        print(f"WiFi Connected! IP: {ip_info[0]}, Gateway: {ip_info[2]}")
+        return True
+    else:
+        print(f"Failed to connect to WiFi within {timeout} seconds")
+        print("Please check your WiFi credentials and network availability")
+        return False
+
+
+def socket_post_request(url, data, headers=None):
+    """
+    Make a POST request using raw sockets when HTTP libraries aren't available.
+    This is a fallback implementation for OpenMV.
+    """
+    import socket
+    import ssl
+
+    if headers is None:
+        headers = {}
+
+    s = None
+    ssl_sock = None
+
+    try:
+        # Parse URL
+        if url.startswith("https://"):
+            protocol = "https"
+            url = url[8:]
+            port = 443
+            use_ssl = True
+        elif url.startswith("http://"):
+            protocol = "http"
+            url = url[7:]
+            port = 80
+            use_ssl = False
+        else:
+            raise ValueError("URL must start with http:// or https://")
+
+        # Split host and path
+        if "/" in url:
+            host, path = url.split("/", 1)
+            path = "/" + path
+        else:
+            host = url
+            path = "/"
+
+        # Handle port in host
+        if ":" in host:
+            host, port_str = host.split(":")
+            port = int(port_str)
+
+        print(f"Connecting to {host}:{port} via {protocol}")
+
+        # Convert data to JSON string
+        json_data = json.dumps(data)
+
+        # Build HTTP request
+        request_lines = [
+            f"POST {path} HTTP/1.1",
+            f"Host: {host}",
+            "Content-Type: application/json",
+            f"Content-Length: {len(json_data)}",
+            "Connection: close",
+            "User-Agent: OpenMV-Watchmen/1.0",
+        ]
+
+        # Add custom headers
+        for key, value in headers.items():
+            if key.lower() not in ["host", "content-length", "connection"]:
+                request_lines.append(f"{key}: {value}")
+
+        request_lines.append("")  # Empty line before body
+        request_lines.append(json_data)
+
+        request = "\r\n".join(request_lines)
+
+        # Create socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(30)  # 30 second timeout
+
+        # Resolve hostname
+        try:
+            addr_info = socket.getaddrinfo(host, port)
+            ip_addr = addr_info[0][-1][0]
+            print(f"Resolved {host} to {ip_addr}")
+        except Exception as e:
+            print(f"DNS resolution failed for {host}: {e}")
+            raise
+
+        # Connect
+        print("Establishing connection...")
+        s.connect((ip_addr, port))
+        print("Connected to server")
+
+        # Wrap with SSL if needed
+        if use_ssl:
+            print("Starting SSL handshake...")
+            try:
+                # Try to create SSL context for better compatibility
+                try:
+                    ssl_context = ssl.create_default_context()
+                    ssl_sock = ssl_context.wrap_socket(s, server_hostname=host)
+                except AttributeError:
+                    # Fallback for older MicroPython versions
+                    ssl_sock = ssl.wrap_socket(s)
+                s = ssl_sock
+                print("SSL connection established")
+            except Exception as e:
+                print(f"SSL handshake failed: {e}")
+                raise
+
+        # Send request
+        print("Sending HTTP request...")
+        s.send(request.encode())
+        print("Request sent, waiting for response...")
+
+        # Read response
+        response = b""
+        while True:
+            try:
+                chunk = s.recv(1024)
+                if not chunk:
+                    break
+                response += chunk
+                # For simple responses, break after getting headers + some body
+                if len(response) > 4096:  # Reasonable limit
+                    break
+            except Exception:
+                break
+
+        response_str = response.decode("utf-8", errors="ignore")
+        print(f"Received response ({len(response)} bytes)")
+
+        # Parse response
+        if not response_str:
+            raise Exception("Empty response received")
+
+        lines = response_str.split("\r\n")
+        if not lines:
+            raise Exception("Invalid response format")
+
+        status_line = lines[0]
+        print(f"Status line: {status_line}")
+
+        # Extract status code
+        try:
+            status_code = int(status_line.split()[1])
+        except (IndexError, ValueError):
+            raise Exception(f"Invalid status line: {status_line}")
+
+        # Find body
+        body_start = response_str.find("\r\n\r\n")
+        if body_start != -1:
+            body = response_str[body_start + 4 :]
+            try:
+                response_data = json.loads(body) if body.strip() else {}
+            except Exception:
+                response_data = {"text": body}
+        else:
+            response_data = {}
+
+        # Create response object similar to requests
+        class SocketResponse:
+            def __init__(self, status_code, data):
+                self.status_code = status_code
+                self.data = data
+
+            def json(self):
+                return self.data
+
+            def close(self):
+                pass
+
+        return SocketResponse(status_code, response_data)
+
+    except Exception as e:
+        print(f"Socket request failed: {e}")
+        raise
+    finally:
+        # Ensure proper cleanup
+        try:
+            if ssl_sock:
+                ssl_sock.close()
+            elif s:
+                s.close()
+        except Exception:
+            pass
+
+
+def register_machine():
+    """
+    Register a watchmen device with VyomIQ using MicroPython libraries.
 
     Returns:
         tuple: (success: bool, error: str)
@@ -49,18 +354,8 @@ def register_machine(interactive=True):
                 print(f"Machine UID: {machine_uid}")
                 print(f"Machine Name: {machine_name}")
 
-                if interactive:
-                    overwrite = (
-                        input("\nDevice already registered. Overwrite? [y/N]: ")
-                        .strip()
-                        .lower()
-                    )
-                    if overwrite not in ["y", "yes"]:
-                        print("Registration cancelled.")
-                        return True, ""
-                else:
-                    print("Device already registered. Skipping registration.")
-                    return True, ""
+                print("Device already registered. Skipping registration.")
+                return True, ""
             else:
                 print(
                     "Warning: Configuration file exists but appears to be invalid. Re-registering..."
@@ -71,58 +366,101 @@ def register_machine(interactive=True):
     else:
         print("No configuration file found. Starting registration...")
 
-    # Get device registration information
-    if interactive:
-        machine_uid = input("Device UID: ").strip()
-        machine_name = input("Device Name: ").strip()
-    else:
-        # For non-interactive mode on microcontrollers, we use hardcoded defaults
-        # as there are no environment variables.
-        machine_uid = "watchmen-device-01"
-        machine_name = "Watchmen Device (Auto)"
-        print(
-            f"Non-interactive mode: Using default UID '{machine_uid}' and Name '{machine_name}'"
+    # Connect to WiFi first
+    print("\n--- Connecting to WiFi ---")
+    if not connect_wifi():
+        return (
+            False,
+            "Failed to connect to WiFi. Please check your network credentials.",
         )
-
-    if not machine_uid or not machine_name:
-        return False, "Device UID and Device Name are required"
 
     # Create payload JSON
     payload = {
-        "name": machine_name,
-        "machine_uid": machine_uid,
+        "name": DEVICE_NAME,
+        "machine_uid": DEVICE_UID,
         "organization_id": WATCHMEN_ORGANIZATION_ID,
     }
 
+    print(f"Registration payload: {payload}")
+
     # Make API call to register device
-    print("Registering device with VyomIQ...")
+    print(f"\nRegistering device with VyomIQ at: {MACHINE_REGISTER_API_URL}")
     response = None
     try:
-        # urequests.post is the equivalent of requests.post
-        response = urequests.post(
-            MACHINE_REGISTER_API_URL,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-        )
+        # Try different HTTP libraries with enhanced debugging and error handling
+        if http_lib:
+            print("Using HTTP library for request...")
+
+            # Debug: Print the exact JSON being sent
+            json_payload = json.dumps(payload)
+            print(f"JSON payload to send: {json_payload}")
+            print(f"JSON payload length: {len(json_payload)}")
+
+            # Enhanced headers to match curl more closely
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "MicroPython-Watchmen/1.0",
+                "Accept": "application/json",
+                "Connection": "close",
+            }
+
+            print(f"Request headers: {headers}")
+
+            # Use data parameter with manual JSON encoding (MicroPython requests doesn't support json parameter)
+            try:
+                response = http_lib.post(
+                    MACHINE_REGISTER_API_URL, data=json_payload, headers=headers
+                )
+                print("POST request successful")
+            except Exception as e:
+                print(f"POST request failed: {e}")
+                raise
+
+            # Debug response details
+            print(f"Response status code: {response.status_code}")
+            print(f"Response headers: {getattr(response, 'headers', 'N/A')}")
+
+            # Handle response
+            try:
+                response_data = response.json()
+            except (ValueError, AttributeError):
+                # If JSON parsing fails, try to get text
+                response_text = getattr(response, "text", str(response.content))
+                print(f"Failed to parse JSON response. Raw response: {response_text}")
+                response_data = {"error": {"message": "Invalid JSON response"}}
+
+            status_code = response.status_code
+
+        else:
+            # Fallback to socket implementation
+            print("Using socket fallback for HTTP request...")
+            response = socket_post_request(
+                MACHINE_REGISTER_API_URL,
+                payload,
+                {
+                    "Content-Type": "application/json",
+                    "User-Agent": "MicroPython-Watchmen/1.0",
+                    "Accept": "application/json",
+                },
+            )
+            response_data = response.json()
+            status_code = response.status_code
+
+        print(f"Received HTTP status: {status_code}")
+        print(f"Response data: {response_data}")
 
         # Check response
-        if response.status_code == 200:
-            data = response.json()  # .json() is also available in urequests
-            if data.get("status") == 200:
+        if status_code == 200:
+            if response_data.get("status") == 200:
                 print("Device registration successful!")
 
-                # Create directory if it doesn't exist.
-                # os.makedirs is not in MicroPython, so we create one level.
-                try:
-                    os.mkdir(VYOM_ROOT_DIR)
-                except OSError as e:
-                    # Error code 17 means directory already exists, which is fine.
-                    if e.args[0] != 17:
-                        raise
+                # Create directory if it doesn't exist using recursive function
+                if not create_directory_recursive(VYOM_ROOT_DIR):
+                    return False, f"Failed to create directory: {VYOM_ROOT_DIR}"
 
                 # Prepare configuration data using a standard Python dictionary
                 config_data = {}
-                machine_data = data.get("data", {})
+                machine_data = response_data.get("data", {})
                 config_data["MACHINE"] = {
                     "machine_id": str(machine_data.get("id", "")),
                     "machine_uid": machine_data.get("machine_uid", ""),
@@ -157,20 +495,39 @@ def register_machine(interactive=True):
                     }
 
                 # Save configuration as a JSON file
-                with open(MACHINE_CONFIG_FILE, "w") as f:
-                    json.dump(config_data, f)
+                try:
+                    with open(MACHINE_CONFIG_FILE, "w") as f:
+                        json.dump(config_data, f)
+                except OSError as e:
+                    return False, f"Failed to write configuration file: {e}"
 
                 print(f"Configuration saved to {MACHINE_CONFIG_FILE}")
                 print(f"Device Model ID: {machine_data.get('machine_model', 'N/A')}")
 
                 return True, ""
             else:
-                error_msg = f"Registration failed with status: {data.get('status')}"
+                error_msg = (
+                    f"Registration failed with status: {response_data.get('status')}"
+                )
                 print(f"Error: {error_msg}")
-                print(f"Response: {data}")
+                print(f"Response: {response_data}")
                 return False, error_msg
+        elif status_code == 400:
+            # Bad request - often due to payload issues
+            error_msg = f"Bad request (400): {response_data.get('error', {}).get('message', 'Invalid request data')}"
+            print(f"Error: {error_msg}")
+            print("This usually means there's an issue with the request payload.")
+            print("Please check that all required fields are present and valid.")
+            return False, error_msg
+        elif status_code == 409:
+            # Conflict - device might already exist
+            error_msg = f"Device conflict (409): {response_data.get('error', {}).get('message', 'Device may already exist')}"
+            print(f"Error: {error_msg}")
+            return False, error_msg
         else:
-            error_msg = f"HTTP error {response.status_code}: {response.text}"
+            error_msg = f"HTTP error {status_code}"
+            if response_data:
+                error_msg += f": {response_data.get('error', {}).get('message', str(response_data))}"
             print(f"Error: {error_msg}")
             return False, error_msg
 
@@ -178,31 +535,49 @@ def register_machine(interactive=True):
         # OSError is the common exception for network errors in MicroPython
         error_msg = f"Network or File I/O error during registration: {e}"
         print(f"Error: {error_msg}")
+        print("Common causes:")
+        print("- WiFi not connected or unstable")
+        print("- DNS resolution failure")
+        print("- Server unreachable")
+        print("- SSL/TLS handshake failure")
+        print("- Timeout during request")
         return False, error_msg
     except Exception as e:
         error_msg = f"Unexpected error during registration: {str(e)}"
         print(f"Error: {error_msg}")
+        import sys
+
+        sys.print_exception(e)  # Print full traceback in MicroPython
         return False, error_msg
     finally:
         # Ensure the response is closed to free up memory
-        if response:
-            response.close()
+        if response and hasattr(response, "close"):
+            try:
+                response.close()
+            except Exception:
+                pass
 
 
-def setup(interactive=True):
+def setup():
     """
     Perform the minimal Watchmen device setup process.
-
-    Args:
-        interactive (bool): Whether to run in interactive mode and prompt for input
 
     Returns:
         bool: True if setup completed successfully, False otherwise
     """
     print("\n=== Starting Watchmen Device Setup (MicroPython) ===\n")
 
+    # Test WiFi credentials first
+    if WIFI_SSID == "YOUR_WIFI_SSID" or WIFI_KEY == "YOUR_WIFI_PASSWORD":
+        print("ERROR: Please update the WiFi credentials at the top of this script!")
+        print("Current values:")
+        print(f'WIFI_SSID = "{WIFI_SSID}"')
+        print(f'WIFI_KEY = "{WIFI_KEY}"')
+        print("\nPlease change these to your actual WiFi network name and password.")
+        return False
+
     # Register the device
-    registration_success, error = register_machine(interactive=interactive)
+    registration_success, error = register_machine()
     if not registration_success:
         print(f"Device registration failed: {error}")
         return False
@@ -213,9 +588,7 @@ def setup(interactive=True):
 
 
 if __name__ == "__main__":
-    # Check if script is run with --non-interactive flag
-    is_interactive = "--non-interactive" not in sys.argv
-    success = setup(interactive=is_interactive)
+    success = setup()
 
     # Exit with appropriate status code
     if not success:

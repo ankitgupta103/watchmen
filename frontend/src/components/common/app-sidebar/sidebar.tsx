@@ -50,8 +50,8 @@ const items = [
     icon: HomeIcon,
   },
   {
-    title: 'Live Feed',
-    url: '/live-feed',
+    title: 'Map View',
+    url: '/map-view',
     icon: CameraIcon,
   },
   {

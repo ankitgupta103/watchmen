@@ -12,7 +12,6 @@ import React, {
 import useAllMachineStats from '@/hooks/use-all-machine-stats';
 import useOrganization from '@/hooks/use-organization';
 import { usePubSub } from '@/hooks/use-pub-sub';
-import useToken from '@/hooks/use-token';
 import { Calendar, RefreshCw, Shield } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -37,8 +36,6 @@ import {
   MAX_EVENTS_PER_MACHINE,
   PULSATING_DURATION_MS,
 } from '@/lib/utils';
-
-import MachineDetailModal from './machine-detail-modal';
 
 interface LiveFeedWrapperProps {
   machines: Machine[];
@@ -73,8 +70,6 @@ export default function LiveFeedWrapper({
   selectedDate,
 }: LiveFeedWrapperProps) {
   const { organizationId } = useOrganization();
-  const { token } = useToken();
-  const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -340,10 +335,6 @@ export default function LiveFeedWrapper({
     setStatusFilter('all');
   }, []);
 
-  const liveEventsForModal = selectedMachine
-    ? machineEvents[selectedMachine.id] || []
-    : [];
-
   return (
     <div className="flex h-full w-full flex-col">
       {/* Map Controls */}
@@ -434,7 +425,6 @@ export default function LiveFeedWrapper({
       <div className="relative flex-1 overflow-hidden">
         <ReactLeafletMap
           machines={filteredMachines}
-          onMarkerClick={setSelectedMachine}
           getMachineData={getMachineData}
         />
 
@@ -469,16 +459,6 @@ export default function LiveFeedWrapper({
           </div>
         )}
       </div>
-
-      {/* Machine Detail Modal */}
-      <MachineDetailModal
-        selectedMachine={selectedMachine}
-        setSelectedMachine={setSelectedMachine}
-        getMachineData={getMachineData}
-        token={token}
-        liveEvents={liveEventsForModal}
-        mqttError={mqttError}
-      />
     </div>
   );
 }
