@@ -1,3 +1,7 @@
+# TODO - Important
+# Note: This script is only for the MicroPython version of the Watchmen device.
+# Update the constants below to match your setup.
+
 import os
 import sys
 import time
@@ -36,13 +40,52 @@ AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
 S3_BUCKET_NAME = "vyomos"
 
 # Device UID and Device Name.
-DEVICE_UID = "watchmen-device-01"
-DEVICE_NAME = "Watchmen Device MicroPython"
+DEVICE_UID = "watchmen-mp-01"
+DEVICE_NAME = "WatchmenMPTest"  # Make sure this matches your curl test
 
 # --- Wi-Fi Configuration ---
 # TODO: IMPORTANT: Replace with your network credentials
 WIFI_SSID = "YOUR_WIFI_SSID"
 WIFI_KEY = "YOUR_WIFI_PASSWORD"
+
+
+def create_directory_recursive(path):
+    """
+    Create directory recursively, handling nested paths for MicroPython.
+
+    Args:
+        path (str): Directory path to create
+
+    Returns:
+        bool: True if directory exists or was created successfully
+    """
+    try:
+        # Check if directory already exists
+        os.stat(path)
+        return True
+    except OSError:
+        pass
+
+    # Split path into components
+    path_parts = path.strip("/").split("/")
+    current_path = ""
+
+    for part in path_parts:
+        if part:
+            if current_path:
+                current_path = current_path + "/" + part
+            else:
+                current_path = "/" + part
+
+            try:
+                os.mkdir(current_path)
+            except OSError as e:
+                # Error code 17 means directory already exists, which is fine
+                if e.args[0] != 17:
+                    print(f"Warning: Could not create directory {current_path}: {e}")
+                    return False
+
+    return True
 
 
 def connect_wifi(ssid=None, password=None, timeout=30):
@@ -107,6 +150,9 @@ def socket_post_request(url, data, headers=None):
     if headers is None:
         headers = {}
 
+    s = None
+    ssl_sock = None
+
     try:
         # Parse URL
         if url.startswith("https://"):
@@ -164,100 +210,113 @@ def socket_post_request(url, data, headers=None):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(30)  # 30 second timeout
 
+        # Resolve hostname
         try:
-            # Resolve hostname
+            addr_info = socket.getaddrinfo(host, port)
+            ip_addr = addr_info[0][-1][0]
+            print(f"Resolved {host} to {ip_addr}")
+        except Exception as e:
+            print(f"DNS resolution failed for {host}: {e}")
+            raise
+
+        # Connect
+        print("Establishing connection...")
+        s.connect((ip_addr, port))
+        print("Connected to server")
+
+        # Wrap with SSL if needed
+        if use_ssl:
+            print("Starting SSL handshake...")
             try:
-                addr_info = socket.getaddrinfo(host, port)
-                ip_addr = addr_info[0][-1][0]
-                print(f"Resolved {host} to {ip_addr}")
+                # Try to create SSL context for better compatibility
+                try:
+                    ssl_context = ssl.create_default_context()
+                    ssl_sock = ssl_context.wrap_socket(s, server_hostname=host)
+                except AttributeError:
+                    # Fallback for older MicroPython versions
+                    ssl_sock = ssl.wrap_socket(s)
+                s = ssl_sock
+                print("SSL connection established")
             except Exception as e:
-                print(f"DNS resolution failed for {host}: {e}")
+                print(f"SSL handshake failed: {e}")
                 raise
 
-            # Connect
-            print("Establishing connection...")
-            s.connect((ip_addr, port))
-            print("Connected to server")
+        # Send request
+        print("Sending HTTP request...")
+        s.send(request.encode())
+        print("Request sent, waiting for response...")
 
-            # Wrap with SSL if needed
-            if use_ssl:
-                print("Starting SSL handshake...")
-                s = ssl.wrap_socket(s)
-                print("SSL connection established")
-
-            # Send request
-            print("Sending HTTP request...")
-            s.send(request.encode())
-            print("Request sent, waiting for response...")
-
-            # Read response
-            response = b""
-            while True:
-                try:
-                    chunk = s.recv(1024)
-                    if not chunk:
-                        break
-                    response += chunk
-                    # For simple responses, break after getting headers + some body
-                    if len(response) > 4096:  # Reasonable limit
-                        break
-                except:
+        # Read response
+        response = b""
+        while True:
+            try:
+                chunk = s.recv(1024)
+                if not chunk:
                     break
+                response += chunk
+                # For simple responses, break after getting headers + some body
+                if len(response) > 4096:  # Reasonable limit
+                    break
+            except Exception:
+                break
 
-            response_str = response.decode("utf-8", errors="ignore")
-            print(f"Received response ({len(response)} bytes)")
+        response_str = response.decode("utf-8", errors="ignore")
+        print(f"Received response ({len(response)} bytes)")
 
-            # Parse response
-            if not response_str:
-                raise Exception("Empty response received")
+        # Parse response
+        if not response_str:
+            raise Exception("Empty response received")
 
-            lines = response_str.split("\r\n")
-            if not lines:
-                raise Exception("Invalid response format")
+        lines = response_str.split("\r\n")
+        if not lines:
+            raise Exception("Invalid response format")
 
-            status_line = lines[0]
-            print(f"Status line: {status_line}")
+        status_line = lines[0]
+        print(f"Status line: {status_line}")
 
-            # Extract status code
+        # Extract status code
+        try:
+            status_code = int(status_line.split()[1])
+        except (IndexError, ValueError):
+            raise Exception(f"Invalid status line: {status_line}")
+
+        # Find body
+        body_start = response_str.find("\r\n\r\n")
+        if body_start != -1:
+            body = response_str[body_start + 4 :]
             try:
-                status_code = int(status_line.split()[1])
-            except (IndexError, ValueError):
-                raise Exception(f"Invalid status line: {status_line}")
+                response_data = json.loads(body) if body.strip() else {}
+            except Exception:
+                response_data = {"text": body}
+        else:
+            response_data = {}
 
-            # Find body
-            body_start = response_str.find("\r\n\r\n")
-            if body_start != -1:
-                body = response_str[body_start + 4 :]
-                try:
-                    response_data = json.loads(body) if body.strip() else {}
-                except:
-                    response_data = {"text": body}
-            else:
-                response_data = {}
+        # Create response object similar to requests
+        class SocketResponse:
+            def __init__(self, status_code, data):
+                self.status_code = status_code
+                self.data = data
 
-            # Create response object similar to requests
-            class SocketResponse:
-                def __init__(self, status_code, data):
-                    self.status_code = status_code
-                    self.data = data
+            def json(self):
+                return self.data
 
-                def json(self):
-                    return self.data
-
-                def close(self):
-                    pass
-
-            return SocketResponse(status_code, response_data)
-
-        finally:
-            try:
-                s.close()
-            except:
+            def close(self):
                 pass
+
+        return SocketResponse(status_code, response_data)
 
     except Exception as e:
         print(f"Socket request failed: {e}")
         raise
+    finally:
+        # Ensure proper cleanup
+        try:
+            if ssl_sock:
+                ssl_sock.close()
+            elif s:
+                s.close()
+        except Exception:
+            pass
 
 
 def register_machine():
@@ -328,21 +387,67 @@ def register_machine():
     print(f"\nRegistering device with VyomIQ at: {MACHINE_REGISTER_API_URL}")
     response = None
     try:
-        # Try different HTTP libraries
+        # Try different HTTP libraries with enhanced debugging and error handling
         if http_lib:
             print("Using HTTP library for request...")
-            response = http_lib.post(
-                MACHINE_REGISTER_API_URL,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            response_data = response.json()
+
+            # Debug: Print the exact JSON being sent
+            json_payload = json.dumps(payload)
+            print(f"JSON payload to send: {json_payload}")
+            print(f"JSON payload length: {len(json_payload)}")
+
+            # Enhanced headers to match curl more closely
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "MicroPython-Watchmen/1.0",
+                "Accept": "application/json",
+                "Connection": "close",
+            }
+
+            print(f"Request headers: {headers}")
+
+            # Try different approaches based on which library is available
+            try:
+                # Method 1: Use json parameter (preferred)
+                response = http_lib.post(
+                    MACHINE_REGISTER_API_URL, json=payload, headers=headers, timeout=30
+                )
+            except (AttributeError, TypeError) as e:
+                print(f"json parameter failed ({e}), trying data parameter...")
+                # Method 2: Use data parameter with manual JSON encoding
+                response = http_lib.post(
+                    MACHINE_REGISTER_API_URL,
+                    data=json_payload,
+                    headers=headers,
+                    timeout=30,
+                )
+
+            # Debug response details
+            print(f"Response status code: {response.status_code}")
+            print(f"Response headers: {getattr(response, 'headers', 'N/A')}")
+
+            # Handle response
+            try:
+                response_data = response.json()
+            except (ValueError, AttributeError):
+                # If JSON parsing fails, try to get text
+                response_text = getattr(response, "text", str(response.content))
+                print(f"Failed to parse JSON response. Raw response: {response_text}")
+                response_data = {"error": {"message": "Invalid JSON response"}}
+
             status_code = response.status_code
+
         else:
             # Fallback to socket implementation
             print("Using socket fallback for HTTP request...")
             response = socket_post_request(
-                MACHINE_REGISTER_API_URL, payload, {"Content-Type": "application/json"}
+                MACHINE_REGISTER_API_URL,
+                payload,
+                {
+                    "Content-Type": "application/json",
+                    "User-Agent": "MicroPython-Watchmen/1.0",
+                    "Accept": "application/json",
+                },
             )
             response_data = response.json()
             status_code = response.status_code
@@ -355,14 +460,9 @@ def register_machine():
             if response_data.get("status") == 200:
                 print("Device registration successful!")
 
-                # Create directory if it doesn't exist.
-                # os.makedirs is not in MicroPython, so we create one level.
-                try:
-                    os.mkdir(VYOM_ROOT_DIR)
-                except OSError as e:
-                    # Error code 17 means directory already exists, which is fine.
-                    if e.args[0] != 17:
-                        raise
+                # Create directory if it doesn't exist using recursive function
+                if not create_directory_recursive(VYOM_ROOT_DIR):
+                    return False, f"Failed to create directory: {VYOM_ROOT_DIR}"
 
                 # Prepare configuration data using a standard Python dictionary
                 config_data = {}
@@ -401,8 +501,11 @@ def register_machine():
                     }
 
                 # Save configuration as a JSON file
-                with open(MACHINE_CONFIG_FILE, "w") as f:
-                    json.dump(config_data, f)
+                try:
+                    with open(MACHINE_CONFIG_FILE, "w") as f:
+                        json.dump(config_data, f)
+                except OSError as e:
+                    return False, f"Failed to write configuration file: {e}"
 
                 print(f"Configuration saved to {MACHINE_CONFIG_FILE}")
                 print(f"Device Model ID: {machine_data.get('machine_model', 'N/A')}")
@@ -415,10 +518,22 @@ def register_machine():
                 print(f"Error: {error_msg}")
                 print(f"Response: {response_data}")
                 return False, error_msg
+        elif status_code == 400:
+            # Bad request - often due to payload issues
+            error_msg = f"Bad request (400): {response_data.get('error', {}).get('message', 'Invalid request data')}"
+            print(f"Error: {error_msg}")
+            print("This usually means there's an issue with the request payload.")
+            print("Please check that all required fields are present and valid.")
+            return False, error_msg
+        elif status_code == 409:
+            # Conflict - device might already exist
+            error_msg = f"Device conflict (409): {response_data.get('error', {}).get('message', 'Device may already exist')}"
+            print(f"Error: {error_msg}")
+            return False, error_msg
         else:
             error_msg = f"HTTP error {status_code}"
             if response_data:
-                error_msg += f": {response_data}"
+                error_msg += f": {response_data.get('error', {}).get('message', str(response_data))}"
             print(f"Error: {error_msg}")
             return False, error_msg
 
@@ -431,15 +546,22 @@ def register_machine():
         print("- DNS resolution failure")
         print("- Server unreachable")
         print("- SSL/TLS handshake failure")
+        print("- Timeout during request")
         return False, error_msg
     except Exception as e:
         error_msg = f"Unexpected error during registration: {str(e)}"
         print(f"Error: {error_msg}")
+        import sys
+
+        sys.print_exception(e)  # Print full traceback in MicroPython
         return False, error_msg
     finally:
         # Ensure the response is closed to free up memory
         if response and hasattr(response, "close"):
-            response.close()
+            try:
+                response.close()
+            except Exception:
+                pass
 
 
 def setup():
