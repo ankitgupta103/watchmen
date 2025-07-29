@@ -48,6 +48,7 @@ my_rsa_public_key = None
 my_rsa_private = None # Only for debugging.
 
 def should_encrypt(mst):
+    return False
     if mst in ["H"]:
         return "RSA"
     if mst in ["P"]:
