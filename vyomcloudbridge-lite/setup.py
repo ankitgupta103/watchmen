@@ -27,6 +27,9 @@ VYOM_ROOT_DIR = "/vyom/vyomcloudbridge"
 # The full path to the machine configuration file.
 MACHINE_CONFIG_FILE = f"{VYOM_ROOT_DIR}/machine_config.json"
 
+# Fallback config file in current directory if original path fails
+FALLBACK_CONFIG_FILE = "machine_config.json"
+
 
 # --- API Configuration ---
 BASE_API_URL = "https://api.vyomiq.io"
@@ -40,13 +43,30 @@ AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
 S3_BUCKET_NAME = "vyomos"
 
 # Device UID and Device Name.
-DEVICE_UID = "watchmen-mp-02"
-DEVICE_NAME = "Watchmen MP Test"  # Make sure this is less than 20 characters
+DEVICE_UID = "watchmen-device-01"
+DEVICE_NAME = "Watchmen Device MicroPython"  # Make sure this matches your curl test
 
 # --- Wi-Fi Configuration ---
 # TODO: IMPORTANT: Replace with your network credentials
-WIFI_SSID = "A"
-WIFI_KEY = "123456789"
+WIFI_SSID = "YOUR_WIFI_SSID"
+WIFI_KEY = "YOUR_WIFI_PASSWORD"
+
+
+def file_exists(path):
+    """
+    Check if a file exists - MicroPython compatible.
+
+    Args:
+        path (str): File path to check
+
+    Returns:
+        bool: True if file exists, False otherwise
+    """
+    try:
+        os.stat(path)
+        return True
+    except OSError:
+        return False
 
 
 def create_directory_recursive(path):
@@ -328,19 +348,22 @@ def register_machine():
     """
     print("\n=== Watchmen Device Registration (MicroPython) ===\n")
 
-    # Check if config file already exists
-    try:
-        # In MicroPython, os.stat is a reliable way to check for file existence.
-        os.stat(MACHINE_CONFIG_FILE)
+    # Check if config file already exists in either location
+    config_exists = False
+    config_file_to_use = None
+
+    if file_exists(MACHINE_CONFIG_FILE):
         config_exists = True
-    except OSError:
-        config_exists = False
+        config_file_to_use = MACHINE_CONFIG_FILE
+    elif file_exists(FALLBACK_CONFIG_FILE):
+        config_exists = True
+        config_file_to_use = FALLBACK_CONFIG_FILE
 
     if config_exists:
-        print(f"Configuration file already exists at: {MACHINE_CONFIG_FILE}")
+        print(f"Configuration file already exists at: {config_file_to_use}")
         try:
             # Read existing configuration
-            with open(MACHINE_CONFIG_FILE, "r") as f:
+            with open(config_file_to_use, "r") as f:
                 config = json.load(f)
 
             machine_info = config.get("MACHINE")
@@ -441,6 +464,7 @@ def register_machine():
                     "Content-Type": "application/json",
                     "User-Agent": "MicroPython-Watchmen/1.0",
                     "Accept": "application/json",
+                    "Connection": "close",
                 },
             )
             response_data = response.json()
@@ -453,10 +477,6 @@ def register_machine():
         if status_code == 200:
             if response_data.get("status") == 200:
                 print("Device registration successful!")
-
-                # Create directory if it doesn't exist using recursive function
-                if not create_directory_recursive(VYOM_ROOT_DIR):
-                    return False, f"Failed to create directory: {VYOM_ROOT_DIR}"
 
                 # Prepare configuration data using a standard Python dictionary
                 config_data = {}
@@ -494,14 +514,43 @@ def register_machine():
                         "root_ca": iot_data.get("root_ca"),
                     }
 
-                # Save configuration as a JSON file
-                try:
-                    with open(MACHINE_CONFIG_FILE, "w") as f:
-                        json.dump(config_data, f)
-                except OSError as e:
-                    return False, f"Failed to write configuration file: {e}"
+                # Print the configuration data first
+                print("\n=== DEVICE CONFIGURATION ===")
+                print(json.dumps(config_data, indent=2))
+                print("=== END CONFIGURATION ===\n")
 
-                print(f"Configuration saved to {MACHINE_CONFIG_FILE}")
+                # Try to create directory and save to original location first
+                config_saved = False
+                if create_directory_recursive(VYOM_ROOT_DIR):
+                    try:
+                        with open(MACHINE_CONFIG_FILE, "w") as f:
+                            json.dump(config_data, f)
+                        print(f"Configuration saved to {MACHINE_CONFIG_FILE}")
+                        config_saved = True
+                    except OSError as e:
+                        print(f"Failed to write to {MACHINE_CONFIG_FILE}: {e}")
+
+                # If original location failed, try fallback location
+                if not config_saved:
+                    try:
+                        with open(FALLBACK_CONFIG_FILE, "w") as f:
+                            json.dump(config_data, f)
+                        print(
+                            f"Configuration saved to fallback location: {FALLBACK_CONFIG_FILE}"
+                        )
+                        config_saved = True
+                    except OSError as e:
+                        print(
+                            f"Failed to write to fallback location {FALLBACK_CONFIG_FILE}: {e}"
+                        )
+
+                if not config_saved:
+                    print("Warning: Could not save configuration to file system.")
+                    print(
+                        "However, the configuration has been printed above and registration was successful."
+                    )
+                    print("You can manually copy the configuration if needed.")
+
                 print(f"Device Model ID: {machine_data.get('machine_model', 'N/A')}")
 
                 return True, ""
@@ -583,7 +632,12 @@ def setup():
         return False
 
     print("\n=== Watchmen Device Setup Completed Successfully ===")
-    print(f"Configuration saved to: {MACHINE_CONFIG_FILE}")
+    if file_exists(MACHINE_CONFIG_FILE):
+        print(f"Configuration saved to: {MACHINE_CONFIG_FILE}")
+    elif file_exists(FALLBACK_CONFIG_FILE):
+        print(f"Configuration saved to fallback location: {FALLBACK_CONFIG_FILE}")
+    else:
+        print("Configuration was printed above (file system save failed)")
     return True
 
 
