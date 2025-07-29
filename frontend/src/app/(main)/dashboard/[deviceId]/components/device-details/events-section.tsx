@@ -16,7 +16,7 @@ import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
 
-import EventRow from './event-row';
+import EventPost from './event-post';
 import Pagination from './pagination';
 
 interface S3EventData {
@@ -25,6 +25,7 @@ interface S3EventData {
   eventstr: string;
   timestamp?: string | Date;
   machineId?: number;
+  event_severity?: string;
 }
 
 interface ProcessedEvent extends S3EventData {
@@ -50,17 +51,17 @@ const EventsSection = ({
 }) => {
   const [events, setEvents] = useState<ProcessedEvent[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dateRange, setDateRange] = useState<'7' | '30' | '90'>('30');
+  // BUG FIX: Changed 'all ' to 'all' to match the SelectItem value
+  const [dateRange, setDateRange] = useState<'7' | '30' | '90' | '180' | '365' | 'all'>('30');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const eventsPerPage = 10;
+  const eventsPerPage = 9; // Changed for better grid layout
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetchEventsForDateRange = useCallback(
-    async (days: number) => {
+    async (days: number | null) => {
       if (!token) return;
 
-      // Abort previous request
       if (controllerRef.current) {
         controllerRef.current.abort();
       }
@@ -70,10 +71,18 @@ const EventsSection = ({
 
       setLoading(true);
       setEvents([]);
+      setCurrentPage(1);
 
       const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      let startDate: Date;
+      
+      if (days === null) {
+        startDate = new Date('2020-01-01'); // All time
+      } else {
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+      }
+      
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
 
@@ -124,7 +133,6 @@ const EventsSection = ({
 
         if (!controller.signal.aborted) {
           setEvents(sortedEvents);
-          setCurrentPage(1);
         }
       } catch (err: unknown) {
         if (err instanceof Error && err.name !== 'AbortError') {
@@ -142,9 +150,10 @@ const EventsSection = ({
     [token, orgId, device.id],
   );
 
-  // Effect for fetching events when date range changes
   useEffect(() => {
-    fetchEventsForDateRange(parseInt(dateRange));
+    // BUG FIX: Correctly parse dateRange, treating 'all' as null for days
+    const days = dateRange === 'all' ? null : parseInt(dateRange, 10);
+    fetchEventsForDateRange(days);
 
     return () => {
       if (controllerRef.current) {
@@ -157,27 +166,39 @@ const EventsSection = ({
   const startIndex = (currentPage - 1) * eventsPerPage;
   const currentEvents = events.slice(startIndex, startIndex + eventsPerPage);
 
+  const getDynamicMessage = () => {
+    if (dateRange === 'all') {
+      return 'of all time';
+    }
+    return `in the last ${dateRange} days`;
+  };
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="flex items-center gap-2 mb-4 sm:mb-0">
             <Activity className="h-6 w-6" />
             Recent Events
           </CardTitle>
           <div className="flex items-center gap-2">
             <Select
               value={dateRange}
-              onValueChange={(value: '7' | '30' | '90') => setDateRange(value)}
+              onValueChange={(value: '7' | '30' | '90' | '180' | '365' | 'all') =>
+                setDateRange(value)
+              }
               disabled={loading}
             >
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="7">Last 7 days</SelectItem>
                 <SelectItem value="30">Last 30 days</SelectItem>
                 <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="180">Last 180 days</SelectItem>
+                <SelectItem value="365">Last 365 days</SelectItem>
+                <SelectItem value="all">All time</SelectItem>
               </SelectContent>
             </Select>
             {loading && (
@@ -190,50 +211,30 @@ const EventsSection = ({
       </CardHeader>
       <CardContent>
         {loading && events.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin" />
             <span className="ml-2 text-gray-600">Loading events...</span>
           </div>
         ) : events.length > 0 ? (
           <div>
-            <div className="mb-4 text-sm text-gray-600">
-              Found {events.length} events in the last {dateRange} days.
+            <div className="mb-6 text-sm text-gray-600">
+              Found {events.length} events {getDynamicMessage()}.
             </div>
 
-            {/* Events Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                      Timestamp
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                      Event Description
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                      Images
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {currentEvents.map((event) => (
-                    <EventRow
-                      key={event.id}
-                      event={event}
-                      token={token}
-                      onViewDetails={onEventSelect}
-                    />
-                  ))}
-                </tbody>
-              </table>
+            {/* NEW: Grid layout for event posts */}
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {currentEvents.map((event) => (
+                <EventPost
+                  key={event.id}
+                  event={event}
+                  token={token}
+                  onViewDetails={onEventSelect}
+                />
+              ))}
             </div>
 
             {totalPages > 1 && (
-              <div className="mt-4">
+              <div className="mt-8">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
@@ -243,11 +244,11 @@ const EventsSection = ({
             )}
           </div>
         ) : (
-          <div className="py-12 text-center text-gray-500">
+          <div className="py-16 text-center text-gray-500">
             <Activity className="mx-auto mb-4 h-16 w-16 opacity-30" />
             <p className="text-lg font-medium">No events found</p>
             <p className="text-sm">
-              No events recorded for this device in the last {dateRange} days.
+              No events were recorded for this device {getDynamicMessage()}.
             </p>
           </div>
         )}
