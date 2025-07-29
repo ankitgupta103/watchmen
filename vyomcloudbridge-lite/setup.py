@@ -40,8 +40,8 @@ AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
 S3_BUCKET_NAME = "vyomos"
 
 # Device UID and Device Name.
-DEVICE_UID = "watchmen-mp-01"
-DEVICE_NAME = "WatchmenMPTest"  # Make sure this matches your curl test
+DEVICE_UID = "watchmen-mp-02"
+DEVICE_NAME = "Watchmen MP Test"  # Make sure this is less than 20 characters
 
 # --- Wi-Fi Configuration ---
 # TODO: IMPORTANT: Replace with your network credentials
@@ -406,21 +406,15 @@ def register_machine():
 
             print(f"Request headers: {headers}")
 
-            # Try different approaches based on which library is available
+            # Use data parameter with manual JSON encoding (MicroPython requests doesn't support json parameter)
             try:
-                # Method 1: Use json parameter (preferred)
                 response = http_lib.post(
-                    MACHINE_REGISTER_API_URL, json=payload, headers=headers, timeout=30
+                    MACHINE_REGISTER_API_URL, data=json_payload, headers=headers
                 )
-            except (AttributeError, TypeError) as e:
-                print(f"json parameter failed ({e}), trying data parameter...")
-                # Method 2: Use data parameter with manual JSON encoding
-                response = http_lib.post(
-                    MACHINE_REGISTER_API_URL,
-                    data=json_payload,
-                    headers=headers,
-                    timeout=30,
-                )
+                print("POST request successful")
+            except Exception as e:
+                print(f"POST request failed: {e}")
+                raise
 
             # Debug response details
             print(f"Response status code: {response.status_code}")
