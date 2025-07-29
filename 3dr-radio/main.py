@@ -473,7 +473,7 @@ def scan_process(mid, msg):
 def spath_process(mid, msg):
     global shortest_path_to_cc
     if not run_omv:
-        print(f"Ignoring shortest path since I am cc")
+        # print(f"Ignoring shortest path since I am cc")
         return
     if len(msg) == 0:
         print(f"Empty spath")
@@ -523,10 +523,7 @@ def process_message(data):
         else:
             ackmessage += f":{retval}"
     if ack_needed(mst) and receiver != "*":
-        print(f"Sending ack for {mst}")
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-    else:
-        print(f"NOT Sending ack for {mst}")
 
 async def send_long_message():
     peer_addr = "B"
