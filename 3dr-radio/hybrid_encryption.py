@@ -105,10 +105,7 @@ def decrypt_hybrid(msg, private_key):
 def get_rand(n):
     rstr = ""
     for i in range(n):
-        if i % 100 == 0:
-            rstr += chr(65+random.randint(0,25))
-        else:
-            rstr += f"{i%10}"
+        rstr += chr(65+random.randint(0,25))
     return rstr
 
 # Debugging only
@@ -126,9 +123,13 @@ def test_encryption(n1,n2, enctype):
     t1 = utime.ticks_diff(utime.ticks_ms(), clock_start)
     print(f"Setup key in time {t1-t0} mili seconds")
     lenstr = n1
+    laststr = ""
     for i in range(0,n2):
         t2 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-        teststr = get_rand(lenstr)
+        if len(laststr) > 0:
+            teststr = laststr + laststr
+        else:
+            teststr = get_rand(lenstr)
         t3 = utime.ticks_diff(utime.ticks_ms(), clock_start)
         if enctype == "RSA":
             teststr_enc = encrypt_rsa(teststr.encode(), public_key)
@@ -153,8 +154,6 @@ def test_encryption(n1,n2, enctype):
             print(f"Strings DONT match {teststr} != {teststr_decrypt}")
         lenstr = lenstr*2
 
-setup_rsa()
-
-#test_encryption(1024, 10, "HYBRID")
-#test_encryption(1, 9, "RSA")
-#test_encryption(1024, 10, "AES")
+test_encryption(1024, 10, "HYBRID")
+test_encryption(1, 9, "RSA")
+test_encryption(1024, 10, "AES")
