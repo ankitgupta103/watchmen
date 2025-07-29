@@ -17,7 +17,7 @@ if run_omv:
     import time
     import binascii
     import machine
-
+    import enc
 else:
     import asyncio
     import serial
@@ -25,6 +25,8 @@ else:
     from time import gmtime, strftime
 import sys
 import random
+
+# Local libraries
 
 print_lock = asyncio.Lock()
 
@@ -44,55 +46,6 @@ image_count = 0                 # Counter to keep tranck of saved images
 
 my_addr = None
 peer_addr = None
-my_rsa_public_key = None
-my_rsa_private = None # Only for debugging.
-
-def should_encrypt(mst):
-    return False
-    if mst in ["H"]:
-        return "RSA"
-    if mst in ["P"]:
-        return "HYBRID"
-
-def pad(data):
-    pad_len = 16 - (len(data) % 16)
-    return data + bytes([pad_len] * pad_len)
-
-def unpad(data):
-    num_bytes_to_remove = 0 - int(data[-1])
-    return data[:num_bytes_to_remove]
-
-def encrypt_aes(msg, aes_key):
-    iv = os.urandom(16)
-    aes = ucryptolib.aes(aes_key, 2, iv)  # mode 2 = CBC
-    padded_data = pad(msg)
-    encrypted_data = aes.encrypt(padded_data)
-    return (iv, encrypted_data)
-
-def decrypt_aes(encrypted_msg, iv, aes_key):
-    aes = ucryptolib.aes(aes_key, 2, iv)  # mode 2 = CBC
-    decrypted_msg = unpad(aes.decrypt(encrypted_msg))
-    return decrypted_msg.decode()
-
-def encrypt_rsa(msg, public_key):
-    return encrypt(msg, public_key)
-
-def encrypt_hybrid(msgstr, public_key):
-    # AES key 32 bytes, IV 16bytes, Message encrypted.
-    aes_key = os.urandom(32)
-    (iv, msg_aes) = encrypt_aes(msgstr, aes_key)
-    iv_rsa = encrypt_rsa(iv, public_key)
-    aes_key_rsa = encrypt_rsa(aes_key, public_key)
-    msg_rsa = encrypt_rsa(msg, public_key)
-    print(f"{len(aes_key)} -> {len(aes_key_rsa)}")
-    print(f"{len(iv)} -> {len(iv_rsa)}")
-    print(f"{len(msg)} -> {len(msg_rsa)}")
-
-# Debugging only
-def decrypt_rsa(msg, private_key):
-    return decrypt(msg, private_key)
-def decrypt_hybrid(msg, private_key):
-    return ""
 
 if run_omv:
     rtc = RTC()
@@ -100,7 +53,6 @@ if run_omv:
     print("Running on device : " + uid.decode())
     if uid == b'e076465dd7194025':                                  
         my_addr = 'A'
-        my_rsa_public_key = None # TODO
     elif uid == b'e076465dd7194211':
         my_addr = 'B'
     elif uid == b'e076465dd7091027':
@@ -276,15 +228,21 @@ def make_chunks(msg):
         chunks.append(msg)
     return chunks
 
+def encrypt_if_needed(mst, msg):
+    if mst in ["H"]:
+        # Must be less than 117 bytes
+        if len(msg) > 117:
+            print(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
+            return msg
+        return enc.encrypt_rsa(msg, enc.load_rsa_pub())
+    if mst == "P":
+        return enc.encrypt_hybrid(msg, enc.load_rsa_pub())
+    return msg
+
 # === Send Function ===
 async def send_msg(msgtype, creator, msg, dest):
-    enctype = should_encrypt(msgtype)
-    if enctype == "RSA":
-        msgbytes = encrypt_rsa(msg, public_key)
-    elif enctype == "HYBRID":
-        msgbytes = encrypt_hybrid(msg, public_key)
-    else:
-        msgbytes = msg
+    msgbytes = encrypt_if_needed(msgtype, msg)
+    print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
@@ -458,10 +416,22 @@ def parse_header(data):
     msg = data[MIDLEN+1:].decode().strip()
     return (mid, mst, creator, sender, receiver, msg)
 
+hb_map = {}
+
 def hb_process(mid, msg):
-    # if cc stats
-    # if intermediate forward. asyncio.create
-    pass
+    creator = mid[1]
+    if my_addr == "Z":
+        if creator not in hb_map:
+            hb_map[creator] = 0
+        hb_map[creator] += 1
+        print(f"HB Counts = {hb_map}")
+        return
+    if len(shortest_path_to_cc) > 0:
+        peer_addr = shortest_path_to_cc[0]
+        print(f"Propogating H to {spath}")
+        asyncio.create_task(send_msg("H", creator, msg, peer_addr))
+    else:
+        print(f"Can't forward HB because I dont have Spath yet")
 
 def img_process(mid, msg):
     # if intermediate forward. asyncio.create
@@ -538,7 +508,7 @@ async def send_heartbeat():
         hbmsg = f"{my_addr}:{get_human_ts()}"
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
-            await send_msg("H", my_addr, hbmsg, peer_addr)
+            await send_msg("H", my_addr, hbmsg.encode(), peer_addr)
         await asyncio.sleep(30)
 
 async def send_scan():
@@ -558,11 +528,12 @@ async def send_scan():
 
 async def send_spath():
     while True:
+        await asyncio.sleep(10)
         sp = f"{my_addr}"
         for n in seen_neighbours:
             print(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp, n)
-        await asyncio.sleep(60)
+        await asyncio.sleep(50)
 
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
