@@ -439,6 +439,7 @@ def end_chunk(msg):
         return (True, recompiled)
 
 def parse_header(data):
+    print(data)
     if len(data) < 9:
         return None
     mid = data[:MIDLEN].decode()
@@ -447,9 +448,28 @@ def parse_header(data):
     sender = mid[2]
     receiver = mid[3]
     for i in range(MIDLEN):
-        if (mid[i] < 'A' or mid[i] > 'Z') and (i == 3 and mid[i] == "*"):
+        if (mid[i] < 'A' or mid[i] > 'Z') and not (i == 3 and mid[i] == "*"):
             return None
     if chr(data[MIDLEN]) != ';':
+        return None
+    msg = data[MIDLEN+1:].decode().strip()
+    return (mid, mst, creator, sender, receiver, msg)
+
+def hb_process(mid, msg):
+    # if cc stats
+    # if intermediate forward. asyncio.create
+    pass
+
+def img_process(mid, msg):
+    # if intermediate forward. asyncio.create
+    # if cc stats
+    pass
+
+# If N messages seen in the last M minutes.
+def scan_process(mid, msg):
+    print(msg)
+    if chr(data[MIDLEN]) != ';':
+        print("Failure 3")
         return None
     msg = data[MIDLEN+1:].decode().strip()
     return (mid, mst, creator, sender, receiver, msg)
