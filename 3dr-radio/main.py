@@ -586,11 +586,12 @@ async def main():
         # asyncio.create_task(person_detection_loop())
         # asyncio.create_task(send_long_message())
         await asyncio.sleep(36000)
-    else if my_addr == "Z":
+    elif my_addr == "Z":
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
         await asyncio.sleep(3600000)
-
+    else:
+        print(f"Unknown device : {my_addr}")
 try:
     asyncio.run(main())
 except KeyboardInterrupt:
