@@ -33,7 +33,7 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/dashboard/:path*',
-    '/live-feed/:path*',
+    '/map-view/:path*',
     '/projects/:path*',
     '/missions/:path*',
     '/devices/:path*',
