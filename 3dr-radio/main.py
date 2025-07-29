@@ -552,12 +552,17 @@ async def send_heartbeat():
         await asyncio.sleep(30)
 
 async def send_scan():
+    i = 1
     while True:
         scanmsg = f"{my_addr}"
         await send_msg("N", my_addr, scanmsg, "*")
-        await asyncio.sleep(10) # reduce after setup
+        if i < 10:
+            await asyncio.sleep(10) # reduce after setup
+        else:
+            await asyncio.sleep(300)
         print(f"Seen neighbours = {seen_neighbours}")
         print(f"Shortest path = {shortest_path_to_cc}")
+        i = i + 1
 
 async def send_spath():
     while True:
@@ -565,7 +570,7 @@ async def send_spath():
         for n in seen_neighbours:
             print(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp, n)
-        await asyncio.sleep(5)
+        await asyncio.sleep(60)
 
 async def main():
     log(f"[INFO] Started device {my_addr} listening for {peer_addr}")
