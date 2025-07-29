@@ -514,7 +514,7 @@ def process_message(data):
     ackmessage = mid
     if mst == "N":
         scan_process(mid, msg)
-    if mst == "N":
+    if mst == "S":
         spath_process(mid, msg)
     if mst == "H":
         hb_process(mid, msg)
@@ -531,20 +531,6 @@ def process_message(data):
             ackmessage += f":{retval}"
     if ack_needed(mst) and receiver != "*":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-
-async def send_long_message():
-    peer_addr = "B"
-    long_string = ""
-    for i in range(500):
-        long_string += "_0123456789"
-    i = 0
-    for i in range(1): #while True:
-        i = i + 1
-        if i > 0 and i % 10 == 0:
-            asyncio.create_task(log_status())
-        msg = f"MSG-{i}-{long_string}"
-        await send_msg("H", my_addr, msg, peer_addr)
-        await asyncio.sleep(2)
 
 async def send_heartbeat():
     while True:
@@ -585,7 +571,6 @@ async def main():
         asyncio.create_task(send_heartbeat())
         asyncio.create_task(send_scan())
         # asyncio.create_task(person_detection_loop())
-        # asyncio.create_task(send_long_message())
         await asyncio.sleep(36000)
     elif my_addr == "Z":
         asyncio.create_task(send_spath())
