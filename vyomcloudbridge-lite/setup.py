@@ -48,8 +48,8 @@ DEVICE_NAME = "Watchmen Device MicroPython"  # Make sure this matches your curl 
 
 # --- Wi-Fi Configuration ---
 # TODO: IMPORTANT: Replace with your network credentials
-WIFI_SSID = "YOUR_WIFI_SSID"
-WIFI_KEY = "YOUR_WIFI_PASSWORD"
+WIFI_SSID = "A"
+WIFI_KEY = "123456789"
 
 
 def file_exists(path):
