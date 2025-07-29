@@ -134,6 +134,7 @@ def register_machine():
                 print(f"Machine Name: {machine_name}")
 
                 print("Device already registered. Skipping registration.")
+                print(f"Config file path: {config_file_to_use}")
                 return True, ""
             else:
                 print(
