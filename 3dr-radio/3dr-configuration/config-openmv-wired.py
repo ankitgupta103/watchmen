@@ -65,3 +65,194 @@ if enter_config_mode():
     print(send_command(b'ATZ'))
 
 
+
+
+# ATI5 responce breakdown 
+
+# S1: SERIAL_SPEED = 57       → UART baud rate (x1000) → 57 → 57600 bps
+# S2: AIR_SPEED = 64          → Over-the-air speed (kbps)
+# S3: NETID = 25              → Network ID                                        (only radios with same NETID communicate)
+# S4: TXPOWER = 20            → Transmit power (dBm)
+# S5: ECC = 0                 → Error correction (0 = off, 1 = on)
+# S6: MAVLINK = 1             → MAVLink framing enabled (0 = transparent)
+# S7: OPPRESEND = 0           → Opportunistic resend (used for reliability)
+# S8: MIN_FREQ = 433050       → Lower frequency bound (Hz × 1k)
+# S9: MAX_FREQ = 434790       → Upper frequency bound (Hz × 1k)
+# S10: NUM_CHANNELS = 10      → Number of hopping channels
+# S11: DUTY_CYCLE = 100       → % of time allowed to transmit
+# S12: LBT_RSSI = 0           → Listen Before Talk RSSI threshold (0 = disabled)
+# S13: MANCHESTER = 0         → Manchester encoding (0 = off, 1 = on)
+# S14: RTSCTS = 0             → Flow control (0 = disabled, 1 = enabled)
+# S15: MAX_WINDOW = 131       → Max window size for resend (used with ECC)
+
+
+# 1
+
+# Parsed ATI5 Response:
+  
+#   S1:SERIAL_SPEED = 57
+#   S2:AIR_SPEED = 64
+#   S3:NETID = 25
+#   S4:TXPOWER = 20
+#   S5:ECC = 1
+#   S6:MAVLINK = 1
+#   S7:OPPRESEND = 1
+#   S8:MIN_FREQ = 433050
+#   S9:MAX_FREQ = 434790
+#   S10:NUM_CHANNELS = 10
+#   S11:DUTY_CYCLE = 100
+#   S12:LBT_RSSI = 0
+#   S13:MANCHESTER = 0
+#   S14:RTSCTS = 0
+#   S15:MAX_WINDOW = 131
+# b'ATS3=25\r\nOK\r\n'
+# b'ATS5=1\r\nOK\r\n'
+# b'ATS7=1\r\nOK\r\n'
+# Parsed ATI5 Response:
+  
+#   S1:SERIAL_SPEED = 57
+#   S2:AIR_SPEED = 64
+#   S3:NETID = 25
+#   S4:TXPOWER = 20
+#   S5:ECC = 1
+#   S6:MAVLINK = 1
+#   S7:OPPRESEND = 1
+#   S8:MIN_FREQ = 433050
+#   S9:MAX_FREQ = 434790
+#   S10:NUM_CHANNELS = 10
+#   S11:DUTY_CYCLE = 100
+#   S12:LBT_RSSI = 0
+#   S13:MANCHESTER = 0
+#   S14:RTSCTS = 0
+#   S15:MAX_WINDOW = 131
+# b'AT&W\r\nOK\r\n'
+# b'ATZ\xff'
+
+
+# 2
+
+# Parsed ATI5 Response:
+  
+#   S1:SERIAL_SPEED = 57
+#   S2:AIR_SPEED = 64
+#   S3:NETID = 25
+#   S4:TXPOWER = 20
+#   S5:ECC = 0
+#   S6:MAVLINK = 1
+#   S7:OPPRESEND = 0
+#   S8:MIN_FREQ = 433050
+#   S9:MAX_FREQ = 434790
+#   S10:NUM_CHANNELS = 10
+#   S11:DUTY_CYCLE = 100
+#   S12:LBT_RSSI = 0
+#   S13:MANCHESTER = 0
+#   S14:RTSCTS = 0
+#   S15:MAX_WINDOW = 131
+# b'ATS3=25\r\nOK\r\n'
+# b'ATS5=1\r\nOK\r\n'
+# b'ATS7=1\r\nOK\r\n'
+# Parsed ATI5 Response:
+  
+#   S1:SERIAL_SPEED = 57
+#   S2:AIR_SPEED = 64
+#   S3:NETID = 25
+#   S4:TXPOWER = 20
+#   S5:ECC = 1
+#   S6:MAVLINK = 1
+#   S7:OPPRESEND = 1
+#   S8:MIN_FREQ = 433050
+#   S9:MAX_FREQ = 434790
+#   S10:NUM_CHANNELS = 10
+#   S11:DUTY_CYCLE = 100
+#   S12:LBT_RSSI = 0
+#   S13:MANCHESTER = 0
+#   S14:RTSCTS = 0
+#   S15:MAX_WINDOW = 131
+# b'AT&W\r\nOK\r\n'
+# b'ATZ\xff'
+
+
+# 3
+
+# Parsed ATI5 Response:
+  
+#   S1:SERIAL_SPEED = 57
+#   S2:AIR_SPEED = 64
+#   S3:NETID = 25
+#   S4:TXPOWER = 20
+#   S5:ECC = 0
+#   S6:MAVLINK = 1
+#   S7:OPPRESEND = 0
+#   S8:MIN_FREQ = 433050
+#   S9:MAX_FREQ = 434790
+#   S10:NUM_CHANNELS = 10
+#   S11:DUTY_CYCLE = 100
+#   S12:LBT_RSSI = 0
+#   S13:MANCHESTER = 0
+#   S14:RTSCTS = 0
+#   S15:MAX_WINDOW = 131
+# b'ATS3=25\r\nOK\r\n'
+# b'ATS5=1\r\nOK\r\n'
+# b'ATS7=1\r\nOK\r\n'
+# Parsed ATI5 Response:
+  
+#   S1:SERIAL_SPEED = 57
+#   S2:AIR_SPEED = 64
+#   S3:NETID = 25
+#   S4:TXPOWER = 20
+#   S5:ECC = 1
+#   S6:MAVLINK = 1
+#   S7:OPPRESEND = 1
+#   S8:MIN_FREQ = 433050
+#   S9:MAX_FREQ = 434790
+#   S10:NUM_CHANNELS = 10
+#   S11:DUTY_CYCLE = 100
+#   S12:LBT_RSSI = 0
+#   S13:MANCHESTER = 0
+#   S14:RTSCTS = 0
+#   S15:MAX_WINDOW = 131
+# b'AT&W\r\nOK\r\n'
+# b'ATZ\xff'
+
+
+# 4
+
+Parsed ATI5 Response:
+  
+  S1:SERIAL_SPEED = 57
+  S2:AIR_SPEED = 64
+  S3:NETID = 25
+  S4:TXPOWER = 20
+  S5:ECC = 1
+  S6:MAVLINK = 1
+  S7:OPPRESEND = 1
+  S8:MIN_FREQ = 433050
+  S9:MAX_FREQ = 434790
+  S10:NUM_CHANNELS = 10
+  S11:DUTY_CYCLE = 100
+  S12:LBT_RSSI = 0
+  S13:MANCHESTER = 0
+  S14:RTSCTS = 0
+  S15:MAX_WINDOW = 131
+b'ATS3=25\r\nOK\r\n'
+b'ATS5=1\r\nOK\r\n'
+b'ATS7=1\r\nOK\r\n'
+Parsed ATI5 Response:
+  
+  S1:SERIAL_SPEED = 57
+  S2:AIR_SPEED = 64
+  S3:NETID = 25
+  S4:TXPOWER = 20
+  S5:ECC = 1
+  S6:MAVLINK = 1
+  S7:OPPRESEND = 1
+  S8:MIN_FREQ = 433050
+  S9:MAX_FREQ = 434790
+  S10:NUM_CHANNELS = 10
+  S11:DUTY_CYCLE = 100
+  S12:LBT_RSSI = 0
+  S13:MANCHESTER = 0
+  S14:RTSCTS = 0
+  S15:MAX_WINDOW = 131
+b'AT&W\r\nOK\r\n'
+b'ATZ\xff'
