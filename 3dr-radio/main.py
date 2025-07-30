@@ -267,7 +267,8 @@ async def send_msg(msgtype, creator, msg, dest):
         log(f"Failed sending chunk begin")
         return False
     for i in range(len(chunks)):
-        _ = await send_single_msg("I", creator, f"{imid}:{i}:{chunks[i]}", dest)
+        chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
+        _ = await send_single_msg("I", creator, chunkbytes, dest)
     for retry_i in range(50):
         succ, missing_chunks = await send_single_msg("E", creator, imid, dest)
         if not succ:
@@ -351,13 +352,12 @@ def begin_chunk(msg):
     chunk_map[cid] = (mst, numchunks, [])
 
 def add_chunk(msgbytes):
-    parts = msg.split(":")
-    if len(parts) != 3:
-        log(f"ERROR : add chunk message unparsable {len(parts)} : {msg}")
+    if len(msgbytes) < 5:
+        log(f"ERROR : Not enough bytes {len(msgbytes)} : {msg}")
         return
-    cid = parts[0]
-    citer = int(parts[1])
-    cdata = parts[2]
+    cid = msgbytes[0:3].decode()
+    citer = int.from_bytes(msgbytes[3:5])
+    cdata = msgbytes[5:]
     if cid not in chunk_map:
         log(f"ERROR : no entry yet for {cid}")
     chunk_map[cid][2].append((citer, cdata))
