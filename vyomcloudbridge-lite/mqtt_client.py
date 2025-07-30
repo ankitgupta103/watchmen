@@ -22,6 +22,15 @@ CERT_FILE = "cert.pem"
 KEY_FILE = "key.pem"
 
 
+def file_exists(path):
+    """Check if a file exists - MicroPython compatible."""
+    try:
+        os.stat(path)
+        return True
+    except OSError:
+        return False
+
+
 class VyomMqttClient:
     """
     A wrapper for the MQTTClient to connect to AWS IoT Core using IoT credentials
@@ -235,9 +244,9 @@ class VyomMqttClient:
 
         # Clean up certificate files
         try:
-            if os.path.exists(CERT_FILE):
+            if file_exists(CERT_FILE):
                 os.remove(CERT_FILE)
-            if os.path.exists(KEY_FILE):
+            if file_exists(KEY_FILE):
                 os.remove(KEY_FILE)
             print("Cleaned up certificate files.")
         except OSError as e:
