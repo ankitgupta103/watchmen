@@ -88,11 +88,14 @@ else:
         sys.exit(1)
     clock_start = int(utime.time() * 1000)
 
-shortest_path_to_cc = ["Z"]
+shortest_path_to_cc = []
 seen_neighbours = []
 
 sent_count = 0
 recv_msg_count = {}
+
+def running_as_cc():
+    return my_addr == "Z"
 
 # ------- Person Detection + snapshot ---------
 # TODO(anand): Test with IR lense for person detection in Night
@@ -187,7 +190,7 @@ def radio_send(data):
     global sent_count
     sent_count = sent_count + 1
     uart.write(data)
-    log(f"[SENT ] {data} at {time_msec()}")
+    log(f"[SENT ] {len(data)} {data} at {time_msec()}")
 
 def pop_and_get(mid):
     for i in range(len(msgs_unacked)):
@@ -242,12 +245,14 @@ def encrypt_if_needed(mst, msg):
             print(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
             return msg
         return enc.encrypt_rsa(msg, enc.load_rsa_pub())
-    if mst == "PXXX":
+    return msg
+    if mst == "P":
         return enc.encrypt_hybrid(msg, enc.load_rsa_pub())
     return msg
 
 # === Send Function ===
 async def send_msg(msgtype, creator, msg, dest):
+    print(msg)
     msgbytes = encrypt_if_needed(msgtype, msg)
     print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
     print(msgbytes)
@@ -430,7 +435,7 @@ hb_map = {}
 
 def hb_process(mid, msgbytes):
     creator = mid[1]
-    if my_addr == "Z":
+    if running_as_cc():
         if creator not in hb_map:
             hb_map[creator] = 0
         hb_map[creator] += 1
@@ -445,7 +450,7 @@ def hb_process(mid, msgbytes):
 
 def img_process(mid, msg):
     # if intermediate forward. asyncio.create
-    if my_addr == "Z":
+    if running_as_cc():
         print(f"Received image of size {len(msg)}")
         print(msg)
         #raw_path = f"~/{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
@@ -462,7 +467,7 @@ def scan_process(mid, msg):
 
 def spath_process(mid, msg):
     global shortest_path_to_cc
-    if not run_omv:
+    if running_as_cc():
         # print(f"Ignoring shortest path since I am cc")
         return
     if len(msg) == 0:
@@ -495,7 +500,7 @@ def process_message(data):
     if receiver != "*" and my_addr != receiver:
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
-    log(f"[RECV ] MID:{mid}:{msg} at {time_msec()}")
+    log(f"[RECV {len(data)}] MID:{mid}:{msg} at {time_msec()}")
     msgs_recd.append((mid, msg, time_msec()))
     ackmessage = mid
     if mst == "N":
