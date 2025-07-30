@@ -54,8 +54,14 @@ if enter_config_mode():
     # Set ECC = ON
     print(send_command(b'ATS5=1'))
 
+    # Turn off mavlink
+    print(send_command(b'ATS6=0'))
+
     # Set OPPRESEND = 1
     print(send_command(b'ATS7=1'))
+
+    # Using max channels = 50
+    print(send_command(b'ATS10=50'))
 
     raw = send_command(b'ATI5')
     parse_ati5_response(raw)
