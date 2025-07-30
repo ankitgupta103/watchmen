@@ -18,8 +18,10 @@ WATCHMEN_ORGANIZATION_ID = 20
 S3_BUCKET_NAME = "vyomos"
 AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
 
+# Certificate File Constants
 CERT_FILE = "cert.pem"
 KEY_FILE = "key.pem"
+ROOT_CA_FILE = "root_ca.pem"
 
 
 def file_exists(path):
@@ -60,9 +62,12 @@ class VyomMqttClient:
 
         # Extract only IoT credentials from config
         iot_config = self.config.get("IOT", {})
+        self.thing_arn = iot_config.get("thing_arn")
         self.thing_name = iot_config.get("thing_name")
+        self.policy_name = iot_config.get("policy_name")
         self.certificate = iot_config.get("certificate")
         self.private_key = iot_config.get("private_key")
+        self.root_ca = iot_config.get("root_ca")
 
         # Validate required credentials
         missing_credentials = []
@@ -72,6 +77,8 @@ class VyomMqttClient:
             missing_credentials.append("certificate")
         if not self.private_key:
             missing_credentials.append("private_key")
+        if not self.root_ca:
+            missing_credentials.append("root_ca")
 
         if missing_credentials:
             raise Exception(
@@ -103,7 +110,7 @@ class VyomMqttClient:
 
     def _write_certs_to_files(self):
         """
-        Writes the certificate and key from config to temporary files,
+        Writes the certificate, key, and Root CA from config to temporary files,
         which is required by the MQTT library.
 
         Returns:
@@ -111,13 +118,17 @@ class VyomMqttClient:
         """
         print("Writing certificates to temporary files...")
         try:
-            if not self.certificate or not self.private_key:
-                raise Exception("Certificate or Private Key not found in config.")
+            if not self.certificate or not self.private_key or not self.root_ca:
+                raise Exception(
+                    "Certificate, Private Key, or Root CA not found in config."
+                )
 
             with open(CERT_FILE, "w") as f:
                 f.write(self.certificate)
             with open(KEY_FILE, "w") as f:
                 f.write(self.private_key)
+            with open(ROOT_CA_FILE, "w") as f:
+                f.write(self.root_ca)
             print("Certificates written successfully.")
             return True
         except Exception as e:
@@ -167,16 +178,15 @@ class VyomMqttClient:
         # 3. Instantiate and connect the MQTT client
         print(f"Connecting to MQTT broker at {AWS_IOT_ENDPOINT}...")
         try:
-            # For OpenMV MicroPython, use the correct SSL syntax
             self.client = MQTTClient(
                 client_id=self.thing_name,
                 server=AWS_IOT_ENDPOINT,
                 port=port,
-                ssl=True,
                 ssl_params={
-                    "key": KEY_FILE,
-                    "cert": CERT_FILE,
-                }
+                    "keyfile": KEY_FILE,
+                    "certfile": CERT_FILE,
+                    "ca_certs": ROOT_CA_FILE,
+                },
             )
             self.client.connect()
             print("MQTT Connection Successful!")
@@ -211,7 +221,6 @@ class VyomMqttClient:
 
         # Get current date in yyyy-mm-dd format
         # Note: The RTC should be synced for this to be accurate.
-        # The OpenMV IDE often syncs the clock on connection.
         try:
             year, month, day, _, _, _, _, _ = time.localtime()
             date_str = f"{year:04d}-{month:02d}-{day:02d}"
@@ -252,6 +261,8 @@ class VyomMqttClient:
                 os.remove(CERT_FILE)
             if file_exists(KEY_FILE):
                 os.remove(KEY_FILE)
+            if file_exists(ROOT_CA_FILE):
+                os.remove(ROOT_CA_FILE)
             print("Cleaned up certificate files.")
         except OSError as e:
             print(f"Error cleaning up certificate files: {e}")
@@ -266,12 +277,6 @@ TEST_MACHINE_ID = "test_machine_123"
 def test_mqtt_client():
     """
     Test function to demonstrate MQTT client usage.
-
-    This function:
-    1. Initializes the MQTT client with configuration
-    2. Connects to Wi-Fi and MQTT broker
-    3. Publishes test messages
-    4. Cleans up connections and files
     """
     client = None
     try:
@@ -288,12 +293,9 @@ def test_mqtt_client():
             while counter < 3:  # Limited to 3 messages for testing
                 counter += 1
                 message_payload = f"Hello from OpenMV! Test message number {counter}"
-
-                # Example for publishing a log message
                 message_type = "log"
                 file_name = f"test_log_{counter}.txt"
 
-                # Call the publish function with all required parameters
                 published_topic = client.publish_message(
                     message=message_payload,
                     message_type=message_type,
@@ -307,7 +309,7 @@ def test_mqtt_client():
                     print("Failed to publish. Check connection.")
 
                 print("-" * 20)
-                time.sleep(2)  # Shorter delay for testing
+                time.sleep(2)
         else:
             print("Failed to establish connection.")
 
