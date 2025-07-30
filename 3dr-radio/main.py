@@ -75,7 +75,7 @@ if run_omv:
 
     sensor.reset()
     sensor.set_pixformat(sensor.RGB565)
-    sensor.set_framesize(sensor.HD)  # Use HD resolution
+    sensor.set_framesize(sensor.QVGA)
     sensor.skip_frames(time=2000)
 else:
     my_addr = 'Z'
@@ -88,7 +88,7 @@ else:
         sys.exit(1)
     clock_start = int(utime.time() * 1000)
 
-shortest_path_to_cc = []
+shortest_path_to_cc = ["Z"]
 seen_neighbours = []
 
 sent_count = 0
@@ -111,7 +111,7 @@ def detect_person(img):
 # ------- Person detection loop ---------
 async def person_detection_loop():
     global image_count
-    for i in range(5): #    while True:
+    while True:
         img = sensor.snapshot()
         print(len(img.bytearray()))
         image_count += 1
@@ -121,11 +121,11 @@ async def person_detection_loop():
             r = get_rand()
             if len(shortest_path_to_cc) > 0:
                 peer_addr = shortest_path_to_cc[0]
-                # Make it async
-                await send_msg("P", my_addr, img.bytearray(), peer_addr)
+                asyncio.create_task(send_msg("P", my_addr, img.bytearray(), peer_addr))
             raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+            img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
             print(f"Saving image to {raw_path}")
-            img.save(raw_path)
+            img2.save(raw_path)
             # Draw visual annotations on the image
             # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
             # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
@@ -187,30 +187,37 @@ def radio_send(data):
     global sent_count
     sent_count = sent_count + 1
     uart.write(data)
-    log(f"[SENT ] {data.decode().strip()} at {time_msec()}")
+    log(f"[SENT ] {data} at {time_msec()}")
 
-async def send_single_msg(msgtype, creator, msgstr, dest):
+def pop_and_get(mid):
+    for i in range(len(msgs_unacked)):
+        m, d, t = msgs_unacked[i]
+        if m == mid:
+            return msgs_unacked.pop(i)
+    return None
+
+async def send_single_msg(msgtype, creator, msgbytes, dest):
     mid = get_msg_id(msgtype, creator, dest)
-    datastr = f"{mid};{msgstr}\n"
+    databytes = mid.encode() + b";" + msgbytes + "\n".encode()
     ackneeded = dest != "*" and ack_needed(msgtype)
     unackedid = 0
     timesent = time_msec()
     if ackneeded:
         unackedid = len(msgs_unacked)
-        msgs_unacked.append((mid, msgstr, timesent))
+        msgs_unacked.append((mid, msgbytes, timesent))
     else:
-        msgs_sent.append((mid, msgstr, timesent))
+        msgs_sent.append((mid, msgbytes, timesent))
     if not ackneeded:
-        radio_send(datastr.encode())
+        radio_send(databytes)
         return (True, [])
     for retry_i in range(5):
-        radio_send(datastr.encode())
+        radio_send(databytes)
         await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
         for i in range(3):
             at, missing_chunks = ack_time(mid)
             if at > 0:
                 log(f"Msg {mid} : was acked in {at - timesent} msecs")
-                msgs_sent.append(msgs_unacked.pop(unackedid))
+                msgs_sent.append(pop_and_get(mid))
                 return (True, missing_chunks)
             else:
                 log(f"Still waiting for ack for {mid} # {i}")
@@ -235,7 +242,7 @@ def encrypt_if_needed(mst, msg):
             print(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
             return msg
         return enc.encrypt_rsa(msg, enc.load_rsa_pub())
-    if mst == "P":
+    if mst == "PXXX":
         return enc.encrypt_hybrid(msg, enc.load_rsa_pub())
     return msg
 
@@ -243,6 +250,7 @@ def encrypt_if_needed(mst, msg):
 async def send_msg(msgtype, creator, msg, dest):
     msgbytes = encrypt_if_needed(msgtype, msg)
     print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+    print(msgbytes)
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
@@ -271,7 +279,8 @@ async def send_msg(msgtype, creator, msg, dest):
 def ack_time(smid):
     for (rmid, msg, t) in msgs_recd:
         if rmid[0] == "A":
-            if smid == msg[:MIDLEN]:
+            print(f"Comparing for acks {smid} and {msg[:MIDLEN].decode()}")
+            if smid == msg[:MIDLEN].decode():
                 missingids = []
                 if msg[0] == "E" and len(msg) > MIDLEN+1:
                     missingids = [int(i) for i in msg[MIDLEN+1:].split(',')]
@@ -337,10 +346,10 @@ def begin_chunk(msg):
     numchunks = int(parts[2])
     chunk_map[cid] = (mst, numchunks, [])
 
-def add_chunk(msg):
+def add_chunk(msgbytes):
     parts = msg.split(":")
     if len(parts) != 3:
-        log(f"ERROR : add chunk message unparsable {msg}")
+        log(f"ERROR : add chunk message unparsable {len(parts)} : {msg}")
         return
     cid = parts[0]
     citer = int(parts[1])
@@ -403,6 +412,7 @@ def end_chunk(msg):
 def parse_header(data):
     if len(data) < 9:
         return None
+    print(data)
     mid = data[:MIDLEN].decode()
     mst = mid[0]
     creator = mid[1]
@@ -413,12 +423,12 @@ def parse_header(data):
             return None
     if chr(data[MIDLEN]) != ';':
         return None
-    msg = data[MIDLEN+1:].decode().strip()
+    msg = data[MIDLEN+1:-1]
     return (mid, mst, creator, sender, receiver, msg)
 
 hb_map = {}
 
-def hb_process(mid, msg):
+def hb_process(mid, msgbytes):
     creator = mid[1]
     if my_addr == "Z":
         if creator not in hb_map:
@@ -429,12 +439,19 @@ def hb_process(mid, msg):
     if len(shortest_path_to_cc) > 0:
         peer_addr = shortest_path_to_cc[0]
         print(f"Propogating H to {spath}")
-        asyncio.create_task(send_msg("H", creator, msg, peer_addr))
+        asyncio.create_task(send_msg("H", creator, msgbytes, peer_addr))
     else:
         print(f"Can't forward HB because I dont have Spath yet")
 
 def img_process(mid, msg):
     # if intermediate forward. asyncio.create
+    if my_addr == "Z":
+        print(f"Received image of size {len(msg)}")
+        print(msg)
+        #raw_path = f"~/{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+        #img2 = image.Image(1280, 720, image.RGB565, buffer=img.bytearray())
+        #print(f"Saving image to {raw_path}")
+        #img2.save(raw_path)
     # if cc stats
     pass
 
@@ -442,7 +459,6 @@ def img_process(mid, msg):
 def scan_process(mid, msg):
     if msg not in seen_neighbours:
         seen_neighbours.append(msg)
-        print(f"Neighbours = {seen_neighbours}")
 
 def spath_process(mid, msg):
     global shortest_path_to_cc
@@ -462,7 +478,7 @@ def spath_process(mid, msg):
         for n in seen_neighbours:
             nmsg = my_addr + "," + ",".join(spath)
             print(f"Propogating spath from {spath} to {nmsg}")
-            asyncio.create_task(send_msg("S", mid[1], nmsg, n))
+            asyncio.create_task(send_msg("S", mid[1], nmsg.encode(), n))
 
 def process_message(data):
     parsed = parse_header(data)
@@ -479,28 +495,28 @@ def process_message(data):
     if receiver != "*" and my_addr != receiver:
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
-    log(f"[RECV ] MID: {mid}: {msg} at {time_msec()}")
+    log(f"[RECV ] MID:{mid}:{msg} at {time_msec()}")
     msgs_recd.append((mid, msg, time_msec()))
     ackmessage = mid
     if mst == "N":
-        scan_process(mid, msg)
+        scan_process(mid, msg.decode())
     if mst == "S":
-        spath_process(mid, msg)
+        spath_process(mid, msg.decode())
     if mst == "H":
         hb_process(mid, msg)
     if mst == "B":
-        begin_chunk(msg)
+        begin_chunk(msg.decode())
     elif mst == "I":
         add_chunk(msg)
     elif mst == "E":
-        alldone, retval = end_chunk(msg)
+        alldone, retval = end_chunk(msg.decode())
         if alldone:
             ackmessage += ":-1"
             log(f"Alldone, Len={len(retval)}, Data={ellepsis(retval)}")
         else:
             ackmessage += f":{retval}"
     if ack_needed(mst) and receiver != "*":
-        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+        asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
 
 async def send_heartbeat():
     while True:
@@ -515,7 +531,7 @@ async def send_scan():
     i = 1
     while True:
         scanmsg = f"{my_addr}"
-        await send_msg("N", my_addr, scanmsg, "*")
+        await send_msg("N", my_addr, scanmsg.encode(), "*")
         if i < 10:
             await asyncio.sleep(10) # reduce after setup
         else:
@@ -532,7 +548,7 @@ async def send_spath():
         sp = f"{my_addr}"
         for n in seen_neighbours:
             print(f"Sending shortest path to {n}")
-            await send_msg("S", my_addr, sp, n)
+            await send_msg("S", my_addr, sp.encode(), n)
         await asyncio.sleep(50)
 
 async def main():
