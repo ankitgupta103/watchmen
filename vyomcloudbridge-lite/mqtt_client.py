@@ -167,12 +167,16 @@ class VyomMqttClient:
         # 3. Instantiate and connect the MQTT client
         print(f"Connecting to MQTT broker at {AWS_IOT_ENDPOINT}...")
         try:
+            # For OpenMV MicroPython, use the correct SSL syntax
             self.client = MQTTClient(
                 client_id=self.thing_name,
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl=True,
-                ssl_params={"certfile": CERT_FILE, "keyfile": KEY_FILE},
+                ssl_params={
+                    "key": KEY_FILE,
+                    "cert": CERT_FILE,
+                }
             )
             self.client.connect()
             print("MQTT Connection Successful!")
