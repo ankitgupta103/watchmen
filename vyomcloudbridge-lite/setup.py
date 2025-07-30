@@ -22,23 +22,24 @@ except ImportError:
         print("Error: No HTTP library available.")
         sys.exit(1)
 
+# TODO: Move top constants.py (Anand)
 # Configuration
-VYOM_ROOT_DIR = "/vyom/vyomcloudbridge"
+VYOM_ROOT_DIR = "vyom"
 MACHINE_CONFIG_FILE = f"{VYOM_ROOT_DIR}/machine_config.json"
-FALLBACK_CONFIG_FILE = "machine_config.json"
 
 # API Configuration
 BASE_API_URL = "https://api.vyomiq.io"
 MACHINE_REGISTER_API_URL = f"{BASE_API_URL}/device/register/watchmen/"
 WATCHMEN_ORGANIZATION_ID = 20
 
-# Device Configuration
-DEVICE_UID = "watchmenOPENMV02"
-DEVICE_NAME = "WatchmenMP03"
-
 # Wi-Fi Configuration - UPDATE THESE!
 WIFI_SSID = "A"
 WIFI_KEY = "123456789"
+
+# TODO: Update every time we want to register new device (Anand)
+# Device Configuration
+DEVICE_UID = "watchmenOPENMV02"
+DEVICE_NAME = "WatchmenMP03"
 
 
 def file_exists(path):
@@ -113,8 +114,6 @@ def register_machine():
     config_file_to_use = None
     if file_exists(MACHINE_CONFIG_FILE):
         config_file_to_use = MACHINE_CONFIG_FILE
-    elif file_exists(FALLBACK_CONFIG_FILE):
-        config_file_to_use = FALLBACK_CONFIG_FILE
 
     if config_file_to_use:
         # Get absolute path
@@ -233,16 +232,6 @@ def register_machine():
                     config_saved = True
                 except OSError as e:
                     print(f"Failed to write to {MACHINE_CONFIG_FILE}: {e}")
-
-            # Fallback location
-            if not config_saved:
-                try:
-                    with open(FALLBACK_CONFIG_FILE, "w") as f:
-                        json.dump(config_data, f)
-                    print(f"Configuration saved to {FALLBACK_CONFIG_FILE}")
-                    config_saved = True
-                except OSError as e:
-                    print(f"Failed to write to {FALLBACK_CONFIG_FILE}: {e}")
 
             if not config_saved:
                 print("Warning: Could not save configuration to file.")
