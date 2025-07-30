@@ -18,9 +18,7 @@ WATCHMEN_ORGANIZATION_ID = 20
 S3_BUCKET_NAME = "vyomos"
 AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
 
-# Certificate File Constants
-CERT_FILE = "cert.pem"
-KEY_FILE = "key.pem"
+# Only the Root CA needs to be written to a file
 ROOT_CA_FILE = "root_ca.pem"
 
 
@@ -42,14 +40,6 @@ class VyomMqttClient:
     def __init__(self, config_path=None):
         """
         Initializes the client by reading IoT configuration from config file.
-
-        Args:
-            config_path (str): The full path to the machine_config.json file.
-                              Defaults to MACHINE_CONFIG_FILE from constants.
-
-        Raises:
-            Exception: If configuration file cannot be loaded or parsed,
-                      or if required IoT credentials are missing.
         """
         self.client = None
         self.config_path = config_path or MACHINE_CONFIG_FILE
@@ -88,12 +78,6 @@ class VyomMqttClient:
     def _load_config(self, path):
         """
         Loads the JSON configuration file.
-
-        Args:
-            path (str): Path to the configuration file.
-
-        Returns:
-            dict: Parsed JSON configuration or None if loading fails.
         """
         print(f"Loading configuration from: {path}")
         try:
@@ -108,44 +92,23 @@ class VyomMqttClient:
             print(f"Error: Could not parse JSON in config file at {path}. {e}")
             return None
 
-    def _write_certs_to_files(self):
+    def _write_ca_cert_to_file(self):
         """
-        Writes the certificate, key, and Root CA from config to temporary files,
-        which is required by the MQTT library.
-
-        Returns:
-            bool: True if certificates were written successfully, False otherwise.
+        Writes the Root CA from config to a temporary file.
         """
-        print("Writing certificates to temporary files...")
+        print("Writing Root CA certificate to file...")
         try:
-            if not self.certificate or not self.private_key or not self.root_ca:
-                raise Exception(
-                    "Certificate, Private Key, or Root CA not found in config."
-                )
-
-            with open(CERT_FILE, "w") as f:
-                f.write(self.certificate)
-            with open(KEY_FILE, "w") as f:
-                f.write(self.private_key)
             with open(ROOT_CA_FILE, "w") as f:
                 f.write(self.root_ca)
-            print("Certificates written successfully.")
+            print("Root CA written successfully.")
             return True
         except Exception as e:
-            print(f"Error writing certificates: {e}")
+            print(f"Error writing Root CA certificate: {e}")
             return False
 
     def connect(self, ssid=None, key=None, port=8883):
         """
-        Connects to Wi-Fi, syncs time, and establishes a secure MQTT connection.
-
-        Args:
-            ssid (str): The Wi-Fi network SSID. Defaults to WIFI_SSID from constants.
-            key (str): The Wi-Fi network password. Defaults to WIFI_KEY from constants.
-            port (int): The MQTT broker port (8883 for AWS IoT).
-
-        Returns:
-            bool: True if connection successful, False otherwise.
+        Connects to Wi-Fi and establishes a secure MQTT connection.
         """
         # Use default credentials if not provided
         ssid = ssid or WIFI_SSID
@@ -160,7 +123,7 @@ class VyomMqttClient:
             wlan.connect(ssid, key)
 
             # Wait for connection with timeout
-            timeout = 30  # 30 seconds timeout
+            timeout = 30
             start_time = time.time()
             while not wlan.isconnected() and (time.time() - start_time) < timeout:
                 time.sleep_ms(500)
@@ -171,8 +134,8 @@ class VyomMqttClient:
 
         print("Wi-Fi Connected. IP:", wlan.ifconfig()[0])
 
-        # 2. Write certs to files
-        if not self._write_certs_to_files():
+        # 2. Write CA cert to file
+        if not self._write_ca_cert_to_file():
             return False
 
         # 3. Instantiate and connect the MQTT client
@@ -183,9 +146,9 @@ class VyomMqttClient:
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl_params={
-                    "keyfile": KEY_FILE,
-                    "certfile": CERT_FILE,
-                    "ca_certs": ROOT_CA_FILE,
+                    "key": self.private_key,  # Pass key content directly
+                    "cert": self.certificate,  # Pass cert content directly
+                    "ca_certs": ROOT_CA_FILE,  # Pass CA cert as a file path
                 },
             )
             self.client.connect()
@@ -197,39 +160,23 @@ class VyomMqttClient:
 
     def publish_message(self, message, message_type, filename, machine_id):
         """
-        Constructs the topic path, publishes a message, and returns the topic.
-
-        Args:
-            message (str): The payload to publish.
-            message_type (str): The type of message (e.g., 'image', 'log', 'event').
-            filename (str): The name of the file associated with the message.
-            machine_id (str): The machine ID for the topic.
-
-        Returns:
-            str: The full topic path the message was published to, or None on failure.
+        Constructs the topic path and publishes a message.
         """
         if not self.client:
             print("Error: MQTT client is not connected.")
             return None
 
-        # Validate input parameters
         if not all([message, message_type, filename, machine_id]):
-            print(
-                "Error: All parameters (message, message_type, filename, machine_id) are required."
-            )
+            print("Error: All parameters are required.")
             return None
 
-        # Get current date in yyyy-mm-dd format
-        # Note: The RTC should be synced for this to be accurate.
         try:
             year, month, day, _, _, _, _, _ = time.localtime()
             date_str = f"{year:04d}-{month:02d}-{day:02d}"
         except Exception as e:
             print(f"Error getting current date: {e}")
-            # Fallback to a default date if time is not available
             date_str = "1970-01-01"
 
-        # Construct the topic
         topic = (
             f"{S3_BUCKET_NAME}/{WATCHMEN_ORGANIZATION_ID}/_all_/{date_str}/"
             f"{machine_id}/_all_/{message_type}/{filename}"
@@ -246,7 +193,7 @@ class VyomMqttClient:
 
     def disconnect(self):
         """
-        Disconnects the client and cleans up certificate files.
+        Disconnects the client and cleans up the CA certificate file.
         """
         if self.client:
             try:
@@ -255,22 +202,13 @@ class VyomMqttClient:
             except Exception as e:
                 print(f"Error disconnecting MQTT client: {e}")
 
-        # Clean up certificate files
+        # Clean up CA certificate file
         try:
-            if file_exists(CERT_FILE):
-                os.remove(CERT_FILE)
-            if file_exists(KEY_FILE):
-                os.remove(KEY_FILE)
             if file_exists(ROOT_CA_FILE):
                 os.remove(ROOT_CA_FILE)
-            print("Cleaned up certificate files.")
+            print("Cleaned up certificate file.")
         except OSError as e:
-            print(f"Error cleaning up certificate files: {e}")
-
-
-# --- Test Configuration ---
-# Test device information - only machine data since IoT certs come from config
-TEST_MACHINE_ID = "test_machine_123"
+            print(f"Error cleaning up certificate file: {e}")
 
 
 # --- Test Function ---
@@ -280,17 +218,13 @@ def test_mqtt_client():
     """
     client = None
     try:
-        # 1. Initialize the client with config path
         print("Initializing MQTT Client...")
         client = VyomMqttClient(config_path=MACHINE_CONFIG_FILE)
 
-        # 2. Connect to Wi-Fi and the MQTT broker
         if client.connect():
             print("Connection successful. Starting message publishing...")
-
-            # 3. Publish messages in a loop
             counter = 0
-            while counter < 3:  # Limited to 3 messages for testing
+            while counter < 3:
                 counter += 1
                 message_payload = f"Hello from OpenMV! Test message number {counter}"
                 message_type = "log"
@@ -300,14 +234,12 @@ def test_mqtt_client():
                     message=message_payload,
                     message_type=message_type,
                     filename=file_name,
-                    machine_id=TEST_MACHINE_ID,
+                    machine_id=client.machine_id,
                 )
-
                 if published_topic:
                     print(f"Successfully published to: {published_topic}")
                 else:
                     print("Failed to publish. Check connection.")
-
                 print("-" * 20)
                 time.sleep(2)
         else:
@@ -316,7 +248,6 @@ def test_mqtt_client():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
     finally:
-        # 4. Clean up the connection and certificate files
         if client:
             client.disconnect()
 
