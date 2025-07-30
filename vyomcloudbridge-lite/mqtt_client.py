@@ -1,15 +1,11 @@
-# TODO - Important
-# Note: This script is only for the MicroPython version of the Watchmen device.
-# Update the constants in constants.py to match your setup.
-
 import os
 import time
 import network
-import ujson as json  # MicroPython uses 'ujson' for JSON operations
-from mqtt import MQTTClient  # Assumes mqtt.py library is on the device
+import ujson as json
+from mqtt import MQTTClient
+import ssl
 
-# TODO: Move to constants.py (Anand)
-# Configuration
+# Configuration - move these to constants.py
 WIFI_SSID = "A"
 WIFI_KEY = "123456789"
 VYOM_ROOT_DIR = "/sdcard/image1"
@@ -17,9 +13,6 @@ MACHINE_CONFIG_FILE = f"{VYOM_ROOT_DIR}/machine_config.json"
 WATCHMEN_ORGANIZATION_ID = 20
 S3_BUCKET_NAME = "vyomos"
 AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
-
-# Only the Root CA needs to be written to a file
-ROOT_CA_FILE = "root_ca.pem"
 
 
 def file_exists(path):
@@ -33,58 +26,40 @@ def file_exists(path):
 
 class VyomMqttClient:
     """
-    A wrapper for the MQTTClient to connect to AWS IoT Core using IoT credentials
-    from the machine_config.json file.
+    Fixed MQTT client for OpenMV connecting to AWS IoT Core
     """
 
     def __init__(self, config_path=None):
-        """
-        Initializes the client by reading IoT configuration from config file.
-        """
+        """Initialize the client by reading IoT configuration from config file."""
         self.client = None
         self.config_path = config_path or MACHINE_CONFIG_FILE
         self.config = self._load_config(self.config_path)
 
         if not self.config:
-            raise Exception(
-                f"Failed to load or parse configuration file: {self.config_path}"
-            )
+            raise Exception(f"Failed to load configuration file: {self.config_path}")
 
-        # Extract only IoT credentials from config
+        # Extract IoT credentials
         iot_config = self.config.get("IOT", {})
         self.thing_arn = iot_config.get("thing_arn")
         self.thing_name = iot_config.get("thing_name")
         self.policy_name = iot_config.get("policy_name")
-        self.certificate = iot_config.get("certificate")
-        self.private_key = iot_config.get("private_key")
-        self.root_ca = iot_config.get("root_ca")
+
+        # Certificate data will be loaded as binary DER format
+        self.certificate = None
+        self.private_key = None
 
         # Validate required credentials
-        missing_credentials = []
         if not self.thing_name:
-            missing_credentials.append("thing_name")
-        if not self.certificate:
-            missing_credentials.append("certificate")
-        if not self.private_key:
-            missing_credentials.append("private_key")
-        if not self.root_ca:
-            missing_credentials.append("root_ca")
-
-        if missing_credentials:
-            raise Exception(
-                f"Configuration is missing required IoT credentials: {', '.join(missing_credentials)}"
-            )
+            raise Exception("Configuration missing required thing_name")
 
     def _load_config(self, path):
-        """
-        Loads the JSON configuration file.
-        """
+        """Load the JSON configuration file."""
         print(f"Loading configuration from: {path}")
         try:
             with open(path, "r") as f:
                 config = json.load(f)
-                print("Configuration loaded successfully.")
-                return config
+            print("Configuration loaded successfully.")
+            return config
         except OSError as e:
             print(f"Error: Could not read config file at {path}. {e}")
             return None
@@ -92,24 +67,29 @@ class VyomMqttClient:
             print(f"Error: Could not parse JSON in config file at {path}. {e}")
             return None
 
-    def _write_ca_cert_to_file(self):
+    def _load_certificates_der(self):
         """
-        Writes the Root CA from config to a temporary file.
+        Load DER format certificates for OpenMV compatibility.
+        Certificates must be converted to DER format beforehand.
         """
-        print("Writing Root CA certificate to file...")
+        print("Loading DER format certificates...")
         try:
-            with open(ROOT_CA_FILE, "w") as f:
-                f.write(self.root_ca)
-            print("Root CA written successfully.")
+            # Load private key in DER format
+            with open("private.der", "rb") as f:
+                self.private_key = f.read()
+
+            # Load certificate in DER format
+            with open("certificate.der", "rb") as f:
+                self.certificate = f.read()
+
+            print("DER certificates loaded successfully.")
             return True
         except Exception as e:
-            print(f"Error writing Root CA certificate: {e}")
+            print(f"Error loading DER certificates: {e}")
             return False
 
     def connect(self, ssid=None, key=None, port=8883):
-        """
-        Connects to Wi-Fi and establishes a secure MQTT connection.
-        """
+        """Connect to Wi-Fi and establish secure MQTT connection."""
         # Use default credentials if not provided
         ssid = ssid or WIFI_SSID
         key = key or WIFI_KEY
@@ -134,41 +114,58 @@ class VyomMqttClient:
 
         print("Wi-Fi Connected. IP:", wlan.ifconfig()[0])
 
-        # 2. Write CA cert to file
-        if not self._write_ca_cert_to_file():
+        # 2. Load DER certificates
+        if not self._load_certificates_der():
             return False
 
-        # 3. Instantiate and connect the MQTT client
+        # 3. Set up time synchronization (required for SSL)
+        try:
+            import ntptime
+
+            ntptime.settime()
+            print("Time synchronized via NTP")
+        except Exception as e:
+            print(f"Warning: NTP sync failed: {e}")
+
+        # 4. Create and connect MQTT client with proper SSL params for OpenMV
         print(f"Connecting to MQTT broker at {AWS_IOT_ENDPOINT}...")
         try:
+            # OpenMV compatible SSL parameters
+            ssl_params = {
+                "key": self.private_key,
+                "cert": self.certificate,
+                "server_hostname": AWS_IOT_ENDPOINT,
+                "cert_reqs": ssl.CERT_REQUIRED,
+            }
+
             self.client = MQTTClient(
                 client_id=self.thing_name,
                 server=AWS_IOT_ENDPOINT,
                 port=port,
-                ssl_params={
-                    "key": self.private_key,  # Pass key content directly
-                    "cert": self.certificate,  # Pass cert content directly
-                    "ca_certs": ROOT_CA_FILE,  # Pass CA cert as a file path
-                },
+                ssl_params=ssl_params,
+                keepalive=60,
             )
+
             self.client.connect()
             print("MQTT Connection Successful!")
             return True
+
         except Exception as e:
             print(f"Failed to connect to MQTT broker: {e}")
             return False
 
-    def publish_message(self, message, message_type, filename, machine_id):
-        """
-        Constructs the topic path and publishes a message.
-        """
+    def publish_message(self, message, message_type, filename, machine_id=None):
+        """Construct topic path and publish message."""
         if not self.client:
             print("Error: MQTT client is not connected.")
             return None
 
-        if not all([message, message_type, filename, machine_id]):
-            print("Error: All parameters are required.")
+        if not all([message, message_type, filename]):
+            print("Error: message, message_type, and filename are required.")
             return None
+
+        # Use thing_name if machine_id not provided
+        machine_id = machine_id or self.thing_name
 
         try:
             year, month, day, _, _, _, _, _ = time.localtime()
@@ -192,9 +189,7 @@ class VyomMqttClient:
             return None
 
     def disconnect(self):
-        """
-        Disconnects the client and cleans up the CA certificate file.
-        """
+        """Disconnect the client."""
         if self.client:
             try:
                 self.client.disconnect()
@@ -202,20 +197,10 @@ class VyomMqttClient:
             except Exception as e:
                 print(f"Error disconnecting MQTT client: {e}")
 
-        # Clean up CA certificate file
-        try:
-            if file_exists(ROOT_CA_FILE):
-                os.remove(ROOT_CA_FILE)
-            print("Cleaned up certificate file.")
-        except OSError as e:
-            print(f"Error cleaning up certificate file: {e}")
 
-
-# --- Test Function ---
+# Test function with fixes
 def test_mqtt_client():
-    """
-    Test function to demonstrate MQTT client usage.
-    """
+    """Test function to demonstrate MQTT client usage."""
     client = None
     try:
         print("Initializing MQTT Client...")
@@ -223,6 +208,7 @@ def test_mqtt_client():
 
         if client.connect():
             print("Connection successful. Starting message publishing...")
+
             counter = 0
             while counter < 3:
                 counter += 1
@@ -230,16 +216,19 @@ def test_mqtt_client():
                 message_type = "log"
                 file_name = f"test_log_{counter}.txt"
 
+                # Fixed: Use thing_name instead of machine_id
                 published_topic = client.publish_message(
                     message=message_payload,
                     message_type=message_type,
                     filename=file_name,
-                    machine_id=client.machine_id,
+                    machine_id=client.thing_name,  # Fixed attribute name
                 )
+
                 if published_topic:
                     print(f"Successfully published to: {published_topic}")
                 else:
                     print("Failed to publish. Check connection.")
+
                 print("-" * 20)
                 time.sleep(2)
         else:
@@ -252,7 +241,7 @@ def test_mqtt_client():
             client.disconnect()
 
 
-# --- Main Execution ---
+# Main execution
 if __name__ == "__main__":
     print("=== MQTT Client Test ===")
     test_mqtt_client()
