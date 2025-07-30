@@ -1,7 +1,7 @@
 import time
 from machine import UART
 
-# Configure UART (adjust TX/RX pins based on your board)
+# Configure UART - pins parameter is not required in this setup 
 uart = UART(1, baudrate=57600, timeout=1000)
 
 def enter_config_mode():
@@ -217,42 +217,42 @@ if enter_config_mode():
 
 # 4
 
-Parsed ATI5 Response:
+# Parsed ATI5 Response:
   
-  S1:SERIAL_SPEED = 57
-  S2:AIR_SPEED = 64
-  S3:NETID = 25
-  S4:TXPOWER = 20
-  S5:ECC = 1
-  S6:MAVLINK = 1
-  S7:OPPRESEND = 1
-  S8:MIN_FREQ = 433050
-  S9:MAX_FREQ = 434790
-  S10:NUM_CHANNELS = 10
-  S11:DUTY_CYCLE = 100
-  S12:LBT_RSSI = 0
-  S13:MANCHESTER = 0
-  S14:RTSCTS = 0
-  S15:MAX_WINDOW = 131
-b'ATS3=25\r\nOK\r\n'
-b'ATS5=1\r\nOK\r\n'
-b'ATS7=1\r\nOK\r\n'
-Parsed ATI5 Response:
+#   S1:SERIAL_SPEED = 57
+#   S2:AIR_SPEED = 64
+#   S3:NETID = 25
+#   S4:TXPOWER = 20
+#   S5:ECC = 1
+#   S6:MAVLINK = 1
+#   S7:OPPRESEND = 1
+#   S8:MIN_FREQ = 433050
+#   S9:MAX_FREQ = 434790
+#   S10:NUM_CHANNELS = 10
+#   S11:DUTY_CYCLE = 100
+#   S12:LBT_RSSI = 0
+#   S13:MANCHESTER = 0
+#   S14:RTSCTS = 0
+#   S15:MAX_WINDOW = 131
+# b'ATS3=25\r\nOK\r\n'
+# b'ATS5=1\r\nOK\r\n'
+# b'ATS7=1\r\nOK\r\n'
+# Parsed ATI5 Response:
   
-  S1:SERIAL_SPEED = 57
-  S2:AIR_SPEED = 64
-  S3:NETID = 25
-  S4:TXPOWER = 20
-  S5:ECC = 1
-  S6:MAVLINK = 1
-  S7:OPPRESEND = 1
-  S8:MIN_FREQ = 433050
-  S9:MAX_FREQ = 434790
-  S10:NUM_CHANNELS = 10
-  S11:DUTY_CYCLE = 100
-  S12:LBT_RSSI = 0
-  S13:MANCHESTER = 0
-  S14:RTSCTS = 0
-  S15:MAX_WINDOW = 131
-b'AT&W\r\nOK\r\n'
-b'ATZ\xff'
+#   S1:SERIAL_SPEED = 57
+#   S2:AIR_SPEED = 64
+#   S3:NETID = 25
+#   S4:TXPOWER = 20
+#   S5:ECC = 1
+#   S6:MAVLINK = 1
+#   S7:OPPRESEND = 1  
+#   S8:MIN_FREQ = 433050
+#   S9:MAX_FREQ = 434790
+#   S10:NUM_CHANNELS = 10
+#   S11:DUTY_CYCLE = 100
+#   S12:LBT_RSSI = 0
+#   S13:MANCHESTER = 0
+#   S14:RTSCTS = 0
+#   S15:MAX_WINDOW = 131
+# b'AT&W\r\nOK\r\n'
+# b'ATZ\xff'
