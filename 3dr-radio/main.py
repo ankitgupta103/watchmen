@@ -53,10 +53,10 @@ if run_omv:
     print("Running on device : " + uid.decode())
     if uid == b'e076465dd7194025':                                  
         my_addr = 'A'
-    elif uid == b'e076465dd7194211':
-        my_addr = 'B'
     elif uid == b'e076465dd7091027':
-        my_addr = 'C'
+        my_addr = 'B'
+    elif uid == b'e076465dd7194211':
+        my_addr = 'Z'
     else:
         print("Unknown device ID for " + omv.board_id())
         sys.exit()
@@ -78,7 +78,7 @@ if run_omv:
     sensor.set_framesize(sensor.QVGA)
     sensor.skip_frames(time=2000)
 else:
-    my_addr = 'Z'
+    my_addr = 'ZZZZ'
     #USBA_PORT = "/dev/ttyUSB0"
     USBA_PORT = "/dev/tty.usbserial-0001"
     try:
