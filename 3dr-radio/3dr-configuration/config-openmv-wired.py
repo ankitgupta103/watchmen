@@ -1,7 +1,7 @@
 import time
 from machine import UART
 
-# Configure UART - pins parameter is not required in this setup 
+# Configure UART - pins parameter is not required in this setup
 uart = UART(1, baudrate=57600, timeout=1000)
 
 def enter_config_mode():
@@ -67,7 +67,7 @@ if enter_config_mode():
 
 
 
-# ATI5 responce breakdown 
+# ATI5 responce breakdown
 
 # S1: SERIAL_SPEED = 57       → UART baud rate (x1000) → 57 → 57600 bps
 # S2: AIR_SPEED = 64          → Over-the-air speed (kbps)
@@ -89,7 +89,7 @@ if enter_config_mode():
 # 1
 
 # Parsed ATI5 Response:
-  
+
 #   S1:SERIAL_SPEED = 57
 #   S2:AIR_SPEED = 64
 #   S3:NETID = 25
@@ -109,7 +109,7 @@ if enter_config_mode():
 # b'ATS5=1\r\nOK\r\n'
 # b'ATS7=1\r\nOK\r\n'
 # Parsed ATI5 Response:
-  
+
 #   S1:SERIAL_SPEED = 57
 #   S2:AIR_SPEED = 64
 #   S3:NETID = 25
@@ -132,7 +132,7 @@ if enter_config_mode():
 # 2
 
 # Parsed ATI5 Response:
-  
+
 #   S1:SERIAL_SPEED = 57
 #   S2:AIR_SPEED = 64
 #   S3:NETID = 25
@@ -152,7 +152,7 @@ if enter_config_mode():
 # b'ATS5=1\r\nOK\r\n'
 # b'ATS7=1\r\nOK\r\n'
 # Parsed ATI5 Response:
-  
+
 #   S1:SERIAL_SPEED = 57
 #   S2:AIR_SPEED = 64
 #   S3:NETID = 25
@@ -175,7 +175,7 @@ if enter_config_mode():
 # 3
 
 # Parsed ATI5 Response:
-  
+
 #   S1:SERIAL_SPEED = 57
 #   S2:AIR_SPEED = 64
 #   S3:NETID = 25
@@ -195,7 +195,7 @@ if enter_config_mode():
 # b'ATS5=1\r\nOK\r\n'
 # b'ATS7=1\r\nOK\r\n'
 # Parsed ATI5 Response:
-  
+
 #   S1:SERIAL_SPEED = 57
 #   S2:AIR_SPEED = 64
 #   S3:NETID = 25
@@ -218,7 +218,7 @@ if enter_config_mode():
 # 4
 
 # Parsed ATI5 Response:
-  
+
 #   S1:SERIAL_SPEED = 57
 #   S2:AIR_SPEED = 64
 #   S3:NETID = 25
@@ -238,14 +238,14 @@ if enter_config_mode():
 # b'ATS5=1\r\nOK\r\n'
 # b'ATS7=1\r\nOK\r\n'
 # Parsed ATI5 Response:
-  
+
 #   S1:SERIAL_SPEED = 57
 #   S2:AIR_SPEED = 64
 #   S3:NETID = 25
 #   S4:TXPOWER = 20
 #   S5:ECC = 1
 #   S6:MAVLINK = 1
-#   S7:OPPRESEND = 1  
+#   S7:OPPRESEND = 1
 #   S8:MIN_FREQ = 433050
 #   S9:MAX_FREQ = 434790
 #   S10:NUM_CHANNELS = 10
