@@ -6,7 +6,7 @@ import ubinascii
 
 from mqtt import MQTTClient  # Your MQTT implementation
 
-# Configuration constants
+# Configuration
 WIFI_SSID = "A"
 WIFI_KEY = "123456789"
 VYOM_ROOT_DIR = "/sdcard/image1"
@@ -15,7 +15,7 @@ WATCHMEN_ORGANIZATION_ID = 20
 S3_BUCKET_NAME = "vyomos"
 AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
 
-# Temporary DER files to be generated
+# Generated temp files
 CERT_DER_FILE = "certificate.der"
 KEY_DER_FILE = "private_key.der"
 ROOT_CA_DER_FILE = "root_ca.der"
@@ -30,7 +30,7 @@ def file_exists(path):
 
 
 def pem_to_der_str(pem_data):
-    """Convert PEM string (with headers) to binary DER data."""
+    """Convert PEM string to DER bytes."""
     lines = pem_data.split("\n")
     b64 = "".join(
         line.strip() for line in lines if not line.startswith("---") and line.strip()
@@ -38,24 +38,25 @@ def pem_to_der_str(pem_data):
     return ubinascii.a2b_base64(b64)
 
 
-def write_der_file_from_pem_or_der(filename, data, is_root_ca=False):
-    """Write DER file from a PEM string or assume already DER if not PEM headers."""
+def write_der_file_from_pem_or_der(filename, data):
+    """Write DER file from PEM or binary DER or ASCII PEM (for CA)."""
     if ("-----BEGIN" in data) and ("-----END" in data):
         # PEM conversion
         der_data = pem_to_der_str(data)
-        mode = "wb"
+        with open(filename, "wb") as f:
+            f.write(der_data)
     else:
-        # If not a PEM, try writing as binary or text (flexibility for Root CA)
-        # For root CA, AWS allows both PEM or DER
-        der_data = data.encode() if is_root_ca else data
-        mode = "wb" if not is_root_ca else "w"
-    with open(filename, mode) as f:
-        f.write(der_data)
+        # For root CA this allows either DER or PEM, both as binary
+        with open(filename, "wb") as f:
+            try:
+                f.write(data if isinstance(data, bytes) else data.encode())
+            except Exception:
+                f.write(data)
 
 
 class VyomMqttClient:
     """
-    MQTT client for OpenMV using credentials from config (supports auto-PEM-to-DER conversion).
+    MQTT client for OpenMV using credentials from config (auto PEM-to-DER conversion).
     """
 
     def __init__(self, config_path=None):
@@ -67,7 +68,6 @@ class VyomMqttClient:
                 f"Failed to load or parse configuration file: {self.config_path}"
             )
 
-        # Pull IoT creds from config
         iot = self.config.get("IOT", {})
         self.thing_arn = iot.get("thing_arn")
         self.thing_name = iot.get("thing_name")
@@ -76,7 +76,7 @@ class VyomMqttClient:
         self.private_key = iot.get("private_key")
         self.root_ca = iot.get("root_ca")
 
-        # Validate
+        # Validate required credentials
         missing = []
         if not self.thing_name:
             missing.append("thing_name")
@@ -104,16 +104,11 @@ class VyomMqttClient:
             return None
 
     def _prepare_certificate_files(self):
-        """
-        Ensure certificate, private key and root CA are written to DER files as needed.
-        """
+        # Always (over)write to DER files each run (safe; files are cleaned up on disconnect)
         try:
             write_der_file_from_pem_or_der(CERT_DER_FILE, self.certificate)
             write_der_file_from_pem_or_der(KEY_DER_FILE, self.private_key)
-            # For the root CA, AWS allows both formats, so if in PEM, keep as text; if in DER, write as binary
-            write_der_file_from_pem_or_der(
-                ROOT_CA_DER_FILE, self.root_ca, is_root_ca=True
-            )
+            write_der_file_from_pem_or_der(ROOT_CA_DER_FILE, self.root_ca)
             return True
         except Exception as e:
             print("Error writing DER files from PEM:", e)
@@ -123,13 +118,12 @@ class VyomMqttClient:
         ssid = ssid or WIFI_SSID
         key = key or WIFI_KEY
 
-        # 1. Connect to Wi-Fi
+        # 1. Wi-Fi connect
         wlan = network.WLAN(network.STA_IF)
         wlan.active(True)
         if not wlan.isconnected():
             print(f'Connecting to Wi-Fi network "{ssid}"...')
             wlan.connect(ssid, key)
-            # Wait for connection with timeout
             timeout = 30
             start_time = time.time()
             while not wlan.isconnected() and (time.time() - start_time) < timeout:
@@ -139,7 +133,7 @@ class VyomMqttClient:
                 return False
         print("Wi-Fi Connected. IP:", wlan.ifconfig()[0])
 
-        # 2. Prepare certificate/key/CA files (converts PEM if necessary)
+        # 2. Prepare DER files
         if not self._prepare_certificate_files():
             return False
 
@@ -196,7 +190,7 @@ class VyomMqttClient:
                 print("MQTT client disconnected.")
             except Exception as e:
                 print(f"Error disconnecting MQTT client: {e}")
-        # Clean up DER/CA certificate files
+        # Clean up DER/CA files
         for fpath in [CERT_DER_FILE, KEY_DER_FILE, ROOT_CA_DER_FILE]:
             try:
                 if file_exists(fpath):
@@ -226,7 +220,7 @@ def test_mqtt_client():
                     message=message_payload,
                     message_type=message_type,
                     filename=file_name,
-                    machine_id=client.machine_id,
+                    machine_id=client.thing_name,
                 )
                 if published_topic:
                     print(f"Successfully published to: {published_topic}")
