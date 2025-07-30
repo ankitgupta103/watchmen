@@ -333,11 +333,10 @@ async def radio_read():
             await asyncio.sleep(0.01)
             while uart.in_waiting > 0:
                 byte = uart.read(1)
+                buffer += byte
                 if byte == b'\n':
                     process_message(buffer)
                     buffer = b""
-                else:
-                    buffer += byte
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
