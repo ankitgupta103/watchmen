@@ -8,6 +8,7 @@ import network
 import ujson as json  # MicroPython uses 'ujson' for JSON operations
 from mqtt import MQTTClient  # Assumes mqtt.py library is on the device
 
+
 # TODO: Move to constants.py (Anand)
 # Configuration
 WIFI_SSID = "A"
@@ -20,15 +21,6 @@ AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
 
 CERT_FILE = "cert.pem"
 KEY_FILE = "key.pem"
-
-
-def file_exists(path):
-    """Check if a file exists - MicroPython compatible."""
-    try:
-        os.stat(path)
-        return True
-    except OSError:
-        return False
 
 
 class VyomMqttClient:
@@ -244,9 +236,9 @@ class VyomMqttClient:
 
         # Clean up certificate files
         try:
-            if file_exists(CERT_FILE):
+            if os.path.exists(CERT_FILE):
                 os.remove(CERT_FILE)
-            if file_exists(KEY_FILE):
+            if os.path.exists(KEY_FILE):
                 os.remove(KEY_FILE)
             print("Cleaned up certificate files.")
         except OSError as e:
