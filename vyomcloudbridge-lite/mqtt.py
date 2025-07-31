@@ -381,6 +381,8 @@ class MQTTClient:
                     print(f"SSL cipher: {self.sock.cipher()}")
             except:
                 pass
+            # Small delay to ensure SSL connection is fully established
+            time.sleep(2)
         except Exception as e:
             if self.sock:
                 try:
@@ -757,10 +759,12 @@ class VyomMqttClient:
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl_params=ssl_params,
-                keepalive=300,  # Reduced keepalive for better connection stability
+                keepalive=60,  # AWS IoT Core recommended keepalive
             )
 
-            self.client.connect(clean_session=False, timeout=15.0)  # Increased timeout
+            self.client.connect(
+                clean_session=True, timeout=15.0
+            )  # AWS IoT Core prefers clean session
             print("MQTT Connection Successful!")
             return True
         except Exception as e:
