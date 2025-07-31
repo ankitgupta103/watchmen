@@ -267,130 +267,60 @@ class MQTTClient:
         self.lw_qos = qos
         self.lw_retain = retain
 
-    def connect(self, clean_session=False, timeout=5.0):
-        try:
-            addr = socket.getaddrinfo(self.server, self.port)[0][-1]
-            print(f"Resolved address: {addr}")
-        except Exception as e:
-            raise MQTTException(f"Failed to resolve address: {e}")
+    def connect(self, clean_session=True, timeout=5.0):
+        # 1. Resolve and wrap socket
+        addr = socket.getaddrinfo(self.server, self.port)[0][-1]
+        self.sock = socket.socket()
+        self.sock.settimeout(timeout)
+        self.sock.connect(addr)
+        self.sock = wrap_socket(self.sock, self.ssl_params)
 
-        if self.sock is not None:
-            self.sock.close()
-            self.sock = None
+        # 2. Build CONNECT packet
+        protocol = b"\x00\x04MQTT\x04"  # Protocol Name + Level
+        flags = (clean_session << 1) & 0x02
+        keepalive_bytes = struct.pack("!H", self.keepalive or 60)
 
-        try:
-            self.sock = socket.socket()
-            self.sock.settimeout(timeout)
-            print("Connecting to socket...")
+        # Payload: Client ID only
+        client_id_bytes = self.client_id.encode()
+        payload = struct.pack("!H", len(client_id_bytes)) + client_id_bytes
 
-            if sys.implementation.name == "micropython":
-                self.sock.connect(addr)
-                print("Socket connected, wrapping with SSL...")
-                self.sock = wrap_socket(self.sock, self.ssl_params)
-                print("SSL handshake completed")
+        # Remaining length
+        remaining = len(protocol) + 1 + len(keepalive_bytes) + len(payload)
+        rem_len = bytearray()
+        while True:
+            byte = remaining & 0x7F
+            remaining >>= 7
+            if remaining:
+                rem_len.append(byte | 0x80)
             else:
-                self.sock = wrap_socket(self.sock, self.ssl_params)
-                self.sock.connect(addr)
-        except Exception as e:
-            if self.sock:
-                self.sock.close()
-                self.sock = None
-            raise MQTTException(f"Connection failed: {e}")
+                rem_len.append(byte)
+                break
 
-        # Build MQTT CONNECT packet
-        premsg = bytearray(b"\x10\0\0\0\0\0")
-        msg = bytearray(b"\x04MQTT\x04\x02\0\0")
+        # Fixed header = 0x10 + remaining length bytes
+        fixed_header = b"\x10" + rem_len
 
-        sz = 10 + 2 + len(self.client_id)  # Fixed header + variable header + client_id
+        # 3. Send full CONNECT packet
+        packet = fixed_header + protocol + bytes([flags]) + keepalive_bytes + payload
+        print("Sending CONNECT packet:", packet.hex())
+        self.sock.write(packet)
 
-        msg[6] = clean_session << 1  # Clean session flag
-
-        if (
-            self.user is not None
-        ):  # If username and password provided (not typical for AWS IoT)
-            sz += 2 + len(self.user) + 2 + len(self.pswd)
-            msg[6] |= 0xC0
-
-        if self.keepalive:
-            assert self.keepalive < 65536
-            msg[7] |= self.keepalive >> 8
-            msg[8] |= self.keepalive & 0x00FF
-
-        if self.lw_topic:
-            sz += 2 + len(self.lw_topic) + 2 + len(self.lw_msg)
-            msg[6] |= 0x4 | (self.lw_qos & 0x1) << 3 | (self.lw_qos & 0x2) << 3
-            msg[6] |= self.lw_retain << 5
-
-        # Encode remaining length (variable length format)
-        i = 1
-        rem_len = sz
-        while rem_len > 0x7F:
-            premsg[i] = (rem_len & 0x7F) | 0x80
-            rem_len >>= 7
-            i += 1
-        premsg[i] = rem_len
-
-        try:
-            # Send the fixed header and variable header part
-            print(
-                f"Sending MQTT CONNECT fixed header+variable header (len={i+2}): {premsg[0:i+2].hex()}"
-            )
-            self.sock.write(premsg[0 : i + 2])
-
-            print(f"Sending MQTT CONNECT payload: {msg.hex()}")
-            self.sock.write(msg)
-
-            # Send client ID
-            print(f"Sending client ID '{self.client_id}'")
-            self._send_str(self.client_id)
-
-            # Send last will topic and message if set
-            if self.lw_topic:
-                print(f"Sending last will topic: {self.lw_topic}")
-                self._send_str(self.lw_topic)
-                print(f"Sending last will message: {self.lw_msg}")
-                self._send_str(self.lw_msg)
-
-            # Send username/password if set (usually None for AWS IoT)
-            if self.user is not None:
-                print(f"Sending username: {self.user}")
-                self._send_str(self.user)
-                print(f"Sending password: {self.pswd}")
-                self._send_str(self.pswd)
-
-            # Wait for CONNACK response
-            print("Waiting to read CONNACK (4 bytes expected)...")
-            resp = self._safe_read(4)
-
-            if resp:
-                print(
-                    f"Received CONNACK bytes: {[hex(b) for b in resp]} (raw: {resp.hex()})"
-                )
-            else:
-                print("No CONNACK response received (empty or None)")
-
-            # Validate CONNACK packet
-            if not resp or len(resp) != 4 or resp[0] != 0x20 or resp[1] != 0x02:
-                raise MQTTException(f"Invalid CONNACK response: {resp}")
-
-            if resp[3] != 0:
-                error_codes = {
-                    1: "Connection Refused, unacceptable protocol version",
-                    2: "Connection Refused, identifier rejected",
-                    3: "Connection Refused, Server unavailable",
-                    4: "Connection Refused, bad user name or password",
-                    5: "Connection Refused, not authorized",
-                }
-                error_msg = error_codes.get(resp[3], f"Unknown error code: {resp[3]}")
-                raise MQTTException(error_msg)
-
-            print("MQTT connection established successfully")
-            return resp[2] & 1
-
-        except MQTTException as e:
-            raise
-        except Exception as e:
-            raise MQTTException(f"Error during MQTT handshake: {e}")
+        # 4. Read CONNACK
+        resp = self._safe_read(4)
+        print("Received CONNACK:", [hex(b) for b in resp])
+        if resp[0] != 0x20 or resp[1] != 0x02:
+            raise MQTTException(f"Invalid CONNACK header {resp}")
+        if resp[3] != 0:
+            code = resp[3]
+            messages = {
+                1: "unacceptable protocol version",
+                2: "identifier rejected",
+                3: "server unavailable",
+                4: "bad user name or password",
+                5: "not authorized",
+            }
+            raise MQTTException(f"Connection refused: {messages.get(code, code)}")
+        print("MQTT connected successfully")
+        return True
 
     def disconnect(self):
         if self.sock:
@@ -616,18 +546,11 @@ class VyomMqttClient:
             }
 
             self.client = MQTTClient(
-<<<<<<< HEAD
                 client_id=f"{MQTT_CLIENT_ID}-{self.thing_name}",
-||||||| be477fb
-                client_id=self.thing_name,
-=======
-                # client_id=f"{MQTT_CLIENT_ID}-{self.thing_name}",
-                client_id=f"{self.thing_name}",
->>>>>>> eea50fe7915f7a47d8403277d4a0146e4e3ba30a
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl_params=ssl_params,
-                keepalive=60,
+                keepalive=1200,
             )
 
             self.client.connect(clean_session=False, timeout=15.0)  # Increased timeout
