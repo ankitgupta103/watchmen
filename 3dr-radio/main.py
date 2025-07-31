@@ -194,7 +194,7 @@ def radio_send(data):
         print(f"Error msg too large : {len(data)}")
     data = lendata.to_bytes(1) + data
     uart.write(data)
-    log(f"[SENT ] {len(data)} {data} at {time_msec()}")
+    log(f"[SENT {len(data)}] {data} at {time_msec()}")
 
 def pop_and_get(mid):
     for i in range(len(msgs_unacked)):
@@ -256,8 +256,9 @@ def encrypt_if_needed(mst, msg):
 
 # === Send Function ===
 async def send_msg(msgtype, creator, msg, dest):
+    print(f"Sending message {msg}")
     msgbytes = encrypt_if_needed(msgtype, msg)
-    print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+    # print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
@@ -329,7 +330,6 @@ async def radio_read():
             if uart.any():
                 buffer = uart.read(1)
                 lendata = int.from_bytes(buffer)
-                print(lendata)
                 buffer = uart.read(lendata)
                 process_message(buffer)
             await asyncio.sleep(0.01)
@@ -444,6 +444,7 @@ def hb_process(mid, msgbytes):
             hb_map[creator] = 0
         hb_map[creator] += 1
         print(f"HB Counts = {hb_map}")
+        print(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv())}")
         return
     if len(shortest_path_to_cc) > 0:
         peer_addr = shortest_path_to_cc[0]
