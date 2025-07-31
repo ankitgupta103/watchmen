@@ -579,6 +579,7 @@ class VyomMqttClient:
                 "keyfile": KEY_DER_FILE,
                 "certfile": CERT_DER_FILE,
                 "cafile": ROOT_CA_DER_FILE,
+                "endpoint": AWS_IOT_ENDPOINT,
                 "verify_mode": ssl.CERT_REQUIRED,
                 "server_hostname": AWS_IOT_ENDPOINT,
             }
