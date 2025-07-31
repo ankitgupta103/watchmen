@@ -520,7 +520,7 @@ def test_mqtt_client():
                     message=message_payload,
                     message_type=message_type,
                     filename=file_name,
-                    machine_id=client.thing_name,
+                    machine_id=client.machine_id,
                 )
 
                 if published_topic:
