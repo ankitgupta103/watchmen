@@ -583,7 +583,7 @@ class VyomMqttClient:
             }
 
             self.client = MQTTClient(
-                client_id=f"machine228Prod-12345678",
+                client_id=f"hqProd-{self.thing_name}",
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl_params=ssl_params,
@@ -675,7 +675,7 @@ def test_mqtt_client():
                     message=message_payload,
                     message_type=message_type,
                     filename=file_name,
-                    machine_id=client.machine_id,
+                    machine_id=228,
                 )
 
                 if published_topic:
