@@ -15,6 +15,7 @@ import sys
 rtc = machine.RTC()
 # (year, month, day, hour, minute, second, microsecond, tzinfo)
 rtc.datetime((2020, 1, 21, 2, 10, 32, 36, 0))
+print(rtc.datetime())
 
 # =============================================================================
 # CONSTANTS
