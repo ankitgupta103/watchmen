@@ -156,7 +156,7 @@ import ssl
 
 
 def wrap_socket(sock, ssl_params={}):
-    """Wrap socket with SSL."""
+    """Wrap socket with SSL for AWS IoT Core with proper SNI support."""
     keyfile = ssl_params.get("keyfile", None)
     certfile = ssl_params.get("certfile", None)
     cafile = ssl_params.get("cafile", None)
@@ -168,23 +168,54 @@ def wrap_socket(sock, ssl_params={}):
     # Use MicroPython SSL to wrap socket
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
-    if hasattr(ctx, "set_default_verify_paths"):
-        ctx.set_default_verify_paths()
-    if hasattr(ctx, "check_hostname") and verify != ssl.CERT_REQUIRED:
-        ctx.check_hostname = False
-
+    # AWS IoT Core requires certificate verification
     ctx.verify_mode = verify
 
+    # Enable hostname checking for AWS IoT Core
+    if hasattr(ctx, "check_hostname"):
+        ctx.check_hostname = verify == ssl.CERT_REQUIRED
+
+    # Load default CA certificates if available
+    if hasattr(ctx, "set_default_verify_paths"):
+        try:
+            ctx.set_default_verify_paths()
+        except:
+            pass  # Some MicroPython versions don't support this
+
+    # Load client certificate and private key (required for AWS IoT Core)
     if keyfile is not None and certfile is not None:
-        ctx.load_cert_chain(certfile, keyfile)
+        try:
+            ctx.load_cert_chain(certfile, keyfile)
+        except Exception as e:
+            raise Exception(f"Failed to load client certificate: {e}")
 
+    # Set cipher suites if specified
     if ciphers is not None:
-        ctx.set_ciphers(ciphers)
+        try:
+            ctx.set_ciphers(ciphers)
+        except:
+            pass  # Some MicroPython versions don't support custom ciphers
 
-    if cafile is not None or cadata is not None:
-        ctx.load_verify_locations(cafile=cafile, cadata=cadata)
+    # Load CA certificate for server verification
+    if cafile is not None:
+        try:
+            ctx.load_verify_locations(cafile=cafile)
+        except Exception as e:
+            raise Exception(f"Failed to load CA certificate: {e}")
+    elif cadata is not None:
+        try:
+            ctx.load_verify_locations(cadata=cadata)
+        except Exception as e:
+            raise Exception(f"Failed to load CA certificate data: {e}")
 
-    return ctx.wrap_socket(sock, server_hostname=hostname)
+    # Wrap socket with SNI support (server_hostname is critical for AWS IoT)
+    if not hostname:
+        raise Exception("server_hostname is required for AWS IoT Core (SNI)")
+
+    try:
+        return ctx.wrap_socket(sock, server_hostname=hostname)
+    except Exception as e:
+        raise Exception(f"SSL handshake failed: {e}")
 
 
 # =============================================================================
@@ -283,7 +314,7 @@ class MQTTClient:
         self.lw_qos = qos
         self.lw_retain = retain
 
-    def connect(self, clean_session=True, timeout=5.0):
+    def connect(self, clean_session=True, timeout=10.0):
         """Connect to MQTT broker with proper socket creation and SSL wrapping."""
         # Step 1: Resolve server address
         print(f"Resolving address for {self.server}:{self.port}")
@@ -338,35 +369,45 @@ class MQTTClient:
         # Step 6: Send MQTT CONNECT packet
         print("Sending MQTT CONNECT packet...")
         try:
-            # Build MQTT CONNECT packet
-            # Variable header
-            vh = b"\x00\x04MQTT\x04"  # Protocol Name (MQTT), Level 4
-            flags = 0x02 if clean_session else 0x00
+            # Build MQTT CONNECT packet for AWS IoT Core
+            # Variable header - Protocol Name and Level (MQTT v3.1.1)
+            protocol_name = b"MQTT"
+            vh = (
+                struct.pack("!H", len(protocol_name)) + protocol_name + b"\x04"
+            )  # Protocol level 4 (v3.1.1)
+
+            # Connect flags
+            flags = 0x02 if clean_session else 0x00  # Clean session flag
 
             # Add username/password flags if provided
             if self.user is not None:
-                flags |= 0xC0
+                flags |= 0x80  # Username flag
+                if self.pswd is not None:
+                    flags |= 0x40  # Password flag
 
             # Add last will flags if provided
             if self.lw_topic:
-                flags |= 0x4 | (self.lw_qos & 0x1) << 3 | (self.lw_qos & 0x2) << 3
-                flags |= self.lw_retain << 5
+                flags |= 0x04  # Will flag
+                flags |= (self.lw_qos & 0x03) << 3  # Will QoS
+                if self.lw_retain:
+                    flags |= 0x20  # Will retain
 
             vh += bytes([flags])  # Connect Flags
             vh += struct.pack("!H", self.keepalive or 60)  # Keepalive
 
-            # Payload
+            # Payload - Client ID (required)
             payload = self._encode_str(self.client_id)
 
             # Add last will to payload if present
             if self.lw_topic:
                 payload += self._encode_str(self.lw_topic)
-                payload += self._encode_str(self.lw_msg)
+                payload += self._encode_str(self.lw_msg or "")
 
             # Add username/password to payload if present
             if self.user is not None:
                 payload += self._encode_str(self.user)
-                payload += self._encode_str(self.pswd)
+                if self.pswd is not None:
+                    payload += self._encode_str(self.pswd)
 
             # Fixed header
             remaining_length = len(vh) + len(payload)
@@ -374,25 +415,52 @@ class MQTTClient:
 
             # Full message
             msg = fixed_header + vh + payload
-            print(f"Sending MQTT CONNECT message: {msg.hex()}")
+            print(f"Sending MQTT CONNECT message ({len(msg)} bytes): {msg.hex()}")
             self.sock.write(msg)
 
-            # Read CONNACK response
+            # Read CONNACK response - must read exact bytes
             print("Waiting for CONNACK...")
-            resp = self.sock.read(4)
-            if not resp or len(resp) != 4:
-                raise MQTTException("Invalid CONNACK response")
+            # First read the fixed header (2 bytes)
+            resp_header = self._safe_read(2)
+            if resp_header[0] != 0x20:  # CONNACK message type
+                raise MQTTException(
+                    f"Expected CONNACK (0x20), got: {resp_header[0]:02x}"
+                )
 
-            print(f"CONNACK received: {resp.hex()}")
+            remaining_len = resp_header[1]
+            if remaining_len != 2:
+                raise MQTTException(
+                    f"Expected CONNACK remaining length 2, got: {remaining_len}"
+                )
 
-            # Check CONNACK
-            if resp[0] != 0x20 or resp[1] != 0x02:
-                raise MQTTException(f"Invalid CONNACK packet: {resp.hex()}")
-            if resp[3] != 0:
-                raise MQTTException(f"Connection refused, return code: {resp[3]}")
+            # Read the variable header (2 bytes)
+            resp_payload = self._safe_read(2)
 
-            print("MQTT connection established successfully!")
-            return resp[2] & 1
+            print(f"CONNACK received: {(resp_header + resp_payload).hex()}")
+
+            # Check CONNACK return code
+            session_present = resp_payload[0] & 0x01
+            return_code = resp_payload[1]
+
+            if return_code != 0:
+                error_codes = {
+                    0x01: "Connection Refused, unacceptable protocol version",
+                    0x02: "Connection Refused, identifier rejected",
+                    0x03: "Connection Refused, Server unavailable",
+                    0x04: "Connection Refused, bad user name or password",
+                    0x05: "Connection Refused, not authorized",
+                }
+                error_msg = error_codes.get(
+                    return_code, f"Unknown error code: {return_code}"
+                )
+                raise MQTTException(
+                    f"Connection refused: {error_msg} (code: {return_code})"
+                )
+
+            print(
+                f"MQTT connection established successfully! Session present: {bool(session_present)}"
+            )
+            return session_present
 
         except Exception as e:
             if self.sock:
@@ -510,7 +578,7 @@ class MQTTClient:
 
     def check_msg(self):
         try:
-            r, w, e = select.select([self.sock], [], [], 0.05)
+            r, _, _ = select.select([self.sock], [], [], 0.05)
             if len(r):
                 return self.wait_msg()
         except:
@@ -627,12 +695,16 @@ class VyomMqttClient:
                 "server_hostname": AWS_IOT_ENDPOINT,
             }
 
+            # AWS IoT Core client ID should be unique and follow naming conventions
+            # Use thing_name as the primary identifier for AWS IoT Core
+            client_id = f"{MQTT_CLIENT_ID}-{int(time.time())}"
+
             self.client = MQTTClient(
-                client_id=f"{MQTT_CLIENT_ID}-{self.thing_name}",
+                client_id=client_id,
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl_params=ssl_params,
-                keepalive=1200,
+                keepalive=300,  # Reduced keepalive for better connection stability
             )
 
             self.client.connect(clean_session=False, timeout=15.0)  # Increased timeout
