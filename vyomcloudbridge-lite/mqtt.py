@@ -583,7 +583,7 @@ class VyomMqttClient:
             }
 
             self.client = MQTTClient(
-                client_id=self.thing_name,
+                client_id=f"machine{self.machine_id}Prod-1234567890",
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl_params=ssl_params,
