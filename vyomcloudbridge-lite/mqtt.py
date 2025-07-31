@@ -1,7 +1,6 @@
 # Combined MQTT Client for OpenMV Camera with AWS IoT Core Support
 # Includes umqtt.py and ussl.py implementations
 
-import machine
 import os
 import time
 import network
@@ -11,11 +10,8 @@ import socket
 import struct
 import select
 import sys
-
-rtc = machine.RTC()
-# (year, month, day, hour, minute, second, microsecond, tzinfo)
-rtc.datetime((2020, 1, 21, 2, 10, 32, 36, 0))
-print(rtc.datetime())
+import ntptime
+import machine
 
 # =============================================================================
 # CONSTANTS
@@ -71,6 +67,33 @@ def write_der_file_from_pem_or_der(filename, data):
                 f.write(data if isinstance(data, bytes) else data.encode())
             except Exception:
                 f.write(data)
+
+
+def sync_time():
+    """Synchronize time with NTP server."""
+    print("Synchronizing time with NTP server...")
+    try:
+        # Try to sync with NTP server
+        ntptime.settime()
+        current_time = time.localtime()
+        print(
+            f"Time synchronized: {current_time[0]}-{current_time[1]:02d}-{current_time[2]:02d} "
+            f"{current_time[3]:02d}:{current_time[4]:02d}:{current_time[5]:02d}"
+        )
+        return True
+    except Exception as e:
+        print(f"NTP sync failed: {e}")
+        # Fallback: Set a reasonable time manually (2024-01-01 00:00:00)
+        try:
+            rtc = machine.RTC()
+            rtc.datetime(
+                (2024, 1, 1, 0, 0, 0, 0, 0)
+            )  # (year, month, day, weekday, hour, minute, second, microsecond)
+            print("Time set manually to 2024-01-01 00:00:00")
+            return True
+        except Exception as e2:
+            print(f"Manual time set failed: {e2}")
+            return False
 
 
 # =============================================================================
@@ -418,7 +441,13 @@ class VyomMqttClient:
                 return False
         print("Wi-Fi Connected. IP:", wlan.ifconfig()[0])
 
-        # 2. Prepare DER files
+        # 2. Synchronize time (important for SSL certificate validation)
+        if not sync_time():
+            print(
+                "Warning: Time synchronization failed. SSL certificates may not work properly."
+            )
+
+        # 3. Prepare DER files
         if not self._prepare_certificate_files():
             return False
 
