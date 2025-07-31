@@ -125,10 +125,11 @@ async def person_detection_loop():
             if len(shortest_path_to_cc) > 0:
                 peer_addr = shortest_path_to_cc[0]
                 asyncio.create_task(send_msg("P", my_addr, img.bytearray(), peer_addr))
-            raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
-            img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
-            print(f"Saving image to {raw_path}")
-            img2.save(raw_path)
+            #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+            #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
+            #print(f"Saving image to {raw_path}")
+            #img2.save(raw_path)
+            
             # Draw visual annotations on the image
             # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
             # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
