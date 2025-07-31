@@ -256,10 +256,8 @@ def encrypt_if_needed(mst, msg):
 
 # === Send Function ===
 async def send_msg(msgtype, creator, msg, dest):
-    print(msg)
     msgbytes = encrypt_if_needed(msgtype, msg)
     print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
-    print(msgbytes)
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
@@ -331,6 +329,7 @@ async def radio_read():
             if uart.any():
                 buffer = uart.read(1)
                 lendata = int.from_bytes(buffer)
+                print(lendata)
                 buffer = uart.read(lendata)
                 process_message(buffer)
             await asyncio.sleep(0.01)
@@ -433,7 +432,7 @@ def parse_header(data):
             return None
     if chr(data[MIDLEN]) != ';':
         return None
-    msg = data[MIDLEN+1:-1]
+    msg = data[MIDLEN+1:]
     return (mid, mst, creator, sender, receiver, msg)
 
 hb_map = {}
