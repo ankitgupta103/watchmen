@@ -293,11 +293,11 @@ class MQTTClient:
         vh += struct.pack("!H", 60)  # Keepalive 60 seconds
 
         # Payload
-        payload = self._encode_str(self.client_id)
+        payload = _encode_str(self.client_id)
 
         # Fixed header
         remaining_length = len(vh) + len(payload)
-        fixed_header = bytes([0x10]) + self._encode_length(remaining_length)
+        fixed_header = bytes([0x10]) + _encode_length(remaining_length)
 
         # Full message
         msg = fixed_header + vh + payload
