@@ -116,7 +116,7 @@ async def person_detection_loop():
     global image_count
     while True:
         img = sensor.snapshot()
-        print(len(img.bytearray()))
+        print(f"Len of image bytes = {len(img.bytearray())}")
         image_count += 1
         print(f"Image count: {image_count}")
         person_detected, confidence = detect_person(img)
@@ -421,7 +421,6 @@ def end_chunk(msg):
 def parse_header(data):
     if len(data) < 9:
         return None
-    print(data)
     mid = data[:MIDLEN].decode()
     mst = mid[0]
     creator = mid[1]
@@ -457,7 +456,6 @@ def img_process(mid, msg):
     # if intermediate forward. asyncio.create
     if running_as_cc():
         print(f"Received image of size {len(msg)}")
-        print(msg)
         img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
         print(len(img_bytes))
         print(img_bytes)
