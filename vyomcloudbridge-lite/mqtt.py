@@ -156,66 +156,53 @@ import ssl
 
 
 def wrap_socket(sock, ssl_params={}):
-    """Wrap socket with SSL for AWS IoT Core with proper SNI support."""
+    """Wrap socket with SSL for AWS IoT Core - MicroPython ussl approach."""
     keyfile = ssl_params.get("keyfile", None)
     certfile = ssl_params.get("certfile", None)
     cafile = ssl_params.get("cafile", None)
-    cadata = ssl_params.get("cadata", None)
-    ciphers = ssl_params.get("ciphers", None)
-    verify = ssl_params.get("verify_mode", ssl.CERT_NONE)
     hostname = ssl_params.get("server_hostname", None)
 
-    # Use MicroPython SSL to wrap socket
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-
-    # AWS IoT Core requires certificate verification
-    ctx.verify_mode = verify
-
-    # Enable hostname checking for AWS IoT Core
-    if hasattr(ctx, "check_hostname"):
-        ctx.check_hostname = verify == ssl.CERT_REQUIRED
-
-    # Load default CA certificates if available
-    if hasattr(ctx, "set_default_verify_paths"):
-        try:
-            ctx.set_default_verify_paths()
-        except:
-            pass  # Some MicroPython versions don't support this
-
-    # Load client certificate and private key (required for AWS IoT Core)
-    if keyfile is not None and certfile is not None:
-        try:
-            ctx.load_cert_chain(certfile, keyfile)
-        except Exception as e:
-            raise Exception(f"Failed to load client certificate: {e}")
-
-    # Set cipher suites if specified
-    if ciphers is not None:
-        try:
-            ctx.set_ciphers(ciphers)
-        except:
-            pass  # Some MicroPython versions don't support custom ciphers
-
-    # Load CA certificate for server verification
-    if cafile is not None:
-        try:
-            ctx.load_verify_locations(cafile=cafile)
-        except Exception as e:
-            raise Exception(f"Failed to load CA certificate: {e}")
-    elif cadata is not None:
-        try:
-            ctx.load_verify_locations(cadata=cadata)
-        except Exception as e:
-            raise Exception(f"Failed to load CA certificate data: {e}")
-
-    # Wrap socket with SNI support (server_hostname is critical for AWS IoT)
-    if not hostname:
-        raise Exception("server_hostname is required for AWS IoT Core (SNI)")
-
+    # For MicroPython/AWS IoT Core, read certificate files as binary data
     try:
-        return ctx.wrap_socket(sock, server_hostname=hostname)
+        # Read the certificate files as binary data
+        with open(keyfile, 'rb') as f:
+            key_data = f.read()
+        with open(certfile, 'rb') as f:
+            cert_data = f.read()
+        with open(cafile, 'rb') as f:
+            ca_data = f.read()
+            
+        print(f"Loaded certificates: key={len(key_data)} bytes, cert={len(cert_data)} bytes, ca={len(ca_data)} bytes")
+        
+        # MicroPython SSL parameters for AWS IoT Core (ussl approach)
+        try:
+            # Try MicroPython's ussl first (more compatible with embedded systems)
+            import ussl
+            ssl_context = {
+                'key': key_data,
+                'cert': cert_data,
+                'cadata': ca_data,
+                'server_side': False,
+            }
+            wrapped_sock = ussl.wrap_socket(sock, **ssl_context)
+            print("SSL socket wrapped successfully with MicroPython ussl")
+            return wrapped_sock
+            
+        except (ImportError, AttributeError, TypeError) as e:
+            print(f"ussl approach failed ({e}), trying standard ssl...")
+            # Fallback to standard ssl approach
+            import ssl
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ctx.verify_mode = ssl.CERT_REQUIRED
+            ctx.check_hostname = True
+            ctx.load_cert_chain(certfile, keyfile)
+            ctx.load_verify_locations(cafile=cafile)
+            wrapped_sock = ctx.wrap_socket(sock, server_hostname=hostname)
+            print("SSL socket wrapped successfully with standard ssl")
+            return wrapped_sock
+        
     except Exception as e:
-        raise Exception(f"SSL handshake failed: {e}")
+        raise Exception(f"SSL wrapping failed: {e}")
 
 
 # =============================================================================
