@@ -36,24 +36,6 @@ ROOT_CA_DER_FILE = "root_ca.der"
 # =============================================================================
 
 
-def _encode_str(self, s):
-    return struct.pack("!H", len(s)) + s.encode()
-
-
-def _encode_length(self, x):
-    # MQTT uses variable length encoding
-    encoded = b""
-    while True:
-        byte = x % 128
-        x //= 128
-        if x > 0:
-            byte |= 0x80
-        encoded += bytes([byte])
-        if x == 0:
-            break
-    return encoded
-
-
 def file_exists(path):
     """Check if file exists."""
     try:
@@ -241,6 +223,22 @@ class MQTTClient:
         self.lw_qos = 0
         self.lw_retain = False
 
+    def _encode_str(self, s):
+        return struct.pack("!H", len(s)) + s.encode()
+
+    def _encode_length(self, x):
+        # MQTT uses variable length encoding
+        encoded = b""
+        while True:
+            byte = x % 128
+            x //= 128
+            if x > 0:
+                byte |= 0x80
+            encoded += bytes([byte])
+            if x == 0:
+                break
+        return encoded
+
     def _send_str(self, s):
         self.sock.write(struct.pack("!H", len(s)))
         self.sock.write(s)
@@ -293,11 +291,11 @@ class MQTTClient:
         vh += struct.pack("!H", 60)  # Keepalive 60 seconds
 
         # Payload
-        payload = _encode_str(self.client_id)
+        payload = self._encode_str(self.client_id)
 
         # Fixed header
         remaining_length = len(vh) + len(payload)
-        fixed_header = bytes([0x10]) + _encode_length(remaining_length)
+        fixed_header = bytes([0x10]) + self._encode_length(remaining_length)
 
         # Full message
         msg = fixed_header + vh + payload
