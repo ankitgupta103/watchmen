@@ -61,7 +61,7 @@ if enter_config_mode():
     print(send_command(b'ATS7=0'))
 
     # Using max channels = 50
-    print(send_command(b'ATS10=50'))
+    print(send_command(b'ATS10=10'))
 
     raw = send_command(b'ATI5')
     parse_ati5_response(raw)
