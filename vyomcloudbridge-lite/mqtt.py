@@ -24,6 +24,7 @@ MACHINE_CONFIG_FILE = f"{VYOM_ROOT_DIR}/machine_config.json"
 WATCHMEN_ORGANIZATION_ID = 20
 S3_BUCKET_NAME = "vyomos"
 AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
+MQTT_CLIENT_ID = "hqProd"
 
 # Generated temp files
 CERT_DER_FILE = "certificate.der"
@@ -266,7 +267,7 @@ class MQTTClient:
         self.lw_qos = qos
         self.lw_retain = retain
 
-    def connect(self, clean_session=True, timeout=5.0):
+    def connect(self, clean_session=False, timeout=5.0):
         try:
             addr = socket.getaddrinfo(self.server, self.port)[0][-1]
             print(f"Resolved address: {addr}")
@@ -578,19 +579,20 @@ class VyomMqttClient:
                 "keyfile": KEY_DER_FILE,
                 "certfile": CERT_DER_FILE,
                 "cafile": ROOT_CA_DER_FILE,
+                "endpoint": AWS_IOT_ENDPOINT,
                 "verify_mode": ssl.CERT_REQUIRED,
                 "server_hostname": AWS_IOT_ENDPOINT,
             }
 
             self.client = MQTTClient(
-                client_id=self.thing_name,
+                client_id=f"{MQTT_CLIENT_ID}-{self.thing_name}",
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl_params=ssl_params,
                 keepalive=60,
             )
 
-            self.client.connect(clean_session=True, timeout=15.0)  # Increased timeout
+            self.client.connect(clean_session=False, timeout=15.0)  # Increased timeout
             print("MQTT Connection Successful!")
             return True
         except Exception as e:
@@ -675,7 +677,7 @@ def test_mqtt_client():
                     message=message_payload,
                     message_type=message_type,
                     filename=file_name,
-                    machine_id=client.machine_id,
+                    machine_id=228,
                 )
 
                 if published_topic:
