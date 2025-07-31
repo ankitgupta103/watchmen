@@ -1,5 +1,5 @@
 # Combined MQTT Client for OpenMV Camera with AWS IoT Core Support
-# Fixed version with proper error handling for byte operations
+# Fixed version with proper socket creation and SSL connection
 
 import os
 import time
@@ -284,23 +284,126 @@ class MQTTClient:
         self.lw_retain = retain
 
     def connect(self, clean_session=True, timeout=5.0):
-        # Variable header
-        vh = b"\x00\x04MQTT\x04"  # Protocol Name (MQTT), Level 4
-        flags = 0x02 if clean_session else 0x00
-        vh += bytes([flags])  # Connect Flags
-        vh += struct.pack("!H", 60)  # Keepalive 60 seconds
+        """Connect to MQTT broker with proper socket creation and SSL wrapping."""
+        # Step 1: Resolve server address
+        print(f"Resolving address for {self.server}:{self.port}")
+        try:
+            addr = socket.getaddrinfo(self.server, self.port)[0][-1]
+            print(f"Resolved address: {addr}")
+        except Exception as e:
+            raise MQTTException(f"Failed to resolve address: {e}")
 
-        # Payload
-        payload = self._encode_str(self.client_id)
+        # Step 2: Close existing socket if any
+        if self.sock is not None:
+            try:
+                self.sock.close()
+            except:
+                pass
+            self.sock = None
 
-        # Fixed header
-        remaining_length = len(vh) + len(payload)
-        fixed_header = bytes([0x10]) + self._encode_length(remaining_length)
+        # Step 3: Create socket and set timeout
+        print("Creating socket...")
+        try:
+            self.sock = socket.socket()
+            self.sock.settimeout(timeout)
+            print("Socket created successfully")
+        except Exception as e:
+            raise MQTTException(f"Failed to create socket: {e}")
 
-        # Full message
-        msg = fixed_header + vh + payload
-        print(f"Sending MQTT CONNECT message: {msg.hex()}")
-        self.sock.write(msg)
+        # Step 4: Connect socket
+        print(f"Connecting socket to {addr}...")
+        try:
+            self.sock.connect(addr)
+            print("Socket connected successfully")
+        except Exception as e:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+            raise MQTTException(f"Failed to connect socket: {e}")
+
+        # Step 5: Wrap with SSL
+        print("Wrapping socket with SSL...")
+        try:
+            self.sock = wrap_socket(self.sock, self.ssl_params)
+            print("SSL wrapping successful")
+        except Exception as e:
+            if self.sock:
+                try:
+                    self.sock.close()
+                except:
+                    pass
+                self.sock = None
+            raise MQTTException(f"Failed to wrap socket with SSL: {e}")
+
+        # Step 6: Send MQTT CONNECT packet
+        print("Sending MQTT CONNECT packet...")
+        try:
+            # Build MQTT CONNECT packet
+            # Variable header
+            vh = b"\x00\x04MQTT\x04"  # Protocol Name (MQTT), Level 4
+            flags = 0x02 if clean_session else 0x00
+
+            # Add username/password flags if provided
+            if self.user is not None:
+                flags |= 0xC0
+
+            # Add last will flags if provided
+            if self.lw_topic:
+                flags |= 0x4 | (self.lw_qos & 0x1) << 3 | (self.lw_qos & 0x2) << 3
+                flags |= self.lw_retain << 5
+
+            vh += bytes([flags])  # Connect Flags
+            vh += struct.pack("!H", self.keepalive or 60)  # Keepalive
+
+            # Payload
+            payload = self._encode_str(self.client_id)
+
+            # Add last will to payload if present
+            if self.lw_topic:
+                payload += self._encode_str(self.lw_topic)
+                payload += self._encode_str(self.lw_msg)
+
+            # Add username/password to payload if present
+            if self.user is not None:
+                payload += self._encode_str(self.user)
+                payload += self._encode_str(self.pswd)
+
+            # Fixed header
+            remaining_length = len(vh) + len(payload)
+            fixed_header = bytes([0x10]) + self._encode_length(remaining_length)
+
+            # Full message
+            msg = fixed_header + vh + payload
+            print(f"Sending MQTT CONNECT message: {msg.hex()}")
+            self.sock.write(msg)
+
+            # Read CONNACK response
+            print("Waiting for CONNACK...")
+            resp = self.sock.read(4)
+            if not resp or len(resp) != 4:
+                raise MQTTException("Invalid CONNACK response")
+
+            print(f"CONNACK received: {resp.hex()}")
+
+            # Check CONNACK
+            if resp[0] != 0x20 or resp[1] != 0x02:
+                raise MQTTException(f"Invalid CONNACK packet: {resp.hex()}")
+            if resp[3] != 0:
+                raise MQTTException(f"Connection refused, return code: {resp[3]}")
+
+            print("MQTT connection established successfully!")
+            return resp[2] & 1
+
+        except Exception as e:
+            if self.sock:
+                try:
+                    self.sock.close()
+                except:
+                    pass
+                self.sock = None
+            raise MQTTException(
+                f"Failed to send CONNECT packet or receive CONNACK: {e}"
+            )
 
     def disconnect(self):
         if self.sock:
@@ -520,7 +623,6 @@ class VyomMqttClient:
                 "keyfile": KEY_DER_FILE,
                 "certfile": CERT_DER_FILE,
                 "cafile": ROOT_CA_DER_FILE,
-                "endpoint": AWS_IOT_ENDPOINT,
                 "verify_mode": ssl.CERT_REQUIRED,
                 "server_hostname": AWS_IOT_ENDPOINT,
             }
