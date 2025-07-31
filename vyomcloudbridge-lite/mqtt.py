@@ -36,6 +36,24 @@ ROOT_CA_DER_FILE = "root_ca.der"
 # =============================================================================
 
 
+def _encode_str(self, s):
+    return struct.pack("!H", len(s)) + s.encode()
+
+
+def _encode_length(self, x):
+    # MQTT uses variable length encoding
+    encoded = b""
+    while True:
+        byte = x % 128
+        x //= 128
+        if x > 0:
+            byte |= 0x80
+        encoded += bytes([byte])
+        if x == 0:
+            break
+    return encoded
+
+
 def file_exists(path):
     """Check if file exists."""
     try:
@@ -268,59 +286,23 @@ class MQTTClient:
         self.lw_retain = retain
 
     def connect(self, clean_session=True, timeout=5.0):
-        # 1. Resolve and wrap socket
-        addr = socket.getaddrinfo(self.server, self.port)[0][-1]
-        self.sock = socket.socket()
-        self.sock.settimeout(timeout)
-        self.sock.connect(addr)
-        self.sock = wrap_socket(self.sock, self.ssl_params)
+        # Variable header
+        vh = b"\x00\x04MQTT\x04"  # Protocol Name (MQTT), Level 4
+        flags = 0x02 if clean_session else 0x00
+        vh += bytes([flags])  # Connect Flags
+        vh += struct.pack("!H", 60)  # Keepalive 60 seconds
 
-        # 2. Build CONNECT packet
-        protocol = b"\x00\x04MQTT\x04"  # Protocol Name + Level
-        flags = (clean_session << 1) & 0x02
-        keepalive_bytes = struct.pack("!H", self.keepalive or 60)
+        # Payload
+        payload = self._encode_str(self.client_id)
 
-        # Payload: Client ID only
-        client_id_bytes = self.client_id.encode()
-        payload = struct.pack("!H", len(client_id_bytes)) + client_id_bytes
+        # Fixed header
+        remaining_length = len(vh) + len(payload)
+        fixed_header = bytes([0x10]) + self._encode_length(remaining_length)
 
-        # Remaining length
-        remaining = len(protocol) + 1 + len(keepalive_bytes) + len(payload)
-        rem_len = bytearray()
-        while True:
-            byte = remaining & 0x7F
-            remaining >>= 7
-            if remaining:
-                rem_len.append(byte | 0x80)
-            else:
-                rem_len.append(byte)
-                break
-
-        # Fixed header = 0x10 + remaining length bytes
-        fixed_header = b"\x10" + rem_len
-
-        # 3. Send full CONNECT packet
-        packet = fixed_header + protocol + bytes([flags]) + keepalive_bytes + payload
-        print("Sending CONNECT packet:", packet.hex())
-        self.sock.write(packet)
-
-        # 4. Read CONNACK
-        resp = self._safe_read(4)
-        print("Received CONNACK:", [hex(b) for b in resp])
-        if resp[0] != 0x20 or resp[1] != 0x02:
-            raise MQTTException(f"Invalid CONNACK header {resp}")
-        if resp[3] != 0:
-            code = resp[3]
-            messages = {
-                1: "unacceptable protocol version",
-                2: "identifier rejected",
-                3: "server unavailable",
-                4: "bad user name or password",
-                5: "not authorized",
-            }
-            raise MQTTException(f"Connection refused: {messages.get(code, code)}")
-        print("MQTT connected successfully")
-        return True
+        # Full message
+        msg = fixed_header + vh + payload
+        print(f"Sending MQTT CONNECT message: {msg.hex()}")
+        self.sock.write(msg)
 
     def disconnect(self):
         if self.sock:
