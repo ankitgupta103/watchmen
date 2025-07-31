@@ -292,16 +292,27 @@ class MQTTClient:
                 raise MQTTException(f"Error reading length: {e}")
 
     def _safe_read(self, num_bytes):
-        """Safely read the specified number of bytes."""
+        """Safely read the specified number of bytes with timeout handling."""
         try:
             data = self.sock.read(num_bytes)
-            if not data or len(data) != num_bytes:
-                raise MQTTException(
-                    f"Expected {num_bytes} bytes, got {len(data) if data else 0}"
-                )
+            if not data:
+                raise MQTTException(f"Connection closed while reading {num_bytes} bytes")
+            if len(data) != num_bytes:
+                # Try to read remaining bytes for partial reads
+                remaining = num_bytes - len(data)
+                print(f"Partial read: got {len(data)}/{num_bytes} bytes, reading {remaining} more...")
+                additional_data = self.sock.read(remaining)
+                if additional_data:
+                    data += additional_data
+                if len(data) != num_bytes:
+                    raise MQTTException(
+                        f"Expected {num_bytes} bytes, got {len(data)} bytes. Data: {data.hex() if data else 'None'}"
+                    )
             return data
         except OSError as e:
             raise MQTTException(f"Socket read error: {e}")
+        except Exception as e:
+            raise MQTTException(f"Unexpected read error: {e}")
 
     def set_callback(self, f):
         self.cb = f
@@ -418,49 +429,71 @@ class MQTTClient:
             print(f"Sending MQTT CONNECT message ({len(msg)} bytes): {msg.hex()}")
             self.sock.write(msg)
 
-            # Read CONNACK response - must read exact bytes
+            # Read CONNACK response with improved error handling
             print("Waiting for CONNACK...")
-            # First read the fixed header (2 bytes)
-            resp_header = self._safe_read(2)
-            if resp_header[0] != 0x20:  # CONNACK message type
-                raise MQTTException(
-                    f"Expected CONNACK (0x20), got: {resp_header[0]:02x}"
+            try:
+                # Read first byte to check message type
+                first_byte = self._safe_read(1)
+                print(f"First byte of response: 0x{first_byte[0]:02x}")
+                
+                if first_byte[0] != 0x20:  # CONNACK message type
+                    # Try to read more bytes to see what we got
+                    try:
+                        extra_bytes = self.sock.read(10)  # Read up to 10 more bytes for debugging
+                        full_response = first_byte + (extra_bytes or b"")
+                        print(f"Unexpected response (first 11 bytes): {full_response.hex()}")
+                    except:
+                        pass
+                    raise MQTTException(
+                        f"Expected CONNACK (0x20), got: 0x{first_byte[0]:02x}"
+                    )
+
+                # Read remaining length byte
+                remaining_len_byte = self._safe_read(1)
+                remaining_len = remaining_len_byte[0]
+                print(f"CONNACK remaining length: {remaining_len}")
+                
+                if remaining_len != 2:
+                    raise MQTTException(
+                        f"Expected CONNACK remaining length 2, got: {remaining_len}"
+                    )
+
+                # Read the variable header (2 bytes)
+                resp_payload = self._safe_read(2)
+                
+                full_connack = first_byte + remaining_len_byte + resp_payload
+                print(f"Full CONNACK received: {full_connack.hex()}")
+
+                # Check CONNACK return code
+                session_present = resp_payload[0] & 0x01
+                return_code = resp_payload[1]
+                
+                print(f"Session present flag: {session_present}, Return code: {return_code}")
+
+                if return_code != 0:
+                    error_codes = {
+                        0x01: "Connection Refused, unacceptable protocol version",
+                        0x02: "Connection Refused, identifier rejected",
+                        0x03: "Connection Refused, Server unavailable",
+                        0x04: "Connection Refused, bad user name or password",
+                        0x05: "Connection Refused, not authorized",
+                    }
+                    error_msg = error_codes.get(
+                        return_code, f"Unknown error code: {return_code}"
+                    )
+                    raise MQTTException(
+                        f"Connection refused: {error_msg} (code: {return_code})"
+                    )
+
+                print(
+                    f"MQTT connection established successfully! Session present: {bool(session_present)}"
                 )
-
-            remaining_len = resp_header[1]
-            if remaining_len != 2:
-                raise MQTTException(
-                    f"Expected CONNACK remaining length 2, got: {remaining_len}"
-                )
-
-            # Read the variable header (2 bytes)
-            resp_payload = self._safe_read(2)
-
-            print(f"CONNACK received: {(resp_header + resp_payload).hex()}")
-
-            # Check CONNACK return code
-            session_present = resp_payload[0] & 0x01
-            return_code = resp_payload[1]
-
-            if return_code != 0:
-                error_codes = {
-                    0x01: "Connection Refused, unacceptable protocol version",
-                    0x02: "Connection Refused, identifier rejected",
-                    0x03: "Connection Refused, Server unavailable",
-                    0x04: "Connection Refused, bad user name or password",
-                    0x05: "Connection Refused, not authorized",
-                }
-                error_msg = error_codes.get(
-                    return_code, f"Unknown error code: {return_code}"
-                )
-                raise MQTTException(
-                    f"Connection refused: {error_msg} (code: {return_code})"
-                )
-
-            print(
-                f"MQTT connection established successfully! Session present: {bool(session_present)}"
-            )
-            return session_present
+                return session_present
+                
+            except MQTTException:
+                raise  # Re-raise MQTT exceptions as-is
+            except Exception as e:
+                raise MQTTException(f"Error reading CONNACK: {e}")
 
         except Exception as e:
             if self.sock:
@@ -697,7 +730,8 @@ class VyomMqttClient:
 
             # AWS IoT Core client ID should be unique and follow naming conventions
             # Use thing_name as the primary identifier for AWS IoT Core
-            client_id = f"{MQTT_CLIENT_ID}-{int(time.time())}"
+            client_id = self.thing_name if self.thing_name else f"{MQTT_CLIENT_ID}-{int(time.time())}"
+            print(f"Using client ID: {client_id}")
 
             self.client = MQTTClient(
                 client_id=client_id,
