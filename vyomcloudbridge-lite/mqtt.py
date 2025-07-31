@@ -267,7 +267,7 @@ class MQTTClient:
         self.lw_qos = qos
         self.lw_retain = retain
 
-    def connect(self, clean_session=True, timeout=5.0):
+    def connect(self, clean_session=False, timeout=5.0):
         try:
             addr = socket.getaddrinfo(self.server, self.port)[0][-1]
             print(f"Resolved address: {addr}")
@@ -592,7 +592,7 @@ class VyomMqttClient:
                 keepalive=60,
             )
 
-            self.client.connect(clean_session=True, timeout=15.0)  # Increased timeout
+            self.client.connect(clean_session=False, timeout=15.0)  # Increased timeout
             print("MQTT Connection Successful!")
             return True
         except Exception as e:
