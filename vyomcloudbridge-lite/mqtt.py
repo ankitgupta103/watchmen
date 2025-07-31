@@ -171,9 +171,9 @@ def wrap_socket(sock, ssl_params={}):
             cert_data = f.read()
         with open(cafile, 'rb') as f:
             ca_data = f.read()
-            
+
         print(f"Loaded certificates: key={len(key_data)} bytes, cert={len(cert_data)} bytes, ca={len(ca_data)} bytes")
-        
+
         # MicroPython SSL parameters for AWS IoT Core (ussl approach)
         try:
             # Try MicroPython's ussl first (more compatible with embedded systems)
@@ -187,7 +187,7 @@ def wrap_socket(sock, ssl_params={}):
             wrapped_sock = ussl.wrap_socket(sock, **ssl_context)
             print("SSL socket wrapped successfully with MicroPython ussl")
             return wrapped_sock
-            
+
         except (ImportError, AttributeError, TypeError) as e:
             print(f"ussl approach failed ({e}), trying standard ssl...")
             # Fallback to standard ssl approach
@@ -200,7 +200,7 @@ def wrap_socket(sock, ssl_params={}):
             wrapped_sock = ctx.wrap_socket(sock, server_hostname=hostname)
             print("SSL socket wrapped successfully with standard ssl")
             return wrapped_sock
-        
+
     except Exception as e:
         raise Exception(f"SSL wrapping failed: {e}")
 
@@ -280,7 +280,7 @@ class MQTTClient:
         print(f"Resolved address: {addr}")
         self.sock.connect(addr)
         print("Socket connected")
-        
+
         if self.ssl is True:
             # Legacy support for ssl=True and ssl_params arguments.
             print("Wrapping with SSL...")
@@ -288,7 +288,7 @@ class MQTTClient:
             print("SSL wrap complete")
         elif self.ssl:
             self.sock = self.ssl.wrap_socket(self.sock, server_hostname=self.server)
-            
+
         print("Building MQTT CONNECT packet...")
         premsg = bytearray(b"\x10\0\0\0\0\0")
         msg = bytearray(b"\x04MQTT\x04\x02\0\0")
@@ -331,9 +331,9 @@ class MQTTClient:
         resp = self.sock.read(4)
         if not resp or len(resp) < 4:
             raise MQTTException(f"Invalid CONNACK response: expected 4 bytes, got {len(resp) if resp else 0}")
-        
+
         print(f"CONNACK response: {resp.hex() if hasattr(resp, 'hex') else [hex(b) for b in resp]}")
-        
+
         if resp[0] != 0x20:
             raise MQTTException(f"Expected CONNACK (0x20), got 0x{resp[0]:02x}")
         if resp[1] != 0x02:
@@ -341,14 +341,14 @@ class MQTTClient:
         if resp[3] != 0:
             error_codes = {
                 0x01: "Connection Refused, unacceptable protocol version",
-                0x02: "Connection Refused, identifier rejected", 
+                0x02: "Connection Refused, identifier rejected",
                 0x03: "Connection Refused, Server unavailable",
                 0x04: "Connection Refused, bad user name or password",
                 0x05: "Connection Refused, not authorized"
             }
             error_msg = error_codes.get(resp[3], f"Unknown error code: {resp[3]}")
             raise MQTTException(f"Connection refused: {error_msg} (code: {resp[3]})")
-        
+
         print("MQTT connection established successfully!")
         return resp[2] & 1
 
@@ -533,6 +533,27 @@ class VyomMqttClient:
         key = key or WIFI_KEY
 
         # 1. Wi-Fi connect
+        # wlan = network.WLAN(network.STA_IF)
+        # wlan.active(True)
+        # if not wlan.isconnected():
+        #     print(f'Connecting to Wi-Fi network "{ssid}"...')
+        #     wlan.connect(ssid, key)
+        #     timeout = 30
+        #     start_time = time.time()
+        #     while not wlan.isconnected() and (time.time() - start_time) < timeout:
+        #         time.sleep_ms(500)
+        #     if not wlan.isconnected():
+        #         print("Failed to connect to Wi-Fi network.")
+        #         return False
+        # print("Wi-Fi Connected. IP:", wlan.ifconfig()[0])
+
+        # # 2. Synchronize time (important for SSL certificate validation)
+        # if not sync_time():
+        #     print(
+        #         "Warning: Time synchronization failed. SSL certificates may not work properly."
+        #     )
+
+        # 1. Wi-Fi connect
         wlan = network.WLAN(network.STA_IF)
         wlan.active(True)
         if not wlan.isconnected():
@@ -541,17 +562,24 @@ class VyomMqttClient:
             timeout = 30
             start_time = time.time()
             while not wlan.isconnected() and (time.time() - start_time) < timeout:
-                time.sleep_ms(500)
+                print(".", end="")
+                time.sleep(1)
+            print()
             if not wlan.isconnected():
                 print("Failed to connect to Wi-Fi network.")
                 return False
         print("Wi-Fi Connected. IP:", wlan.ifconfig()[0])
 
-        # 2. Synchronize time (important for SSL certificate validation)
-        if not sync_time():
-            print(
-                "Warning: Time synchronization failed. SSL certificates may not work properly."
-            )
+        # 2. Synchronize time with retry (important for SSL)
+        for attempt in range(3):
+            if sync_time():
+                break
+            print(f"Retrying time sync... Attempt {attempt + 1}/3")
+            time.sleep(2)
+        else:
+            print("Warning: Time synchronization failed. SSL certificates may not work properly.")
+
+
 
         # 3. Prepare DER files
         if not self._prepare_certificate_files():
