@@ -189,6 +189,10 @@ def ack_needed(msgtype):
 def radio_send(data):
     global sent_count
     sent_count = sent_count + 1
+    lendata = len(data)
+    if len(data) > 254:
+        print(f"Error msg too large : {len(data)}")
+    data = lendata.to_bytes(1) + data
     uart.write(data)
     log(f"[SENT ] {len(data)} {data} at {time_msec()}")
 
@@ -201,7 +205,7 @@ def pop_and_get(mid):
 
 async def send_single_msg(msgtype, creator, msgbytes, dest):
     mid = get_msg_id(msgtype, creator, dest)
-    databytes = mid.encode() + b";" + msgbytes + "\n".encode()
+    databytes = mid.encode() + b";" + msgbytes
     ackneeded = dest != "*" and ack_needed(msgtype)
     unackedid = 0
     timesent = time_msec()
@@ -325,7 +329,9 @@ async def radio_read():
         buffer = b""
         while True:
             if uart.any():
-                buffer = uart.readline()
+                buffer = uart.read(1)
+                lendata = int.from_bytes(buffer)
+                buffer = uart.read(lendata)
                 process_message(buffer)
             await asyncio.sleep(0.01)
     else:
