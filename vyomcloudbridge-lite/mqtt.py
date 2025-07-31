@@ -296,11 +296,15 @@ class MQTTClient:
         try:
             data = self.sock.read(num_bytes)
             if not data:
-                raise MQTTException(f"Connection closed while reading {num_bytes} bytes")
+                raise MQTTException(
+                    f"Connection closed while reading {num_bytes} bytes"
+                )
             if len(data) != num_bytes:
                 # Try to read remaining bytes for partial reads
                 remaining = num_bytes - len(data)
-                print(f"Partial read: got {len(data)}/{num_bytes} bytes, reading {remaining} more...")
+                print(
+                    f"Partial read: got {len(data)}/{num_bytes} bytes, reading {remaining} more..."
+                )
                 additional_data = self.sock.read(remaining)
                 if additional_data:
                     data += additional_data
@@ -365,9 +369,18 @@ class MQTTClient:
 
         # Step 5: Wrap with SSL
         print("Wrapping socket with SSL...")
+        print(
+            f"SSL parameters: keyfile={self.ssl_params.get('keyfile')}, certfile={self.ssl_params.get('certfile')}, cafile={self.ssl_params.get('cafile')}"
+        )
         try:
             self.sock = wrap_socket(self.sock, self.ssl_params)
-            print("SSL wrapping successful")
+            print("SSL wrapping successful - TLS handshake completed")
+            # Verify SSL connection details if possible
+            try:
+                if hasattr(self.sock, "cipher"):
+                    print(f"SSL cipher: {self.sock.cipher()}")
+            except:
+                pass
         except Exception as e:
             if self.sock:
                 try:
@@ -435,13 +448,17 @@ class MQTTClient:
                 # Read first byte to check message type
                 first_byte = self._safe_read(1)
                 print(f"First byte of response: 0x{first_byte[0]:02x}")
-                
+
                 if first_byte[0] != 0x20:  # CONNACK message type
                     # Try to read more bytes to see what we got
                     try:
-                        extra_bytes = self.sock.read(10)  # Read up to 10 more bytes for debugging
+                        extra_bytes = self.sock.read(
+                            10
+                        )  # Read up to 10 more bytes for debugging
                         full_response = first_byte + (extra_bytes or b"")
-                        print(f"Unexpected response (first 11 bytes): {full_response.hex()}")
+                        print(
+                            f"Unexpected response (first 11 bytes): {full_response.hex()}"
+                        )
                     except:
                         pass
                     raise MQTTException(
@@ -452,7 +469,7 @@ class MQTTClient:
                 remaining_len_byte = self._safe_read(1)
                 remaining_len = remaining_len_byte[0]
                 print(f"CONNACK remaining length: {remaining_len}")
-                
+
                 if remaining_len != 2:
                     raise MQTTException(
                         f"Expected CONNACK remaining length 2, got: {remaining_len}"
@@ -460,15 +477,17 @@ class MQTTClient:
 
                 # Read the variable header (2 bytes)
                 resp_payload = self._safe_read(2)
-                
+
                 full_connack = first_byte + remaining_len_byte + resp_payload
                 print(f"Full CONNACK received: {full_connack.hex()}")
 
                 # Check CONNACK return code
                 session_present = resp_payload[0] & 0x01
                 return_code = resp_payload[1]
-                
-                print(f"Session present flag: {session_present}, Return code: {return_code}")
+
+                print(
+                    f"Session present flag: {session_present}, Return code: {return_code}"
+                )
 
                 if return_code != 0:
                     error_codes = {
@@ -489,7 +508,7 @@ class MQTTClient:
                     f"MQTT connection established successfully! Session present: {bool(session_present)}"
                 )
                 return session_present
-                
+
             except MQTTException:
                 raise  # Re-raise MQTT exceptions as-is
             except Exception as e:
@@ -728,10 +747,10 @@ class VyomMqttClient:
                 "server_hostname": AWS_IOT_ENDPOINT,
             }
 
-            # AWS IoT Core client ID should be unique and follow naming conventions
-            # Use thing_name as the primary identifier for AWS IoT Core
-            client_id = self.thing_name if self.thing_name else f"{MQTT_CLIENT_ID}-{int(time.time())}"
-            print(f"Using client ID: {client_id}")
+            # AWS IoT Core client ID must match the policy authorization
+            # Use the original MQTT_CLIENT_ID that matches your AWS IoT policy
+            client_id = f"{MQTT_CLIENT_ID}-{int(time.time())}"
+            print(f"Using client ID: {client_id} (must match AWS IoT policy)")
 
             self.client = MQTTClient(
                 client_id=client_id,
