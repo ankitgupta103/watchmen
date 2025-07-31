@@ -1,7 +1,6 @@
 # Combined MQTT Client for OpenMV Camera with AWS IoT Core Support
-# Includes umqtt.py and ussl.py implementations
+# Fixed version with proper error handling for byte operations
 
-import machine
 import os
 import time
 import network
@@ -11,11 +10,8 @@ import socket
 import struct
 import select
 import sys
-
-rtc = machine.RTC()
-# (year, month, day, hour, minute, second, microsecond, tzinfo)
-rtc.datetime((2020, 1, 21, 2, 10, 32, 36, 0))
-print(rtc.datetime())
+import ntptime
+import machine
 
 # =============================================================================
 # CONSTANTS
@@ -50,27 +46,97 @@ def file_exists(path):
 
 def pem_to_der_str(pem_data):
     """Convert PEM string to DER bytes."""
+    # First, handle escaped newlines from JSON strings
+    if "\\n" in pem_data:
+        pem_data = pem_data.replace("\\n", "\n")
+
+    # Split into lines and extract base64 content
     lines = pem_data.split("\n")
     b64 = "".join(
         line.strip() for line in lines if not line.startswith("---") and line.strip()
     )
+
+    if not b64:
+        raise ValueError("No base64 content found in PEM data")
+
     return ubinascii.a2b_base64(b64)
 
 
 def write_der_file_from_pem_or_der(filename, data):
     """Write DER file from PEM or binary DER data."""
-    if ("-----BEGIN" in data) and ("-----END" in data):
-        # PEM conversion
-        der_data = pem_to_der_str(data)
-        with open(filename, "wb") as f:
-            f.write(der_data)
-    else:
-        # For root CA this allows either DER or PEM, both as binary
-        with open(filename, "wb") as f:
+    print(f"Processing certificate data for {filename}")
+
+    # Handle string data (from JSON config)
+    if isinstance(data, str):
+        # Check if it's PEM format
+        if ("-----BEGIN" in data) and ("-----END" in data):
+            print(f"Converting PEM to DER for {filename}")
+
+            # Handle escaped newlines from JSON
+            if "\\n" in data:
+                print("Found escaped newlines, converting...")
+                data = data.replace("\\n", "\n")
+
+            # Convert PEM to DER
             try:
-                f.write(data if isinstance(data, bytes) else data.encode())
-            except Exception:
+                der_data = pem_to_der_str(data)
+                with open(filename, "wb") as f:
+                    f.write(der_data)
+                print(f"Successfully wrote DER file: {filename}")
+                return
+            except Exception as e:
+                print(f"Error converting PEM to DER: {e}")
+                raise
+        else:
+            # Assume it's already DER data as string, encode to bytes
+            with open(filename, "wb") as f:
+                f.write(data.encode("utf-8"))
+            return
+
+    # Handle binary data
+    elif isinstance(data, bytes):
+        # Check if it's PEM format in bytes
+        if b"-----BEGIN" in data and b"-----END" in data:
+            # Convert bytes PEM to string, then to DER
+            pem_string = data.decode("utf-8")
+            if "\\n" in pem_string:
+                pem_string = pem_string.replace("\\n", "\n")
+            der_data = pem_to_der_str(pem_string)
+            with open(filename, "wb") as f:
+                f.write(der_data)
+        else:
+            # Already DER data in bytes
+            with open(filename, "wb") as f:
                 f.write(data)
+    else:
+        raise ValueError(f"Unsupported data type for {filename}: {type(data)}")
+
+
+def sync_time():
+    """Synchronize time with NTP server."""
+    print("Synchronizing time with NTP server...")
+    try:
+        # Try to sync with NTP server
+        ntptime.settime()
+        current_time = time.localtime()
+        print(
+            f"Time synchronized: {current_time[0]}-{current_time[1]:02d}-{current_time[2]:02d} "
+            f"{current_time[3]:02d}:{current_time[4]:02d}:{current_time[5]:02d}"
+        )
+        return True
+    except Exception as e:
+        print(f"NTP sync failed: {e}")
+        # Fallback: Set a reasonable time manually (2024-01-01 00:00:00)
+        try:
+            rtc = machine.RTC()
+            rtc.datetime(
+                (2024, 1, 1, 0, 0, 0, 0, 0)
+            )  # (year, month, day, weekday, hour, minute, second, microsecond)
+            print("Time set manually to 2024-01-01 00:00:00")
+            return True
+        except Exception as e2:
+            print(f"Manual time set failed: {e2}")
+            return False
 
 
 # =============================================================================
@@ -121,7 +187,7 @@ def wrap_socket(sock, ssl_params={}):
 
 
 # =============================================================================
-# MQTT MODULE (umqtt.py implementation)
+# MQTT MODULE (umqtt.py implementation) - FIXED VERSION
 # =============================================================================
 
 
@@ -161,14 +227,33 @@ class MQTTClient:
         self.sock.write(s)
 
     def _recv_len(self):
+        """Fixed version with proper error handling."""
         n = 0
         sh = 0
         while 1:
-            b = self.sock.read(1)[0]
-            n |= (b & 0x7F) << sh
-            if not b & 0x80:
-                return n
-            sh += 7
+            try:
+                data = self.sock.read(1)
+                if not data or len(data) == 0:
+                    raise MQTTException("Connection closed while reading length")
+                b = data[0]
+                n |= (b & 0x7F) << sh
+                if not b & 0x80:
+                    return n
+                sh += 7
+            except (IndexError, OSError) as e:
+                raise MQTTException(f"Error reading length: {e}")
+
+    def _safe_read(self, num_bytes):
+        """Safely read the specified number of bytes."""
+        try:
+            data = self.sock.read(num_bytes)
+            if not data or len(data) != num_bytes:
+                raise MQTTException(
+                    f"Expected {num_bytes} bytes, got {len(data) if data else 0}"
+                )
+            return data
+        except OSError as e:
+            raise MQTTException(f"Socket read error: {e}")
 
     def set_callback(self, f):
         self.cb = f
@@ -182,22 +267,36 @@ class MQTTClient:
         self.lw_retain = retain
 
     def connect(self, clean_session=True, timeout=5.0):
-        addr = socket.getaddrinfo(self.server, self.port)[0][-1]
+        try:
+            addr = socket.getaddrinfo(self.server, self.port)[0][-1]
+            print(f"Resolved address: {addr}")
+        except Exception as e:
+            raise MQTTException(f"Failed to resolve address: {e}")
 
         if self.sock is not None:
             self.sock.close()
             self.sock = None
 
-        self.sock = socket.socket()
-        self.sock.settimeout(timeout)
+        try:
+            self.sock = socket.socket()
+            self.sock.settimeout(timeout)
+            print("Connecting to socket...")
 
-        if sys.implementation.name == "micropython":
-            self.sock.connect(addr)
-            self.sock = wrap_socket(self.sock, self.ssl_params)
-        else:
-            self.sock = wrap_socket(self.sock, self.ssl_params)
-            self.sock.connect(addr)
+            if sys.implementation.name == "micropython":
+                self.sock.connect(addr)
+                print("Socket connected, wrapping with SSL...")
+                self.sock = wrap_socket(self.sock, self.ssl_params)
+                print("SSL handshake completed")
+            else:
+                self.sock = wrap_socket(self.sock, self.ssl_params)
+                self.sock.connect(addr)
+        except Exception as e:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+            raise MQTTException(f"Connection failed: {e}")
 
+        # Build MQTT CONNECT packet
         premsg = bytearray(b"\x10\0\0\0\0\0")
         msg = bytearray(b"\x04MQTT\x04\x02\0\0")
 
@@ -222,24 +321,53 @@ class MQTTClient:
             i += 1
         premsg[i] = sz
 
-        self.sock.write(premsg[0 : i + 2])
-        self.sock.write(msg)
-        self._send_str(self.client_id)
-        if self.lw_topic:
-            self._send_str(self.lw_topic)
-            self._send_str(self.lw_msg)
-        if self.user is not None:
-            self._send_str(self.user)
-            self._send_str(self.pswd)
-        resp = self.sock.read(4)
-        assert resp[0] == 0x20 and resp[1] == 0x02
-        if resp[3] != 0:
-            raise MQTTException(resp[3])
-        return resp[2] & 1
+        try:
+            print("Sending CONNECT packet...")
+            self.sock.write(premsg[0 : i + 2])
+            self.sock.write(msg)
+            self._send_str(self.client_id)
+            if self.lw_topic:
+                self._send_str(self.lw_topic)
+                self._send_str(self.lw_msg)
+            if self.user is not None:
+                self._send_str(self.user)
+                self._send_str(self.pswd)
+
+            print("Reading CONNACK response...")
+            resp = self._safe_read(4)  # Use safe read instead of direct read
+            print(f"CONNACK response: {[hex(b) for b in resp]}")
+
+            if resp[0] != 0x20 or resp[1] != 0x02:
+                raise MQTTException(
+                    f"Invalid CONNACK response: {[hex(b) for b in resp]}"
+                )
+            if resp[3] != 0:
+                error_codes = {
+                    1: "Connection Refused, unacceptable protocol version",
+                    2: "Connection Refused, identifier rejected",
+                    3: "Connection Refused, Server unavailable",
+                    4: "Connection Refused, bad user name or password",
+                    5: "Connection Refused, not authorized",
+                }
+                error_msg = error_codes.get(resp[3], f"Unknown error code: {resp[3]}")
+                raise MQTTException(error_msg)
+
+            print("MQTT connection established successfully")
+            return resp[2] & 1
+
+        except MQTTException:
+            raise
+        except Exception as e:
+            raise MQTTException(f"Error during MQTT handshake: {e}")
 
     def disconnect(self):
-        self.sock.write(b"\xe0\0")
-        self.sock.close()
+        if self.sock:
+            try:
+                self.sock.write(b"\xe0\0")
+                self.sock.close()
+            except:
+                pass
+            self.sock = None
 
     def ping(self):
         self.sock.write(b"\xc0\0")
@@ -296,38 +424,52 @@ class MQTTClient:
                 return
 
     def wait_msg(self):
-        res = self.sock.read(1)
-        if res is None or res == b"":
+        try:
+            res = self.sock.read(1)
+            if res is None or res == b"" or len(res) == 0:
+                return None
+            if res == b"\xd0":  # PINGRESP
+                sz_data = self.sock.read(1)
+                if not sz_data or len(sz_data) == 0:
+                    return None
+                sz = sz_data[0]
+                assert sz == 0
+                return None
+            op = res[0]
+            if op & 0xF0 != 0x30:
+                return op
+            sz = self._recv_len()
+            topic_len_data = self.sock.read(2)
+            if not topic_len_data or len(topic_len_data) != 2:
+                return None
+            topic_len = (topic_len_data[0] << 8) | topic_len_data[1]
+            topic = self.sock.read(topic_len)
+            sz -= topic_len + 2
+            if op & 6:
+                pid_data = self.sock.read(2)
+                if not pid_data or len(pid_data) != 2:
+                    return None
+                pid = pid_data[0] << 8 | pid_data[1]
+                sz -= 2
+            msg = self.sock.read(sz)
+            self.cb(topic, msg)
+            if op & 6 == 2:
+                pkt = bytearray(b"\x40\x02\0\0")
+                struct.pack_into("!H", pkt, 2, pid)
+                self.sock.write(pkt)
+            elif op & 6 == 4:
+                assert 0
+        except Exception as e:
+            print(f"Error in wait_msg: {e}")
             return None
-        if res == b"\xd0":  # PINGRESP
-            sz = self.sock.read(1)[0]
-            assert sz == 0
-            return None
-        op = res[0]
-        if op & 0xF0 != 0x30:
-            return op
-        sz = self._recv_len()
-        topic_len = self.sock.read(2)
-        topic_len = (topic_len[0] << 8) | topic_len[1]
-        topic = self.sock.read(topic_len)
-        sz -= topic_len + 2
-        if op & 6:
-            pid = self.sock.read(2)
-            pid = pid[0] << 8 | pid[1]
-            sz -= 2
-        msg = self.sock.read(sz)
-        self.cb(topic, msg)
-        if op & 6 == 2:
-            pkt = bytearray(b"\x40\x02\0\0")
-            struct.pack_into("!H", pkt, 2, pid)
-            self.sock.write(pkt)
-        elif op & 6 == 4:
-            assert 0
 
     def check_msg(self):
-        r, w, e = select.select([self.sock], [], [], 0.05)
-        if len(r):
-            return self.wait_msg()
+        try:
+            r, w, e = select.select([self.sock], [], [], 0.05)
+            if len(r):
+                return self.wait_msg()
+        except:
+            return None
 
 
 # =============================================================================
@@ -357,6 +499,7 @@ class VyomMqttClient:
         self.certificate = iot.get("certificate")
         self.private_key = iot.get("private_key")
         self.root_ca = iot.get("root_ca")
+        self.machine_id = self.config.get("machine_id", self.thing_name)
 
         # Validate required credentials
         missing = []
@@ -418,7 +561,13 @@ class VyomMqttClient:
                 return False
         print("Wi-Fi Connected. IP:", wlan.ifconfig()[0])
 
-        # 2. Prepare DER files
+        # 2. Synchronize time (important for SSL certificate validation)
+        if not sync_time():
+            print(
+                "Warning: Time synchronization failed. SSL certificates may not work properly."
+            )
+
+        # 3. Prepare DER files
         if not self._prepare_certificate_files():
             return False
 
@@ -441,7 +590,7 @@ class VyomMqttClient:
                 keepalive=60,
             )
 
-            self.client.connect(clean_session=True, timeout=10.0)
+            self.client.connect(clean_session=True, timeout=15.0)  # Increased timeout
             print("MQTT Connection Successful!")
             return True
         except Exception as e:
