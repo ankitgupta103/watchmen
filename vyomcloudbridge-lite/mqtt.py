@@ -24,7 +24,7 @@ MACHINE_CONFIG_FILE = f"{VYOM_ROOT_DIR}/machine_config.json"
 WATCHMEN_ORGANIZATION_ID = 20
 S3_BUCKET_NAME = "vyomos"
 AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
-MQTT_CLIENT_ID = "hqProd"
+MQTT_CLIENT_ID = "hqDev"
 
 # Generated temp files
 CERT_DER_FILE = "certificate.der"
@@ -749,7 +749,7 @@ class VyomMqttClient:
 
             # AWS IoT Core client ID must match the policy authorization exactly
             # Use the exact MQTT_CLIENT_ID that matches your AWS IoT policy
-            client_id = self.thing_name
+            client_id = f"{MQTT_CLIENT_ID}-{time.time()}"
             print(f"Using client ID: {client_id} (must match AWS IoT policy exactly)")
 
             self.client = MQTTClient(
