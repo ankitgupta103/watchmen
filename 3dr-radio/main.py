@@ -120,6 +120,7 @@ async def person_detection_loop():
         image_count += 1
         print(f"Image count: {image_count}")
         person_detected, confidence = detect_person(img)
+        print(f"Person detected = {person_detected}, confidence = {confidence}")
         if person_detected:
             r = get_rand()
             if len(shortest_path_to_cc) > 0:
@@ -330,8 +331,9 @@ async def radio_read():
             if uart.any():
                 buffer = uart.read(1)
                 lendata = int.from_bytes(buffer)
-                buffer = uart.read(lendata)
-                process_message(buffer)
+                if lendata > 0:
+                    buffer = uart.read(lendata)
+                    process_message(buffer)
             await asyncio.sleep(0.01)
     else:
         buffer = b""
@@ -419,9 +421,16 @@ def end_chunk(msg):
         return (True, recompiled)
 
 def parse_header(data):
+    if data == None:
+        print(f"Weird that data is none")
+        return None
     if len(data) < 9:
         return None
-    mid = data[:MIDLEN].decode()
+    print(f"Trying to parse header from {data}")
+    try:
+        mid = data[:MIDLEN].decode()
+    except Exception as e:
+        print(f"ERROR PARSING {data[:MIDLEN]} Error : {e}")
     mst = mid[0]
     creator = mid[1]
     sender = mid[2]
