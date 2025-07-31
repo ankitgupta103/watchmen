@@ -257,7 +257,10 @@ def encrypt_if_needed(mst, msg):
 
 # === Send Function ===
 async def send_msg(msgtype, creator, msg, dest):
-    print(f"Sending message {msg}")
+    if msgtype == "P":
+        print(f"Sending photo of length {len(msg)}")
+    else:
+        print(f"Sending message {msg}")
     msgbytes = encrypt_if_needed(msgtype, msg)
     # print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
     if len(msgbytes) < FRAME_SIZE:
@@ -272,6 +275,7 @@ async def send_msg(msgtype, creator, msg, dest):
         return False
     for i in range(len(chunks)):
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
+        await asyncio.sleep(1) # TODO remove ... this is just for testing
         _ = await send_single_msg("I", creator, chunkbytes, dest)
     for retry_i in range(50):
         succ, missing_chunks = await send_single_msg("E", creator, imid, dest)
