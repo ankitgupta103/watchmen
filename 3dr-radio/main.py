@@ -458,6 +458,9 @@ def img_process(mid, msg):
     if running_as_cc():
         print(f"Received image of size {len(msg)}")
         print(msg)
+        img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
+        print(len(img_bytes))
+        print(img_bytes)
         #raw_path = f"~/{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
         #img2 = image.Image(1280, 720, image.RGB565, buffer=img.bytearray())
         #print(f"Saving image to {raw_path}")
@@ -567,7 +570,7 @@ async def main():
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
         asyncio.create_task(send_scan())
-        # asyncio.create_task(person_detection_loop())
+        asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
     elif my_addr == "Z":
         asyncio.create_task(send_spath())
