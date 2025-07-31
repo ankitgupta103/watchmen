@@ -1,6 +1,7 @@
 # Combined MQTT Client for OpenMV Camera with AWS IoT Core Support
 # Includes umqtt.py and ussl.py implementations
 
+import machine
 import os
 import time
 import network
@@ -10,6 +11,10 @@ import socket
 import struct
 import select
 import sys
+
+rtc = machine.RTC()
+# (year, month, day, hour, minute, second, microsecond, tzinfo)
+rtc.datetime((2020, 1, 21, 2, 10, 32, 36, 0))
 
 # =============================================================================
 # CONSTANTS
