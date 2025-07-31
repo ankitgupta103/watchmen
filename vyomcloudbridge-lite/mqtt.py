@@ -24,6 +24,7 @@ MACHINE_CONFIG_FILE = f"{VYOM_ROOT_DIR}/machine_config.json"
 WATCHMEN_ORGANIZATION_ID = 20
 S3_BUCKET_NAME = "vyomos"
 AWS_IOT_ENDPOINT = "a1k0jxthwpkkce-ats.iot.ap-south-1.amazonaws.com"
+MQTT_CLIENT_ID = "hqProd"
 
 # Generated temp files
 CERT_DER_FILE = "certificate.der"
@@ -583,7 +584,7 @@ class VyomMqttClient:
             }
 
             self.client = MQTTClient(
-                client_id=f"hqDev-{self.thing_name}",
+                client_id=f"{MQTT_CLIENT_ID}-{self.thing_name}",
                 server=AWS_IOT_ENDPOINT,
                 port=port,
                 ssl_params=ssl_params,
