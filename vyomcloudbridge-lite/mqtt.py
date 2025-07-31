@@ -82,10 +82,6 @@ except (ImportError, AttributeError):
 import ssl
 
 
-def log_level_enabled(level):
-    return logging.getLogger().isEnabledFor(level)
-
-
 def wrap_socket(sock, ssl_params={}):
     """Wrap socket with SSL."""
     keyfile = ssl_params.get("keyfile", None)
