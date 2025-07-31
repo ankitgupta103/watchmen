@@ -252,7 +252,10 @@ class MQTTClient:
         n = 0
         sh = 0
         while 1:
-            b = self.sock.read(1)[0]
+            data = self.sock.read(1)
+            if not data or len(data) == 0:
+                raise MQTTException("Connection closed while reading length")
+            b = data[0]
             n |= (b & 0x7F) << sh
             if not b & 0x80:
                 return n
@@ -270,15 +273,23 @@ class MQTTClient:
         self.lw_retain = retain
 
     def connect(self, clean_session=True, timeout=None):
+        print(f"Connecting to {self.server}:{self.port}")
         self.sock = socket.socket()
         self.sock.settimeout(timeout)
         addr = socket.getaddrinfo(self.server, self.port)[0][-1]
+        print(f"Resolved address: {addr}")
         self.sock.connect(addr)
+        print("Socket connected")
+        
         if self.ssl is True:
             # Legacy support for ssl=True and ssl_params arguments.
+            print("Wrapping with SSL...")
             self.sock = wrap_socket(self.sock, self.ssl_params)
+            print("SSL wrap complete")
         elif self.ssl:
             self.sock = self.ssl.wrap_socket(self.sock, server_hostname=self.server)
+            
+        print("Building MQTT CONNECT packet...")
         premsg = bytearray(b"\x10\0\0\0\0\0")
         msg = bytearray(b"\x04MQTT\x04\x02\0\0")
 
@@ -303,20 +314,42 @@ class MQTTClient:
             i += 1
         premsg[i] = sz
 
+        print(f"Sending CONNECT packet: premsg={premsg[:i+2].hex()}, msg={msg.hex()}")
         self.sock.write(premsg, i + 2)
         self.sock.write(msg)
-        # print(hex(len(msg)), hexlify(msg, ":"))
+        print(f"Sending client_id: {self.client_id}")
         self._send_str(self.client_id)
         if self.lw_topic:
+            print(f"Sending last will topic: {self.lw_topic}")
             self._send_str(self.lw_topic)
             self._send_str(self.lw_msg)
         if self.user:
+            print(f"Sending username: {self.user}")
             self._send_str(self.user)
             self._send_str(self.pswd)
+        print("Waiting for CONNACK...")
         resp = self.sock.read(4)
-        assert resp[0] == 0x20 and resp[1] == 0x02
+        if not resp or len(resp) < 4:
+            raise MQTTException(f"Invalid CONNACK response: expected 4 bytes, got {len(resp) if resp else 0}")
+        
+        print(f"CONNACK response: {resp.hex() if hasattr(resp, 'hex') else [hex(b) for b in resp]}")
+        
+        if resp[0] != 0x20:
+            raise MQTTException(f"Expected CONNACK (0x20), got 0x{resp[0]:02x}")
+        if resp[1] != 0x02:
+            raise MQTTException(f"Expected CONNACK length 2, got {resp[1]}")
         if resp[3] != 0:
-            raise MQTTException(resp[3])
+            error_codes = {
+                0x01: "Connection Refused, unacceptable protocol version",
+                0x02: "Connection Refused, identifier rejected", 
+                0x03: "Connection Refused, Server unavailable",
+                0x04: "Connection Refused, bad user name or password",
+                0x05: "Connection Refused, not authorized"
+            }
+            error_msg = error_codes.get(resp[3], f"Unknown error code: {resp[3]}")
+            raise MQTTException(f"Connection refused: {error_msg} (code: {resp[3]})")
+        
+        print("MQTT connection established successfully!")
         return resp[2] & 1
 
     def disconnect(self):
