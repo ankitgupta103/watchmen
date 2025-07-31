@@ -747,10 +747,10 @@ class VyomMqttClient:
                 "server_hostname": AWS_IOT_ENDPOINT,
             }
 
-            # AWS IoT Core client ID must match the policy authorization
-            # Use the original MQTT_CLIENT_ID that matches your AWS IoT policy
-            client_id = f"{MQTT_CLIENT_ID}-{int(time.time())}"
-            print(f"Using client ID: {client_id} (must match AWS IoT policy)")
+            # AWS IoT Core client ID must match the policy authorization exactly
+            # Use the exact MQTT_CLIENT_ID that matches your AWS IoT policy
+            client_id = self.thing_name
+            print(f"Using client ID: {client_id} (must match AWS IoT policy exactly)")
 
             self.client = MQTTClient(
                 client_id=client_id,
