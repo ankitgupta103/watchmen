@@ -165,24 +165,27 @@ def wrap_socket(sock, ssl_params={}):
     # For MicroPython/AWS IoT Core, read certificate files as binary data
     try:
         # Read the certificate files as binary data
-        with open(keyfile, 'rb') as f:
+        with open(keyfile, "rb") as f:
             key_data = f.read()
-        with open(certfile, 'rb') as f:
+        with open(certfile, "rb") as f:
             cert_data = f.read()
-        with open(cafile, 'rb') as f:
+        with open(cafile, "rb") as f:
             ca_data = f.read()
 
-        print(f"Loaded certificates: key={len(key_data)} bytes, cert={len(cert_data)} bytes, ca={len(ca_data)} bytes")
+        print(
+            f"Loaded certificates: key={len(key_data)} bytes, cert={len(cert_data)} bytes, ca={len(ca_data)} bytes"
+        )
 
         # MicroPython SSL parameters for AWS IoT Core (ussl approach)
         try:
             # Try MicroPython's ussl first (more compatible with embedded systems)
             import ussl
+
             ssl_context = {
-                'key': key_data,
-                'cert': cert_data,
-                'cadata': ca_data,
-                'server_side': False,
+                "key": key_data,
+                "cert": cert_data,
+                "cadata": ca_data,
+                "server_side": False,
             }
             wrapped_sock = ussl.wrap_socket(sock, **ssl_context)
             print("SSL socket wrapped successfully with MicroPython ussl")
@@ -192,6 +195,7 @@ def wrap_socket(sock, ssl_params={}):
             print(f"ussl approach failed ({e}), trying standard ssl...")
             # Fallback to standard ssl approach
             import ssl
+
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             ctx.verify_mode = ssl.CERT_REQUIRED
             ctx.check_hostname = True
@@ -206,7 +210,7 @@ def wrap_socket(sock, ssl_params={}):
 
 
 # =============================================================================
-# MQTT MODULE (umqtt.py implementation) - Standard MicroPython MQTT Client
+# MQTT MODULE (umqtt.py implementation) - FIXED VERSION
 # =============================================================================
 
 
@@ -219,47 +223,91 @@ class MQTTClient:
         self,
         client_id,
         server,
-        port=0,
+        port,
+        ssl_params,
         user=None,
         password=None,
         keepalive=0,
-        ssl=None,
-        ssl_params={},
+        callback=None,
     ):
-        if port == 0:
-            port = 8883 if ssl else 1883
         self.client_id = client_id
-        self.sock = None
         self.server = server
         self.port = port
-        self.ssl = ssl
         self.ssl_params = ssl_params
-        self.pid = 0
-        self.cb = None
         self.user = user
         self.pswd = password
         self.keepalive = keepalive
+        self.cb = callback
+        self.sock = None
+        self.pid = 0
         self.lw_topic = None
         self.lw_msg = None
         self.lw_qos = 0
         self.lw_retain = False
+
+    def _encode_str(self, s):
+        return struct.pack("!H", len(s)) + s.encode()
+
+    def _encode_length(self, x):
+        # MQTT uses variable length encoding
+        encoded = b""
+        while True:
+            byte = x % 128
+            x //= 128
+            if x > 0:
+                byte |= 0x80
+            encoded += bytes([byte])
+            if x == 0:
+                break
+        return encoded
 
     def _send_str(self, s):
         self.sock.write(struct.pack("!H", len(s)))
         self.sock.write(s)
 
     def _recv_len(self):
+        """Fixed version with proper error handling."""
         n = 0
         sh = 0
         while 1:
-            data = self.sock.read(1)
-            if not data or len(data) == 0:
-                raise MQTTException("Connection closed while reading length")
-            b = data[0]
-            n |= (b & 0x7F) << sh
-            if not b & 0x80:
-                return n
-            sh += 7
+            try:
+                data = self.sock.read(1)
+                if not data or len(data) == 0:
+                    raise MQTTException("Connection closed while reading length")
+                b = data[0]
+                n |= (b & 0x7F) << sh
+                if not b & 0x80:
+                    return n
+                sh += 7
+            except (IndexError, OSError) as e:
+                raise MQTTException(f"Error reading length: {e}")
+
+    def _safe_read(self, num_bytes):
+        """Safely read the specified number of bytes with timeout handling."""
+        try:
+            data = self.sock.read(num_bytes)
+            if not data:
+                raise MQTTException(
+                    f"Connection closed while reading {num_bytes} bytes"
+                )
+            if len(data) != num_bytes:
+                # Try to read remaining bytes for partial reads
+                remaining = num_bytes - len(data)
+                print(
+                    f"Partial read: got {len(data)}/{num_bytes} bytes, reading {remaining} more..."
+                )
+                additional_data = self.sock.read(remaining)
+                if additional_data:
+                    data += additional_data
+                if len(data) != num_bytes:
+                    raise MQTTException(
+                        f"Expected {num_bytes} bytes, got {len(data)} bytes. Data: {data.hex() if data else 'None'}"
+                    )
+            return data
+        except OSError as e:
+            raise MQTTException(f"Socket read error: {e}")
+        except Exception as e:
+            raise MQTTException(f"Unexpected read error: {e}")
 
     def set_callback(self, f):
         self.cb = f
@@ -272,89 +320,212 @@ class MQTTClient:
         self.lw_qos = qos
         self.lw_retain = retain
 
-    def connect(self, clean_session=True, timeout=None):
-        print(f"Connecting to {self.server}:{self.port}")
-        self.sock = socket.socket()
-        self.sock.settimeout(timeout)
-        addr = socket.getaddrinfo(self.server, self.port)[0][-1]
-        print(f"Resolved address: {addr}")
-        self.sock.connect(addr)
-        print("Socket connected")
+    def connect(self, clean_session=True, timeout=10.0):
+        """Connect to MQTT broker with proper socket creation and SSL wrapping."""
+        # Step 1: Resolve server address
+        print(f"Resolving address for {self.server}:{self.port}")
+        try:
+            addr = socket.getaddrinfo(self.server, self.port)[0][-1]
+            print(f"Resolved address: {addr}")
+        except Exception as e:
+            raise MQTTException(f"Failed to resolve address: {e}")
 
-        if self.ssl is True:
-            # Legacy support for ssl=True and ssl_params arguments.
-            print("Wrapping with SSL...")
+        # Step 2: Close existing socket if any
+        if self.sock is not None:
+            try:
+                self.sock.close()
+            except:
+                pass
+            self.sock = None
+
+        # Step 3: Create socket and set timeout
+        print("Creating socket...")
+        try:
+            self.sock = socket.socket()
+            self.sock.settimeout(timeout)
+            print("Socket created successfully")
+        except Exception as e:
+            raise MQTTException(f"Failed to create socket: {e}")
+
+        # Step 4: Connect socket
+        print(f"Connecting socket to {addr}...")
+        try:
+            self.sock.connect(addr)
+            print("Socket connected successfully")
+        except Exception as e:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+            raise MQTTException(f"Failed to connect socket: {e}")
+
+        # Step 5: Wrap with SSL
+        print("Wrapping socket with SSL...")
+        print(
+            f"SSL parameters: keyfile={self.ssl_params.get('keyfile')}, certfile={self.ssl_params.get('certfile')}, cafile={self.ssl_params.get('cafile')}"
+        )
+        try:
             self.sock = wrap_socket(self.sock, self.ssl_params)
-            print("SSL wrap complete")
-        elif self.ssl:
-            self.sock = self.ssl.wrap_socket(self.sock, server_hostname=self.server)
+            print("SSL wrapping successful - TLS handshake completed")
+            # Verify SSL connection details if possible
+            try:
+                if hasattr(self.sock, "cipher"):
+                    print(f"SSL cipher: {self.sock.cipher()}")
+            except:
+                pass
+            # Small delay to ensure SSL connection is fully established
+            time.sleep(2)
+        except Exception as e:
+            if self.sock:
+                try:
+                    self.sock.close()
+                except:
+                    pass
+                self.sock = None
+            raise MQTTException(f"Failed to wrap socket with SSL: {e}")
 
-        print("Building MQTT CONNECT packet...")
-        premsg = bytearray(b"\x10\0\0\0\0\0")
-        msg = bytearray(b"\x04MQTT\x04\x02\0\0")
+        # Step 6: Send MQTT CONNECT packet
+        print("Sending MQTT CONNECT packet...")
+        try:
+            # Build MQTT CONNECT packet for AWS IoT Core
+            # Variable header - Protocol Name and Level (MQTT v3.1.1)
+            protocol_name = b"MQTT"
+            vh = (
+                struct.pack("!H", len(protocol_name)) + protocol_name + b"\x04"
+            )  # Protocol level 4 (v3.1.1)
 
-        sz = 10 + 2 + len(self.client_id)
-        msg[6] = clean_session << 1
-        if self.user:
-            sz += 2 + len(self.user) + 2 + len(self.pswd)
-            msg[6] |= 0xC0
-        if self.keepalive:
-            assert self.keepalive < 65536
-            msg[7] |= self.keepalive >> 8
-            msg[8] |= self.keepalive & 0x00FF
-        if self.lw_topic:
-            sz += 2 + len(self.lw_topic) + 2 + len(self.lw_msg)
-            msg[6] |= 0x4 | (self.lw_qos & 0x1) << 3 | (self.lw_qos & 0x2) << 3
-            msg[6] |= self.lw_retain << 5
+            # Connect flags
+            flags = 0x02 if clean_session else 0x00  # Clean session flag
 
-        i = 1
-        while sz > 0x7F:
-            premsg[i] = (sz & 0x7F) | 0x80
-            sz >>= 7
-            i += 1
-        premsg[i] = sz
+            # Add username/password flags if provided
+            if self.user is not None:
+                flags |= 0x80  # Username flag
+                if self.pswd is not None:
+                    flags |= 0x40  # Password flag
 
-        print(f"Sending CONNECT packet: premsg={premsg[:i+2].hex()}, msg={msg.hex()}")
-        self.sock.write(premsg, i + 2)
-        self.sock.write(msg)
-        print(f"Sending client_id: {self.client_id}")
-        self._send_str(self.client_id)
-        if self.lw_topic:
-            print(f"Sending last will topic: {self.lw_topic}")
-            self._send_str(self.lw_topic)
-            self._send_str(self.lw_msg)
-        if self.user:
-            print(f"Sending username: {self.user}")
-            self._send_str(self.user)
-            self._send_str(self.pswd)
-        print("Waiting for CONNACK...")
-        resp = self.sock.read(4)
-        if not resp or len(resp) < 4:
-            raise MQTTException(f"Invalid CONNACK response: expected 4 bytes, got {len(resp) if resp else 0}")
+            # Add last will flags if provided
+            if self.lw_topic:
+                flags |= 0x04  # Will flag
+                flags |= (self.lw_qos & 0x03) << 3  # Will QoS
+                if self.lw_retain:
+                    flags |= 0x20  # Will retain
 
-        print(f"CONNACK response: {resp.hex() if hasattr(resp, 'hex') else [hex(b) for b in resp]}")
+            vh += bytes([flags])  # Connect Flags
+            vh += struct.pack("!H", self.keepalive or 60)  # Keepalive
 
-        if resp[0] != 0x20:
-            raise MQTTException(f"Expected CONNACK (0x20), got 0x{resp[0]:02x}")
-        if resp[1] != 0x02:
-            raise MQTTException(f"Expected CONNACK length 2, got {resp[1]}")
-        if resp[3] != 0:
-            error_codes = {
-                0x01: "Connection Refused, unacceptable protocol version",
-                0x02: "Connection Refused, identifier rejected",
-                0x03: "Connection Refused, Server unavailable",
-                0x04: "Connection Refused, bad user name or password",
-                0x05: "Connection Refused, not authorized"
-            }
-            error_msg = error_codes.get(resp[3], f"Unknown error code: {resp[3]}")
-            raise MQTTException(f"Connection refused: {error_msg} (code: {resp[3]})")
+            # Payload - Client ID (required)
+            payload = self._encode_str(self.client_id)
 
-        print("MQTT connection established successfully!")
-        return resp[2] & 1
+            # Add last will to payload if present
+            if self.lw_topic:
+                payload += self._encode_str(self.lw_topic)
+                payload += self._encode_str(self.lw_msg or "")
+
+            # Add username/password to payload if present
+            if self.user is not None:
+                payload += self._encode_str(self.user)
+                if self.pswd is not None:
+                    payload += self._encode_str(self.pswd)
+
+            # Fixed header
+            remaining_length = len(vh) + len(payload)
+            fixed_header = bytes([0x10]) + self._encode_length(remaining_length)
+
+            # Full message
+            msg = fixed_header + vh + payload
+            print(f"Sending MQTT CONNECT message ({len(msg)} bytes): {msg.hex()}")
+            self.sock.write(msg)
+
+            # Read CONNACK response with improved error handling
+            print("Waiting for CONNACK...")
+            try:
+                # Read first byte to check message type
+                first_byte = self._safe_read(1)
+                print(f"First byte of response: 0x{first_byte[0]:02x}")
+
+                if first_byte[0] != 0x20:  # CONNACK message type
+                    # Try to read more bytes to see what we got
+                    try:
+                        extra_bytes = self.sock.read(
+                            10
+                        )  # Read up to 10 more bytes for debugging
+                        full_response = first_byte + (extra_bytes or b"")
+                        print(
+                            f"Unexpected response (first 11 bytes): {full_response.hex()}"
+                        )
+                    except:
+                        pass
+                    raise MQTTException(
+                        f"Expected CONNACK (0x20), got: 0x{first_byte[0]:02x}"
+                    )
+
+                # Read remaining length byte
+                remaining_len_byte = self._safe_read(1)
+                remaining_len = remaining_len_byte[0]
+                print(f"CONNACK remaining length: {remaining_len}")
+
+                if remaining_len != 2:
+                    raise MQTTException(
+                        f"Expected CONNACK remaining length 2, got: {remaining_len}"
+                    )
+
+                # Read the variable header (2 bytes)
+                resp_payload = self._safe_read(2)
+
+                full_connack = first_byte + remaining_len_byte + resp_payload
+                print(f"Full CONNACK received: {full_connack.hex()}")
+
+                # Check CONNACK return code
+                session_present = resp_payload[0] & 0x01
+                return_code = resp_payload[1]
+
+                print(
+                    f"Session present flag: {session_present}, Return code: {return_code}"
+                )
+
+                if return_code != 0:
+                    error_codes = {
+                        0x01: "Connection Refused, unacceptable protocol version",
+                        0x02: "Connection Refused, identifier rejected",
+                        0x03: "Connection Refused, Server unavailable",
+                        0x04: "Connection Refused, bad user name or password",
+                        0x05: "Connection Refused, not authorized",
+                    }
+                    error_msg = error_codes.get(
+                        return_code, f"Unknown error code: {return_code}"
+                    )
+                    raise MQTTException(
+                        f"Connection refused: {error_msg} (code: {return_code})"
+                    )
+
+                print(
+                    f"MQTT connection established successfully! Session present: {bool(session_present)}"
+                )
+                return session_present
+
+            except MQTTException:
+                raise  # Re-raise MQTT exceptions as-is
+            except Exception as e:
+                raise MQTTException(f"Error reading CONNACK: {e}")
+
+        except Exception as e:
+            if self.sock:
+                try:
+                    self.sock.close()
+                except:
+                    pass
+                self.sock = None
+            raise MQTTException(
+                f"Failed to send CONNECT packet or receive CONNACK: {e}"
+            )
 
     def disconnect(self):
-        self.sock.write(b"\xe0\0")
-        self.sock.close()
+        if self.sock:
+            try:
+                self.sock.write(b"\xe0\0")
+                self.sock.close()
+            except:
+                pass
+            self.sock = None
 
     def ping(self):
         self.sock.write(b"\xc0\0")
@@ -372,14 +543,13 @@ class MQTTClient:
             sz >>= 7
             i += 1
         pkt[i] = sz
-        # print(hex(len(pkt)), hexlify(pkt, ":"))
-        self.sock.write(pkt, i + 1)
+        self.sock.write(pkt[0 : i + 1])
         self._send_str(topic)
         if qos > 0:
             self.pid += 1
             pid = self.pid
             struct.pack_into("!H", pkt, 0, pid)
-            self.sock.write(pkt, 2)
+            self.sock.write(pkt[0:2])
         self.sock.write(msg)
         if qos == 1:
             while 1:
@@ -399,7 +569,6 @@ class MQTTClient:
         pkt = bytearray(b"\x82\0\0\0")
         self.pid += 1
         struct.pack_into("!BH", pkt, 1, 2 + 2 + len(topic) + 1, self.pid)
-        # print(hex(len(pkt)), hexlify(pkt, ":"))
         self.sock.write(pkt)
         self._send_str(topic)
         self.sock.write(qos.to_bytes(1, "little"))
@@ -407,55 +576,58 @@ class MQTTClient:
             op = self.wait_msg()
             if op == 0x90:
                 resp = self.sock.read(4)
-                # print(resp)
                 assert resp[1] == pkt[2] and resp[2] == pkt[3]
                 if resp[3] == 0x80:
                     raise MQTTException(resp[3])
                 return
 
-    # Wait for a single incoming MQTT message and process it.
-    # Subscribed messages are delivered to a callback previously
-    # set by .set_callback() method. Other (internal) MQTT
-    # messages processed internally.
     def wait_msg(self):
-        res = self.sock.read(1)
-        self.sock.setblocking(True)
-        if res is None:
+        try:
+            res = self.sock.read(1)
+            if res is None or res == b"" or len(res) == 0:
+                return None
+            if res == b"\xd0":  # PINGRESP
+                sz_data = self.sock.read(1)
+                if not sz_data or len(sz_data) == 0:
+                    return None
+                sz = sz_data[0]
+                assert sz == 0
+                return None
+            op = res[0]
+            if op & 0xF0 != 0x30:
+                return op
+            sz = self._recv_len()
+            topic_len_data = self.sock.read(2)
+            if not topic_len_data or len(topic_len_data) != 2:
+                return None
+            topic_len = (topic_len_data[0] << 8) | topic_len_data[1]
+            topic = self.sock.read(topic_len)
+            sz -= topic_len + 2
+            if op & 6:
+                pid_data = self.sock.read(2)
+                if not pid_data or len(pid_data) != 2:
+                    return None
+                pid = pid_data[0] << 8 | pid_data[1]
+                sz -= 2
+            msg = self.sock.read(sz)
+            self.cb(topic, msg)
+            if op & 6 == 2:
+                pkt = bytearray(b"\x40\x02\0\0")
+                struct.pack_into("!H", pkt, 2, pid)
+                self.sock.write(pkt)
+            elif op & 6 == 4:
+                assert 0
+        except Exception as e:
+            print(f"Error in wait_msg: {e}")
             return None
-        if res == b"":
-            raise OSError(-1)
-        if res == b"\xd0":  # PINGRESP
-            sz = self.sock.read(1)[0]
-            assert sz == 0
-            return None
-        op = res[0]
-        if op & 0xF0 != 0x30:
-            return op
-        sz = self._recv_len()
-        topic_len = self.sock.read(2)
-        topic_len = (topic_len[0] << 8) | topic_len[1]
-        topic = self.sock.read(topic_len)
-        sz -= topic_len + 2
-        if op & 6:
-            pid = self.sock.read(2)
-            pid = pid[0] << 8 | pid[1]
-            sz -= 2
-        msg = self.sock.read(sz)
-        self.cb(topic, msg)
-        if op & 6 == 2:
-            pkt = bytearray(b"\x40\x02\0\0")
-            struct.pack_into("!H", pkt, 2, pid)
-            self.sock.write(pkt)
-        elif op & 6 == 4:
-            assert 0
-        return op
 
-    # Checks whether a pending message from server is available.
-    # If not, returns immediately with None. Otherwise, does
-    # the same processing as wait_msg.
     def check_msg(self):
-        self.sock.setblocking(False)
-        return self.wait_msg()
+        try:
+            r, _, _ = select.select([self.sock], [], [], 0.05)
+            if len(r):
+                return self.wait_msg()
+        except:
+            return None
 
 
 # =============================================================================
@@ -577,9 +749,9 @@ class VyomMqttClient:
             print(f"Retrying time sync... Attempt {attempt + 1}/3")
             time.sleep(2)
         else:
-            print("Warning: Time synchronization failed. SSL certificates may not work properly.")
-
-
+            print(
+                "Warning: Time synchronization failed. SSL certificates may not work properly."
+            )
 
         # 3. Prepare DER files
         if not self._prepare_certificate_files():
@@ -592,23 +764,22 @@ class VyomMqttClient:
                 "keyfile": KEY_DER_FILE,
                 "certfile": CERT_DER_FILE,
                 "cafile": ROOT_CA_DER_FILE,
+                "verify_mode": ssl.CERT_REQUIRED,
                 "server_hostname": AWS_IOT_ENDPOINT,
             }
 
             # AWS IoT Core client ID must match the policy authorization exactly
             # Use the exact MQTT_CLIENT_ID that matches your AWS IoT policy
-            client_id = f"{MQTT_CLIENT_ID}-{int(time.time())}"
+            client_id = f"machine228Prod-1234232"
             print(f"Using client ID: {client_id} (must match AWS IoT policy exactly)")
 
             self.client = MQTTClient(
                 client_id=client_id,
                 server=AWS_IOT_ENDPOINT,
                 port=port,
-                user=None,
-                password=None,
+                ssl=True,
+                ssl_params=ssl_params,
                 keepalive=60,  # AWS IoT Core recommended keepalive
-                ssl=True,  # Enable SSL
-                ssl_params=ssl_params
             )
 
             self.client.connect(
