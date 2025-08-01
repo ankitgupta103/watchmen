@@ -2,6 +2,7 @@ import sensor
 import ml
 import time
 import random
+import utime
 
 clock = time.clock()
 image_count = 0
@@ -18,14 +19,21 @@ sensor.reset()
 
 # RGB565 is required for ml model
 # JPEG is for best quality
-sensor.set_pixformat(sensor.RGB565)
+sensor.set_pixformat(sensor.RGB565)\
+
+
+# Inference time
+# SXGA 1280x720 - High qulaity image - 42ms
+# HD 1280x720 - HD image - 40ms
+# VGA 640x480 - 37ms
+# QVGA 320x240 - 35ms
 
 # HD for 1280x720 res
 # SXGA for 1280x720 high quality images
 # QVGA for 320x240 (best balance for person detection)
 # VGA 640x480 — gives more spatial resolution
 # SVGA 800x600 — better for long distance, use only if no memory issues
-sensor.set_framesize(sensor.SXGA)
+sensor.set_framesize(sensor.QVGA)
 
 sensor.skip_frames(time=3000)
 
@@ -36,7 +44,11 @@ sensor.set_auto_exposure(False)
 
 
 def detect_person(img):
+    start = time.ticks_ms()
     prediction = model.predict([img])
+    end = time.ticks_ms()
+    inference_duration = time.ticks_diff(end, start)
+    print(f"Inference time: {inference_duration} ms")
     scores = zip(model.labels, prediction[0].flatten().tolist())
     scores = sorted(scores, key=lambda x: x[1], reverse=True)  # Highest confidence first
     p_conf = 0.0
@@ -95,15 +107,13 @@ def get_rand(n):
         rstr += chr(65+random.randint(0,25))
     return rstr
 
-def model_info():
-    print("Model loaded:", model)
-
-
-
-model_info()
+def get_input_size_expected():
+    print(model.input_width())
+    print(model.input_height())
+    print(model.input_channels())
 
 while True:
-    person_detection_loop()
-    
+    # person_detection_loop()
+    get_input_size_expected()
 
 
