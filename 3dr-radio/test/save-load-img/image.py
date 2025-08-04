@@ -19,28 +19,45 @@ while time.ticks_diff(time.ticks_ms(), start) < 3000:
 
 led.off()
 
-# Take final snapshot
-img = sensor.snapshot()
+# # Take final snapshot
+# img = sensor.snapshot()
 
-# Save to SD card
-filename = "/sdcard/jack111.jpg"  # Always use absolute path for SD
+# # Save to SD card
+# filename = "/sdcard/jack111.jpg"  # Always use absolute path for SD
+# img.save(filename)
+
+# # Load the saved image
+# loaded_img = image.Image(filename, copy_to_fb=True) # Load as mutable image
+
+# # Display it in OpenMV IDE
+# sensor.flush()  # Clear previous frame
+# print("Displaying saved image from SD card...")
+# loaded_img.draw_string(10, 10, "Saved Image", color=(255, 0, 0))  # Optional annotation
+# sensor.snapshot()  # Required to refresh display in IDE
+# # Note: Displaying saved image requires a dummy snapshot or IDE may not refresh
+
+# # Show the loaded image
+# while True:
+#     # Continuously display loaded image
+#     sensor.flush()
+#     loaded_img.draw_image(loaded_img, 0, 0)
+#     time.sleep(200)
+
+
+
+
+
+# Take and save final snapshot
+img = sensor.snapshot()
+filename = "/sdcard/image100/example.jpg"
 img.save(filename)
 
-# Load the saved image
-loaded_img = image.Image(filename, copy_to_fb=True) # Load as mutable image
+# Load saved image as mutable
+loaded_img = image.Image(filename, copy_to_fb=True)
 
-# Display it in OpenMV IDE
-sensor.flush()  # Clear previous frame
-print("Displaying saved image from SD card...")
-loaded_img.draw_string(10, 10, "Saved Image", color=(255, 0, 0))  # Optional annotation
-sensor.snapshot()  # Required to refresh display in IDE
-# Note: Displaying saved image requires a dummy snapshot or IDE may not refresh
+# Draw something on it (optional)
+loaded_img.draw_string(10, 10, "Saved Image", color=(255, 0, 0))
 
-# Show the loaded image
-while True:
-    # Continuously display loaded image
-    sensor.flush()
-    loaded_img.draw_image(loaded_img, 0, 0)
-    time.sleep(200)
-
-
+# Display in IDE (need to draw it back to framebuffer)
+sensor.flush()
+sensor.snapshot()  # Snapshot to refresh IDE display
