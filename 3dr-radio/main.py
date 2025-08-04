@@ -271,7 +271,7 @@ def encrypt_if_needed(mst, msg):
         return msgbytes
     if mst == "P":
         msgbytes = enc.encrypt_hybrid(msg, enc.load_rsa_pub())
-        print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        print(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
     return msg
 
