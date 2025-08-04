@@ -278,9 +278,9 @@ def encrypt_if_needed(mst, msg):
 # === Send Function ===
 async def send_msg(msgtype, creator, msgbytes, dest):
     if msgtype == "P":
-        print(f"Sending photo of length {len(msg)}")
+        print(f"Sending photo of length {len(msgbytes)}")
     else:
-        print(f"Sending message {msg}")
+        print(f"Sending message {msgbytes}")
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
