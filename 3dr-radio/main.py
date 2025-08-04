@@ -275,7 +275,6 @@ async def send_msg(msgtype, creator, msg, dest):
         return False
     for i in range(len(chunks)):
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
-        await asyncio.sleep(1) # TODO remove ... this is just for testing
         _ = await send_single_msg("I", creator, chunkbytes, dest)
     for retry_i in range(50):
         succ, missing_chunks = await send_single_msg("E", creator, imid, dest)
@@ -293,7 +292,6 @@ async def send_msg(msgtype, creator, msg, dest):
 def ack_time(smid):
     for (rmid, msg, t) in msgs_recd:
         if rmid[0] == "A":
-            print(f"Comparing for acks {smid} and {msg[:MIDLEN].decode()}")
             if smid == msg[:MIDLEN].decode():
                 missingids = []
                 if msg[0] == "E" and len(msg) > MIDLEN+1:
@@ -430,7 +428,6 @@ def parse_header(data):
         return None
     if len(data) < 9:
         return None
-    print(f"Trying to parse header from {data}")
     try:
         mid = data[:MIDLEN].decode()
     except Exception as e:
