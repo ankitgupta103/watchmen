@@ -125,7 +125,7 @@ async def person_detection_loop():
             r = get_rand()
             if len(shortest_path_to_cc) > 0:
                 peer_addr = shortest_path_to_cc[0]
-                asyncio.create_task(send_msg("P", my_addr, img.bytearray(), peer_addr))
+                await send_msg("P", my_addr, img.bytearray(), peer_addr)
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
             #print(f"Saving image to {raw_path}")
