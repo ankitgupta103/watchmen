@@ -1,4 +1,4 @@
-import ucryptolib
+# import ucryptolib
 import os
 
 import time as utime
@@ -31,6 +31,16 @@ def load_rsa():
     pubkey = load_rsa_pub()
     privkey = load_rsa_prv()
     return pubkey, privkey
+
+def load_rsa_pem( pub_path='public.pem', priv_path='private.pem'):
+    pubkey = load_rsa_pub()
+    privkey = load_rsa_prv()
+    with open(pub_path, 'w') as pub_file:
+        pub_file.write(pubkey.save_pkcs1().decode())
+
+    with open(priv_path, 'w') as priv_file:
+        priv_file.write(privkey.save_pkcs1().decode())
+    
 
 def setup_rsa():
     print("\nGeneration RSA Keys...")
@@ -137,3 +147,4 @@ def test_encryption(n2, enctype):
             print(f"Strings DONT match {teststr} != {teststr_decrypt}")
         lenstr = lenstr*2
 
+load_rsa_pem()
