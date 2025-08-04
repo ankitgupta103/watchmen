@@ -11,9 +11,9 @@ if run_omv:
     import uasyncio as asyncio
     import utime
     import sensor
+    import image
     import ml
     import os                   # file system access
-    import image                # image drawing and manipulation
     import time
     import binascii
     import machine
@@ -61,7 +61,7 @@ if run_omv:
     rtc = RTC()
     uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
     print("Running on device : " + uid.decode())
-    if uid == b'e076465dd7194025':                                  
+    if uid == b'e076465dd7194025':
         my_addr = 'A'
     elif uid == b'e076465dd7091027':
         my_addr = 'B'
@@ -121,6 +121,7 @@ def detect_person(img):
                 return (True, p_conf)
     return (False, p_conf)
 
+
 # ------- Person detection loop ---------
 async def person_detection_loop():
     global image_count
@@ -137,13 +138,13 @@ async def person_detection_loop():
                 global MYMODE
                 MYMODE = MODE_CRITICAL_SENDING
                 peer_addr = shortest_path_to_cc[0]
-                await send_msg("P", my_addr, img.bytearray(), peer_addr)
+                await send_msg("P", my_addr, img.to_jpeg(), peer_addr)
                 MYMODE = MODE_HB
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
             #print(f"Saving image to {raw_path}")
             #img2.save(raw_path)
-            
+
             # Draw visual annotations on the image
             # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
             # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
@@ -439,6 +440,7 @@ def end_chunk(msg):
         return (False, missing_str)
     else:
         recompiled = recompile_msg(cid)
+        img_process(cid, recompiled)
         clear_chunkid(msg)
         return (True, recompiled)
 
@@ -486,18 +488,19 @@ def hb_process(mid, msgbytes):
         print(f"Can't forward HB because I dont have Spath yet")
 
 def img_process(mid, msg):
+    # TODO save image
     # if intermediate forward. asyncio.create
     if running_as_cc():
         print(f"Received image of size {len(msg)}")
         img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
+        img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         print(len(img_bytes))
-        print(img_bytes)
+        img.save(f"cc_{mid}.jpg")
         #raw_path = f"~/{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
         #img2 = image.Image(1280, 720, image.RGB565, buffer=img.bytearray())
         #print(f"Saving image to {raw_path}")
         #img2.save(raw_path)
     # if cc stats
-    pass
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
@@ -608,6 +611,18 @@ async def send_spath():
             await asyncio.sleep(5)
         else:
             await asyncio.sleep(60)
+
+def image_test():
+    r = get_rand()
+    print(r)
+    img = sensor.snapshot()
+    print(len(img.bytearray()))
+    im2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
+    print(len(img.to_jpeg()))
+    im3 = image.Image(320, 240, image.JPEG, buffer=img.to_jpeg())
+    img.save(f"{r}.jpg")
+    im2.save(f"reconstructed_{r}.jpg")
+    im3.save(f"reconstructed_jpeg_{r}.jpg")
 
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
