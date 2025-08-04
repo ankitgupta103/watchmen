@@ -82,9 +82,9 @@ def encrypt_hybrid(msg, public_key):
     return aes_key_rsa + iv_rsa + msg_aes
 
 def decrypt_hybrid(msg, private_key):
-    aes_key = decrypt_rsa(msg[:256], private_key)
-    iv = decrypt_rsa(msg[256:512], private_key)
-    msg_decrypt = decrypt_aes(msg[512:], iv, aes_key)
+    aes_key = decrypt_rsa(msg[:128], private_key)
+    iv = decrypt_rsa(msg[128:256], private_key)
+    msg_decrypt = decrypt_aes(msg[256:], iv, aes_key)
     return msg_decrypt
 
 # Debugging only
