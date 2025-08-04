@@ -274,6 +274,9 @@ async def send_msg(msgtype, creator, msg, dest):
         log(f"Failed sending chunk begin")
         return False
     for i in range(len(chunks)):
+        await asyncio.sleep(0.1)
+        if i % 50 == 0:
+            print(f"Sending chunk {i}")
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
         _ = await send_single_msg("I", creator, chunkbytes, dest)
     for retry_i in range(50):
@@ -432,6 +435,7 @@ def parse_header(data):
         mid = data[:MIDLEN].decode()
     except Exception as e:
         print(f"ERROR PARSING {data[:MIDLEN]} Error : {e}")
+        return
     mst = mid[0]
     creator = mid[1]
     sender = mid[2]
