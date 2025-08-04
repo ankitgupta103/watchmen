@@ -138,7 +138,7 @@ async def person_detection_loop():
                 global MYMODE
                 MYMODE = MODE_CRITICAL_SENDING
                 peer_addr = shortest_path_to_cc[0]
-                await send_msg("P", my_addr, img.to_jpeg(), peer_addr)
+                await send_msg("P", my_addr, img.to_jpeg().bytearray(), peer_addr)
                 MYMODE = MODE_HB
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
@@ -616,10 +616,10 @@ def image_test():
     r = get_rand()
     print(r)
     img = sensor.snapshot()
-    print(len(img.bytearray()))
-    im2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
-    print(len(img.to_jpeg()))
-    im3 = image.Image(320, 240, image.JPEG, buffer=img.to_jpeg())
+    print(img.size())
+    print(img.to_jpeg().size())
+    im2 = image.Image(320, 240, image.RGB565, data=img.bytearray())
+    im3 = image.Image(320, 240, image.JPEG, buffer=img.to_jpeg().bytearray())
     img.save(f"{r}.jpg")
     im2.save(f"reconstructed_{r}.jpg")
     im3.save(f"reconstructed_jpeg_{r}.jpg")
