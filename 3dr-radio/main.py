@@ -267,7 +267,7 @@ def encrypt_if_needed(mst, msg):
             print(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
             return msg
         msgbytes = enc.encrypt_rsa(msg, enc.load_rsa_pub())
-        print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        print(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
     if mst == "P":
         msgbytes = enc.encrypt_hybrid(msg, enc.load_rsa_pub())
