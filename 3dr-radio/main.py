@@ -139,7 +139,8 @@ async def person_detection_loop():
                 peer_addr = shortest_path_to_cc[0]
                 imgbytes = img.to_jpeg().bytearray()
                 print(f"Sending {len(imgbytes)} bytes to the network")
-                await send_msg("P", my_addr, imgbytes, peer_addr)
+                msgbytes = encrypt_if_needed("P", imgbytes)
+                await send_msg("P", my_addr, msgbytes, peer_addr)
                 MYMODE = MODE_HB
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
@@ -265,19 +266,21 @@ def encrypt_if_needed(mst, msg):
         if len(msg) > 117:
             print(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
             return msg
-        return enc.encrypt_rsa(msg, enc.load_rsa_pub())
+        msgbytes = enc.encrypt_rsa(msg, enc.load_rsa_pub())
+        print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        return msgbytes
     if mst == "P":
-        return enc.encrypt_hybrid(msg, enc.load_rsa_pub())
+        msgbytes = enc.encrypt_hybrid(msg, enc.load_rsa_pub())
+        print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        return msgbytes
     return msg
 
 # === Send Function ===
-async def send_msg(msgtype, creator, msg, dest):
+async def send_msg(msgtype, creator, msgbytes, dest):
     if msgtype == "P":
         print(f"Sending photo of length {len(msg)}")
     else:
         print(f"Sending message {msg}")
-    msgbytes = encrypt_if_needed(msgtype, msg)
-    print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
@@ -371,6 +374,7 @@ async def radio_read():
                     buffer = b""
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
+chunks_done = {} # chunk ID to bytes
 
 def begin_chunk(msg):
     parts = msg.split(":")
@@ -429,8 +433,9 @@ def clear_chunkid(cid):
 
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
-def end_chunk(msg):
+def end_chunk(mid, msg):
     cid = msg
+    creator = mid[1]
     missing = get_missing_chunks(cid)
     log(f"I am missing {len(missing)} chunks : {missing}")
     if len(missing) > 0:
@@ -440,11 +445,13 @@ def end_chunk(msg):
                 missing_str += "," + str(missing[i])
         return (False, missing_str)
     else:
+        if cid in chunks_done:
+            print(f"Ignoring this because we have already processed this.")
+            return (True, None)
         recompiled = recompile_msg(cid)
-        # TODO trigger this only once. Currently every retry of END is triggering this.
-        img_process(cid, recompiled)
         clear_chunkid(msg)
-        return (True, recompiled)
+        img_process(cid, recompiled, creator)
+        return (True, None)
 
 def parse_header(data):
     if data == None:
@@ -489,20 +496,24 @@ def hb_process(mid, msgbytes):
     else:
         print(f"Can't forward HB because I dont have Spath yet")
 
-def img_process(mid, msg):
+def img_process(mid, msg, creator):
     # TODO save image
-    # if intermediate forward. asyncio.create
     if running_as_cc():
         print(f"Received image of size {len(msg)}")
         img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         print(len(img_bytes))
         img.save(f"cc_{mid}.jpg")
-        #raw_path = f"~/{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
-        #img2 = image.Image(1280, 720, image.RGB565, buffer=img.bytearray())
-        #print(f"Saving image to {raw_path}")
-        #img2.save(raw_path)
-    # if cc stats
+    else:
+        if len(shortest_path_to_cc) > 0:
+            peer_addr = shortest_path_to_cc[0]
+            print(f"Propogating H to {spath}")
+            global MYMODE
+            MYMODE = MODE_CRITICAL_SENDING
+            send_msg("P", creator, msg, peer_addr)
+            MYMODE = MODE_HB
+        else:
+            print(f"Can't forward Photo because I dont have Spath yet")
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
@@ -565,10 +576,9 @@ def process_message(data):
     elif mst == "I":
         add_chunk(msg)
     elif mst == "E":
-        alldone, retval = end_chunk(msg.decode())
+        alldone, retval = end_chunk(mid, msg.decode())
         if alldone:
             ackmessage += ":-1"
-            log(f"Alldone, Len={len(retval)}, Data={ellepsis(retval)}")
             global MYMODE
             MYMODE = MODE_CRITICAL_RECEIVING
         else:
@@ -584,7 +594,8 @@ async def send_heartbeat():
         hbmsg = f"{my_addr}:{get_human_ts()}"
         if MYMODE == MODE_HB and len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
-            await send_msg("H", my_addr, hbmsg.encode(), peer_addr)
+            msgbytes = encrypt_if_needed("H", hbmsg.encode())
+            await send_msg("H", my_addr, msgbytes, peer_addr)
         await asyncio.sleep(30)
 
 async def send_scan():
