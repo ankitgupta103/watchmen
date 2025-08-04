@@ -127,7 +127,6 @@ async def person_detection_loop():
     global image_count
     while True:
         img = sensor.snapshot()
-        print(f"Len of image bytes = {len(img.bytearray())}")
         image_count += 1
         print(f"Image count: {image_count}")
         person_detected, confidence = detect_person(img)
@@ -138,7 +137,9 @@ async def person_detection_loop():
                 global MYMODE
                 MYMODE = MODE_CRITICAL_SENDING
                 peer_addr = shortest_path_to_cc[0]
-                await send_msg("P", my_addr, img.to_jpeg().bytearray(), peer_addr)
+                imgbytes = img.to_jpeg().bytearray()
+                print(f"Sending {len(imgbytes)} bytes to the network")
+                await send_msg("P", my_addr, imgbytes, peer_addr)
                 MYMODE = MODE_HB
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
@@ -276,7 +277,7 @@ async def send_msg(msgtype, creator, msg, dest):
     else:
         print(f"Sending message {msg}")
     msgbytes = encrypt_if_needed(msgtype, msg)
-    # print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+    print(f"{msgtype} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
