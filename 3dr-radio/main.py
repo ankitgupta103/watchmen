@@ -274,9 +274,9 @@ async def send_msg(msgtype, creator, msg, dest):
         log(f"Failed sending chunk begin")
         return False
     for i in range(len(chunks)):
-        await asyncio.sleep(0.1)
         if i % 50 == 0:
             print(f"Sending chunk {i}")
+        await asyncio.sleep(0.1)
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
         _ = await send_single_msg("I", creator, chunkbytes, dest)
     for retry_i in range(50):
@@ -289,15 +289,19 @@ async def send_msg(msgtype, creator, msg, dest):
             return True
         log(f"Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}")
         for mc in missing_chunks:
-            _, _ = await send_single_msg("I", creator, f"{imid}:{mc}:{chunks[mc]}", dest)
+            await asyncio.sleep(0.1)
+            chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
+            _ = await send_single_msg("I", creator, chunkbytes, dest)
     return False
 
 def ack_time(smid):
-    for (rmid, msg, t) in msgs_recd:
+    for (rmid, msgbytes, t) in msgs_recd:
         if rmid[0] == "A":
-            if smid == msg[:MIDLEN].decode():
+            msg = msgbytes.decode()
+            if smid == msg[:MIDLEN]:
                 missingids = []
-                if msg[0] == "E" and len(msg) > MIDLEN+1:
+                print(f"Checking for missing IDs in {msg[MIDLEN+1:]}")
+                if msg[0] == 'E' and len(msg) > (MIDLEN+1):
                     missingids = [int(i) for i in msg[MIDLEN+1:].split(',')]
                 return (t, missingids)
     return (-1, None)
@@ -398,7 +402,7 @@ def recompile_msg(cid):
         #log(f"Should never happen, have no entry in chunk_map for {cid}")
         return []
     mst, expected_chunks, list_chunks = chunk_map[cid]
-    recompiled = ""
+    recompiled = b""
     for i in range(expected_chunks):
         recompiled += get_data_for_iter(list_chunks, i)
     # Ignoring message type for now
