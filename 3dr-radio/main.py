@@ -374,7 +374,6 @@ async def radio_read():
                     buffer = b""
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
-chunks_done = {} # chunk ID to bytes
 
 def begin_chunk(msg):
     parts = msg.split(":")
@@ -445,8 +444,8 @@ def end_chunk(mid, msg):
                 missing_str += "," + str(missing[i])
         return (False, missing_str)
     else:
-        if cid in chunks_done:
-            print(f"Ignoring this because we have already processed this.")
+        if cid not in chunk_map:
+            print(f"Ignoring this because we dont have an entry for this chunkid, likely because we have already processed this.")
             return (True, None)
         recompiled = recompile_msg(cid)
         clear_chunkid(msg)
