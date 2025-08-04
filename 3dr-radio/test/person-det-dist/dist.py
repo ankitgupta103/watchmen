@@ -107,13 +107,16 @@ def get_rand(n):
         rstr += chr(65+random.randint(0,25))
     return rstr
 
-def get_input_size_expected():
-    print(model.input_width())
-    print(model.input_height())
-    print(model.input_channels())
+def get_model_info():
+    print("Model info:")
+    print("  Input shape:", model.input_shape)
+    print("  Output shape:", model.output_shape)
+    print("  Labels:", model.labels)
+
+get_model_info()
 
 while True:
-    # person_detection_loop()
-    get_input_size_expected()
+    person_detection_loop()
+
 
 
