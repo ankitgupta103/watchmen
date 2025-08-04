@@ -27,7 +27,7 @@ filename = "/sdcard/jack111.jpg"  # Always use absolute path for SD
 img.save(filename)
 
 # Load the saved image
-loaded_img = image.Image(filename)
+loaded_img = image.Image(filename, copy_to_fb=True) # Load as mutable image
 
 # Display it in OpenMV IDE
 sensor.flush()  # Clear previous frame
@@ -42,3 +42,5 @@ while True:
     sensor.flush()
     loaded_img.draw_image(loaded_img, 0, 0)
     time.sleep(200)
+
+
