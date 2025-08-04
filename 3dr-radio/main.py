@@ -441,6 +441,7 @@ def end_chunk(msg):
         return (False, missing_str)
     else:
         recompiled = recompile_msg(cid)
+        # TODO trigger this only once. Currently every retry of END is triggering this.
         img_process(cid, recompiled)
         clear_chunkid(msg)
         return (True, recompiled)
