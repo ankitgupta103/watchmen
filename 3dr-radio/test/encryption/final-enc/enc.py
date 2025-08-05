@@ -146,5 +146,3 @@ def test_encryption(n2, enctype):
         if teststr.encode() != teststr_decrypt:
             print(f"Strings DONT match {teststr} != {teststr_decrypt}")
         lenstr = lenstr*2
-
-load_rsa_pem()
