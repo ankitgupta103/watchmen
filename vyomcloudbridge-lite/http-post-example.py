@@ -35,6 +35,7 @@ organization_id = 20  # Hardcoded for now, extract from organization.id
 date = "2025-08-05"  # YYYY-MM-DD format (Hardcoded for now, extract from datetime.now().strftime("%Y-%m-%d") handle for micropython)
 s3_bucket = "vyomos"  # Always the same
 message_type = "test"  # Can be event or test (Hardcoded for now)
+topic = f"20/_all_/{date}/{machine_id}/_all_/events/{int(time.time())}.json"  # Topic will be the same for all events
 file_path = f"20/_all_/{date}/{machine_id}/_all_/images"  # File path will be the same for all images
 example_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII"
 
@@ -47,7 +48,18 @@ payload = {
     "message_type": message_type,
     "file_path": file_path,
     "image": example_image,
+    "topic": topic,
     "timestamp": int(time.time()),
+    "email_list": [
+        "caleb@vyomos.org",
+        "anand@vyomos.org",
+        "vaseka@vyomos.org",
+        "amardeep@vyomos.org",
+    ],
+    "phone_list": [
+        "+917597050815",
+        "+919044268425",
+    ],
 }
 
 # Manually convert the dictionary to a JSON string
