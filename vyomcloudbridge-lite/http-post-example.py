@@ -7,7 +7,7 @@
 import network
 import requests
 import time
-import json  # <-- 1. IMPORT THE JSON LIBRARY
+import json
 
 # AP info
 SSID = "BWH07-STARTUP1"  # Network SSID
@@ -26,15 +26,16 @@ while not wlan.isconnected():
 # We should have a valid IP now via DHCP
 print("WiFi Connected ", wlan.ifconfig())
 
-# 2. DEFINE THE HEADERS TO SPECIFY CONTENT TYPE
+# Define the headers to specify content type
 headers = {"Content-Type": "application/json"}
 
-# 3. DEFINE THE PAYLOAD (TODO: Make it dynamic {Anand})
+# Define the payload (TODO: Make it dynamic {Anand})
 machine_id = 228  # Hardcoded for now, extract from machine.id
 organization_id = 20  # Hardcoded for now, extract from organization.id
 date = "2025-08-05"  # YYYY-MM-DD format (Hardcoded for now, extract from datetime.now().strftime("%Y-%m-%d") handle for micropython)
 s3_bucket = "vyomos"  # Always the same
 message_type = "test"  # Can be event or test (Hardcoded for now)
+topic = f"20/_all_/{date}/{machine_id}/_all_/events/{int(time.time())}.json"  # Topic will be the same for all events
 file_path = f"20/_all_/{date}/{machine_id}/_all_/images"  # File path will be the same for all images
 example_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII"
 
@@ -47,13 +48,24 @@ payload = {
     "message_type": message_type,
     "file_path": file_path,
     "image": example_image,
+    "topic": topic,
     "timestamp": int(time.time()),
+    "email_list": [
+        "caleb@vyomos.org",
+        "anand@vyomos.org",
+        "vaseka@vyomos.org",
+        "amardeep@vyomos.org",
+    ],
+    "phone_list": [
+        "+917597050815",
+        "+919044268425",
+    ],
 }
 
-# 3. MANUALLY CONVERT THE DICTIONARY TO A JSON STRING
+# Manually convert the dictionary to a JSON string
 json_payload = json.dumps(payload)
 
-# 4. SEND THE REQUEST USING data= and headers= PARAMETERS
+# Send the request using data= and headers= parameters
 r = requests.post(URL, data=json_payload, headers=headers)
 
 # Print the response from the server
