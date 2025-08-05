@@ -490,7 +490,7 @@ def hb_process(mid, msgbytes):
         return
     if len(shortest_path_to_cc) > 0:
         peer_addr = shortest_path_to_cc[0]
-        print(f"Propogating H to {spath}")
+        print(f"Propogating H to {peer_addr}")
         asyncio.create_task(send_msg("H", creator, msgbytes, peer_addr))
     else:
         print(f"Can't forward HB because I dont have Spath yet")
@@ -502,7 +502,7 @@ def img_process(mid, msg, creator):
         img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         print(len(img_bytes))
-        img.save(f"cc_{mid}.jpg")
+        img.save(f"cc_{creator}_{mid}.jpg")
     else:
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
