@@ -366,7 +366,9 @@ async def radio_read():
                 lendata = int.from_bytes(buffer)
                 if lendata > 0:
                     buffer = uart.read(lendata)
-                    process_message(buffer)
+                    processed_success = process_message(buffer)
+                    if not processed_success:
+                        uart.read() # clear buffer.
             await asyncio.sleep(0.01)
     else:
         buffer = b""
@@ -558,10 +560,10 @@ def process_message(data):
     parsed = parse_header(data)
     if not parsed:
         log(f"Failure parsing incoming data : {data}")
-        return
+        return False
     if random.randint(1,100) <= FLAKINESS:
         log(f"Flakiness dropping {data}")
-        return
+        return True
     mid, mst, creator, sender, receiver, msg = parsed
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
@@ -594,6 +596,7 @@ def process_message(data):
             ackmessage += f":{retval}"
     if ack_needed(mst) and receiver != "*":
         asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
+    return True
 
 async def send_heartbeat():
     while True:
@@ -649,6 +652,7 @@ def image_test():
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
     asyncio.create_task(radio_read())
+    # Create a task which will monitor time_since_last_read and hard reboot radio if needed.
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
         # asyncio.create_task(send_scan())
