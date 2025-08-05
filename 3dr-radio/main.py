@@ -600,8 +600,8 @@ async def send_heartbeat():
         while MYMODE in [MODE_CRITICAL_SENDING, MODE_CRITICAL_RECEIVING]:
             await asyncio.sleep(60)
         # TODO add last known GPS here also.
-        hbmsg = f"{my_addr}:{get_human_ts()}"
         if MYMODE == MODE_HB and len(shortest_path_to_cc) > 0:
+            hbmsg = f"{my_addr}:{get_human_ts()}"
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg.encode())
             await send_msg("H", my_addr, msgbytes, peer_addr)

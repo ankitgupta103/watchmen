@@ -49,7 +49,7 @@ if enter_config_mode():
     parse_ati5_response(raw)
 
     # Set NETID to 25
-    print(send_command(b'ATS3=25'))
+    print(send_command(b'ATS3=5'))
 
     # Set ECC = OFF
     print(send_command(b'ATS5=0'))
