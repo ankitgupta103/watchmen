@@ -29,15 +29,24 @@ print("WiFi Connected ", wlan.ifconfig())
 # 2. DEFINE THE HEADERS TO SPECIFY CONTENT TYPE
 headers = {"Content-Type": "application/json"}
 
+# 3. DEFINE THE PAYLOAD (TODO: Make it dynamic {Anand})
+machine_id = 228  # Hardcoded for now, extract from machine.id
+organization_id = 20  # Hardcoded for now, extract from organization.id
+date = "2025-08-05"  # YYYY-MM-DD format (Hardcoded for now, extract from datetime.now().strftime("%Y-%m-%d") handle for micropython)
+s3_bucket = "vyomos"  # Always the same
+message_type = "test"  # Can be event or test (Hardcoded for now)
+file_path = f"20/_all_/{date}/{machine_id}/_all_/images"  # File path will be the same for all images
+example_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII"
+
 # Send some files
 payload = {
-    "machine_id": 228,
-    "organization_id": 20,
-    "date": "2025-08-05",
-    "s3_bucket": "vyomos",
-    "message_type": "test",
-    "file_path": "20/_all_/2025-08-05/228/_all_/images",
-    "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII",
+    "machine_id": machine_id,
+    "organization_id": organization_id,
+    "date": date,
+    "s3_bucket": s3_bucket,
+    "message_type": message_type,
+    "file_path": file_path,
+    "image": example_image,
     "timestamp": int(time.time()),
 }
 
