@@ -7,7 +7,7 @@
 import network
 import requests
 import time
-import json  # <-- 1. IMPORT THE JSON LIBRARY
+import json
 
 # AP info
 SSID = "BWH07-STARTUP1"  # Network SSID
@@ -26,10 +26,10 @@ while not wlan.isconnected():
 # We should have a valid IP now via DHCP
 print("WiFi Connected ", wlan.ifconfig())
 
-# 2. DEFINE THE HEADERS TO SPECIFY CONTENT TYPE
+# Define the headers to specify content type
 headers = {"Content-Type": "application/json"}
 
-# 3. DEFINE THE PAYLOAD (TODO: Make it dynamic {Anand})
+# Define the payload (TODO: Make it dynamic {Anand})
 machine_id = 228  # Hardcoded for now, extract from machine.id
 organization_id = 20  # Hardcoded for now, extract from organization.id
 date = "2025-08-05"  # YYYY-MM-DD format (Hardcoded for now, extract from datetime.now().strftime("%Y-%m-%d") handle for micropython)
@@ -50,10 +50,10 @@ payload = {
     "timestamp": int(time.time()),
 }
 
-# 3. MANUALLY CONVERT THE DICTIONARY TO A JSON STRING
+# Manually convert the dictionary to a JSON string
 json_payload = json.dumps(payload)
 
-# 4. SEND THE REQUEST USING data= and headers= PARAMETERS
+# Send the request using data= and headers= parameters
 r = requests.post(URL, data=json_payload, headers=headers)
 
 # Print the response from the server
