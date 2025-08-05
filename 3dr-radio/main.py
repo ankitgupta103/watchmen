@@ -541,6 +541,8 @@ def spath_process(mid, msg):
         shortest_path_to_cc = spath
         if my_addr == "B":
             shortest_path_to_cc = ["A", "Z"]
+        elif my_addr == "A":
+            shortest_path_to_cc = ["Z"]
         for n in seen_neighbours:
             nmsg = my_addr + "," + ",".join(spath)
             print(f"Propogating spath from {spath} to {nmsg}")
