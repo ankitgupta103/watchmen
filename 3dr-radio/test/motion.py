@@ -5,6 +5,9 @@
 # backgound image changing overtime.
 
 import sensor, image, os, time
+import ml
+import machine
+
 high_threshold = (30, 100)
 TRIGGER_THRESHOLD = 35
 
@@ -14,7 +17,7 @@ blob_cx_trh=100
 sensor.reset() # Initialize the camera sensor.
 
 sensor.set_pixformat(sensor.RGB565) # or sensor.RGB565
-sensor.set_framesize(sensor.QVGA) # or sensor.QQVGA (or others)
+sensor.set_framesize(sensor.HD) # or sensor.QQVGA (or others)
 sensor.skip_frames(time = 2000) # Let new settings take affect.
 sensor.set_auto_whitebal(False) # Turn off white balance.
 clock = time.clock() # Tracks FPS.
@@ -37,6 +40,10 @@ triggered = False
 MODEL_PATH = "/rom/person_detect.tflite"
 model = ml.Model(MODEL_PATH)
 print(" Model loaded:", model)
+CONFIDENCE_THRESHOLD = 0.5
+
+led = machine.LED("LED_RED")
+
 def detect_person(img):
     prediction = model.predict([img])
     scores = zip(model.labels, prediction[0].flatten().tolist())
@@ -69,6 +76,7 @@ while(True):
         extra_fb.replace(img)
 
     # Replace the image with the "abs(NEW-OLD)" frame difference.
+    imorig = img
     img.difference(extra_fb)
 
     hist = img.get_histogram()
@@ -79,10 +87,15 @@ while(True):
     # image seems more pixels change.
     
     diff = hist.get_percentile(0.99).l_value() - hist.get_percentile(0.90).l_value()
-    print(diff)
-    triggered = diff > TRIGGER_THRESHOLD
-    img.binary([high_threshold])
-
-    for blob in img.find_blobs([high_threshold], pixels_threshold=10, area_threshold=180, merge=False):
-           print(blob)
-           img.draw_keypoints([(blob.cx(), blob.cy(),90)] , size=40, color=127)
+    print(hist.get_percentile(0.99).l_value())
+    print(hist.get_percentile(0.90).l_value())
+    detected, conf = detect_person(img)
+    print(f"Motion = {diff}, person conf = {conf}")
+    isperson = diff > 25 and conf > 0.25
+    fname = f"/sdcard/person_{frame_count}_{isperson}_{diff}_{int(conf*100)}.jpg"
+    print(fname)
+    imorig.save(fname)
+    led.on()
+    sensor.skip_frames(time = 2000)
+    led.off()
+    sensor.skip_frames(time = 2000)
