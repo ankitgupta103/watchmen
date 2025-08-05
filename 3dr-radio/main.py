@@ -48,7 +48,7 @@ MODE_HB = 3
 MODE_CRITICAL_SENDING = 4
 MODE_CRITICAL_RECEIVING = 4
 
-MYMODE = MODE_NETWORK
+MYMODE = MODE_HB
 
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
