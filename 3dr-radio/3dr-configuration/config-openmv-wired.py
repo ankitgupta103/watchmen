@@ -60,7 +60,7 @@ if enter_config_mode():
     # Set OPPRESEND = 0
     print(send_command(b'ATS7=0'))
 
-    # Using max channels = 50
+    # Using max channels = 10
     print(send_command(b'ATS10=10'))
 
     raw = send_command(b'ATI5')
