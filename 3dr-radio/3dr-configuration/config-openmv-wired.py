@@ -48,11 +48,11 @@ if enter_config_mode():
     raw = send_command(b'ATI5')
     parse_ati5_response(raw)
 
-    # Set NETID to 25
+    # Set NETID to 5
     print(send_command(b'ATS3=5'))
 
-    # Set ECC = OFF
-    print(send_command(b'ATS5=0'))
+    # Set ECC = 1
+    print(send_command(b'ATS5=1'))
 
     # Turn off mavlink
     print(send_command(b'ATS6=0'))
