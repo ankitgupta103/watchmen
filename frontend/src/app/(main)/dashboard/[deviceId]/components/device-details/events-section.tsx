@@ -116,6 +116,8 @@ const EventsSection = ({
           ).map((s3Event, index) => ({
             ...s3Event,
             id: `${device.id}-${dateStr}-${index}`,
+            event_severity: s3Event.event_severity,
+            eventstr: s3Event.eventstr,
             machineId: device.id,
             timestamp: s3Event.timestamp
               ? new Date(s3Event.timestamp)
