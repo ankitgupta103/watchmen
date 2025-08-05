@@ -63,6 +63,9 @@ if enter_config_mode():
     # Using max channels = 10
     print(send_command(b'ATS10=10'))
 
+    # Set RTSCTS
+    print(send_command(b'ATS14=1'))
+
     raw = send_command(b'ATI5')
     parse_ati5_response(raw)
 

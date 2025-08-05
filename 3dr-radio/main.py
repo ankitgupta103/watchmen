@@ -656,7 +656,7 @@ async def main():
         await asyncio.sleep(36000)
     elif my_addr == "Z":
         # asyncio.create_task(send_spath())
-        # asyncio.create_task(send_scan())
+        asyncio.create_task(send_scan())
         await asyncio.sleep(360000)
     else:
         print(f"Unknown device : {my_addr}")
