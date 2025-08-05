@@ -27,6 +27,7 @@ import sys
 import random
 
 # Local libraries
+import radio
 
 print_lock = asyncio.Lock()
 
@@ -56,6 +57,8 @@ image_count = 0                 # Counter to keep tranck of saved images
 
 my_addr = None
 peer_addr = None
+
+time_of_last_radio_receive = 0
 
 if run_omv:
     rtc = RTC()
@@ -369,6 +372,8 @@ async def radio_read():
                     processed_success = process_message(buffer)
                     if not processed_success:
                         uart.read() # clear buffer.
+                    else:
+                        time_of_last_radio_receive = time_msec()
             await asyncio.sleep(0.01)
     else:
         buffer = b""
@@ -637,6 +642,16 @@ async def send_spath():
         else:
             await asyncio.sleep(600)
 
+async def time_since_last_read():
+    while True:
+        await asyncio.sleep(10)
+        time_since_last = time_msec() - time_of_last_radio_receive
+        print(f"Checking if radio needs to be rebooted, time since last = {time_since_last}")
+        if time_since_last > 300000:
+            print(f"Time since last read = {time_since_last}, rebooting radio ...............")
+            radio.hard_reboot()
+            print("Radio rebooted")
+
 def image_test():
     r = get_rand()
     print(r)
@@ -652,7 +667,7 @@ def image_test():
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
     asyncio.create_task(radio_read())
-    # Create a task which will monitor time_since_last_read and hard reboot radio if needed.
+    asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
         # asyncio.create_task(send_scan())
