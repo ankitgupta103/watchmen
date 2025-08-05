@@ -595,7 +595,7 @@ async def send_heartbeat():
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg.encode())
             await send_msg("H", my_addr, msgbytes, peer_addr)
-        await asyncio.sleep(30)
+        await asyncio.sleep(120)
 
 async def send_scan():
     i = 1
@@ -605,9 +605,9 @@ async def send_scan():
         scanmsg = f"{my_addr}"
         await send_msg("N", my_addr, scanmsg.encode(), "*")
         if MYMODE == MODE_NETWORK:
-            await asyncio.sleep(10) # reduce after setup
+            await asyncio.sleep(60) # reduce after setup
         else:
-            await asyncio.sleep(300)
+            await asyncio.sleep(600)
         print(f"{my_addr} : MyMode = {MYMODE} Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
@@ -620,9 +620,9 @@ async def send_spath():
             print(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp.encode(), n)
         if MYMODE == MODE_NETWORK:
-            await asyncio.sleep(5)
-        else:
             await asyncio.sleep(60)
+        else:
+            await asyncio.sleep(600)
 
 def image_test():
     r = get_rand()
