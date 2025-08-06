@@ -8,7 +8,7 @@ import gc
 # --- Enhanced Configuration ---
 MODEL_PATH = "/rom/person_detect.tflite"
 IMG_DIR = "/sdcard/images/"
-CONFIDENCE_THRESHOLD = 0.8
+CONFIDENCE_THRESHOLD = 0.7
 SAVE_COOLDOWN = 5000  # milliseconds between saves
 AUTOFOCUS_INTERVAL = 10  # frames between autofocus attempts
 SAVE_ALL_IMAGES = False  # Set to True to save all images, False to save only detections
@@ -202,7 +202,9 @@ def initialize_system():
         print("📷 Setting up camera...")
         sensor.reset()
         sensor.set_pixformat(sensor.GRAYSCALE)
-        sensor.set_framesize(sensor.VGA)  # 320x240 for best balance
+        sensor.set_framesize(sensor.FHD)
+        sensor.set_windowing((800, 600))
+        # sensor.set_color_palette(image.PALLETE_IRONBOW)
         sensor.skip_frames(time=3000)
         sensor.set_auto_gain(False)
         sensor.set_auto_whitebal(False)
