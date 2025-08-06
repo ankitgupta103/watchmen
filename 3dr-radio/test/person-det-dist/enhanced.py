@@ -140,9 +140,9 @@ def person_detection_loop():
             clock.tick()
 
             # Periodic autofocus
-            if autofocus_counter % AUTOFOCUS_INTERVAL == 0:
-                trigger_autofocus()
-            autofocus_counter += 1
+            # if autofocus_counter % AUTOFOCUS_INTERVAL == 0:
+            #     trigger_autofocus()
+            # autofocus_counter += 1
 
             # Capture image
             img = sensor.snapshot()
@@ -201,8 +201,8 @@ def initialize_system():
         # Camera setup
         print("📷 Setting up camera...")
         sensor.reset()
-        sensor.set_pixformat(sensor.RGB565)
-        sensor.set_framesize(sensor.QVGA)  # 320x240 for best balance
+        sensor.set_pixformat(sensor.GRAYSCALE)
+        sensor.set_framesize(sensor.VGA)  # 320x240 for best balance
         sensor.skip_frames(time=3000)
         sensor.set_auto_gain(False)
         sensor.set_auto_whitebal(False)
@@ -233,12 +233,30 @@ def initialize_system():
         return False
 
 
+def run_camera_loop():
+    clock = time.clock()
+    frame_count = 0
+
+    try:
+        while True:
+            clock.tick()
+            sensor.snapshot()
+            frame_count += 1
+            print(
+                f"🖼️ Frame {frame_count} | FPS: {clock.fps():.2f} | Free mem: {gc.mem_free()} bytes"
+            )
+            time.sleep_ms(100)
+    except KeyboardInterrupt:
+        print("\n🛑 Camera loop stopped by user")
+
+
 # --- Main Execution ---
 if __name__ == "__main__":
     if initialize_system():
         print("\n🎯 Starting person detection...")
         print("Press Ctrl+C to stop")
         print("-" * 50)
+        # run_camera_loop()
 
         try:
             person_detection_loop()
