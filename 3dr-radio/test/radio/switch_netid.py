@@ -144,4 +144,8 @@ async def run_all():
     asyncio.create_task(radio_read())
     await main_loop()
 
+if not change_netid(my_netid):
+    print("[ERROR] Failed to set correct NETID. Exiting.")
+    sys.exit()
+
 asyncio.run(run_all())
