@@ -76,7 +76,7 @@ def process_message(data):
         if msg.startswith("MSG:"):
             sender = msg.split(":")[1]
             msgs_recd.append(sender)
-            print(f"[RECV] From {sender} | Total received: {len(msgs_recd)}")
+            print(f"[RECV] {data} From {sender} | Total received: {len(msgs_recd)}")
     except Exception as e:
         print(f"[ERROR] {e}")
 
