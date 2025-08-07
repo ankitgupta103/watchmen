@@ -35,7 +35,6 @@ target_netid = [v[1] for k, v in NETID_MAP.items() if v[0] == target_name][0]
 msgs_recd = []
 msgs_sent = []
 current_netid = my_netid
-communicating = False
 
 def change_netid(new_netid):
     global current_netid
@@ -92,10 +91,10 @@ async def radio_read():
                 buffer = b""
         await asyncio.sleep(0.01)
 
-async def send_messages():
+def send_messages(n):
     global msgs_sent
-    for i in range(5):  # Send 5 messages
-        msg = f"MSG:{my_name}:{i}"
+    for i in range(n):
+        msg = f"MSG:{my_name}:{current_netid}:{i}"
         send_message(msg)
         msgs_sent.append((msg, time.time()))
         print(f"[SEND] {msg}")
@@ -111,36 +110,38 @@ def summarize_received():
     print("============================\n")
 
 async def main_loop():
-    global communicating
+    print("Sending messages")
+    if my_name == "B":
+        asyncio.run(send_messages(100))
+    elif my_name == "A":
+        asyncio.run(send_messages(5))
+        # At 10 seconds
+        change_netid(2)
+        # At 15 seconds
+        asyncio.run(send_messages(20))
+        # At 55 seconds
+        change_netid(1)
+        asyncio.run(send_messages(20))
+    elif my_name == "C":
+        asyncio.run(send_messages(17))
+        # At 35
+        change_netid(2)
+        # At 40
+        asyncio.run(send_messages(5))
+        # at 50
+        change_netid(3)
+        # at 55
+        await asyncio.sleep(20)
+        # at 75
+        change_netid(2)
+        # 80
+        asyncio.run(send_messages(5))
+        # 90
+        change_netid(3)
 
-    while True:
-        await asyncio.sleep(1)
-        if communicating:
-            continue  # wait until current communication is done
 
-# Run everything
 async def run_all():
     asyncio.create_task(radio_read())
     await main_loop()
 
-try:
-    asyncio.run(run_all())
-except KeyboardInterrupt:
-    print(f"\n[KEYBOARD INTERRUPT] Current NETID: {current_netid}")
-    if current_netid == my_netid:
-        # Switch to target NETID
-        print(f"[ACTION] Switching to {target_name}'s NETID ({target_netid}) to communicate.")
-        if change_netid(target_netid):
-            print(f"[INFO] Now communicating with {target_name}")
-            asyncio.run(send_messages())
-            print("[INFO] Done. Switching back...")
-            change_netid(my_netid)
-        else:
-            print("[ERROR] Failed to switch NETID.")
-    else:
-        print("[INFO] Already communicating. Switching back to own NETID.")
-        change_netid(my_netid)
-
-    summarize_received()
-    print("[INFO] Restarting main loop...\n")
-    asyncio.run(run_all())
+asyncio.run(run_all())
