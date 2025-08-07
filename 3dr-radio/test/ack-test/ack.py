@@ -7,8 +7,8 @@ import sys
 # Constants
 UART_BAUDRATE = 57600
 UART_PORT = 1
-MESSAGE_INTERVAL = 3
-TOTAL_MESSAGES = 20
+MESSAGE_INTERVAL = 5
+TOTAL_MESSAGES = 100
 
 # Global variables
 msgs_recd = []
@@ -48,7 +48,7 @@ def process_message(msg_bytes):
         if msg.startswith("MSG:"):
             sender = msg.split(":")[1]
             msgs_recd.append(sender)
-            print(f"[RECV] From {sender} | Total received: {len(msgs_recd)}")
+            print(f"[RECV] {msg_bytes} From {sender} | Total received: {len(msgs_recd)}")
     except Exception as e:
         print(f"[ERROR] Decoding message: {e}")
 
@@ -66,11 +66,13 @@ async def radio_read():
 async def send_messages():
     global msgs_sent
     for i in range(TOTAL_MESSAGES):
+        await asyncio.sleep(MESSAGE_INTERVAL)
         msg = f"MSG:{my_addr}:{i}"
         send_message(msg)
         msgs_sent.append((msg, time.time()))
         print(f"[SEND] {msg}")
-        await asyncio.sleep(MESSAGE_INTERVAL)
+        if i % 10 == 0:
+            summarize_received()
 
     await asyncio.sleep(5)  # Give some time to receive remaining messages
     summarize_received()
