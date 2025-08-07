@@ -65,11 +65,11 @@ if run_omv:
     uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
     print("Running on device : " + uid.decode())
     if uid == b'e076465dd7194025':
-        my_addr = 'A'
+        my_addr = 'Z'
     elif uid == b'e076465dd7091027':
         my_addr = 'B'
     elif uid == b'e076465dd7194211':
-        my_addr = 'Z'
+        my_addr = 'A'
     else:
         print("Unknown device ID for " + omv.board_id())
         sys.exit()
