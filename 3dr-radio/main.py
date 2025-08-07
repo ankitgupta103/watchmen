@@ -189,6 +189,9 @@ def time_msec():
         delta = int(utime.time() * 1000) - clock_start
     return delta
 
+def time_sec():
+    return utime.ticks_diff(utime.ticks_ms(), clock_start) # compute time difference
+
 def get_rand():
     rstr = ""
     for i in range(3):
@@ -368,13 +371,16 @@ async def radio_read():
             if uart.any():
                 buffer = uart.read(1)
                 lendata = int.from_bytes(buffer)
+                print(f"Lendata to read = {lendata}")
                 if lendata > 0:
+                    print(lendata)
                     buffer = uart.read(lendata)
-                    processed_success = process_message(buffer)
-                    if not processed_success:
-                        uart.read() # clear buffer.
-                    else:
-                        time_of_last_radio_receive = time_msec()
+                    process_message(buffer)
+                    #processed_success = process_message(buffer)
+                    #if not processed_success:
+                    #    uart.read() # clear buffer.
+                    #else:
+                    #    time_of_last_radio_receive = time_msec()
             await asyncio.sleep(0.01)
     else:
         buffer = b""
@@ -565,6 +571,7 @@ def spath_process(mid, msg):
             asyncio.create_task(send_msg("S", mid[1], nmsg.encode(), n))
 
 def process_message(data):
+    log(f"[RECV {len(data)}] {data} at {time_msec()}")
     parsed = parse_header(data)
     if not parsed:
         log(f"Failure parsing incoming data : {data}")
@@ -606,6 +613,8 @@ def process_message(data):
         asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
     return True
 
+HB_WAIT_SEC = 30
+
 async def send_heartbeat():
     while True:
         while MYMODE in [MODE_CRITICAL_SENDING, MODE_CRITICAL_RECEIVING]:
@@ -616,7 +625,7 @@ async def send_heartbeat():
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg.encode())
             await send_msg("H", my_addr, msgbytes, peer_addr)
-        await asyncio.sleep(30)
+        await asyncio.sleep(HB_WAIT_SEC)
 
 async def send_scan():
     i = 1
@@ -648,10 +657,11 @@ async def send_spath():
 async def time_since_last_read():
     while True:
         await asyncio.sleep(10)
-        time_since_last = time_msec() - time_of_last_radio_receive
+        time_since_last = int((time_msec() - time_of_last_radio_receive) / 1000)
         print(f"Checking if radio needs to be rebooted, time since last = {time_since_last}")
-        if time_since_last > 300000:
+        if time_since_last >= HB_WAIT_SEC:
             print(f"Time since last read = {time_since_last}, rebooting radio ...............")
+            await asyncio.sleep(5)
             radio.hard_reboot()
             print("Radio rebooted")
 
@@ -670,11 +680,11 @@ def image_test():
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
     asyncio.create_task(radio_read())
-    asyncio.create_task(time_since_last_read())
+    # asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
-        asyncio.create_task(send_heartbeat())
-        asyncio.create_task(send_scan())
-        asyncio.create_task(person_detection_loop())
+        #asyncio.create_task(send_heartbeat())
+        #asyncio.create_task(send_scan())
+        #asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
     elif my_addr == "Z":
         asyncio.create_task(send_spath())
