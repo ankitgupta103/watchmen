@@ -51,8 +51,8 @@ if enter_config_mode():
     # Set NETID to 5
     print(send_command(b'ATS3=5'))
 
-    # Set ECC = 1
-    print(send_command(b'ATS5=1'))
+    # Set ECC = 0
+    print(send_command(b'ATS5=0'))
 
     # Turn off mavlink
     print(send_command(b'ATS6=0'))

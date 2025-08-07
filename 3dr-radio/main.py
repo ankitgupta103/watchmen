@@ -673,11 +673,11 @@ async def main():
     asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
-        # asyncio.create_task(send_scan())
+        asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
     elif my_addr == "Z":
-        # asyncio.create_task(send_spath())
+        asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
         await asyncio.sleep(360000)
     else:
