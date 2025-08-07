@@ -110,6 +110,7 @@ def summarize_received():
     print("============================\n")
 
 async def main_loop():
+    change_netid(my_netid)
     print("Sending messages")
     if my_name == "B":
         asyncio.run(send_messages(100))
@@ -143,9 +144,5 @@ async def main_loop():
 async def run_all():
     asyncio.create_task(radio_read())
     await main_loop()
-
-if not change_netid(my_netid):
-    print("[ERROR] Failed to set correct NETID. Exiting.")
-    sys.exit()
 
 asyncio.run(run_all())
