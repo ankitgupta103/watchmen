@@ -457,7 +457,7 @@ def add_chunk(msgbytes):
     chunk_map[cid][2].append((citer, cdata))
     _, expected_chunks, _ = chunk_map[cid]
     missing = get_missing_chunks(cid)
-    received = expected_chunks - len(missing_chunks)
+    received = expected_chunks - len(missing)
     print(f" ===== Got {received} / {expected_chunks} chunks ====")
 
 def get_data_for_iter(list_chunks, chunkiter):
