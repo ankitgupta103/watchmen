@@ -557,7 +557,7 @@ def img_process(cid, msg, creator):
     else:
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
-            print(f"Propogating H to {spath}")
+            print(f"Propogating H to {peer_addr}")
             send_msg("P", creator, msg, peer_addr)
         else:
             print(f"Can't forward Photo because I dont have Spath yet")
