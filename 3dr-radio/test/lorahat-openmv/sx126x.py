@@ -2,561 +2,424 @@ import machine
 import time
 from machine import Pin, UART
 
-class sx126x:
+class SX126X:
     """
-    SX126x LoRa module driver for OpenMV RT1062
-    Flexible pin configuration for different OpenMV boards
+    SX126X LoRa module driver for OpenMV RT1062
+    M0 connected to Pin P6, M1 connected to Pin P7
+    UART connected to appropriate UART pins on OpenMV
     """
 
-    # Configuration register template
-    cfg_reg = [0xC2,0x00,0x09,0x00,0x00,0x00,0x62,0x00,0x12,0x43,0x00,0x00]
-    get_reg = bytearray(12)
-
-    # UART Baudrate constants
-    SX126X_UART_BAUDRATE_1200 = 0x00
-    SX126X_UART_BAUDRATE_2400 = 0x20
-    SX126X_UART_BAUDRATE_4800 = 0x40
-    SX126X_UART_BAUDRATE_9600 = 0x60
-    SX126X_UART_BAUDRATE_19200 = 0x80
-    SX126X_UART_BAUDRATE_38400 = 0xA0
-    SX126X_UART_BAUDRATE_57600 = 0xC0
-    SX126X_UART_BAUDRATE_115200 = 0xE0
-
-    # Package size constants
-    SX126X_PACKAGE_SIZE_240_BYTE = 0x00
-    SX126X_PACKAGE_SIZE_128_BYTE = 0x40
-    SX126X_PACKAGE_SIZE_64_BYTE = 0x80
-    SX126X_PACKAGE_SIZE_32_BYTE = 0xC0
-
-    # Power constants
-    SX126X_Power_22dBm = 0x00
-    SX126X_Power_17dBm = 0x01
-    SX126X_Power_13dBm = 0x02
-    SX126X_Power_10dBm = 0x03
-
-    # Lookup dictionaries
-    lora_air_speed_dic = {
-        1200: 0x01,
-        2400: 0x02,
-        4800: 0x03,
-        9600: 0x04,
-        19200: 0x05,
-        38400: 0x06,
-        62500: 0x07
-    }
-
-    lora_power_dic = {
-        22: 0x00,
-        17: 0x01,
-        13: 0x02,
-        10: 0x03
-    }
-
-    lora_buffer_size_dic = {
-        240: SX126X_PACKAGE_SIZE_240_BYTE,
-        128: SX126X_PACKAGE_SIZE_128_BYTE,
-        64: SX126X_PACKAGE_SIZE_64_BYTE,
-        32: SX126X_PACKAGE_SIZE_32_BYTE
-    }
-
-    def __init__(self, uart_id, freq, addr, power, rssi, m0_pin="P6", m1_pin="P7",
-                 air_speed=2400, net_id=0, buffer_size=240, crypt=0,
-                 relay=False, lbt=False, wor=False):
+    def __init__(self, uart_id=3, freq=868, addr=65535, power=22, rssi=True, air_speed=2400):
         """
-        Initialize the SX126x LoRa module
+        Initialize SX126X LoRa module
 
         Args:
-            uart_id: UART ID (0, 1, 2, or 3 for OpenMV RT1062)
+            uart_id: UART interface number (default 3 for OpenMV RT1062)
             freq: Frequency in MHz (410-493 or 850-930)
             addr: Node address (0-65535)
-            power: Transmission power (10, 13, 17, or 22 dBm)
-            rssi: Enable RSSI output (True/False)
-            m0_pin: M0 control pin (default "P6", can be "P0", "P1", etc.)
-            m1_pin: M1 control pin (default "P7", can be "P0", "P1", etc.)
+            power: Transmission power in dBm (10, 13, 17, 22)
+            rssi: Enable RSSI reporting
             air_speed: Air data rate (1200, 2400, 4800, 9600, 19200, 38400, 62500)
-            net_id: Network ID (0-255)
-            buffer_size: Buffer size (32, 64, 128, 240)
-            crypt: Encryption key (0-65535)
         """
-        self.rssi = rssi
-        self.addr = addr
+        # GPIO pins for mode control (using OpenMV pin naming)
+        self.M0 = Pin('P6', Pin.OUT)  # Pin P6 on OpenMV RT1062
+        self.M1 = Pin('P7', Pin.OUT)  # Pin P7 on OpenMV RT1062
+
+        # Configuration parameters
         self.freq = freq
+        self.addr = addr
         self.power = power
-        self.target_baud = 115200
+        self.rssi = rssi
+        self.air_speed = air_speed
 
-        # Determine frequency parameters
-        if freq > 850:
+        # Frequency ranges
+        if freq >= 850:
             self.start_freq = 850
-            self.offset_freq = freq - 850
-        elif freq > 410:
-            self.start_freq = 410
-            self.offset_freq = freq - 410
+            self.freq_offset = freq - 850
         else:
-            raise ValueError("Frequency must be 410-493 MHz or 850-930 MHz")
+            self.start_freq = 410
+            self.freq_offset = freq - 410
 
-        # Initialize GPIO pins for M0 and M1 with flexible pin naming
-        self.m0_pin = self._init_pin(m0_pin, "M0")
-        self.m1_pin = self._init_pin(m1_pin, "M1")
+        # Lookup tables
+        self.uart_baud_dict = {
+            1200: 0x00, 2400: 0x20, 4800: 0x40, 9600: 0x60,
+            19200: 0x80, 38400: 0xA0, 57600: 0xC0, 115200: 0xE0
+        }
 
-        print(f"[INFO] Using M0 pin: {m0_pin}, M1 pin: {m1_pin}")
+        self.air_speed_dict = {
+            1200: 0x01, 2400: 0x02, 4800: 0x03, 9600: 0x04,
+            19200: 0x05, 38400: 0x06, 62500: 0x07
+        }
 
-        # Set module to configuration mode (M0=LOW, M1=HIGH)
-        self.m0_pin.value(0)
-        self.m1_pin.value(1)
-        time.sleep(0.1)
+        self.power_dict = {22: 0x00, 17: 0x01, 13: 0x02, 10: 0x03}
 
-        # Initialize UART at 9600 baud for configuration
-        print(f"[INFO] Opening UART {uart_id} at 9600 baud for configuration")
-        try:
-            self.uart = UART(uart_id, baudrate=9600, bits=8, parity=None, stop=1, timeout=1000)
-        except Exception as e:
-            print(f"[ERROR] Failed to initialize UART {uart_id}: {e}")
-            print("[INFO] Available UART IDs are typically 0, 1, 2, 3")
-            print("[INFO] Make sure your LoRa module TX/RX are connected to the correct UART pins")
-            raise
+        self.buffer_size_dict = {240: 0x00, 128: 0x40, 64: 0x80, 32: 0xC0}
 
-        time.sleep(0.3)
+        # Initialize UART at 9600 for all communication
+        print("[INFO] Initializing UART at 9600 baud...")
+        self.uart = UART(uart_id, baudrate=9600, bits=8, parity=None, stop=1, timeout=1000)
 
         # Configure the module
-        self.set_config(freq, addr, power, rssi, air_speed, net_id, buffer_size, crypt, relay, lbt, wor)
+        self.configure_module()
 
-        # Close and reopen at target baudrate
-        print(f"[INFO] Reconfiguring UART to {self.target_baud} baud")
-        self.uart.deinit()
-        time.sleep(0.3)
+        # Set to normal mode
+        self.set_normal_mode()
 
-        # Set to configuration mode again
-        self.m0_pin.value(0)
-        self.m1_pin.value(1)
-        time.sleep(0.5)
+    def set_config_mode(self):
+        """Set module to configuration mode (M0=0, M1=1)"""
+        self.M0.value(0)
+        self.M1.value(1)
+        time.sleep_ms(200)  # Increased delay for mode switch
+        print(f"[DEBUG] Config mode set: M0={self.M0.value()}, M1={self.M1.value()}")
 
-        # Reopen UART at target baudrate
-        try:
-            self.uart = UART(uart_id, baudrate=self.target_baud, bits=8, parity=None, stop=1, timeout=1000)
-        except Exception as e:
-            print(f"[ERROR] Failed to reinitialize UART: {e}")
-            raise
+    def set_normal_mode(self):
+        """Set module to normal transmission mode (M0=0, M1=0)"""
+        self.M0.value(0)
+        self.M1.value(0)
+        time.sleep_ms(200)  # Increased delay for mode switch
+        print(f"[DEBUG] Normal mode set: M0={self.M0.value()}, M1={self.M1.value()}")
 
-        time.sleep(0.5)  # Give more time for baudrate change
-
-        # Set to normal mode (M0=LOW, M1=LOW) - This is important for receiving!
-        self.m0_pin.value(0)
-        self.m1_pin.value(0)
-        time.sleep(0.2)
-
-        print("[INFO] SX126x initialization complete")
-        print(f"[INFO] Module ready - Mode: Normal (M0=0, M1=0)")
-        print(f"[INFO] Address: {addr}, Frequency: {freq}.125MHz")
-
-    def _init_pin(self, pin_name, pin_type):
-        """Initialize a pin with flexible naming support"""
-        pin_options = [
-            pin_name,  # Try the provided pin name first
-            f"P{pin_name}" if isinstance(pin_name, int) else pin_name,  # Add P prefix if numeric
-            pin_name.replace("P", "") if pin_name.startswith("P") else f"P{pin_name}",  # Toggle P prefix
-        ]
-
-        # Add some common alternatives
-        if pin_name in ["P6", "6"]:
-            pin_options.extend(["P0", "P1", "P2", "P3", "P4", "P5"])
-        elif pin_name in ["P7", "7"]:
-            pin_options.extend(["P8", "P9", "P4", "P5"])
-
-        for pin_option in pin_options:
-            try:
-                pin = Pin(pin_option, Pin.OUT)
-                print(f"[INFO] {pin_type} pin initialized as {pin_option}")
-                return pin
-            except (ValueError, OSError):
-                continue
-
-        # If all options failed, show available information
-        print(f"[ERROR] Could not initialize {pin_type} pin with any of: {pin_options}")
-        print("[INFO] Common OpenMV RT1062 pins: P0, P1, P2, P3, P4, P5, P6, P7, P8, P9")
-        print("[INFO] You can also try: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9")
-        raise ValueError(f"Unable to initialize {pin_type} pin")
-
-    def set_config(self, freq, addr, power, rssi, air_speed=2400,
-                   net_id=0, buffer_size=240, crypt=0,
-                   relay=False, lbt=False, wor=False):
-        """Configure the LoRa module parameters"""
-
-        # Set module to configuration mode
-        self.m0_pin.value(0)
-        self.m1_pin.value(1)
-        time.sleep(0.1)
-
-        # Calculate address bytes
-        low_addr = addr & 0xff
-        high_addr = (addr >> 8) & 0xff
-        net_id_temp = net_id & 0xff
-
-        # Calculate frequency offset
-        if freq > 850:
-            freq_temp = freq - 850
-        elif freq > 410:
-            freq_temp = freq - 410
-        else:
-            freq_temp = 0
-
-        # Get configuration values from dictionaries
-        air_speed_temp = self.lora_air_speed_dic.get(air_speed, 0x02)  # Default to 2400
-        buffer_size_temp = self.lora_buffer_size_dic.get(buffer_size, 0x00)  # Default to 240
-        power_temp = self.lora_power_dic.get(power, 0x00)  # Default to 22dBm
-
-        # Set RSSI enable bit
-        rssi_temp = 0x80 if rssi else 0x00
-
-        # Calculate encryption key bytes
-        l_crypt = crypt & 0xff
-        h_crypt = (crypt >> 8) & 0xff
+    def configure_module(self):
+        """Configure the LoRa module with specified parameters"""
+        self.set_config_mode()
 
         # Build configuration register
-        if not relay:
-            self.cfg_reg[3] = high_addr
-            self.cfg_reg[4] = low_addr
-            self.cfg_reg[5] = net_id_temp
-            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_115200 + air_speed_temp
-            self.cfg_reg[7] = buffer_size_temp + power_temp + 0x20  # Enable noise RSSI
-            self.cfg_reg[8] = freq_temp
-            self.cfg_reg[9] = 0x43 + rssi_temp
-            self.cfg_reg[10] = h_crypt
-            self.cfg_reg[11] = l_crypt
-        else:
-            # Relay configuration
-            self.cfg_reg[3] = 0x01
-            self.cfg_reg[4] = 0x02
-            self.cfg_reg[5] = 0x03
-            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_115200 + air_speed_temp
-            self.cfg_reg[7] = buffer_size_temp + power_temp + 0x20
-            self.cfg_reg[8] = freq_temp
-            self.cfg_reg[9] = 0x03 + rssi_temp
-            self.cfg_reg[10] = h_crypt
-            self.cfg_reg[11] = l_crypt
+        high_addr = (self.addr >> 8) & 0xFF
+        low_addr = self.addr & 0xFF
+        net_id = 0  # Network ID
 
-        # Send configuration with retries
-        for attempt in range(3):
-            print(f"[INFO] Sending configuration (attempt {attempt + 1})")
+        # Get configuration values from dictionaries
+        uart_baud_val = self.uart_baud_dict.get(9600, 0x60)  # Keep UART at 9600
+        air_speed_val = self.air_speed_dict.get(self.air_speed, 0x02)
+        power_val = self.power_dict.get(self.power, 0x00)
+        buffer_size_val = self.buffer_size_dict.get(240, 0x00)  # Default 240 bytes
 
-            # Clear any pending data
-            while self.uart.any():
-                self.uart.read()
+        # RSSI enable bit
+        rssi_bit = 0x80 if self.rssi else 0x00
 
-            self.uart.write(bytes(self.cfg_reg))
-            time.sleep(0.3)
+        # Configuration register (12 bytes)
+        # 0xC2 = volatile settings (lost on power off)
+        # 0xC0 = non-volatile settings (retained on power off)
+        config_reg = [
+            0xC2,                                    # Header - volatile config
+            0x00, 0x09,                             # Address and length
+            high_addr,                              # Address high byte
+            low_addr,                               # Address low byte
+            net_id,                                 # Network ID
+            uart_baud_val | air_speed_val,          # UART baud + air speed
+            buffer_size_val | power_val | 0x20,     # Buffer + power + noise RSSI enable
+            self.freq_offset,                       # Frequency offset
+            0x43 | rssi_bit,                        # Mode + RSSI enable
+            0x00,                                   # Encryption key high
+            0x00                                    # Encryption key low
+        ]
 
+        print(f"[INFO] Configuring module to keep UART at 9600 baud...")
+        print(f"[CONFIG] Address: {self.addr}, Frequency: {self.freq}.125 MHz")
+        print(f"[CONFIG] Power: {self.power} dBm, Air Speed: {self.air_speed} bps")
+
+        # Send configuration (try twice)
+        for attempt in range(2):
+            self.uart.write(bytes(config_reg))
+            time.sleep_ms(200)
+
+            # Check response
             if self.uart.any():
-                time.sleep(0.1)
+                time.sleep_ms(100)
                 response = self.uart.read()
                 if response and len(response) > 0 and response[0] == 0xC1:
-                    print("[INFO] Configuration successful")
-                    print(f"[DEBUG] Config sent: {[hex(x) for x in self.cfg_reg]}")
-                    print(f"[DEBUG] Response: {[hex(x) for x in response]}")
-                    break
+                    print("[SUCCESS] Module configured successfully!")
+                    self.parse_config_response(response)
+                    return True
                 else:
-                    print(f"[WARN] Unexpected response: {response}")
+                    print(f"[WARNING] Unexpected response: {response}")
             else:
-                print(f"[WARN] No response on attempt {attempt + 1}")
-                if attempt == 2:
-                    print("[ERROR] Configuration failed after 3 attempts")
+                print(f"[WARNING] No response on attempt {attempt + 1}")
 
-        # Return to normal mode
-        self.m0_pin.value(0)
-        self.m1_pin.value(0)
-        time.sleep(0.1)
+        print("[ERROR] Configuration failed!")
+        return False
+
+    def parse_config_response(self, response):
+        """Parse and display the configuration response"""
+        if len(response) < 12:
+            print(f"[ERROR] Response too short: {len(response)} bytes")
+            return
+
+        print("[RESPONSE] Configuration response received:")
+        print(f"[RESPONSE] Raw bytes: {[hex(b) for b in response]}")
+
+        if response[0] == 0xC1:
+            addr = (response[3] << 8) | response[4]
+            net_id = response[5]
+            uart_air = response[6]
+            buf_power = response[7]
+            freq_offset = response[8]
+            mode_rssi = response[9]
+
+            # Decode settings
+            uart_baud = self._decode_uart_baud(uart_air & 0xE0)
+            air_speed = self._decode_air_speed(uart_air & 0x07)
+            buffer_size = self._decode_buffer_size(buf_power & 0xC0)
+            power = self._decode_power(buf_power & 0x03)
+            rssi_enabled = bool(mode_rssi & 0x80)
+
+            print(f"[PARSED] Address: {addr}")
+            print(f"[PARSED] Network ID: {net_id}")
+            print(f"[PARSED] Frequency: {freq_offset + self.start_freq}.125 MHz")
+            print(f"[PARSED] UART Baud: {uart_baud} bps")
+            print(f"[PARSED] Air Speed: {air_speed} bps")
+            print(f"[PARSED] Power: {power} dBm")
+            print(f"[PARSED] Buffer Size: {buffer_size} bytes")
+            print(f"[PARSED] RSSI Enabled: {rssi_enabled}")
+
+    def _decode_uart_baud(self, val):
+        """Decode UART baud rate from register value"""
+        baud_map = {0x00: 1200, 0x20: 2400, 0x40: 4800, 0x60: 9600,
+                   0x80: 19200, 0xA0: 38400, 0xC0: 57600, 0xE0: 115200}
+        return baud_map.get(val, "Unknown")
+
+    def _decode_air_speed(self, val):
+        """Decode air speed from register value"""
+        speed_map = {0x01: 1200, 0x02: 2400, 0x03: 4800, 0x04: 9600,
+                    0x05: 19200, 0x06: 38400, 0x07: 62500}
+        return speed_map.get(val, "Unknown")
+
+    def _decode_buffer_size(self, val):
+        """Decode buffer size from register value"""
+        size_map = {0x00: 240, 0x40: 128, 0x80: 64, 0xC0: 32}
+        return size_map.get(val, "Unknown")
+
+    def _decode_power(self, val):
+        """Decode transmission power from register value"""
+        power_map = {0x00: 22, 0x01: 17, 0x02: 13, 0x03: 10}
+        return power_map.get(val, "Unknown")
 
     def get_settings(self):
-        """Read current configuration from the module"""
-        # Set to configuration mode
-        self.m0_pin.value(0)
-        self.m1_pin.value(1)
-        time.sleep(0.2)
+        """Read current module settings"""
+        self.set_config_mode()
+        time.sleep_ms(200)  # Give more time for mode switch
 
-        print("[INFO] Reading current settings...")
+        # Clear any existing data
+        self.uart.read()
 
-        # Clear input buffer
-        while self.uart.any():
-            self.uart.read()
-
-        # Send get settings command
+        print("[INFO] Requesting current settings...")
         self.uart.write(bytes([0xC1, 0x00, 0x09]))
-        time.sleep(0.5)
+        time.sleep_ms(800)  # Longer wait for response
 
         if self.uart.any():
             response = self.uart.read()
-            print(f"[DEBUG] Settings response: {[hex(b) for b in response] if response else 'None'}")
-
-            if response and len(response) >= 12 and response[0] == 0xC1 and response[2] == 0x09:
-                # Parse the response
-                high_addr = response[3]
-                low_addr = response[4]
-                addr = (high_addr << 8) | low_addr
-                net_id = response[5]
-                freq = response[8] + self.start_freq
-
-                print(f"[Config] Address: {addr}")
-                print(f"[Config] Network ID: {net_id}")
-                print(f"[Config] Frequency: {freq}.125 MHz")
-
-                # Return to normal mode
-                self.m0_pin.value(0)
-                self.m1_pin.value(0)
-                return response
+            print(f"[INFO] Settings response: {[hex(b) for b in response]} (length: {len(response)})")
+            if response and len(response) >= 12 and response[0] == 0xC1:
+                self.parse_config_response(response)
+                self.set_normal_mode()
+                return True
             else:
-                print("[ERROR] Invalid settings response")
+                print(f"[WARNING] Unexpected response format or length")
         else:
             print("[ERROR] No response to settings request")
 
-        # Return to normal mode
-        self.m0_pin.value(0)
-        self.m1_pin.value(0)
-        return None
+        self.set_normal_mode()
+        return False
 
     def send_data(self, data):
-        """
-        Send data through LoRa
-
-        Args:
-            data: bytes or string to send
-        """
-        # Ensure normal transmission mode
-        self.m0_pin.value(0)
-        self.m1_pin.value(0)
-        time.sleep(0.1)
+        """Send data via LoRa"""
+        self.set_normal_mode()
 
         if isinstance(data, str):
             data = data.encode('utf-8')
 
-        print(f"[SEND] Transmitting {len(data)} bytes: {data}")
+        print(f"[INFO] Sending {len(data)} bytes: {data}")
         self.uart.write(data)
-        time.sleep(0.1)
+        time.sleep_ms(100)
 
     def receive_data(self):
-        """
-        Check for and receive incoming LoRa data
-
-        Returns:
-            Received data as bytes, or None if no data
-        """
-        # Ensure we're in normal receiving mode
-        self.m0_pin.value(0)
-        self.m1_pin.value(0)
-
+        """Check for received data"""
         if self.uart.any():
-            time.sleep(0.2)  # Wait for complete message
+            time.sleep_ms(100)  # Wait for complete packet
             data = self.uart.read()
 
-            if data and len(data) > 0:
-                print(f"[RECV] Raw data ({len(data)} bytes): {data}")
-                print(f"[RECV] Hex: {[hex(b) for b in data]}")
+            if data and len(data) > 3:
+                # Parse LoRa packet format
+                sender_addr = (data[0] << 8) | data[1]
+                freq_info = data[2]
+                payload = data[3:]
 
-                # Try to decode as text if it looks like text
-                try:
-                    if all(32 <= b <= 126 for b in data):  # Printable ASCII
-                        decoded = data.decode('utf-8')
-                        print(f"[RECV] Decoded text: {decoded}")
-                        return data
-                except:
-                    pass
-
-                # If it looks like a LoRa packet with addressing
-                if len(data) >= 4:
-                    try:
-                        # Parse LoRa packet format: [high_addr, low_addr, freq, payload..., rssi]
-                        sender_addr = (data[0] << 8) + data[1]
-                        sender_freq = data[2] + self.start_freq
-
-                        if self.rssi and len(data) > 4:
-                            payload = data[3:-1]
-                            rssi_val = 256 - data[-1] if data[-1] > 0 else 0
-                            print(f"[RECV] Structured packet from addr {sender_addr}, freq {sender_freq}.125MHz")
-                            print(f"[RECV] Payload: {payload}")
-                            print(f"[RECV] RSSI: -{rssi_val}dBm")
-                            return payload
-                        else:
-                            payload = data[3:]
-                            print(f"[RECV] Structured packet from addr {sender_addr}, freq {sender_freq}.125MHz")
-                            print(f"[RECV] Payload: {payload}")
-                            return payload
-                    except (IndexError, TypeError):
-                        print(f"[RECV] Could not parse as structured packet")
-                        return data
+                # Check for RSSI byte at the end
+                if self.rssi and len(payload) > 0:
+                    rssi_val = 256 - payload[-1]
+                    payload = payload[:-1]
+                    print(f"[RX] From addr {sender_addr}, freq {freq_info + self.start_freq}.125 MHz")
+                    print(f"[RX] Data: {payload}")
+                    print(f"[RX] RSSI: -{rssi_val} dBm")
                 else:
-                    return data
+                    print(f"[RX] From addr {sender_addr}, freq {freq_info + self.start_freq}.125 MHz")
+                    print(f"[RX] Data: {payload}")
+
+                return {'addr': sender_addr, 'freq': freq_info, 'data': payload}
 
         return None
 
-    def get_channel_rssi(self):
-        """Get current channel noise RSSI"""
-        # Ensure normal mode
-        self.m0_pin.value(0)
-        self.m1_pin.value(0)
-        time.sleep(0.1)
+# Example usage and test functions
+def test_settings_only():
+    """Test only settings retrieval"""
+    print("=== Testing Settings Retrieval ===")
 
-        # Clear input buffer
-        while self.uart.any():
-            self.uart.read()
-
-        # Send RSSI request
-        self.uart.write(bytes([0xC0, 0xC1, 0xC2, 0xC3, 0x00, 0x02]))
-        time.sleep(0.5)
-
-        if self.uart.any():
-            response = self.uart.read()
-            if response and len(response) >= 4 and response[0] == 0xC1 and response[1] == 0x00 and response[2] == 0x02:
-                noise_rssi = 256 - response[3]
-                print(f"[RSSI] Channel noise: -{noise_rssi}dBm")
-                return noise_rssi
-            else:
-                print(f"[ERROR] Invalid RSSI response: {response}")
-                return None
-        else:
-            print("[ERROR] No RSSI response")
-            return None
-
-# Test functions with flexible pin configuration
-def test_send():
-    """Test function for sending data"""
     try:
-        # Initialize LoRa module with custom pins if needed
-        # Change m0_pin and m1_pin if P6/P7 don't work
-        lora = sx126x(uart_id=1, freq=868, addr=100, power=22, rssi=True,
-                     m0_pin="P6", m1_pin="P7")  # Try "P0", "P1" etc. if these fail
+        lora = SX126X(uart_id=3, freq=868, addr=1000, power=22, rssi=True, air_speed=2400)
+        print("\n=== Attempting to get settings ===")
+        success = lora.get_settings()
+        if success:
+            print("Settings retrieved successfully!")
+        else:
+            print("Failed to retrieve settings - trying alternative method...")
+            # Try a different approach
+            lora.set_config_mode()
+            time.sleep_ms(500)
+            lora.uart.write(bytes([0xC1, 0x00, 0x09]))
+            time.sleep_ms(1000)
+            if lora.uart.any():
+                raw_data = lora.uart.read()
+                print(f"Raw response: {raw_data}")
+                print(f"Raw hex: {[hex(b) for b in raw_data]}")
+            lora.set_normal_mode()
 
-        # Optional: Get current settings
+    except Exception as e:
+        print(f"[ERROR] Test failed: {e}")
+
+def test_basic_config():
+    """Test basic module configuration"""
+    print("=== Testing SX126X Configuration ===")
+
+    try:
+        # Initialize with basic parameters
+        lora = SX126X(
+            uart_id=1,          # UART3 on OpenMV RT1062
+            freq=868,           # 868 MHz
+            addr=1000,          # Node address
+            power=22,           # 22 dBm power
+            rssi=True,          # Enable RSSI
+            air_speed=2400      # 2400 bps air speed
+        )
+
+        print("\n=== Getting Current Settings ===")
         lora.get_settings()
 
-        # Send test messages
-        count = 0
-        while True:
-            message = f"Hello from OpenMV #{count}!"
-            print(f"Sending: {message}")
-            lora.send_data(message)
-            count += 1
-            time.sleep(5)  # Send every 5 seconds
+        print("\n=== Testing Send ===")
+        lora.send_data("Hello LoRa World!")
+
+        print("\n=== Listening for 5 seconds ===")
+        for i in range(50):  # Listen for 5 seconds
+            received = lora.receive_data()
+            if received:
+                print("Received data:", received)
+            time.sleep_ms(100)
+
+        print("Test completed!")
 
     except Exception as e:
-        print(f"[ERROR] Test send failed: {e}")
-        print("[INFO] Try different pin combinations:")
-        print("       m0_pin='P0', m1_pin='P1'")
-        print("       m0_pin='P2', m1_pin='P3'")
-        print("       m0_pin='P4', m1_pin='P5'")
+        print(f"[ERROR] Test failed: {e}")
 
-def test_receive():
-    """Test function for receiving data"""
+def test_transmission():
+    """Test continuous transmission and monitoring"""
+    print("=== Testing LoRa Transmission ===")
+
     try:
-        # Initialize LoRa module
-        # Change m0_pin and m1_pin if P6/P7 don't work
-        lora = sx126x(uart_id=1, freq=868, addr=200, power=22, rssi=True,
-                     m0_pin="P6", m1_pin="P7")  # Try "P0", "P1" etc. if these fail
+        lora = SX126X(uart_id=1, freq=868, addr=1000, power=22, rssi=True, air_speed=2400)
 
-        # Skip settings check that's failing and go straight to receiving
-        print("[INFO] Skipping settings check - going straight to receive mode")
+        print("\n=== Continuous Send/Listen Test ===")
+        print("Sending messages every 2 seconds, listening in between...")
+        print("Press Ctrl+C to stop\n")
 
-        # Ensure we're in normal receiving mode
-        lora.m0_pin.value(0)
-        lora.m1_pin.value(0)
-        time.sleep(0.1)
-
-        print("[INFO] Receiver ready - listening for LoRa messages...")
-        print(f"[INFO] Module address: 200, Frequency: 868.125MHz")
-        print(f"[INFO] UART baudrate: {lora.target_baud}")
-
-        message_count = 0
-        last_activity = time.ticks_ms()
+        counter = 0
 
         while True:
-            # Check for any UART activity
-            if lora.uart.any():
-                last_activity = time.ticks_ms()
-                print(f"\n[ACTIVITY] UART has {lora.uart.any()} bytes waiting")
+            counter += 1
 
-                # Read raw data
-                time.sleep(0.3)  # Wait for complete message
-                raw_data = lora.uart.read()
+            # Send a test message
+            message = f"Test message #{counter}"
+            print(f"[TX] Sending: {message}")
+            lora.send_data(message)
 
-                if raw_data:
-                    message_count += 1
-                    print(f"[MSG #{message_count}] Received {len(raw_data)} bytes")
-                    print(f"[RAW] {raw_data}")
-                    print(f"[HEX] {[hex(b) for b in raw_data]}")
+            # Listen for responses for 2 seconds
+            print("[RX] Listening...")
+            received_any = False
 
-                    # Try to decode as text
-                    try:
-                        text = raw_data.decode('utf-8')
-                        print(f"[TEXT] {text}")
-                    except:
-                        print("[TEXT] Could not decode as UTF-8")
+            for i in range(20):  # 2 seconds of listening
+                received = lora.receive_data()
+                if received:
+                    received_any = True
+                    print(f"[RX] *** RECEIVED: {received} ***")
+                time.sleep_ms(100)
 
-                    print("-" * 50)
+            if not received_any:
+                print("[RX] No data received")
 
-            # Show periodic status
-            if time.ticks_diff(time.ticks_ms(), last_activity) > 10000:  # 10 seconds
-                print(f"[STATUS] Still listening... (received {message_count} messages)")
-                last_activity = time.ticks_ms()
+            print("-" * 40)
+            time.sleep_ms(1000)  # Wait 1 second before next transmission
 
-            time.sleep(0.05)  # Very short delay for responsiveness
-
+    except KeyboardInterrupt:
+        print("\n[INFO] Test stopped by user")
     except Exception as e:
-        print(f"[ERROR] Test receive failed: {e}")
-        print("[INFO] Try different pin combinations:")
-        print("       m0_pin='P0', m1_pin='P1'")
-        print("       m0_pin='P2', m1_pin='P3'")
-        print("       m0_pin='P4', m1_pin='P5'")
+        print(f"[ERROR] Transmission test failed: {e}")
 
-# Quick pin test function
-def test_pins():
-    """Test which pins are available on your OpenMV board"""
-    available_pins = []
-    pin_names = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
+def test_receive_only():
+    """Test receive-only mode for monitoring"""
+    print("=== Testing Receive Only Mode ===")
 
-    for pin_name in pin_names:
+    try:
+        lora = SX126X(uart_id=3, freq=868, addr=1000, power=22, rssi=True, air_speed=2400)
+
+        print("\n=== Monitoring for LoRa Messages ===")
+        print("Listening for incoming messages...")
+        print("Press Ctrl+C to stop\n")
+
+        while True:
+            received = lora.receive_data()
+            if received:
+                print(f"[RX] *** MESSAGE RECEIVED ***")
+                print(f"    From Address: {received['addr']}")
+                print(f"    Frequency: {received['freq'] + lora.start_freq}.125 MHz")
+                print(f"    Data: {received['data']}")
+                print(f"    Time: {time.ticks_ms()}")
+                print()
+
+            time.sleep_ms(50)  # Check every 50ms
+
+    except KeyboardInterrupt:
+        print("\n[INFO] Monitoring stopped by user")
+    except Exception as e:
+        print(f"[ERROR] Receive test failed: {e}")
+
+def test_range_test():
+    """Send range test messages with incremental power"""
+    print("=== Testing Range with Different Power Levels ===")
+
+    power_levels = [10, 13, 17, 22]  # Different power levels to test
+
+    for power in power_levels:
         try:
-            pin = Pin(pin_name, Pin.OUT)
-            pin.value(0)  # Test setting value
-            available_pins.append(pin_name)
-            print(f"[OK] Pin {pin_name} is available")
-        except:
-            print(f"[FAIL] Pin {pin_name} is not available")
+            print(f"\n--- Testing with {power} dBm power ---")
+            lora = SX126X(uart_id=3, freq=868, addr=1000, power=power, rssi=True, air_speed=2400)
 
-    print(f"\n[INFO] Available pins: {available_pins}")
-    print(f"[INFO] Use any two available pins for M0 and M1")
+            for i in range(3):
+                message = f"Range test {power}dBm #{i+1}"
+                print(f"[TX] Power {power}dBm: {message}")
+                lora.send_data(message)
 
-# Uncomment the function you want to test:
-test_pins()    # Test which pins work on your board
-# test_send()    # For sending
-test_receive() # For receiving
+                # Short listen period
+                for j in range(10):
+                    received = lora.receive_data()
+                    if received:
+                        print(f"[RX] Response: {received}")
+                        break
+                    time.sleep_ms(100)
 
+                time.sleep_ms(1000)
 
-# [OK] Pin P0 is available
-# [OK] Pin P1 is available
-# [OK] Pin P2 is available
-# [OK] Pin P3 is available
-# [OK] Pin P4 is available
-# [OK] Pin P5 is available
-# [OK] Pin P6 is available
-# [OK] Pin P7 is available
-# [OK] Pin P8 is available
-# [OK] Pin P9 is available
+        except Exception as e:
+            print(f"[ERROR] Range test at {power}dBm failed: {e}")
 
-# [INFO] Available pins: ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9']
-# [INFO] Use any two available pins for M0 and M1
-# [INFO] M0 pin initialized as P6
-# [INFO] M1 pin initialized as P7
-# [INFO] Using M0 pin: P6, M1 pin: P7
-# [INFO] Opening UART 1 at 9600 baud for configuration
-# [INFO] Sending configuration (attempt 1)
-# [INFO] Configuration successful
-# [DEBUG] Config sent: ['0xc2', '0x0', '0x9', '0x0', '0xc8', '0x0', '0xe2', '0x20', '0x12', '0xc3', '0x0', '0x0']
-# [DEBUG] Response: ['0xc1', '0x0', '0x9', '0x0', '0xc8', '0x0', '0xe2', '0x20', '0x12', '0xc3', '0x0', '0x0']
-# [INFO] Reconfiguring UART to 115200 baud
-# [INFO] SX126x initialization complete
-# [INFO] Module ready - Mode: Normal (M0=0, M1=0)
-# [INFO] Address: 200, Frequency: 868.125MHz
-# [INFO] Skipping settings check - going straight to receive mode
-# [INFO] Receiver ready - listening for LoRa messages...
-# [INFO] Module address: 200, Frequency: 868.125MHz
-# [INFO] UART baudrate: 115200
-# [STATUS] Still listening... (received 0 messages)
-# [STATUS] Still listening... (received 0 messages)
-# [STATUS] Still listening... (received 0 messages)
+        time.sleep_ms(2000)  # Wait between power level tests
+
+if __name__ == "__main__":
+    test_basic_config()
