@@ -44,6 +44,10 @@ FLAKINESS = 0
 
 FRAME_SIZE = 225
 
+TRANSFERRING_IMAGE = False
+RECEIVING_IMAGE = False
+CURRENT_NETID = 0
+
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 image_count = 0                 # Counter to keep tranck of saved images
@@ -152,7 +156,10 @@ async def person_detection_loop():
                 imgbytes = img.to_jpeg().bytearray()
                 print(f"Sending {len(imgbytes)} bytes to the network")
                 msgbytes = encrypt_if_needed("P", imgbytes)
+                global TRANSFERRING_IMAGE
+                TRANSFERRING_IMAGE = True
                 await send_msg("P", my_addr, msgbytes, peer_addr)
+                TRANSFERRING_IMAGE = False
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
             #print(f"Saving image to {raw_path}")
@@ -327,12 +334,20 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
             _ = await send_single_msg("I", creator, chunkbytes, dest)
     return False
 
+def switch_netid(netid):
+    global CURRENT_NETID
+    if CURRENT_NETID == netid:
+        return
+    print(f"Switching netid from {CURRENT_NETID} to {netid}")
+    if radio.change_netid(uart, netid):
+        CURRENT_NETID = netid
+
 async def send_msg(msgtype, creator, msgbytes, dest):
     if msgtype != "A":
-        radio.change_netid(uart, get_net_id(dest))
+        switch_netid(get_net_id(dest))
     retval = await send_msg_internal(msgtype, creator, msgbytes, dest)
     if msgtype != "A":
-        radio.change_netid(uart, get_net_id())
+        switch_netid(get_net_id())
     return retval
 
 def ack_time(smid):
@@ -406,6 +421,8 @@ async def radio_read():
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
 def begin_chunk(msg):
+    global RECEIVING_IMAGE
+    RECEIVING_IMAGE = True
     parts = msg.split(":")
     if len(parts) != 3:
         log(f"ERROR : begin message unparsable {msg}")
@@ -602,6 +619,9 @@ def process_message(data):
     elif mst == "E":
         alldone, retval = end_chunk(mid, msg.decode())
         if alldone:
+            global RECEIVING_IMAGE
+            RECEIVING_IMAGE = False
+            # Also when it fails
             ackmessage += ":-1"
         else:
             ackmessage += f":{retval}"
@@ -611,6 +631,10 @@ def process_message(data):
 
 async def send_heartbeat():
     while True:
+        if RECEIVING_IMAGE or TRANSFERRING_IMAGE:
+            print(f"Not sending HB because image transfer in progress {TRANSFERRING_IMAGE} {RECEIVING_IMAGE}")
+            await asyncio.sleep(60)
+            continue
         # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
@@ -639,6 +663,14 @@ async def send_spath():
             await send_msg("S", my_addr, sp.encode(), n)
             await asyncio.sleep(60)
 
+async def print_summary():
+    while True:
+        await asyncio.sleep(10)
+        print(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)}")
+        print(msgs_sent)
+        print(msgs_recd)
+        print(msgs_unacked)
+
 async def time_since_last_read():
     while True:
         await asyncio.sleep(10)
@@ -664,11 +696,12 @@ def image_test():
 
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
-    radio.change_netid(uart, get_net_id())
+    switch_netid(get_net_id())
     asyncio.create_task(radio_read())
     # asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
+        asyncio.create_task(print_summary())
         #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
