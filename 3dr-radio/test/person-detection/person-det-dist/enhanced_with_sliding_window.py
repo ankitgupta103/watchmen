@@ -2,25 +2,19 @@ import sensor
 import ml
 import time
 import random
-import utime
 import gc
 
 # --- Enhanced Configuration ---
 MODEL_PATH = "/rom/person_detect.tflite"
-IMG_DIR = "/sdcard/images1/"
 CONFIDENCE_THRESHOLD = 0.7  # Increased for sliding window to reduce false positives
-SAVE_COOLDOWN = 5000  # milliseconds between saves
-AUTOFOCUS_INTERVAL = 10  # frames between autofocus attempts
-SAVE_ALL_IMAGES = False  # Set to True to save all images, False to save only detections
-MAX_IMAGES_PER_SESSION = 1000  # Prevent storage overflow
-SLIDING_WINDOW_STRIDE = 16  # How many pixels to jump for the next window. Smaller is more thorough but slower.
+SLIDING_WINDOW_STRIDE = 64  # Increased from 16 to 64 for much better performance
+MAX_WINDOWS_PER_FRAME = 25  # Limit total windows to process per frame
+MIN_WINDOW_SIZE = 96  # Minimum window size to avoid tiny detections
 
 # --- Global Variables ---
 clock = time.clock()
 image_count = 0
 detection_count = 0
-last_save_time = 0
-autofocus_counter = 0
 session_start_time = time.ticks_ms()
 model = None  # Will be initialized later
 model_w, model_h = 0, 0  # Model dimensions
@@ -51,7 +45,7 @@ def print_session_stats():
     elapsed_time = time.ticks_diff(time.ticks_ms(), session_start_time) / 1000
     detection_rate = (detection_count / image_count * 100) if image_count > 0 else 0
 
-    print(f"\n--- SESSION STATS ---")
+    print("\n--- SESSION STATS ---")
     print(f"Runtime: {elapsed_time:.1f}s")
     print(f"Images processed: {image_count}")
     print(f"Person detections: {detection_count}")
@@ -61,21 +55,46 @@ def print_session_stats():
     print("-" * 20)
 
 
-def trigger_autofocus():
-    """Attempt to trigger autofocus with error handling"""
-    try:
-        sensor.__write_reg(0x3022, 0x03)
-        print("📷 Autofocus triggered")
-        return True
-    except Exception as e:
-        print(f"⚠️ Autofocus failed: {e}")
-        return False
+def calculate_optimal_windows(
+    img_width, img_height, model_w, model_h, max_windows=MAX_WINDOWS_PER_FRAME
+):
+    """
+    Calculate optimal window positions to cover the image efficiently
+    Returns list of (x, y) positions for windows
+    """
+    windows = []
+
+    # Calculate how many windows we can fit in each dimension
+    windows_x = min(
+        max_windows // 2, (img_width - model_w) // SLIDING_WINDOW_STRIDE + 1
+    )
+    windows_y = min(
+        max_windows // 2, (img_height - model_h) // SLIDING_WINDOW_STRIDE + 1
+    )
+
+    # Ensure we don't exceed max windows
+    total_windows = windows_x * windows_y
+    if total_windows > max_windows:
+        # Reduce windows proportionally
+        scale_factor = (max_windows / total_windows) ** 0.5
+        windows_x = max(1, int(windows_x * scale_factor))
+        windows_y = max(1, int(windows_y * scale_factor))
+
+    # Generate window positions
+    for y in range(0, img_height - model_h, SLIDING_WINDOW_STRIDE):
+        if len(windows) >= max_windows:
+            break
+        for x in range(0, img_width - model_w, SLIDING_WINDOW_STRIDE):
+            if len(windows) >= max_windows:
+                break
+            windows.append((x, y))
+
+    return windows
 
 
 def detect_person_with_sliding_window(img):
     """
-    Detects a person using a sliding window to find the best bounding box.
-    This replaces the simple classifier with a basic object detector.
+    Optimized person detection using sliding window with limited windows and better performance.
     """
     global model_w, model_h
     start_time = time.ticks_ms()
@@ -84,23 +103,31 @@ def detect_person_with_sliding_window(img):
     best_box = None
     person_detected = False
 
-    # Loop over the image, creating small tiles to test
-    for y in range(0, img.height() - model_h, SLIDING_WINDOW_STRIDE):
-        for x in range(0, img.width() - model_w, SLIDING_WINDOW_STRIDE):
-            # Create a small image tile (Region of Interest)
-            tile = img.copy(roi=(x, y, model_w, model_h))
+    # Calculate optimal window positions
+    windows = calculate_optimal_windows(img.width(), img.height(), model_w, model_h)
 
-            # Run the classifier on this small tile
-            prediction = model.predict([tile])[0].flatten().tolist()
-            scores = sorted(
-                zip(model.labels, prediction), key=lambda item: item[1], reverse=True
-            )
-            label, confidence = scores[0]
+    print(f"🔍 Processing {len(windows)} windows (stride: {SLIDING_WINDOW_STRIDE}px)")
 
-            # If this is the best 'person' detection so far, save it
-            if label == "person" and confidence > best_confidence:
-                best_confidence = confidence
-                best_box = (x, y, model_w, model_h)
+    # Process each window
+    for i, (x, y) in enumerate(windows):
+        # Create a small image tile (Region of Interest) - more efficient than copy
+        tile = img.copy(roi=(x, y, model_w, model_h))
+
+        # Run the classifier on this small tile
+        prediction = model.predict([tile])[0].flatten().tolist()
+        scores = sorted(
+            zip(model.labels, prediction), key=lambda item: item[1], reverse=True
+        )
+        label, confidence = scores[0]
+
+        # If this is the best 'person' detection so far, save it
+        if label == "person" and confidence > best_confidence:
+            best_confidence = confidence
+            best_box = (x, y, model_w, model_h)
+
+        # Early termination if we find a very confident detection
+        if best_confidence > 0.95:
+            break
 
     inference_time = time.ticks_diff(time.ticks_ms(), start_time)
     person_detected = best_confidence >= CONFIDENCE_THRESHOLD
@@ -108,54 +135,24 @@ def detect_person_with_sliding_window(img):
     # Print detection info
     status_emoji = "✅" if person_detected else "❌"
     print(
-        f"{status_emoji} Best Person Confidence: {best_confidence:.3f} | Scan Time: {inference_time}ms | FPS: {clock.fps():.1f}"
+        f"{status_emoji} Best Person Confidence: {best_confidence:.3f} | Scan Time: {inference_time}ms | FPS: {clock.fps():.1f} | Windows: {len(windows)}"
     )
 
     return person_detected, best_confidence, best_box
 
 
-def save_image(img, person_detected, confidence):
-    """Save image with enhanced naming and error handling"""
-    global last_save_time
-
-    current_time = time.ticks_ms()
-
-    if time.ticks_diff(current_time, last_save_time) < SAVE_COOLDOWN:
-        return False  # Cooldown active
-
-    rand_str = get_rand(4)
-    timestamp = utime.time()
-    filename = f"img_{timestamp}_{rand_str}_{person_detected}_{confidence:.3f}.jpg"
-    file_path = f"{IMG_DIR}{filename}"
-
-    try:
-        print(f"💾 Saving: {filename}")
-        img.save(file_path, quality=95)
-        last_save_time = current_time
-        print(f"✅ Saved successfully")
-        return True
-    except Exception as e:
-        print(f"❌ Save failed: {e}")
-        return False
-
-
 # --- Main Detection Loop ---
 def person_detection_loop():
-    """Enhanced main loop using the sliding window detector"""
-    global image_count, detection_count, autofocus_counter
+    """Optimized main loop using the sliding window detector"""
+    global image_count, detection_count
 
-    while image_count < MAX_IMAGES_PER_SESSION:
+    while True:  # Removed MAX_IMAGES_PER_SESSION limit for continuous operation
         try:
             clock.tick()
-
-            if autofocus_counter % AUTOFOCUS_INTERVAL == 0:
-                trigger_autofocus()
-            autofocus_counter += 1
-
             img = sensor.snapshot()
             image_count += 1
 
-            # Detect person using the new sliding window function
+            # Detect person using the optimized sliding window function
             person_detected, confidence, box = detect_person_with_sliding_window(img)
 
             if person_detected and box:
@@ -167,14 +164,13 @@ def person_detection_loop():
                     x, y - 12, f"PERSON: {confidence:.2f}", color=(0, 255, 0), scale=2
                 )
 
-            if SAVE_ALL_IMAGES or (person_detected and box):
-                save_image(img, person_detected, confidence)
-
-            if image_count % 50 == 0:
+            # Print stats every 10 frames instead of 50 for more frequent feedback
+            if image_count % 10 == 0:
                 print_session_stats()
                 gc.collect()
 
-            time.sleep_ms(100)
+            # Reduced sleep time for better responsiveness
+            time.sleep_ms(50)
 
         except KeyboardInterrupt:
             print("\n🛑 Interrupted by user")
@@ -184,7 +180,7 @@ def person_detection_loop():
             time.sleep_ms(1000)
             continue
 
-    print(f"\n🏁 Session complete. Max images ({MAX_IMAGES_PER_SESSION}) reached.")
+    print("\n🏁 Session complete.")
     print_session_stats()
 
 
@@ -193,13 +189,14 @@ def initialize_system():
     """Initialize camera and model with enhanced error handling"""
     global model, model_w, model_h
 
-    print("🚀 Initializing Enhanced Person Detection System...")
+    print("🚀 Initializing Optimized Person Detection System...")
 
     try:
         print("📷 Setting up camera...")
         sensor.reset()
-        sensor.set_pixformat(sensor.RGB565)
+        sensor.set_pixformat(sensor.GRAYSCALE)
         sensor.set_framesize(sensor.QVGA)
+        sensor.set_windowing(320, 320)
         sensor.skip_frames(time=3000)
         sensor.set_auto_gain(False)
         sensor.set_auto_whitebal(False)
@@ -214,10 +211,11 @@ def initialize_system():
 
         get_model_info()
 
-        print("⚙️ CONFIGURATION:")
+        print("⚙️ OPTIMIZED CONFIGURATION:")
         print(f"  Confidence threshold: {CONFIDENCE_THRESHOLD}")
-        print(f"  Sliding Window Stride: {SLIDING_WINDOW_STRIDE}px")
-        print(f"  Save all images: {SAVE_ALL_IMAGES}")
+        print(f"  Sliding Window Stride: {SLIDING_WINDOW_STRIDE}px (optimized)")
+        print(f"  Max windows per frame: {MAX_WINDOWS_PER_FRAME}")
+        print(f"  Model input size: {model_w}x{model_h}")
         print("✅ System ready!")
 
         return True
@@ -230,7 +228,7 @@ def initialize_system():
 # --- Main Execution ---
 if __name__ == "__main__":
     if initialize_system():
-        print("\n🎯 Starting person detection...")
+        print("\n🎯 Starting optimized person detection...")
         print("Press Ctrl+C to stop")
         print("-" * 50)
 
