@@ -29,8 +29,6 @@ def _run_command(cmd):
     return uart.read()
 
 def change_netid(new_netid):
-    global current_netid
-
     while uart.any():
         uart.read()  # clear buffer
 
@@ -55,7 +53,6 @@ def change_netid(new_netid):
     uart.write(b'ATZ\r\n')  # Reboot
     time.sleep(2)
 
-    current_netid = new_netid
     print(f"NETID changed to {new_netid}")
     return True
 
