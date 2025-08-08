@@ -348,3 +348,113 @@ if __name__ == "__main__":
     quick_config('default', addr=100)
     # interactive_config()
     read_current_config()
+
+
+
+
+
+# =====================================================
+# Device 1 config detail
+
+# LoRa SX126x Configuration Script
+# Available functions:
+# 1. quick_config('default', addr=100)
+# 2. interactive_config()
+# 3. read_current_config()
+
+# Example usage:
+# >>> quick_config('default', addr=100)
+
+# [CONFIG] Reading current module configuration...
+# [CONFIG] Initializing UART at 9600 baud for configuration...
+
+# [CONFIG] Reading current configuration...
+# [CONFIG] Set to configuration mode (M0=0, M1=1)
+# [CONFIG] Raw response: ['0xc1', '0x0', '0x9', '0x0', '0x64', '0x0', '0x62', '0x20', '0x12', '0xc3', '0x0', '0x0']
+
+# ============================================================
+#               LORA MODULE CONFIGURATION
+# ============================================================
+# Module Address      : 100
+# Network ID          : 0
+# Frequency           : 868.125 MHz
+# UART Baudrate       : 9600 bps
+# Air Data Rate       : 2400 bps
+# Buffer Size         : 240 bytes
+# TX Power            : 22 dBm
+# RSSI Output         : Enabled
+# Noise RSSI          : Enabled
+# Encryption Key      : 0x0000
+# ============================================================
+# [CONFIG] Set to normal mode (M0=0, M1=0)
+
+# [CONFIG] ✓ Successfully read configuration
+# [CONFIG] UART closed
+# [CONFIG] Using preset: default
+# [CONFIG] Settings: {'uart_baud': 9600, 'air_speed': 2400, 'power': 22, 'rssi': True, 'addr': 100, 'freq': 868}
+# [CONFIG] Initializing UART at 9600 baud for configuration...
+
+# [CONFIG] Starting configuration...
+#   Frequency: 868 MHz
+#   Address: 100
+#   Power: 22 dBm
+#   UART Baud: 9600
+#   Air Speed: 2400
+#   RSSI: True
+# [CONFIG] Set to configuration mode (M0=0, M1=1)
+# [CONFIG] Configuration bytes: ['0xc2', '0x0', '0x9', '0x0', '0x64', '0x0', '0x62', '0x20', '0x12', '0xc3', '0x0', '0x0']
+# [CONFIG] Configuration attempt 1/3
+# [CONFIG] Response: ['0xc1', '0x0', '0x9', '0x0', '0x64', '0x0', '0x62', '0x20', '0x12', '0xc3', '0x0', '0x0']
+# [CONFIG] ✓ Configuration successful!
+# [CONFIG] Set to normal mode (M0=0, M1=0)
+
+# [CONFIG] ✓ Module configured with preset 'default'
+
+# [CONFIG] Reading current configuration...
+# [CONFIG] Set to configuration mode (M0=0, M1=1)
+# [CONFIG] Raw response: ['0xc1', '0x0', '0x9', '0x0', '0x64', '0x0', '0x62', '0x20', '0x12', '0xc3', '0x0', '0x0']
+
+# ============================================================
+#               LORA MODULE CONFIGURATION
+# ============================================================
+# Module Address      : 100
+# Network ID          : 0
+# Frequency           : 868.125 MHz
+# UART Baudrate       : 9600 bps
+# Air Data Rate       : 2400 bps
+# Buffer Size         : 240 bytes
+# TX Power            : 22 dBm
+# RSSI Output         : Enabled
+# Noise RSSI          : Enabled
+# Encryption Key      : 0x0000
+# ============================================================
+# [CONFIG] Set to normal mode (M0=0, M1=0)
+# [CONFIG] UART closed
+
+# [CONFIG] Reading current module configuration...
+# [CONFIG] Initializing UART at 9600 baud for configuration...
+
+# [CONFIG] Reading current configuration...
+# [CONFIG] Set to configuration mode (M0=0, M1=1)
+# [CONFIG] Raw response: ['0xc1', '0x0', '0x9', '0x0', '0x64', '0x0', '0x62', '0x20', '0x12', '0xc3', '0x0', '0x0']
+
+# ============================================================
+#               LORA MODULE CONFIGURATION
+# ============================================================
+# Module Address      : 100
+# Network ID          : 0
+# Frequency           : 868.125 MHz
+# UART Baudrate       : 9600 bps
+# Air Data Rate       : 2400 bps
+# Buffer Size         : 240 bytes
+# TX Power            : 22 dBm
+# RSSI Output         : Enabled
+# Noise RSSI          : Enabled
+# Encryption Key      : 0x0000
+# ============================================================
+# [CONFIG] Set to normal mode (M0=0, M1=0)
+
+# [CONFIG] ✓ Successfully read configuration
+# [CONFIG] UART closed
+# OpenMV v4.7.0; MicroPython v1.25.0-r0; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
+# Type "help()" for more information.
