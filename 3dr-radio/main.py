@@ -542,7 +542,7 @@ def hb_process(mid, msgbytes):
     else:
         print(f"Can't forward HB because I dont have Spath yet")
 
-def img_process(mid, msg, creator):
+def img_process(cid, msg, creator):
     clear_chunkid(cid)
     # TODO save image
     if running_as_cc():
@@ -551,7 +551,7 @@ def img_process(mid, msg, creator):
         #img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         print(len(img_bytes))
-        fname = f"cc_{creator}_{mid}.jpg"
+        fname = f"cc_{creator}_{cid}.jpg"
         print(f"Saving to file {fname}")
         img.save(fname)
     else:
@@ -711,7 +711,7 @@ async def main():
     asyncio.create_task(radio_read())
     # asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
-        asyncio.create_task(send_heartbeat())
+        # asyncio.create_task(send_heartbeat())
         asyncio.create_task(print_summary())
         #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
