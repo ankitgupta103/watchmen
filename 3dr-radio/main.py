@@ -714,10 +714,10 @@ async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
     switch_netid(get_net_id())
     asyncio.create_task(radio_read())
+    asyncio.create_task(print_summary())
     # asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
         # asyncio.create_task(send_heartbeat())
-        asyncio.create_task(print_summary())
         #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
