@@ -58,6 +58,17 @@ image_count = 0                 # Counter to keep tranck of saved images
 my_addr = None
 peer_addr = None
 
+NET_ID_MAP = {
+        "A" : 1,
+        "B" : 2,
+        "C" : 3
+        }
+
+def get_net_id(node_addr=None):
+    if node_addr == None:
+        return NET_ID_MAP[my_addr]
+    return NET_ID_MAP[node_addr]
+
 time_of_last_radio_receive = 0
 
 if run_omv:
@@ -288,8 +299,13 @@ def encrypt_if_needed(mst, msg):
         return msgbytes
     return msg
 
+def send_msg(msgtype, creator, msgbytes, dest):
+    radio.change_netid(get_net_id(dest))
+    send_msg_internal(msgtype, creator, msgbytes, dest)
+    radio.change_netid(get_net_id())
+
 # === Send Function ===
-async def send_msg(msgtype, creator, msgbytes, dest):
+async def send_msg_internal(msgtype, creator, msgbytes, dest):
     if msgtype == "P":
         print(f"Sending photo of length {len(msgbytes)}")
     else:
@@ -679,6 +695,7 @@ def image_test():
 
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
+    await radio.change_netid(get_net_id())
     asyncio.create_task(radio_read())
     # asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
