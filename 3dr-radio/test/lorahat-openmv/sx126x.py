@@ -473,5 +473,37 @@ def test_pins():
 
 # Uncomment the function you want to test:
 test_pins()    # Test which pins work on your board
-test_send()    # For sending
-# test_receive() # For receiving
+# test_send()    # For sending
+test_receive() # For receiving
+
+
+
+# OpenMV v4.7.0; MicroPython v1.25.0-r0; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
+# Type "help()" for more information.
+# >>> [OK] Pin P0 is available
+# [OK] Pin P1 is available
+# [OK] Pin P2 is available
+# [OK] Pin P3 is available
+# [OK] Pin P4 is available
+# [OK] Pin P5 is available
+# [OK] Pin P6 is available
+# [OK] Pin P7 is available
+# [OK] Pin P8 is available
+# [OK] Pin P9 is available
+
+# [INFO] Available pins: ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9']
+# [INFO] Use any two available pins for M0 and M1
+# [INFO] M0 pin initialized as P6
+# [INFO] M1 pin initialized as P7
+# [INFO] Using M0 pin: P6, M1 pin: P7
+# [INFO] Opening UART 1 at 9600 baud for configuration
+# [INFO] Sending configuration (attempt 1)
+# [INFO] Configuration successful
+# [DEBUG] Config sent: ['0xc2', '0x0', '0x9', '0x0', '0xc8', '0x0', '0xe2', '0x20', '0x12', '0xc3', '0x0', '0x0']
+# [DEBUG] Response: ['0xc1', '0x0', '0x9', '0x0', '0xc8', '0x0', '0xe2', '0x20', '0x12', '0xc3', '0x0', '0x0']
+# [INFO] Reconfiguring UART to 115200 baud
+# [INFO] SX126x initialization complete
+# [INFO] Reading current settings...
+# [DEBUG] Settings response: ['0x0', '0x0', '0x0']
+# [ERROR] Invalid settings response
+# Listening for LoRa messages...
