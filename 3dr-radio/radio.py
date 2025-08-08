@@ -28,10 +28,36 @@ def _run_command(cmd):
     time.sleep(0.5)
     return uart.read()
 
-def set_net_id(netid):
-    # Set NETID to 5
-    net_id_cmd = f"ATS3={netid}"
-    print(_run_command(net_id_cmd))
+def change_netid(new_netid):
+    global current_netid
+
+    while uart.any():
+        uart.read()  # clear buffer
+
+    print(f"Changing NETID to {new_netid}...")
+    time.sleep(1.2)
+    uart.write(b"+++")
+    time.sleep(1.2)
+
+    response = uart.read()
+    if response and b'OK' in response:
+        print("Entered config mode.")
+    else:
+        print("Failed to enter config mode.")
+        return False
+
+    uart.write(f'ATS3={new_netid}\r\n'.encode())
+    time.sleep(0.5)
+
+    uart.write(b'AT&W\r\n')  # Save config
+    time.sleep(0.5)
+
+    uart.write(b'ATZ\r\n')  # Reboot
+    time.sleep(2)
+
+    current_netid = new_netid
+    print(f"NETID changed to {new_netid}")
+    return True
 
 def hard_reboot():
     if not enter_config_mode:
