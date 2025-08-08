@@ -1,10 +1,7 @@
 import time
 from machine import UART
 
-# Configure UART - pins parameter is not required in this setup
-uart = UART(1, baudrate=57600, timeout=1000)
-
-def enter_config_mode():
+def enter_config_mode(uart):
     print("Clearing serial buffer...")
     while uart.any():
         uart.read()  # clear buffer
@@ -23,12 +20,12 @@ def enter_config_mode():
         return False
     return True
 
-def _run_command(cmd):
+def _run_command(uart, cmd):
     uart.write(cmd + b'\r\n')
     time.sleep(0.5)
     return uart.read()
 
-def change_netid(new_netid):
+def change_netid(uart, new_netid):
     while uart.any():
         uart.read()  # clear buffer
 
@@ -41,10 +38,11 @@ def change_netid(new_netid):
     if response and b'OK' in response:
         print("Entered config mode.")
     else:
-        print("Failed to enter config mode.")
+        print(f"Failed to enter config mode : {response}")
         return False
 
     uart.write(f'ATS3={new_netid}\r\n'.encode())
+    # uart.write(b'ATS3=5')
     time.sleep(0.5)
 
     uart.write(b'AT&W\r\n')  # Save config
@@ -56,7 +54,7 @@ def change_netid(new_netid):
     print(f"NETID changed to {new_netid}")
     return True
 
-def hard_reboot():
+def hard_reboot(uart):
     if not enter_config_mode:
         print("Couldnt enter config mode")
         return

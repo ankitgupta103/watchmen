@@ -35,21 +35,14 @@ UART_BAUDRATE = 57600
 USBA_BAUDRATE = 57600
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.3
-
 CHUNK_SLEEP = 0.1
+
+HB_WAIT_SEC = 30
 
 MIDLEN = 7
 FLAKINESS = 0
 
 FRAME_SIZE = 225
-
-MODE_SETUP = 1
-MODE_NETWORK = 2
-MODE_HB = 3
-MODE_CRITICAL_SENDING = 4
-MODE_CRITICAL_RECEIVING = 4
-
-MYMODE = MODE_HB
 
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
@@ -61,7 +54,8 @@ peer_addr = None
 NET_ID_MAP = {
         "A" : 1,
         "B" : 2,
-        "C" : 3
+        "C" : 3,
+        "Z" : 9
         }
 
 def get_net_id(node_addr=None):
@@ -154,14 +148,11 @@ async def person_detection_loop():
         if person_detected:
             r = get_rand()
             if len(shortest_path_to_cc) > 0:
-                global MYMODE
-                MYMODE = MODE_CRITICAL_SENDING
                 peer_addr = shortest_path_to_cc[0]
                 imgbytes = img.to_jpeg().bytearray()
                 print(f"Sending {len(imgbytes)} bytes to the network")
                 msgbytes = encrypt_if_needed("P", imgbytes)
                 await send_msg("P", my_addr, msgbytes, peer_addr)
-                MYMODE = MODE_HB
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
             #print(f"Saving image to {raw_path}")
@@ -299,13 +290,8 @@ def encrypt_if_needed(mst, msg):
         return msgbytes
     return msg
 
-def send_msg(msgtype, creator, msgbytes, dest):
-    radio.change_netid(get_net_id(dest))
-    send_msg_internal(msgtype, creator, msgbytes, dest)
-    radio.change_netid(get_net_id())
-
 # === Send Function ===
-async def send_msg_internal(msgtype, creator, msgbytes, dest):
+def send_msg_internal(msgtype, creator, msgbytes, dest):
     if msgtype == "P":
         print(f"Sending photo of length {len(msgbytes)}")
     else:
@@ -340,6 +326,12 @@ async def send_msg_internal(msgtype, creator, msgbytes, dest):
             chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
             _ = await send_single_msg("I", creator, chunkbytes, dest)
     return False
+
+async def send_msg(msgtype, creator, msgbytes, dest):
+    radio.change_netid(uart, get_net_id(dest))
+    retval = await send_msg_internal(msgtype, creator, msgbytes, dest)
+    radio.change_netid(uart, get_net_id())
+    return retval
 
 def ack_time(smid):
     for (rmid, msgbytes, t) in msgs_recd:
@@ -514,8 +506,6 @@ def parse_header(data):
 hb_map = {}
 
 def hb_process(mid, msgbytes):
-    if MYMODE == MODE_CRITICAL_RECEIVING:
-        print(f"Skipping all messages for now since I am receiving a critical message")
     creator = mid[1]
     if running_as_cc():
         if creator not in hb_map:
@@ -545,10 +535,7 @@ def img_process(mid, msg, creator):
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
             print(f"Propogating H to {spath}")
-            global MYMODE
-            MYMODE = MODE_CRITICAL_SENDING
             send_msg("P", creator, msg, peer_addr)
-            MYMODE = MODE_HB
         else:
             print(f"Can't forward Photo because I dont have Spath yet")
 
@@ -559,11 +546,6 @@ def scan_process(mid, msg):
 
 def spath_process(mid, msg):
     global shortest_path_to_cc
-    global MYMODE
-    if MYMODE == MODE_CRITICAL_RECEIVING:
-        print(f"Skipping all messages for now since I am receiving a critical message")
-    MYMODE = MODE_HB
-    print (f"MY MODE IS NOW HB")
     if running_as_cc():
         # print(f"Ignoring shortest path since I am cc")
         return
@@ -612,8 +594,6 @@ def process_message(data):
     if mst == "H":
         hb_process(mid, msg)
     if mst == "B":
-        global MYMODE
-        MYMODE = MODE_CRITICAL_RECEIVING
         begin_chunk(msg.decode())
     elif mst == "I":
         add_chunk(msg)
@@ -621,54 +601,41 @@ def process_message(data):
         alldone, retval = end_chunk(mid, msg.decode())
         if alldone:
             ackmessage += ":-1"
-            global MYMODE
-            MYMODE = MODE_CRITICAL_RECEIVING
         else:
             ackmessage += f":{retval}"
     if ack_needed(mst) and receiver != "*":
         asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
     return True
 
-HB_WAIT_SEC = 30
-
 async def send_heartbeat():
     while True:
-        while MYMODE in [MODE_CRITICAL_SENDING, MODE_CRITICAL_RECEIVING]:
-            await asyncio.sleep(60)
         # TODO add last known GPS here also.
-        if MYMODE == MODE_HB and len(shortest_path_to_cc) > 0:
+        print(f"Shortest path = {shortest_path_to_cc}")
+        if len(shortest_path_to_cc) > 0:
             hbmsg = f"{my_addr}:{get_human_ts()}"
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg.encode())
             await send_msg("H", my_addr, msgbytes, peer_addr)
+        else:
+            print("Not sending right now")
         await asyncio.sleep(HB_WAIT_SEC)
 
 async def send_scan():
     i = 1
     while True:
-        while MYMODE in [MODE_CRITICAL_SENDING, MODE_CRITICAL_RECEIVING]:
-            await asyncio.sleep(60)
         scanmsg = f"{my_addr}"
         await send_msg("N", my_addr, scanmsg.encode(), "*")
-        if MYMODE == MODE_NETWORK:
-            await asyncio.sleep(60) # reduce after setup
-        else:
-            await asyncio.sleep(600)
-        print(f"{my_addr} : MyMode = {MYMODE} Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
+        await asyncio.sleep(60) # reduce after setup
+        print(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
 async def send_spath():
     while True:
-        while MYMODE in [MODE_CRITICAL_SENDING, MODE_CRITICAL_RECEIVING]:
-            await asyncio.sleep(60)
         sp = f"{my_addr}"
         for n in seen_neighbours:
             print(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp.encode(), n)
-        if MYMODE == MODE_NETWORK:
             await asyncio.sleep(60)
-        else:
-            await asyncio.sleep(600)
 
 async def time_since_last_read():
     while True:
@@ -678,7 +645,7 @@ async def time_since_last_read():
         if time_since_last >= HB_WAIT_SEC:
             print(f"Time since last read = {time_since_last}, rebooting radio ...............")
             await asyncio.sleep(5)
-            radio.hard_reboot()
+            radio.hard_reboot(uart)
             print("Radio rebooted")
 
 def image_test():
@@ -695,17 +662,17 @@ def image_test():
 
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
-    await radio.change_netid(get_net_id())
+    radio.change_netid(uart, get_net_id())
     asyncio.create_task(radio_read())
     # asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
-        asyncio.create_task(send_scan())
+        #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
     elif my_addr == "Z":
         asyncio.create_task(send_spath())
-        asyncio.create_task(send_scan())
+        #asyncio.create_task(send_scan())
         await asyncio.sleep(360000)
     else:
         print(f"Unknown device : {my_addr}")
