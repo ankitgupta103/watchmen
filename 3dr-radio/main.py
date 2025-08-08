@@ -683,9 +683,9 @@ async def print_summary():
         await asyncio.sleep(10)
         print(f"My current NETID is {CURRENT_NETID}")
         print(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)}")
-        print(msgs_sent)
-        print(msgs_recd)
-        print(msgs_unacked)
+        #print(msgs_sent)
+        #print(msgs_recd)
+        #print(msgs_unacked)
 
 async def time_since_last_read():
     while True:
