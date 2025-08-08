@@ -432,24 +432,6 @@ def begin_chunk(msg):
     numchunks = int(parts[2])
     chunk_map[cid] = (mst, numchunks, [])
 
-def add_chunk(msgbytes):
-    if len(msgbytes) < 5:
-        log(f"ERROR : Not enough bytes {len(msgbytes)} : {msg}")
-        return
-    cid = msgbytes[0:3].decode()
-    citer = int.from_bytes(msgbytes[3:5])
-    print(f"Got chunk id {citer}")
-    cdata = msgbytes[5:]
-    if cid not in chunk_map:
-        log(f"ERROR : no entry yet for {cid}")
-    chunk_map[cid][2].append((citer, cdata))
-
-def get_data_for_iter(list_chunks, chunkiter):
-    for citer, chunk_data in list_chunks:
-        if citer == chunkiter:
-            return chunk_data
-    return None
-
 def get_missing_chunks(cid):
     if cid not in chunk_map:
         #log(f"Should never happen, have no entry in chunk_map for {cid}")
@@ -460,6 +442,29 @@ def get_missing_chunks(cid):
         if not get_data_for_iter(list_chunks, i):
             missing_chunks.append(i)
     return missing_chunks
+
+def add_chunk(msgbytes):
+    if len(msgbytes) < 5:
+        log(f"ERROR : Not enough bytes {len(msgbytes)} : {msg}")
+        return
+    cid = msgbytes[0:3].decode()
+    print(f"")
+    citer = int.from_bytes(msgbytes[3:5])
+    print(f"Got chunk id {citer}")
+    cdata = msgbytes[5:]
+    if cid not in chunk_map:
+        log(f"ERROR : no entry yet for {cid}")
+    chunk_map[cid][2].append((citer, cdata))
+    _, expected_chunks, _ = chunk_map[cid]
+    missing = get_missing_chunks(cid)
+    received = expected_chunks - len(missing_chunks)
+    print(f" ===== Got {received} / {expected_chunks} chunks ====")
+
+def get_data_for_iter(list_chunks, chunkiter):
+    for citer, chunk_data in list_chunks:
+        if citer == chunkiter:
+            return chunk_data
+    return None
 
 def recompile_msg(cid):
     if len(get_missing_chunks(cid)) > 0:
