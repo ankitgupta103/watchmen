@@ -7,11 +7,11 @@ class sx126x:
     SX126x LoRa module driver for OpenMV RT1062
     Flexible pin configuration for different OpenMV boards
     """
-    
+
     # Configuration register template
     cfg_reg = [0xC2,0x00,0x09,0x00,0x00,0x00,0x62,0x00,0x12,0x43,0x00,0x00]
     get_reg = bytearray(12)
-    
+
     # UART Baudrate constants
     SX126X_UART_BAUDRATE_1200 = 0x00
     SX126X_UART_BAUDRATE_2400 = 0x20
@@ -59,12 +59,12 @@ class sx126x:
         32: SX126X_PACKAGE_SIZE_32_BYTE
     }
 
-    def __init__(self, uart_id, freq, addr, power, rssi, m0_pin="P6", m1_pin="P7", 
+    def __init__(self, uart_id, freq, addr, power, rssi, m0_pin="P6", m1_pin="P7",
                  air_speed=2400, net_id=0, buffer_size=240, crypt=0,
                  relay=False, lbt=False, wor=False):
         """
         Initialize the SX126x LoRa module
-        
+
         Args:
             uart_id: UART ID (0, 1, 2, or 3 for OpenMV RT1062)
             freq: Frequency in MHz (410-493 or 850-930)
@@ -83,7 +83,7 @@ class sx126x:
         self.freq = freq
         self.power = power
         self.target_baud = 115200
-        
+
         # Determine frequency parameters
         if freq > 850:
             self.start_freq = 850
@@ -97,9 +97,9 @@ class sx126x:
         # Initialize GPIO pins for M0 and M1 with flexible pin naming
         self.m0_pin = self._init_pin(m0_pin, "M0")
         self.m1_pin = self._init_pin(m1_pin, "M1")
-        
+
         print(f"[INFO] Using M0 pin: {m0_pin}, M1 pin: {m1_pin}")
-        
+
         # Set module to configuration mode (M0=LOW, M1=HIGH)
         self.m0_pin.value(0)
         self.m1_pin.value(1)
@@ -114,7 +114,7 @@ class sx126x:
             print("[INFO] Available UART IDs are typically 0, 1, 2, 3")
             print("[INFO] Make sure your LoRa module TX/RX are connected to the correct UART pins")
             raise
-        
+
         time.sleep(0.3)
 
         # Configure the module
@@ -124,26 +124,26 @@ class sx126x:
         print(f"[INFO] Reconfiguring UART to {self.target_baud} baud")
         self.uart.deinit()
         time.sleep(0.3)
-        
+
         # Set to configuration mode again
         self.m0_pin.value(0)
         self.m1_pin.value(1)
         time.sleep(0.5)
-        
+
         # Reopen UART at target baudrate
         try:
             self.uart = UART(uart_id, baudrate=self.target_baud, bits=8, parity=None, stop=1, timeout=1000)
         except Exception as e:
             print(f"[ERROR] Failed to reinitialize UART: {e}")
             raise
-        
+
         time.sleep(0.5)  # Give more time for baudrate change
 
         # Set to normal mode (M0=LOW, M1=LOW) - This is important for receiving!
         self.m0_pin.value(0)
         self.m1_pin.value(0)
         time.sleep(0.2)
-        
+
         print("[INFO] SX126x initialization complete")
         print(f"[INFO] Module ready - Mode: Normal (M0=0, M1=0)")
         print(f"[INFO] Address: {addr}, Frequency: {freq}.125MHz")
@@ -155,13 +155,13 @@ class sx126x:
             f"P{pin_name}" if isinstance(pin_name, int) else pin_name,  # Add P prefix if numeric
             pin_name.replace("P", "") if pin_name.startswith("P") else f"P{pin_name}",  # Toggle P prefix
         ]
-        
+
         # Add some common alternatives
         if pin_name in ["P6", "6"]:
             pin_options.extend(["P0", "P1", "P2", "P3", "P4", "P5"])
         elif pin_name in ["P7", "7"]:
             pin_options.extend(["P8", "P9", "P4", "P5"])
-            
+
         for pin_option in pin_options:
             try:
                 pin = Pin(pin_option, Pin.OUT)
@@ -169,7 +169,7 @@ class sx126x:
                 return pin
             except (ValueError, OSError):
                 continue
-        
+
         # If all options failed, show available information
         print(f"[ERROR] Could not initialize {pin_type} pin with any of: {pin_options}")
         print("[INFO] Common OpenMV RT1062 pins: P0, P1, P2, P3, P4, P5, P6, P7, P8, P9")
@@ -180,7 +180,7 @@ class sx126x:
                    net_id=0, buffer_size=240, crypt=0,
                    relay=False, lbt=False, wor=False):
         """Configure the LoRa module parameters"""
-        
+
         # Set module to configuration mode
         self.m0_pin.value(0)
         self.m1_pin.value(1)
@@ -190,7 +190,7 @@ class sx126x:
         low_addr = addr & 0xff
         high_addr = (addr >> 8) & 0xff
         net_id_temp = net_id & 0xff
-        
+
         # Calculate frequency offset
         if freq > 850:
             freq_temp = freq - 850
@@ -237,14 +237,14 @@ class sx126x:
         # Send configuration with retries
         for attempt in range(3):
             print(f"[INFO] Sending configuration (attempt {attempt + 1})")
-            
+
             # Clear any pending data
             while self.uart.any():
                 self.uart.read()
-                
+
             self.uart.write(bytes(self.cfg_reg))
             time.sleep(0.3)
-            
+
             if self.uart.any():
                 time.sleep(0.1)
                 response = self.uart.read()
@@ -273,11 +273,11 @@ class sx126x:
         time.sleep(0.2)
 
         print("[INFO] Reading current settings...")
-        
+
         # Clear input buffer
         while self.uart.any():
             self.uart.read()
-            
+
         # Send get settings command
         self.uart.write(bytes([0xC1, 0x00, 0x09]))
         time.sleep(0.5)
@@ -285,7 +285,7 @@ class sx126x:
         if self.uart.any():
             response = self.uart.read()
             print(f"[DEBUG] Settings response: {[hex(b) for b in response] if response else 'None'}")
-            
+
             if response and len(response) >= 12 and response[0] == 0xC1 and response[2] == 0x09:
                 # Parse the response
                 high_addr = response[3]
@@ -293,11 +293,11 @@ class sx126x:
                 addr = (high_addr << 8) | low_addr
                 net_id = response[5]
                 freq = response[8] + self.start_freq
-                
+
                 print(f"[Config] Address: {addr}")
                 print(f"[Config] Network ID: {net_id}")
                 print(f"[Config] Frequency: {freq}.125 MHz")
-                
+
                 # Return to normal mode
                 self.m0_pin.value(0)
                 self.m1_pin.value(0)
@@ -306,7 +306,7 @@ class sx126x:
                 print("[ERROR] Invalid settings response")
         else:
             print("[ERROR] No response to settings request")
-        
+
         # Return to normal mode
         self.m0_pin.value(0)
         self.m1_pin.value(0)
@@ -315,7 +315,7 @@ class sx126x:
     def send_data(self, data):
         """
         Send data through LoRa
-        
+
         Args:
             data: bytes or string to send
         """
@@ -326,7 +326,7 @@ class sx126x:
 
         if isinstance(data, str):
             data = data.encode('utf-8')
-        
+
         print(f"[SEND] Transmitting {len(data)} bytes: {data}")
         self.uart.write(data)
         time.sleep(0.1)
@@ -334,22 +334,22 @@ class sx126x:
     def receive_data(self):
         """
         Check for and receive incoming LoRa data
-        
+
         Returns:
             Received data as bytes, or None if no data
         """
         # Ensure we're in normal receiving mode
         self.m0_pin.value(0)
         self.m1_pin.value(0)
-        
+
         if self.uart.any():
             time.sleep(0.2)  # Wait for complete message
             data = self.uart.read()
-            
+
             if data and len(data) > 0:
                 print(f"[RECV] Raw data ({len(data)} bytes): {data}")
                 print(f"[RECV] Hex: {[hex(b) for b in data]}")
-                
+
                 # Try to decode as text if it looks like text
                 try:
                     if all(32 <= b <= 126 for b in data):  # Printable ASCII
@@ -358,14 +358,14 @@ class sx126x:
                         return data
                 except:
                     pass
-                
+
                 # If it looks like a LoRa packet with addressing
                 if len(data) >= 4:
                     try:
                         # Parse LoRa packet format: [high_addr, low_addr, freq, payload..., rssi]
                         sender_addr = (data[0] << 8) + data[1]
                         sender_freq = data[2] + self.start_freq
-                        
+
                         if self.rssi and len(data) > 4:
                             payload = data[3:-1]
                             rssi_val = 256 - data[-1] if data[-1] > 0 else 0
@@ -383,7 +383,7 @@ class sx126x:
                         return data
                 else:
                     return data
-        
+
         return None
 
     def get_channel_rssi(self):
@@ -392,15 +392,15 @@ class sx126x:
         self.m0_pin.value(0)
         self.m1_pin.value(0)
         time.sleep(0.1)
-        
+
         # Clear input buffer
         while self.uart.any():
             self.uart.read()
-        
+
         # Send RSSI request
         self.uart.write(bytes([0xC0, 0xC1, 0xC2, 0xC3, 0x00, 0x02]))
         time.sleep(0.5)
-        
+
         if self.uart.any():
             response = self.uart.read()
             if response and len(response) >= 4 and response[0] == 0xC1 and response[1] == 0x00 and response[2] == 0x02:
@@ -422,10 +422,10 @@ def test_send():
         # Change m0_pin and m1_pin if P6/P7 don't work
         lora = sx126x(uart_id=1, freq=868, addr=100, power=22, rssi=True,
                      m0_pin="P6", m1_pin="P7")  # Try "P0", "P1" etc. if these fail
-        
+
         # Optional: Get current settings
         lora.get_settings()
-        
+
         # Send test messages
         count = 0
         while True:
@@ -434,7 +434,7 @@ def test_send():
             lora.send_data(message)
             count += 1
             time.sleep(5)  # Send every 5 seconds
-            
+
     except Exception as e:
         print(f"[ERROR] Test send failed: {e}")
         print("[INFO] Try different pin combinations:")
@@ -445,58 +445,58 @@ def test_send():
 def test_receive():
     """Test function for receiving data"""
     try:
-        # Initialize LoRa module  
+        # Initialize LoRa module
         # Change m0_pin and m1_pin if P6/P7 don't work
         lora = sx126x(uart_id=1, freq=868, addr=200, power=22, rssi=True,
                      m0_pin="P6", m1_pin="P7")  # Try "P0", "P1" etc. if these fail
-        
+
         # Skip settings check that's failing and go straight to receiving
         print("[INFO] Skipping settings check - going straight to receive mode")
-        
+
         # Ensure we're in normal receiving mode
         lora.m0_pin.value(0)
         lora.m1_pin.value(0)
         time.sleep(0.1)
-        
+
         print("[INFO] Receiver ready - listening for LoRa messages...")
         print(f"[INFO] Module address: 200, Frequency: 868.125MHz")
         print(f"[INFO] UART baudrate: {lora.target_baud}")
-        
+
         message_count = 0
         last_activity = time.ticks_ms()
-        
+
         while True:
             # Check for any UART activity
             if lora.uart.any():
                 last_activity = time.ticks_ms()
                 print(f"\n[ACTIVITY] UART has {lora.uart.any()} bytes waiting")
-                
+
                 # Read raw data
                 time.sleep(0.3)  # Wait for complete message
                 raw_data = lora.uart.read()
-                
+
                 if raw_data:
                     message_count += 1
                     print(f"[MSG #{message_count}] Received {len(raw_data)} bytes")
                     print(f"[RAW] {raw_data}")
                     print(f"[HEX] {[hex(b) for b in raw_data]}")
-                    
+
                     # Try to decode as text
                     try:
                         text = raw_data.decode('utf-8')
                         print(f"[TEXT] {text}")
                     except:
                         print("[TEXT] Could not decode as UTF-8")
-                    
+
                     print("-" * 50)
-            
+
             # Show periodic status
             if time.ticks_diff(time.ticks_ms(), last_activity) > 10000:  # 10 seconds
                 print(f"[STATUS] Still listening... (received {message_count} messages)")
                 last_activity = time.ticks_ms()
-            
+
             time.sleep(0.05)  # Very short delay for responsiveness
-            
+
     except Exception as e:
         print(f"[ERROR] Test receive failed: {e}")
         print("[INFO] Try different pin combinations:")
@@ -509,7 +509,7 @@ def test_pins():
     """Test which pins are available on your OpenMV board"""
     available_pins = []
     pin_names = ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
-    
+
     for pin_name in pin_names:
         try:
             pin = Pin(pin_name, Pin.OUT)
@@ -518,11 +518,11 @@ def test_pins():
             print(f"[OK] Pin {pin_name} is available")
         except:
             print(f"[FAIL] Pin {pin_name} is not available")
-    
+
     print(f"\n[INFO] Available pins: {available_pins}")
     print(f"[INFO] Use any two available pins for M0 and M1")
 
 # Uncomment the function you want to test:
 test_pins()    # Test which pins work on your board
-test_send()    # For sending
-# test_receive() # For receiving
+# test_send()    # For sending
+test_receive() # For receiving
