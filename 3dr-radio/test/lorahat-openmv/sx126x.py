@@ -64,7 +64,7 @@ class SX126x:
         self.M1 = Pin(m1_pin, Pin.OUT)
 
         # Initialize UART
-        self.uart = UART(uart_id, baudrate=9600, bits=8, parity=None, stop=1)
+        self.uart = UART(uart_id,1baudrate=9600, bits=8, parity=None, stop=1)
 
         # Configuration register array (12 bytes)
         self.cfg_reg = [0xC0, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
@@ -166,46 +166,83 @@ class SX126x:
         self.M1.value(0)
         time.sleep(0.1)
 
-    def send(self, data):
-        """Send data through LoRa"""
+    def send(self, data, target_addr=None):
+        """
+        Send data through LoRa
+        Data format: [target_high_addr][target_low_addr][channel][payload]
+        """
         # Ensure we're in transmission mode
         self.M0.value(0)
         self.M1.value(0)
         time.sleep(0.1)
 
-        if isinstance(data, str):
-            data = data.encode('utf-8')
+        if target_addr is None:
+            target_addr = 0xFFFF  # Broadcast address
 
-        self.uart.write(data)
+        if isinstance(data, str):
+            payload = data.encode('utf-8')
+        else:
+            payload = data
+
+        # Create packet: [high_addr][low_addr][channel][payload]
+        target_high = (target_addr >> 8) & 0xFF
+        target_low = target_addr & 0xFF
+        channel = self.offset_freq  # Use configured frequency offset
+
+        packet = bytes([target_high, target_low, channel]) + payload
+
+        self.uart.write(packet)
         time.sleep(0.1)
-        print(f"Sent: {data}")
+        print(f"Sent to addr {target_addr}: {data}")
 
     def receive(self):
         """Receive data from LoRa"""
         if self.uart.any():
-            time.sleep(0.5)  # Wait for complete message
+            time.sleep(0.2)  # Wait for complete message
             data = self.uart.read()
 
-            if data and len(data) >= 4:
-                # Parse the received message
-                node_addr = (data[0] << 8) + data[1]
-                freq = data[2] + self.start_freq
-                message = data[3:-1] if self.rssi else data[3:]
+            if data and len(data) >= 3:
+                try:
+                    # Parse the received message format
+                    # Format: [sender_high][sender_low][channel][payload][rssi_byte if enabled]
+                    sender_addr = (data[0] << 8) + data[1]
+                    channel = data[2]
+                    freq = channel + self.start_freq
 
-                print(f"Received from node {node_addr} at {freq}.125MHz")
-                print(f"Message: {message}")
+                    if self.rssi and len(data) > 3:
+                        # RSSI byte is at the end
+                        message = data[3:-1]
+                        rssi_value = 256 - data[-1]
+                    else:
+                        message = data[3:]
+                        rssi_value = None
 
-                # Print RSSI if enabled
-                if self.rssi and len(data) > 4:
-                    rssi_value = 256 - data[-1]
-                    print(f"RSSI: -{rssi_value}dBm")
+                    # Try to decode message as string
+                    try:
+                        message_str = message.decode('utf-8')
+                    except:
+                        message_str = str(message)
 
-                return {
-                    'node_addr': node_addr,
-                    'frequency': freq,
-                    'message': message,
-                    'rssi': rssi_value if self.rssi else None
-                }
+                    print("=" * 50)
+                    print(f"📡 Received from node {sender_addr} at {freq}.125MHz")
+                    print(f"📝 Message: {message_str}")
+
+                    # Print RSSI if enabled
+                    if self.rssi and rssi_value is not None:
+                        print(f"📶 RSSI: -{rssi_value}dBm")
+                    print("=" * 50)
+
+                    return {
+                        'sender_addr': sender_addr,
+                        'frequency': freq,
+                        'message': message_str,
+                        'raw_message': message,
+                        'rssi': rssi_value
+                    }
+                except Exception as e:
+                    print(f"Error parsing received data: {e}")
+                    print(f"Raw data: {[hex(b) for b in data]}")
+
         return None
 
     def set_mode(self, mode):
@@ -294,18 +331,42 @@ def main():
 
 
 # For interactive testing
-def create_lora_instance():
+def create_lora_instance(my_addr=100):
     """Create and return a LoRa instance for interactive use"""
     return SX126x(
         uart_id=3,
         freq=868,         # Change as needed
-        addr=100,         # Change as needed
+        addr=my_addr,     # Unique address for this device
         power=22,
         rssi=True,
         air_speed=2400,
         m0_pin='P6',
         m1_pin='P7'
     )
+
+
+def broadcast_test(my_addr=100):
+    """Test function for broadcast communication"""
+    lora = create_lora_instance(my_addr)
+    counter = 0
+
+    print(f"Starting broadcast test with address {my_addr}")
+    print("Sending broadcast messages every 5 seconds...")
+
+    while True:
+        try:
+            # Check for messages
+            lora.receive()
+
+            # Send broadcast message
+            time.sleep(5)
+            counter += 1
+            msg = f"Broadcast from {my_addr}: #{counter}"
+            lora.send(msg, target_addr=0xFFFF)  # Broadcast to all
+            print(f"Broadcast #{counter}")
+
+        except KeyboardInterrupt:
+            break
 
 
 if __name__ == "__main__":
