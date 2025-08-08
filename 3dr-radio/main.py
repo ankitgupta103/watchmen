@@ -34,7 +34,7 @@ print_lock = asyncio.Lock()
 UART_BAUDRATE = 57600
 USBA_BAUDRATE = 57600
 MIN_SLEEP = 0.1
-ACK_SLEEP = 0.3
+ACK_SLEEP = 0.5
 CHUNK_SLEEP = 0.1
 
 HB_WAIT_SEC = 30
@@ -233,7 +233,7 @@ def radio_send(data):
         print(f"Error msg too large : {len(data)}")
     data = lendata.to_bytes(1) + data
     uart.write(data)
-    log(f"[SENT {len(data)}] {data} at {time_msec()}")
+    log(f"[SENT at {CURRENT_NETID} {len(data)} bytes] {data} at {time_msec()}")
 
 def pop_and_get(mid):
     for i in range(len(msgs_unacked)):
@@ -666,6 +666,7 @@ async def send_spath():
 async def print_summary():
     while True:
         await asyncio.sleep(10)
+        print(f"My current NETID is {CURRENT_NETID}")
         print(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)}")
         print(msgs_sent)
         print(msgs_recd)
