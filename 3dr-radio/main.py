@@ -314,7 +314,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
         log(f"Failed sending chunk begin")
         return False
     for i in range(len(chunks)):
-        if i % 50 == 0:
+        if i % 10 == 0:
             print(f"Sending chunk {i}")
         await asyncio.sleep(CHUNK_SLEEP)
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
@@ -438,6 +438,7 @@ def add_chunk(msgbytes):
         return
     cid = msgbytes[0:3].decode()
     citer = int.from_bytes(msgbytes[3:5])
+    print(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
     if cid not in chunk_map:
         log(f"ERROR : no entry yet for {cid}")
@@ -476,6 +477,8 @@ def recompile_msg(cid):
 def clear_chunkid(cid):
     if cid in chunk_map:
         chunk_map.pop(cid)
+    else:
+        print(f"Couldnt find {cid} in {chunk_map}")
 
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
@@ -489,15 +492,13 @@ def end_chunk(mid, msg):
         for i in range(1, len(missing)):
             if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < FRAME_SIZE:
                 missing_str += "," + str(missing[i])
-        return (False, missing_str)
+        return (False, missing_str, None, None, None)
     else:
         if cid not in chunk_map:
             print(f"Ignoring this because we dont have an entry for this chunkid, likely because we have already processed this.")
-            return (True, None)
+            return (True, None, None, None, None)
         recompiled = recompile_msg(cid)
-        clear_chunkid(msg)
-        img_process(cid, recompiled, creator)
-        return (True, None)
+        return (True, None, cid, recompiled, creator)
 
 def parse_header(data):
     if data == None:
@@ -542,6 +543,7 @@ def hb_process(mid, msgbytes):
         print(f"Can't forward HB because I dont have Spath yet")
 
 def img_process(mid, msg, creator):
+    clear_chunkid(cid)
     # TODO save image
     if running_as_cc():
         print(f"Received image of size {len(msg)}")
@@ -549,7 +551,9 @@ def img_process(mid, msg, creator):
         #img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         print(len(img_bytes))
-        img.save(f"cc_{creator}_{mid}.jpg")
+        fname = f"cc_{creator}_{mid}.jpg"
+        print(f"Saving to file {fname}")
+        img.save(fname)
     else:
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
@@ -611,22 +615,28 @@ def process_message(data):
     if mst == "S":
         spath_process(mid, msg.decode())
     if mst == "H":
+        asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
         hb_process(mid, msg)
     if mst == "B":
+        asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
         begin_chunk(msg.decode())
     elif mst == "I":
         add_chunk(msg)
     elif mst == "E":
-        alldone, retval = end_chunk(mid, msg.decode())
+        alldone, retval, cid, recompiled, creator = end_chunk(mid, msg.decode())
         if alldone:
             global RECEIVING_IMAGE
             RECEIVING_IMAGE = False
             # Also when it fails
             ackmessage += ":-1"
+            asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
+            if recompiled:
+                img_process(cid, recompiled, creator)
+            else:
+                print(f"No recompiled, so not sending")
         else:
             ackmessage += f":{retval}"
-    if ack_needed(mst) and receiver != "*":
-        asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
+            asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
     return True
 
 async def send_heartbeat():
