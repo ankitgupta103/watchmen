@@ -763,6 +763,40 @@ class TaskManager:
             await asyncio.sleep(50)
 
 # ============================================================================
+# Chnage NetID
+# ============================================================================
+class NetIDChanger:
+    def __init__(self, uart):
+        self.uart = uart
+    
+    def change_netid(self, new_netid):
+        """Chnange the NETID of the device"""
+        
+        while self.uart.any():
+            self.uart.read()  # clear buffer
+
+        print(f"Changing NETID to {new_netid}...")
+        utime.sleep(1.2)    # Guard time before sending +++
+
+        self.uart.write(b"+++")
+        utime.sleep(1.2)    # Guard time after sending +++
+
+        response = self.uart.read()
+        if response and b'OK' in response:
+            print("Entered config mode.")
+
+            self.uart.write(f'ATS3={new_netid}\r\n'.encode())
+            utime.sleep(0.5)
+            self.uart.write(b'AT&W\r\n')  # Save config
+            utime.sleep(0.5)
+            self.uart.write(b'ATZ\r\n')  # Reboot
+            utime.sleep(2)  # Wait for reboot                   
+            return True
+        else:
+            print("Failed to enter config mode.")
+            return False
+
+# ============================================================================
 # MAIN APPLICATION
 # ============================================================================
 
@@ -776,6 +810,8 @@ class MeshNetworkApp:
     async def run(self):
         """Main application entry point"""
         print(f"[INFO] Starting device {self.hw.my_addr} (OMV={run_omv})")
+
+        
 
         # Start radio receiver
         asyncio.create_task(self.msg_handler.radio_read())
