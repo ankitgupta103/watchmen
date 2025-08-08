@@ -328,9 +328,11 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
     return False
 
 async def send_msg(msgtype, creator, msgbytes, dest):
-    radio.change_netid(uart, get_net_id(dest))
+    if msgtype != "A":
+        radio.change_netid(uart, get_net_id(dest))
     retval = await send_msg_internal(msgtype, creator, msgbytes, dest)
-    radio.change_netid(uart, get_net_id())
+    if msgtype != "A":
+        radio.change_netid(uart, get_net_id())
     return retval
 
 def ack_time(smid):
