@@ -1,11 +1,6 @@
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 
-interface PresignedUrlRequest {
-  bucket: string;
-  filename: string;
-}
-
 interface PresignedUrlResponse {
   success: boolean;
   url?: string;
@@ -25,17 +20,17 @@ export async function getPresignedUrl(
   try {
     console.log('[PresignedURL] Requesting presigned URL for:', filename);
     
-    const payload: PresignedUrlRequest = {
+    // Use GET request with query parameters
+    const queryParams = new URLSearchParams({
       bucket,
       filename,
-    };
+    });
 
     const response = await fetcherClient<PresignedUrlResponse>(
-      `${API_BASE_URL}/s3-presigned-url/`,
+      `${API_BASE_URL}/s3-presigned-url/?${queryParams.toString()}`,
       token,
       {
-        method: 'POST',
-        body: payload,
+        method: 'GET',
       }
     );
 
