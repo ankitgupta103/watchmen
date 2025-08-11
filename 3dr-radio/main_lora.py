@@ -165,7 +165,7 @@ async def person_detection_loop():
             # TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
             # processed_path = f"{IMG_DIR}/processed_{image_count}.jpg"
             # img.save(processed_path)  # Save image with annotations
-        await asyncio.sleep(30)
+        await asyncio.sleep(10)
 
 def get_human_ts():
     _,_,_,_,h,m,s,_ = rtc.datetime()
@@ -372,7 +372,7 @@ async def radio_read():
         if message:
             print(f"In Main, message received = {message}")
             process_message(message)
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.01)
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
