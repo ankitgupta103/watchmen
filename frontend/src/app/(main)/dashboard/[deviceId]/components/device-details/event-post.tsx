@@ -110,24 +110,28 @@ const EventPost: React.FC<EventPostProps> = ({
 
 
   const getSeverity = () => {
-    switch (event.event_severity) {
-      case '1':
+    const severityNum = event.event_severity ? parseInt(event.event_severity) : 1;
+    switch (severityNum) {
+      case 1:
         return {
           label: 'Low',
           className: 'border-yellow-500 bg-yellow-400 text-black',
         };
-      case '2':
+      case 2:
         return {
           label: 'High',
           className: 'border-orange-600 bg-orange-500 text-white',
         };
-      case '3':
+      case 3:
         return {
           label: 'Critical',
           className: 'border-red-700 bg-red-600 text-white',
         };
       default:
-        return null;
+        return {
+          label: 'Low',
+          className: 'border-yellow-500 bg-yellow-400 text-black',
+        };
     }
   };
 
