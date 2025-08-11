@@ -721,7 +721,7 @@ def init_lora():
     loranode = sx1262.sx126x(
         uart_num=1,        # UART port number - adjust as needed
         freq=868,          # Frequency in MHz
-        addr=0,            # Node address
+        addr=my_lora_addr, # Node address
         power=22,          # Transmission power in dBm
         rssi=True,         # Enable RSSI reporting
         air_speed=2400,    # Air data rate
@@ -769,6 +769,7 @@ async def main2():
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv} my_lora_addr = {my_lora_addr}")
     init_lora()
+    loranode.get_settings()
     await asyncio.sleep(2)
     print(shortest_path_to_cc)
     asyncio.create_task(lora_read())
