@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button';
 
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
-import { Machine } from '@/lib/types/machine';
+import { Machine, MQTTEvent } from '@/lib/types/machine';
+import { calculateSeverity } from '@/lib/utils/severity';
 
 import PageHeader from '../page-header';
 import DeviceInfo from './device-info';
 import EventDetailsModal from './event-details-modal';
 import EventsSection from './events-section';
+import MQTTEventFeed from './mqtt-event-feed';
 
 interface S3EventData {
   image_c_key: string;
@@ -84,6 +86,8 @@ export default function DeviceDetailsClient({
   const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
     null,
   );
+  const [mqttEvents, setMqttEvents] = useState<MQTTEvent[]>([]);
+  const [showMqttFeed, setShowMqttFeed] = useState(false);
 
   const handleFetchModalImages = useCallback(
     async (event: ProcessedEvent): Promise<ProcessedEvent | void> => {
@@ -109,6 +113,36 @@ export default function DeviceDetailsClient({
     [token],
   );
 
+  const handleNewMqttEvent = useCallback((eventData: Omit<MQTTEvent, 'id' | 'severity'>) => {
+    const newEvent: MQTTEvent = {
+      ...eventData,
+      id: `mqtt-${Date.now()}-${Math.random()}`,
+      severity: calculateSeverity(eventData.cropped_images),
+    };
+    
+    setMqttEvents(prevEvents => [newEvent, ...prevEvents].slice(0, 20));
+  }, []);
+
+  const simulateMqttEvent = useCallback(() => {
+    const sampleEvent = {
+      timestamp: new Date(),
+      original_image_path: "20/_all_/2025-08-07/228/_all_/images/1754562022_full.jpg",
+      cropped_images: [
+        {
+          class_name: "person",
+          confidence: 0.92,
+          image_file_path: "20/_all_/2025-08-07/228/_all_/images/1754562022_cropped_0.jpg"
+        },
+        {
+          class_name: Math.random() > 0.5 ? "backpack" : "person",
+          confidence: 0.85,
+          image_file_path: "20/_all_/2025-08-07/228/_all_/images/1754562022_cropped_1.jpg"
+        }
+      ],
+    };
+    handleNewMqttEvent(sampleEvent);
+  }, [handleNewMqttEvent]);
+
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader deviceId={device.id.toString()} deviceName={device.name} />
@@ -132,12 +166,44 @@ export default function DeviceDetailsClient({
 
       <DeviceInfo device={device} machineStats={machineStats} buffer={buffer} />
 
-      <EventsSection
-        device={device}
-        orgId={orgId}
-        token={token}
-        onEventSelect={setSelectedEvent}
-      />
+      <div className="flex gap-2 mb-4">
+        <Button
+          variant={!showMqttFeed ? "default" : "outline"}
+          onClick={() => setShowMqttFeed(false)}
+          size="sm"
+        >
+          Historical Events
+        </Button>
+        <Button
+          variant={showMqttFeed ? "default" : "outline"}
+          onClick={() => setShowMqttFeed(true)}
+          size="sm"
+        >
+          Live Activity Feed {mqttEvents.length > 0 && `(${mqttEvents.length})`}
+        </Button>
+        {showMqttFeed && (
+          <Button
+            variant="secondary"
+            onClick={simulateMqttEvent}
+            size="sm"
+          >
+            + Add Test Event
+          </Button>
+        )}
+      </div>
+
+      {showMqttFeed ? (
+        <div className="flex-1 overflow-hidden">
+          <MQTTEventFeed events={mqttEvents} />
+        </div>
+      ) : (
+        <EventsSection
+          device={device}
+          orgId={orgId}
+          token={token}
+          onEventSelect={setSelectedEvent}
+        />
+      )}
 
       {selectedEvent && (
         <EventDetailsModal
