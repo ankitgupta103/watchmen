@@ -28,8 +28,9 @@ import dynamic from 'next/dynamic';
 
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
-import { Machine } from '@/lib/types/machine';
+import { Machine, S3EventData } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
+import { getPresignedUrl } from '@/lib/utils/presigned-url';
 
 import ImageViewerModal from './image-viewer';
 import Pagination from './pagination';
@@ -48,15 +49,6 @@ interface MapBounds {
   south: number;
   east: number;
   west: number;
-}
-
-interface S3EventData {
-  image_c_key: string;
-  image_f_key: string;
-  eventstr: string;
-  timestamp?: string | Date;
-  machineId?: number;
-  event_severity?: string; // Ensure this is part of the API response
 }
 
 interface ProcessedEvent extends S3EventData {
@@ -199,57 +191,66 @@ export default function HeatMapCalendar({
       signal: AbortSignal,
     ) => {
       const eventsToFetch = eventList.filter(
-        (e) => e.image_c_key && !e.imagesLoaded,
+        (e) => (e.image_c_key || e.original_image_path) && !e.imagesLoaded,
       );
       if (!token || eventsToFetch.length === 0) return;
 
       setLoadingImages((prev) => ({ ...prev, [dateStr]: true }));
       try {
-        const imagePromises = eventsToFetch.map((event) =>
-          fetcherClient<{
-            success: boolean;
-            cropped_image_url?: string;
-            full_image_url?: string;
-          }>(`${API_BASE_URL}/event-images/`, token, {
-            method: 'POST',
-            body: {
-              image_c_key: event.image_c_key,
-              image_f_key: event.image_f_key,
-            },
-            signal,
-          })
-            .then((imageResult) => {
-              if (signal.aborted) return;
-              const updatedEvent = {
-                ...event,
-                croppedImageUrl: imageResult?.cropped_image_url,
-                fullImageUrl: imageResult?.full_image_url,
-                imagesLoaded: true,
-              };
-              setEvents((prev) => {
-                const newDayEvents = [...(prev[dateStr] || [])];
-                const index = newDayEvents.findIndex((e) => e.id === event.id);
-                if (index !== -1) newDayEvents[index] = updatedEvent;
-                return { ...prev, [dateStr]: newDayEvents };
-              });
-            })
-            .catch((err) => {
-              if (err.name !== 'AbortError') {
-                console.warn(
-                  `Image fetch failed for event: ${event.id} ${err}`,
-                );
-                const updatedEvent = { ...event, imagesLoaded: true };
-                setEvents((prev) => {
-                  const newDayEvents = [...(prev[dateStr] || [])];
-                  const index = newDayEvents.findIndex(
-                    (e) => e.id === event.id,
-                  );
-                  if (index !== -1) newDayEvents[index] = updatedEvent;
-                  return { ...prev, [dateStr]: newDayEvents };
-                });
-              }
-            }),
-        );
+        const imagePromises = eventsToFetch.map(async (event) => {
+          if (signal.aborted) return;
+          
+          try {
+            let croppedImageUrl: string | null = null;
+            let fullImageUrl: string | null = null;
+
+            // Get presigned URL for cropped image if available
+            if (event.image_c_key) {
+              croppedImageUrl = await getPresignedUrl(event.image_c_key, token);
+            }
+
+            // Get presigned URL for full image if available
+            if (event.image_f_key) {
+              fullImageUrl = await getPresignedUrl(event.image_f_key, token);
+            }
+
+            // If no specific keys, try to get from original_image_path
+            if (!croppedImageUrl && !fullImageUrl && event.original_image_path) {
+              fullImageUrl = await getPresignedUrl(event.original_image_path, token);
+            }
+
+            const updatedEvent = {
+              ...event,
+              croppedImageUrl: croppedImageUrl || undefined,
+              fullImageUrl: fullImageUrl || undefined,
+              imagesLoaded: true,
+            };
+
+            setEvents((prev) => {
+              const newDayEvents = [...(prev[dateStr] || [])];
+              const index = newDayEvents.findIndex((e) => e.id === event.id);
+              if (index !== -1) newDayEvents[index] = updatedEvent;
+              return { ...prev, [dateStr]: newDayEvents };
+            });
+          } catch (err) {
+            if (err instanceof Error && err.name !== 'AbortError') {
+              console.warn(
+                `Image fetch failed for event: ${event.id} ${err}`,
+              );
+            }
+            // Mark as loaded even if failed to prevent infinite retries
+            const updatedEvent = { ...event, imagesLoaded: true };
+            setEvents((prev) => {
+              const newDayEvents = [...(prev[dateStr] || [])];
+              const index = newDayEvents.findIndex(
+                (e) => e.id === event.id,
+              );
+              if (index !== -1) newDayEvents[index] = updatedEvent;
+              return { ...prev, [dateStr]: newDayEvents };
+            });
+          }
+        });
+
         await Promise.allSettled(imagePromises);
       } finally {
         if (!signal.aborted) {
@@ -458,23 +459,6 @@ export default function HeatMapCalendar({
                 {getCalendarDays().map((date, index) => {
                   const dateStr = date.toLocaleDateString('en-CA');
                   const dayEventsCount = (events[dateStr] || []).length;
-                  const dayEventsSeverity = (events[dateStr] || []).reduce(
-                    (acc, event) => {
-                      if (event?.event_severity) {
-                        acc[event.event_severity] =
-                          (acc[event.event_severity] || 0) + 1;
-                      } else {
-                        acc['0'] = (acc['0'] || 0) + 1;
-                      }
-                      return acc;
-                    },
-                    {
-                      '0': 0,
-                      '1': 0,
-                      '2': 0,
-                      '3': 0,
-                    } as Record<string, number>,
-                  );
 
                   return (
                     <Button
@@ -513,36 +497,12 @@ export default function HeatMapCalendar({
                       )}
                       {!loading[dateStr] && dayEventsCount > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {Object.entries(dayEventsSeverity).map(
-                            ([severity, count]) => {
-                              if (count === 0) return null;
-                              return (
-                                <Badge
-                                  variant="secondary"
-                                  key={severity}
-                                  className={cn(
-                                    'px-0.5 py-0.5 text-[10px]',
-                                    severity === '0' &&
-                                      'bg-gray-200 text-gray-500',
-                                    severity === '1' &&
-                                      'bg-yellow-500 text-black',
-                                    severity === '2' &&
-                                      'bg-orange-500 text-white',
-                                    severity === '3' && 'bg-red-500 text-white',
-                                  )}
-                                >
-                                  {count}{' '}
-                                  {severity === '1'
-                                    ? 'Low'
-                                    : severity === '2'
-                                      ? 'High'
-                                      : severity === '0'
-                                        ? 'Unknown'
-                                        : 'Critical'}
-                                </Badge>
-                              );
-                            },
-                          )}
+                          <Badge
+                            variant="secondary"
+                            className="px-1 py-0.5 text-[10px] bg-blue-200 text-blue-700"
+                          >
+                            {dayEventsCount} Events
+                          </Badge>
                         </div>
                       )}
                     </Button>
@@ -597,26 +557,12 @@ export default function HeatMapCalendar({
                               {event.machineName}
                             </span>
                           </div>
-                          {event?.event_severity && (
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                'text-xs',
-                                event.event_severity === '1' &&
-                                  'border-yellow-500 bg-yellow-400 text-black',
-                                event.event_severity === '2' &&
-                                  'border-orange-600 bg-orange-500 text-white',
-                                event.event_severity === '3' &&
-                                  'border-red-700 bg-red-600 text-white',
-                              )}
-                            >
-                              {event.event_severity === '1'
-                                ? 'Low'
-                                : event.event_severity === '2'
-                                  ? 'High'
-                                  : 'Critical'}
-                            </Badge>
-                          )}
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-gray-300 bg-gray-100 text-gray-700"
+                          >
+                            Event
+                          </Badge>
                         </div>
                         <div className="text-xs text-gray-600">
                           Time:{' '}
@@ -624,6 +570,11 @@ export default function HeatMapCalendar({
                             {new Date(event.timestamp).toLocaleTimeString()}
                           </span>
                         </div>
+                        {event.eventstr && (
+                          <div className="text-xs text-gray-600 mt-1">
+                            Event: <span className="font-medium">{event.eventstr}</span>
+                          </div>
+                        )}
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           {event.croppedImageUrl && (
                             <div
