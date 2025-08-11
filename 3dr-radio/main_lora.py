@@ -60,7 +60,7 @@ NET_ID_MAP = {
         "A" : 1,
         "B" : 2,
         "C" : 3,
-        "Z" : 9
+        "Z" : 0
         }
 
 def get_net_id(node_addr=None):
