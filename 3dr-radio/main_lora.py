@@ -30,7 +30,7 @@ HB_WAIT_SEC = 30
 MIDLEN = 7
 FLAKINESS = 0
 
-FRAME_SIZE = 225
+FRAME_SIZE = 200
 
 TRANSFERRING_IMAGE = False
 RECEIVING_IMAGE = False
@@ -580,7 +580,10 @@ def process_message(data):
         hb_process(mid, msg)
     if mst == "B":
         asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
-        begin_chunk(msg.decode())
+        try:
+            begin_chunk(msg.decode())
+        except Exception as e:
+            print(f"Error decoding unicode {e} : {msg}")
     elif mst == "I":
         add_chunk(msg)
     elif mst == "E":
@@ -665,7 +668,7 @@ async def main():
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
         #asyncio.create_task(send_scan())
-        #asyncio.create_task(person_detection_loop())
+        asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
     elif my_addr == "Z":
         # asyncio.create_task(send_spath())
@@ -673,14 +676,6 @@ async def main():
         await asyncio.sleep(360000)
     else:
         print(f"Unknown device : {my_addr}")
-
-async def testmain():
-    log(f"[INFO] Started device {my_addr} my_lora_addr = {my_lora_addr}")
-    await init_lora()
-    print(shortest_path_to_cc)
-    read_task = asyncio.create_task(lora_radio_read())
-    send_task = asyncio.create_task(lora_send_messages(100))
-    await asyncio.gather(read_task, send_task)
 
 try:
     asyncio.run(main())
