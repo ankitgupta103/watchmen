@@ -352,13 +352,13 @@ class sx126x:
         if self.ser.any():
             time.sleep_ms(500)
             r_buff = self.ser.read()
-            print(r_buff)
+            #print(r_buff)
             
             if r_buff and len(r_buff) >= 6:
                 sender_addr = (r_buff[0] << 8) + r_buff[1]
                 frequency = r_buff[2] + self.start_freq
                 
-                print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
+                # print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
                 
                 # Extract message payload (skip first 3 bytes for address and freq)
                 if len(r_buff) > 3:
