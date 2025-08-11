@@ -117,7 +117,7 @@ if my_addr == "A":
 elif my_addr == "B":
     shortest_path_to_cc = ["A", "Z"]
 else:
-    shortest_path_to_cc = []
+    shortest_path_to_cc = ["A"]
 seen_neighbours = []
 
 sent_count = 0
