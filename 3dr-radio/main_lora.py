@@ -23,7 +23,7 @@ UART_BAUDRATE = 57600
 USBA_BAUDRATE = 57600
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.5
-CHUNK_SLEEP = 0.1
+CHUNK_SLEEP = 0.5
 
 HB_WAIT_SEC = 30
 
@@ -245,10 +245,10 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
     if not ackneeded:
         radio_send(dest, databytes)
         return (True, [])
-    for retry_i in range(5):
+    for retry_i in range(3):
         radio_send(dest, databytes)
         await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
-        for i in range(3):
+        for i in range(10):
             at, missing_chunks = ack_time(mid)
             if at > 0:
                 log(f"Msg {mid} : was acked in {at - timesent} msecs")
@@ -302,6 +302,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
     if not succ:
         log(f"Failed sending chunk begin")
         return False
+    await asyncio.sleep(5)
     for i in range(len(chunks)):
         if i % 10 == 0:
             print(f"Sending chunk {i}")

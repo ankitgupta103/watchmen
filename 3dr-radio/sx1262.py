@@ -342,7 +342,7 @@ class sx126x:
 
     def receive(self):
         if self.ser.any():
-            time.sleep_ms(5)
+            time.sleep_ms(300)
             r_buff = self.ser.read()
             #print(r_buff)
             if r_buff and len(r_buff) >= 6:
