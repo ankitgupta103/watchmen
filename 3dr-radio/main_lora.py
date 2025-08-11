@@ -1,29 +1,16 @@
-run_omv = True
-try:
-    import omv
-    print("The 'omv' library IS installed.")
-except ImportError:
-    print("The 'omv' library IS NOT installed.")
-    run_omv = False
-
-if run_omv:
-    from machine import RTC, UART
-    import uasyncio as asyncio
-    import utime
-    import sensor
-    import image
-    import ml
-    import os                   # file system access
-    import time
-    import binascii
-    import machine
-    import enc
-    import sx1262
-else:
-    import asyncio
-    import serial
-    import time as utime
-    from time import gmtime, strftime
+import omv
+from machine import RTC, UART
+import uasyncio as asyncio
+import utime
+import sensor
+import image
+import ml
+import os                   # file system access
+import time
+import binascii
+import machine
+import enc
+import sx1262
 import sys
 import random
 
@@ -70,46 +57,32 @@ def get_net_id(node_addr=None):
 
 time_of_last_radio_receive = 0
 
-if run_omv:
-    rtc = RTC()
-    uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
-    print("Running on device : " + uid.decode())
-    if uid == b'e076465dd7194025':
-        my_addr = 'B'
-    elif uid == b'e076465dd7091027':
-        my_addr = 'A'
-    elif uid == b'e076465dd7194211':
-        my_addr = 'Z'
-    else:
-        print("Unknown device ID for " + omv.board_id())
-        sys.exit()
-    clock_start = utime.ticks_ms() # get millisecond counter
-    UART_PORT = 1
-    uart = UART(UART_PORT, baudrate=UART_BAUDRATE, timeout=1000)
-    uart.init(UART_BAUDRATE, bits=8, parity=None, stop=1)
-
-    # ------ Configuration for tensorflow model ------
-    MODEL_PATH = "/rom/person_detect.tflite"
-    model = ml.Model(MODEL_PATH)
-    print(" Model loaded:", model)
-
-    IMG_DIR = "/sdcard/images/"
-    CONFIDENCE_THRESHOLD = 0.5
-
-    sensor.reset()
-    sensor.set_pixformat(sensor.RGB565)
-    sensor.set_framesize(sensor.QVGA)
-    sensor.skip_frames(time=2000)
+rtc = RTC()
+uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
+print("Running on device : " + uid.decode())
+if uid == b'e076465dd7194025':
+    my_addr = 'B'
+elif uid == b'e076465dd7091027':
+    my_addr = 'A'
+elif uid == b'e076465dd7194211':
+    my_addr = 'Z'
 else:
-    my_addr = 'ZZZZ'
-    #USBA_PORT = "/dev/ttyUSB0"
-    USBA_PORT = "/dev/tty.usbserial-0001"
-    try:
-        uart = serial.Serial(USBA_PORT, USBA_BAUDRATE, timeout=0.1)
-    except serial.SerialException as e:
-        print(f"[ERROR] Could not open serial port {USBA_PORT}: {e}")
-        sys.exit(1)
-    clock_start = int(utime.time() * 1000)
+    print("Unknown device ID for " + omv.board_id())
+    sys.exit()
+clock_start = utime.ticks_ms() # get millisecond counter
+
+# ------ Configuration for tensorflow model ------
+MODEL_PATH = "/rom/person_detect.tflite"
+model = ml.Model(MODEL_PATH)
+print(" Model loaded:", model)
+
+IMG_DIR = "/sdcard/images/"
+CONFIDENCE_THRESHOLD = 0.5
+
+sensor.reset()
+sensor.set_pixformat(sensor.RGB565)
+sensor.set_framesize(sensor.QVGA)
+sensor.skip_frames(time=2000)
 
 shortest_path_to_cc = []
 if my_addr == "A":
@@ -122,6 +95,26 @@ seen_neighbours = []
 
 sent_count = 0
 recv_msg_count = {}
+
+loranode = None
+my_lora_addr = NET_ID_MAP[my_addr]
+
+async def init_lora():
+    global loranode
+    print(f"Initializing LoRa SX126X module... my lora addr = {my_lora_addr}")
+    loranode = sx1262.sx126x(
+        uart_num=1,        # UART port number - adjust as needed
+        freq=868,          # Frequency in MHz
+        addr=my_lora_addr, # Node address
+        power=22,          # Transmission power in dBm
+        rssi=False,         # Enable RSSI reporting
+        air_speed=2400,    # Air data rate
+        m0_pin='P6',       # M0 control pin - adjust to your wiring
+        m1_pin='P7'        # M1 control pin - adjust to your wiring
+    )
+    print("LoRa module initialized successfully!")
+    print(f"Node address: {loranode.addr}")
+    print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
 def running_as_cc():
     return my_addr == "Z"
@@ -175,11 +168,8 @@ async def person_detection_loop():
         await asyncio.sleep(30)
 
 def get_human_ts():
-    if run_omv:
-        _,_,_,_,h,m,s,_ = rtc.datetime()
-        t=f"{m}:{s}"
-    else:
-        t = strftime("%M:%S", gmtime())
+    _,_,_,_,h,m,s,_ = rtc.datetime()
+    t=f"{m}:{s}"
     return t
 
 def log(msg):
@@ -193,10 +183,7 @@ msgs_recd = []
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
 def time_msec():
-    if run_omv:
-        delta = utime.ticks_diff(utime.ticks_ms(), clock_start) # compute time difference
-    else:
-        delta = int(utime.time() * 1000) - clock_start
+    delta = utime.ticks_diff(utime.ticks_ms(), clock_start) # compute time difference
     return delta
 
 def time_sec():
@@ -226,14 +213,15 @@ def ack_needed(msgtype):
         return True
     return False
 
-def radio_send(data):
+def radio_send(dest, data):
     global sent_count
     sent_count = sent_count + 1
     lendata = len(data)
     if len(data) > 254:
         print(f"Error msg too large : {len(data)}")
-    data = lendata.to_bytes(1) + data
-    uart.write(data)
+    #data = lendata.to_bytes(1) + data
+    target_addr = NET_ID_MAP[dest]
+    loranode.send(target_addr, data)
     log(f"[SENT at {CURRENT_NETID} {len(data)} bytes] {data} at {time_msec()}")
 
 def pop_and_get(mid):
@@ -255,10 +243,10 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
     else:
         msgs_sent.append((mid, msgbytes, timesent))
     if not ackneeded:
-        radio_send(databytes)
+        radio_send(dest, databytes)
         return (True, [])
     for retry_i in range(5):
-        radio_send(databytes)
+        radio_send(dest, databytes)
         await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
         for i in range(3):
             at, missing_chunks = ack_time(mid)
@@ -335,20 +323,8 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
             _ = await send_single_msg("I", creator, chunkbytes, dest)
     return False
 
-def switch_netid(netid):
-    global CURRENT_NETID
-    if CURRENT_NETID == netid:
-        return
-    print(f"Switching netid from {CURRENT_NETID} to {netid}")
-    if radio.change_netid(uart, netid):
-        CURRENT_NETID = netid
-
 async def send_msg(msgtype, creator, msgbytes, dest):
-    if msgtype != "A":
-        switch_netid(get_net_id(dest))
     retval = await send_msg_internal(msgtype, creator, msgbytes, dest)
-    if msgtype != "A":
-        switch_netid(get_net_id())
     return retval
 
 def ack_time(smid):
@@ -391,33 +367,12 @@ async def log_status():
 
 # === Async Receiver for openmv ===
 async def radio_read():
-    if run_omv:
-        buffer = b""
-        while True:
-            if uart.any():
-                buffer = uart.read(1)
-                lendata = int.from_bytes(buffer)
-                print(f"Lendata to read = {lendata}")
-                if lendata > 0:
-                    print(lendata)
-                    buffer = uart.read(lendata)
-                    process_message(buffer)
-                    #processed_success = process_message(buffer)
-                    #if not processed_success:
-                    #    uart.read() # clear buffer.
-                    #else:
-                    #    time_of_last_radio_receive = time_msec()
-            await asyncio.sleep(0.01)
-    else:
-        buffer = b""
-        while True:
-            await asyncio.sleep(0.01)
-            while uart.in_waiting > 0:
-                byte = uart.read(1)
-                buffer += byte
-                if byte == b'\n':
-                    process_message(buffer)
-                    buffer = b""
+    while True:
+        message = loranode.receive()
+        if message:
+            print(f"In Main, message received = {message}")
+            process_message(message)
+        await asyncio.sleep(0.05)
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
@@ -688,17 +643,6 @@ async def print_summary():
         #print(msgs_recd)
         #print(msgs_unacked)
 
-async def time_since_last_read():
-    while True:
-        await asyncio.sleep(10)
-        time_since_last = int((time_msec() - time_of_last_radio_receive) / 1000)
-        print(f"Checking if radio needs to be rebooted, time since last = {time_since_last}")
-        if time_since_last >= HB_WAIT_SEC:
-            print(f"Time since last read = {time_since_last}, rebooting radio ...............")
-            await asyncio.sleep(5)
-            radio.hard_reboot(uart)
-            print("Radio rebooted")
-
 def image_test():
     r = get_rand()
     print(r)
@@ -712,50 +656,26 @@ def image_test():
     im3.save(f"reconstructed_jpeg_{r}.jpg")
 
 
-loranode = None
-my_lora_addr = NET_ID_MAP[my_addr]
-
-async def init_lora():
-    global loranode
-    print(f"Initializing LoRa SX126X module... my lora addr = {my_lora_addr}")
-    loranode = sx1262.sx126x(
-        uart_num=1,        # UART port number - adjust as needed
-        freq=868,          # Frequency in MHz
-        addr=my_lora_addr, # Node address
-        power=22,          # Transmission power in dBm
-        rssi=False,         # Enable RSSI reporting
-        air_speed=2400,    # Air data rate
-        m0_pin='P6',       # M0 control pin - adjust to your wiring
-        m1_pin='P7'        # M1 control pin - adjust to your wiring
-    )
-    print("LoRa module initialized successfully!")
-    print(f"Node address: {loranode.addr}")
-    print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
-
-async def lora_radio_read():
-    print("In Read Method")
-    while True:
-        message = loranode.receive()
-        if message:
-            print(f"In Main, message received = {message}")
-        await asyncio.sleep(0.05)
-
-async def lora_send_messages(n):
-    global loranode
-    if len(shortest_path_to_cc) == 0:
-        print(f"Error, no shortest_path_to_cc yet {shortest_path_to_cc}")
-        return
-    dest = shortest_path_to_cc[0]
-    target_addr = NET_ID_MAP[dest]
-    print(f"Sending {n} messages to {target_addr}")
-    for i in range(n):
-        msg = f"Message from {my_addr},{my_lora_addr}, message num = {i}"
-        print(f"Sending to {target_addr} : {msg}")
-        loranode.send(target_addr, msg)
-        await asyncio.sleep(10)
-
 async def main():
-    log(f"[INFO] Started device {my_addr} run_omv = {run_omv} my_lora_addr = {my_lora_addr}")
+    log(f"[INFO] Started device {my_addr}, {my_lora_addr}")
+    await init_lora()
+    asyncio.create_task(radio_read())
+    asyncio.create_task(print_summary())
+    # asyncio.create_task(time_since_last_read())
+    if my_addr in ["A", "B", "C"]:
+        asyncio.create_task(send_heartbeat())
+        #asyncio.create_task(send_scan())
+        #asyncio.create_task(person_detection_loop())
+        await asyncio.sleep(36000)
+    elif my_addr == "Z":
+        # asyncio.create_task(send_spath())
+        #asyncio.create_task(send_scan())
+        await asyncio.sleep(360000)
+    else:
+        print(f"Unknown device : {my_addr}")
+
+async def testmain():
+    log(f"[INFO] Started device {my_addr} my_lora_addr = {my_lora_addr}")
     await init_lora()
     print(shortest_path_to_cc)
     read_task = asyncio.create_task(lora_radio_read())
