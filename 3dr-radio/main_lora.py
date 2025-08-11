@@ -734,12 +734,14 @@ def init_lora():
     print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
 async def lora_read():
+    global loranode
     while True:
         message = loranode.receive()
         if message:
             print(f"In Main, message received = {message}")
 
 def lora_send(message):
+    global loranode
     if len(shortest_path_to_cc) == 0:
         print(f"Error, no shortest_path_to_cc yet {shortest_path_to_cc}")
         return
