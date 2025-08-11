@@ -344,7 +344,7 @@ class sx126x:
                bytes([self.offset_freq]) + \
                message.encode()
 
-        print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
+        #print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
         self.ser.write(data)
         time.sleep_ms(100)
 
