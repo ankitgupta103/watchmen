@@ -733,10 +733,12 @@ async def init_lora():
     print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
 async def lora_radio_read():
+    print("In Read Method")
     while True:
         message = loranode.receive()
         if message:
             print(f"In Main, message received = {message}")
+        await asyncio.sleep(0.05)
 
 async def lora_send_messages(n):
     global loranode
@@ -755,6 +757,7 @@ async def lora_send_messages(n):
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv} my_lora_addr = {my_lora_addr}")
     await init_lora()
+    print(shortest_path_to_cc)
     read_task = asyncio.create_task(lora_radio_read())
     send_task = asyncio.create_task(lora_send_messages(100))
     await asyncio.gather(read_task, send_task)
