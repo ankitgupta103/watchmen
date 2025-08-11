@@ -238,30 +238,90 @@ class sx126x:
         time.sleep_ms(100)
 
     def get_settings(self):
-        # the pin M1 of lora HAT must be high when enter setting mode and get parameters
+        """Get and parse all LoRa module settings"""
+        # Enter configuration mode
+        self.M0.value(0)  # LOW
         self.M1.value(1)  # HIGH
         time.sleep_ms(100)
         
-        # send command to get setting parameters
+        # Clear input buffer
+        while self.ser.any():
+            self.ser.read()
+        
+        # Send get settings command
         self.ser.write(bytes([0xC1, 0x00, 0x09]))
-        time.sleep_ms(100)
+        time.sleep_ms(200)
         
-        if self.ser.any():
-            time.sleep_ms(100)
-            self.get_reg = self.ser.read()
+        if not self.ser.any():
+            print("No response from module")
+            self.M1.value(0)
+            return
         
-        # check the return characters from hat and print the setting parameters
-        if self.get_reg and len(self.get_reg) >= 9 and self.get_reg[0] == 0xC1 and self.get_reg[2] == 0x09:
-            fre_temp = self.get_reg[8]
-            addr_temp = (self.get_reg[3] << 8) + self.get_reg[4]
-            air_speed_temp = self.get_reg[6] & 0x03
-            power_temp = self.get_reg[7] & 0x03
-            
-            print(f"Frequency is {fre_temp + self.start_freq}.125MHz")
-            print(f"Node address is {addr_temp}")
-            print(f"Air speed code is {air_speed_temp}")
-            print(f"Power code is {power_temp}")
-            
+        response = self.ser.read()
+        
+        # Validate response
+        if not response or len(response) < 12 or response[0] != 0xC1 or response[2] != 0x09:
+            print(f"Invalid response: {[hex(x) for x in response] if response else 'None'}")
+            self.M1.value(0)
+            return
+        
+        # Parse response bytes
+        high_addr = response[3]
+        low_addr = response[4] 
+        net_id = response[5]
+        uart_speed_reg = response[6]
+        power_buffer_reg = response[7]
+        freq_offset = response[8]
+        mode_rssi_reg = response[9]
+        h_crypt = response[10]
+        l_crypt = response[11]
+        
+        # Decode values
+        node_addr = (high_addr << 8) + low_addr
+        frequency = freq_offset + self.start_freq
+        
+        # UART baud rates
+        uart_rates = {0x00: 1200, 0x20: 2400, 0x40: 4800, 0x60: 9600, 
+                    0x80: 19200, 0xA0: 38400, 0xC0: 57600, 0xE0: 115200}
+        uart_baud = uart_rates.get(uart_speed_reg & 0xE0, "Unknown")
+        
+        # Air speeds  
+        air_speeds = {0x01: 1200, 0x02: 2400, 0x03: 4800, 0x04: 9600,
+                    0x05: 19200, 0x06: 38400, 0x07: 62500}
+        air_speed = air_speeds.get(uart_speed_reg & 0x07, "Unknown")
+        
+        # Buffer sizes
+        buffer_sizes = {0x00: 240, 0x40: 128, 0x80: 64, 0xC0: 32}
+        buffer_size = buffer_sizes.get(power_buffer_reg & 0xC0, "Unknown")
+        
+        # Power levels
+        power_levels = {0x00: 22, 0x01: 17, 0x02: 13, 0x03: 10}
+        power = power_levels.get(power_buffer_reg & 0x03, "Unknown")
+        
+        # Encryption key
+        crypt_key = (h_crypt << 8) + l_crypt
+        
+        # Flags
+        rssi_enabled = bool(mode_rssi_reg & 0x80)
+        noise_rssi_enabled = bool(power_buffer_reg & 0x20)
+        
+        # Display parsed settings
+        print("=" * 40)
+        print("      LoRa Module Settings")
+        print("=" * 40)
+        print(f"Node Address    : {node_addr} (0x{node_addr:04X})")
+        print(f"Network ID      : {net_id}")
+        print(f"Frequency       : {frequency}.125 MHz")
+        print(f"UART Baud Rate  : {uart_baud} bps")
+        print(f"Air Data Rate   : {air_speed} bps") 
+        print(f"TX Power        : {power} dBm")
+        print(f"Buffer Size     : {buffer_size} bytes")
+        print(f"Encryption Key  : {crypt_key} (0x{crypt_key:04X})")
+        print(f"Packet RSSI     : {'Enabled' if rssi_enabled else 'Disabled'}")
+        print(f"Noise RSSI      : {'Enabled' if noise_rssi_enabled else 'Disabled'}")
+        print("=" * 40)
+        
+        # Return to normal mode
         self.M1.value(0)  # LOW
 
     def send(self, target_addr, message):
