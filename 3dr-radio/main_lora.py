@@ -60,7 +60,7 @@ NET_ID_MAP = {
         "A" : 1,
         "B" : 2,
         "C" : 3,
-        "Z" : 0
+        "Z" : 9
         }
 
 def get_net_id(node_addr=None):
@@ -715,7 +715,7 @@ def image_test():
 loranode = None
 my_lora_addr = NET_ID_MAP[my_addr]
 
-def init_lora():
+async def init_lora():
     global loranode
     print(f"Initializing LoRa SX126X module... my lora addr = {my_lora_addr}")
     loranode = sx1262.sx126x(
@@ -723,63 +723,44 @@ def init_lora():
         freq=868,          # Frequency in MHz
         addr=my_lora_addr, # Node address
         power=22,          # Transmission power in dBm
-        rssi=False,        # Enable RSSI reporting
+        rssi=True,         # Enable RSSI reporting
         air_speed=2400,    # Air data rate
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
     )
-
     print("LoRa module initialized successfully!")
     print(f"Node address: {loranode.addr}")
     print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
-async def lora_read():
-    global loranode
+async def lora_radio_read():
+    print("=================In READ METHOD")
     while True:
+        print("Trying to read from serial")
         message = loranode.receive()
+        await asyncio.sleep(5)
         if message:
+            print(message)
             print(f"In Main, message received = {message}")
 
-def lora_send(message):
+async def lora_send_messages(n):
     global loranode
     if len(shortest_path_to_cc) == 0:
         print(f"Error, no shortest_path_to_cc yet {shortest_path_to_cc}")
         return
     dest = shortest_path_to_cc[0]
     target_addr = NET_ID_MAP[dest]
-    print(f"Sending message to {target_addr} : {message}")
-    loranode.send(target_addr, message)
-
-async def main2():
-    log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
-    switch_netid(get_net_id())
-    asyncio.create_task(radio_read())
-    asyncio.create_task(print_summary())
-    # asyncio.create_task(time_since_last_read())
-    if my_addr in ["A", "B", "C"]:
-        # asyncio.create_task(send_heartbeat())
-        #asyncio.create_task(send_scan())
-        asyncio.create_task(person_detection_loop())
-        await asyncio.sleep(36000)
-    elif my_addr == "Z":
-        # asyncio.create_task(send_spath())
-        #asyncio.create_task(send_scan())
-        await asyncio.sleep(360000)
-    else:
-        print(f"Unknown device : {my_addr}")
+    print(f"Sending {n} messages to {target_addr}")
+    for i in range(n):
+        msg = f"Message from {my_addr},{my_lora_addr}, message num = {i}"
+        loranode.send(target_addr, msg)
+        await asyncio.sleep(10)
 
 async def main():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv} my_lora_addr = {my_lora_addr}")
-    init_lora()
-    loranode.get_settings()
-    await asyncio.sleep(2)
-    print(shortest_path_to_cc)
-    asyncio.create_task(lora_read())
-    for i in range(10000):
-        msg = f"Message from {my_addr},{my_lora_addr}, message num = {i}"
-        lora_send(msg)
-        print("Sending finished")
-        time.sleep(5)
+    await init_lora()
+    read_task = asyncio.create_task(lora_radio_read())
+    send_task = asyncio.create_task(lora_send_messages(100))
+    await asyncio.gather(read_task, send_task)
 
 try:
     asyncio.run(main())
