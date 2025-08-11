@@ -342,7 +342,7 @@ class sx126x:
                bytes([self.addr >> 8]) + \
                bytes([self.addr & 0xff]) + \
                bytes([self.offset_freq]) + \
-               message.encode()
+               message
 
         #print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
         self.ser.write(data)
