@@ -735,9 +735,7 @@ async def init_lora():
 async def lora_radio_read():
     while True:
         message = loranode.receive()
-        await asyncio.sleep(5)
         if message:
-            print(message)
             print(f"In Main, message received = {message}")
 
 async def lora_send_messages(n):
