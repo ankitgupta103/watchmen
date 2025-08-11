@@ -28,6 +28,39 @@ export interface CroppedImage {
   image_file_path: string;
 }
 
+export interface S3EventData {
+  original_image_path: string;
+  cropped_images: CroppedImage[];
+  timestamp?: string | Date;
+  eventstr?: string;
+  event_severity?: string;
+  image_c_key?: string;
+  image_f_key?: string;
+  machine_id?: number;
+}
+
+export interface S3EventsResponse {
+  success: boolean;
+  events: S3EventData[];
+  chunk: number;
+  events_per_chunk: number;
+  total_events: number;
+  total_chunks: number;
+  has_next: boolean;
+}
+
+export interface FeedEvent extends S3EventData {
+  id: string;
+  machineId: number;
+  machineName: string;
+  machineType: string;
+  timestamp: Date;
+  croppedImageUrl?: string;
+  fullImageUrl?: string;
+  imagesLoaded: boolean;
+  severity: string;
+}
+
 export interface MQTTEvent {
   id: string;
   timestamp: Date;

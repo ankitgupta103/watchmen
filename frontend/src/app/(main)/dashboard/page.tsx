@@ -5,11 +5,11 @@ import { API_BASE_URL } from '@/lib/constants';
 import { fetcher } from '@/lib/fetcher';
 import { Machine } from '@/lib/types/machine';
 
-import DeviceListing from './components/device-listing';
+import EventsFeed from './components/events-feed';
 import PageHeader from './components/page-header';
 
 export default async function DashboardPage() {
-  const { organization_uid } = await getOrg();
+  const { organization_uid, organization_id } = await getOrg();
 
   const { data: machines } = await fetcher<{
     status: string;
@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader />
       <div className="bg-background h-full w-full overflow-y-auto rounded-lg border">
-        <DeviceListing machines={machines ?? []} />
+        <EventsFeed machines={machines ?? []} orgId={organization_id} />
       </div>
     </section>
   );
