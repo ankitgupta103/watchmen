@@ -373,7 +373,6 @@ class sx126x:
                     else:
                         # No RSSI, message is from byte 3 to end
                         message = r_buff[3:]
-                        print(f"Message: {message}")
                         return message
             else:
                 print(f"Received short or empty message: {r_buff}")
