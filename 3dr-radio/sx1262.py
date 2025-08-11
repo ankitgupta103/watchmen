@@ -264,7 +264,7 @@ class sx126x:
             
         self.M1.value(0)  # LOW
 
-    def send(self, target_addr, data):
+    def send(self, target_addr, message):
         if not hasattr(self, 'config_success') or not self.config_success:
             print("Warning: Module not properly configured, send may fail")
             
@@ -272,7 +272,7 @@ class sx126x:
         self.M0.value(0)  # LOW - Normal operation mode
         time.sleep_ms(100)
        
-        offset_frequency = self.target_freq - (850 if self.target_freq > 850 else 410)
+        offset_frequency = self.freq - (850 if self.freq > 850 else 410)
 
         # Create message packet
         # Format: [target_high][target_low][target_freq][own_high][own_low][own_freq][message]

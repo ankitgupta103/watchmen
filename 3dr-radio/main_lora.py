@@ -18,6 +18,7 @@ if run_omv:
     import binascii
     import machine
     import enc
+    import sx1262
 else:
     import asyncio
     import serial
@@ -74,11 +75,11 @@ if run_omv:
     uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
     print("Running on device : " + uid.decode())
     if uid == b'e076465dd7194025':
-        my_addr = 'Z'
-    elif uid == b'e076465dd7091027':
         my_addr = 'B'
-    elif uid == b'e076465dd7194211':
+    elif uid == b'e076465dd7091027':
         my_addr = 'A'
+    elif uid == b'e076465dd7194211':
+        my_addr = 'Z'
     else:
         print("Unknown device ID for " + omv.board_id())
         sys.exit()
@@ -717,7 +718,7 @@ my_lora_addr = NET_ID_MAP[my_addr]
 def init_lora():
     global loranode
     print(f"Initializing LoRa SX126X module... my lora addr = {my_lora_addr}")
-    loranode = sx126x.sx126x(
+    loranode = sx1262.sx126x(
         uart_num=1,        # UART port number - adjust as needed
         freq=868,          # Frequency in MHz
         addr=0,            # Node address
@@ -731,17 +732,14 @@ def init_lora():
     print("LoRa module initialized successfully!")
     print(f"Node address: {loranode.addr}")
     print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
-    if led_available:
-        led.value(1)  # LED on
-        time.sleep_ms(500)
-        led.value(0)  # LED off
 
-def lora_read():
+async def lora_read():
     while True:
         message = loranode.receive()
-        print(f"In Main, message received = {message}")
+        if message:
+            print(f"In Main, message received = {message}")
 
-def lora_send(message)
+def lora_send(message):
     if len(shortest_path_to_cc) == 0:
         print(f"Error, no shortest_path_to_cc yet {shortest_path_to_cc}")
         return
@@ -750,7 +748,7 @@ def lora_send(message)
     print(f"Sending message to {target_addr} : {message}")
     loranode.send(target_addr, message)
 
-async def main():
+async def main2():
     log(f"[INFO] Started device {my_addr} run_omv = {run_omv}")
     switch_netid(get_net_id())
     asyncio.create_task(radio_read())
@@ -767,6 +765,19 @@ async def main():
         await asyncio.sleep(360000)
     else:
         print(f"Unknown device : {my_addr}")
+
+async def main():
+    log(f"[INFO] Started device {my_addr} run_omv = {run_omv} my_lora_addr = {my_lora_addr}")
+    init_lora()
+    await asyncio.sleep(2)
+    print(shortest_path_to_cc)
+    asyncio.create_task(lora_read())
+    for i in range(10000):
+        msg = f"Message from {my_addr},{my_lora_addr}, message num = {i}"
+        lora_send(msg)
+        print("Sending finished")
+        time.sleep(5)
+
 try:
     asyncio.run(main())
 except KeyboardInterrupt:
