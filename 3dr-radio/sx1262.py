@@ -292,6 +292,7 @@ class sx126x:
         if self.ser.any():
             time.sleep_ms(500)
             r_buff = self.ser.read()
+            print(r_buff)
             
             if r_buff and len(r_buff) >= 6:
                 sender_addr = (r_buff[0] << 8) + r_buff[1]
