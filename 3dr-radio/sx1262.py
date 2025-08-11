@@ -328,13 +328,7 @@ class sx126x:
         if not hasattr(self, 'config_success') or not self.config_success:
             print("Warning: Module not properly configured, send may fail")
             
-        #self.M1.value(0)  # LOW
-        #self.M0.value(0)  # LOW - Normal operation mode
-        #time.sleep_ms(100)
-       
         offset_frequency = self.freq - (850 if self.freq > 850 else 410)
-
-        # Create message packet
         # Format: [target_high][target_low][target_freq][own_high][own_low][own_freq][message]
         data = bytes([target_addr >> 8]) + \
                bytes([target_addr & 0xff]) + \
@@ -343,37 +337,22 @@ class sx126x:
                bytes([self.addr & 0xff]) + \
                bytes([self.offset_freq]) + \
                message
-
         #print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
         self.ser.write(data)
-        time.sleep_ms(50)
 
     def receive(self):
         if self.ser.any():
-            time.sleep_ms(50)
+            time.sleep_ms(5)
             r_buff = self.ser.read()
             #print(r_buff)
-            
             if r_buff and len(r_buff) >= 6:
                 sender_addr = (r_buff[0] << 8) + r_buff[1]
                 frequency = r_buff[2] + self.start_freq
-                
                 # print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
-                
                 # Extract message payload (skip first 3 bytes for address and freq)
                 if len(r_buff) > 3:
-                    if self.rssi and len(r_buff) > 4:
-                        # Last byte is RSSI, message is everything in between
-                        message = r_buff[3:-1]
-                        rssi_val = r_buff[-1]
-                        print(f"Message: {message}")
-                        print(f"Packet RSSI: -{256-rssi_val}dBm")
-                        self.get_channel_rssi()
-                        return None
-                    else:
-                        # No RSSI, message is from byte 3 to end
-                        message = r_buff[3:]
-                        return message
+                    message = r_buff[3:]
+                    return message
             else:
                 print(f"Received short or empty message: {r_buff}")
                 return None
