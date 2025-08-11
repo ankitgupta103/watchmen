@@ -31,6 +31,7 @@ import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
 import { calculateSeverity } from '@/lib/utils/severity';
+import { getPresignedUrl, getMultiplePresignedUrls } from '@/lib/utils/presigned-url';
 
 import { AudioManager } from './audio-manager';
 
@@ -66,6 +67,8 @@ interface EventAlert {
   croppedImageUrl?: string;
   fullImageUrl?: string;
   croppedImages?: CroppedImage[];
+  croppedImageUrls?: Record<string, string>; // Map filename to presigned URL
+  fullImagePresignedUrl?: string;
   acknowledged: boolean;
   imagesFetched: boolean;
   fetchingImages: boolean;
@@ -462,27 +465,65 @@ export default function CriticalAlertSystem({
 
       for (const alert of alertsNeedingImages) {
         try {
-          if (!alert.message.image_c_key || !alert.message.image_f_key) {
-            continue; // Skip if no image keys available
+          let croppedImageUrls: Record<string, string> = {};
+          let fullImagePresignedUrl: string | undefined;
+          
+          // Handle new format with cropped_images
+          if (alert.croppedImages && alert.croppedImages.length > 0) {
+            console.log('[AlertSystem] Fetching presigned URLs for cropped images:', alert.croppedImages.length);
+            
+            const filenames = alert.croppedImages.map(img => img.image_file_path);
+            croppedImageUrls = await getMultiplePresignedUrls(filenames, token);
+            
+            // Also get full image if available
+            if (alert.message.original_image_path) {
+              fullImagePresignedUrl = await getPresignedUrl(alert.message.original_image_path, token) || undefined;
+            }
           }
-          const imageUrls = await fetchEventImages({
-            image_c_key: alert.message.image_c_key,
-            image_f_key: alert.message.image_f_key,
-          });
+          
+          // Handle legacy format with image keys
+          else if (alert.message.image_c_key || alert.message.image_f_key) {
+            console.log('[AlertSystem] Fetching presigned URLs for legacy image keys');
+            
+            const imageUrls = await fetchEventImages({
+              image_c_key: alert.message.image_c_key!,
+              image_f_key: alert.message.image_f_key!,
+            });
+            
+            // Store in legacy format for backward compatibility
+            if (imageUrls) {
+              setAlerts((prev) =>
+                prev.map((a) =>
+                  a.id === alert.id
+                    ? {
+                        ...a,
+                        croppedImageUrl: imageUrls.croppedImageUrl,
+                        fullImageUrl: imageUrls.fullImageUrl,
+                        imagesFetched: true,
+                        fetchingImages: false,
+                      }
+                    : a,
+                ),
+              );
+              continue; // Skip the new format update below
+            }
+          }
 
+          // Update alert with presigned URLs
           setAlerts((prev) =>
             prev.map((a) =>
               a.id === alert.id
                 ? {
                     ...a,
-                    croppedImageUrl: imageUrls?.croppedImageUrl,
-                    fullImageUrl: imageUrls?.fullImageUrl,
+                    croppedImageUrls,
+                    fullImagePresignedUrl,
                     imagesFetched: true,
                     fetchingImages: false,
                   }
                 : a,
             ),
           );
+          
         } catch (error) {
           console.error(`Failed to fetch images for alert ${alert.id}:`, error);
           setAlerts((prev) =>
@@ -789,31 +830,60 @@ export default function CriticalAlertSystem({
                               <p className="mb-2 text-sm font-medium text-gray-700">
                                 Detected Objects ({alert.croppedImages.length})
                               </p>
-                              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                                {alert.croppedImages.map((img, index) => (
-                                  <div key={index} className="text-center">
-                                    <div className="aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center mb-2">
-                                      <div className="text-center text-gray-500">
-                                        <Camera className="h-8 w-8 mx-auto mb-1 opacity-50" />
-                                        <div className="text-xs">
-                                          {img.class_name}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <Badge variant="secondary" className="text-xs">
-                                      {img.class_name} {Math.round(img.confidence * 100)}%
-                                    </Badge>
+                              
+                              {/* Full image if available */}
+                              {alert.fullImagePresignedUrl && (
+                                <div className="mb-3">
+                                  <p className="mb-1 text-xs text-gray-500">Full Scene</p>
+                                  <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
+                                    <Image
+                                      src={alert.fullImagePresignedUrl}
+                                      alt="Full scene"
+                                      fill
+                                      className="object-cover"
+                                    />
                                   </div>
-                                ))}
+                                </div>
+                              )}
+                              
+                              {/* Cropped images grid */}
+                              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                                {alert.croppedImages.map((img, index) => {
+                                  const imageUrl = alert.croppedImageUrls?.[img.image_file_path];
+                                  
+                                  return (
+                                    <div key={index} className="text-center">
+                                      <div className="aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mb-2">
+                                        {imageUrl ? (
+                                          <Image
+                                            src={imageUrl}
+                                            alt={`${img.class_name} detection`}
+                                            width={120}
+                                            height={120}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                            <div className="text-center">
+                                              <Camera className="h-8 w-8 mx-auto mb-1 opacity-50" />
+                                              <div className="text-xs">{img.class_name}</div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Badge variant="secondary" className="text-xs">
+                                        {img.class_name} {Math.round(img.confidence * 100)}%
+                                      </Badge>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           ) : alert.imagesFetched && (alert.croppedImageUrl || alert.fullImageUrl) ? (
                             <div className="flex items-center gap-2">
                               {alert.croppedImageUrl && (
                                 <div>
-                                  <p className="mb-1 text-xs text-gray-500">
-                                    Cropped
-                                  </p>
+                                  <p className="mb-1 text-xs text-gray-500">Cropped</p>
                                   <Image
                                     width={100}
                                     height={100}
@@ -825,9 +895,7 @@ export default function CriticalAlertSystem({
                               )}
                               {alert.fullImageUrl && (
                                 <div>
-                                  <p className="mb-1 text-xs text-gray-500">
-                                    Full
-                                  </p>
+                                  <p className="mb-1 text-xs text-gray-500">Full</p>
                                   <Image
                                     width={100}
                                     height={100}

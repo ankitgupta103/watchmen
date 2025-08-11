@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { MQTTEvent } from '@/lib/types/machine';
 import { calculateSeverity, getSeverityLabel } from '@/lib/utils/severity';
 import { cn } from '@/lib/utils';
+import { getPresignedUrl, getMultiplePresignedUrls } from '@/lib/utils/presigned-url';
+import useToken from '@/hooks/use-token';
 
 interface MQTTEventFeedProps {
   events: MQTTEvent[];
@@ -18,8 +20,53 @@ interface EventItemProps {
 }
 
 const EventItem: React.FC<EventItemProps> = ({ event }) => {
+  const { token } = useToken();
+  const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
+  const [croppedImageUrls, setCroppedImageUrls] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
   const severity = event.severity || calculateSeverity(event.cropped_images);
   const severityInfo = getSeverityLabel(severity);
+
+  // Fetch presigned URLs when component mounts
+  useEffect(() => {
+    const fetchImages = async () => {
+      if (!token || loading) return;
+      
+      setLoading(true);
+      
+      try {
+        setError(null);
+        
+        // Fetch full image URL
+        if (event.full_image_url) {
+          setFullImageUrl(event.full_image_url);
+        } else if (event.original_image_path) {
+          const url = await getPresignedUrl(event.original_image_path, token);
+          setFullImageUrl(url);
+        }
+        
+        // Fetch cropped image URLs
+        if (event.cropped_images && event.cropped_images.length > 0) {
+          const filenames = event.cropped_images.map(img => img.image_file_path);
+          const urls = await getMultiplePresignedUrls(filenames, token);
+          setCroppedImageUrls(urls);
+          
+          if (Object.keys(urls).length === 0) {
+            setError('Failed to load images');
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching presigned URLs:', err);
+        setError('Failed to load images');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchImages();
+  }, [token, event.full_image_url, event.original_image_path, event.cropped_images, loading]);
   
   const formatTimestamp = (timestamp: Date) => {
     const now = new Date();
@@ -75,10 +122,17 @@ const EventItem: React.FC<EventItemProps> = ({ event }) => {
         </div>
         
         {/* Main image or detection placeholder */}
-        {event.full_image_url ? (
+        {loading ? (
+          <div className="w-full h-64 bg-gray-100 rounded-lg mb-3 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              <p className="text-gray-500 text-sm">Loading images...</p>
+            </div>
+          </div>
+        ) : fullImageUrl ? (
           <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden mb-3">
             <Image
-              src={event.full_image_url}
+              src={fullImageUrl}
               alt="Detection event"
               fill
               className="object-cover"
@@ -86,6 +140,16 @@ const EventItem: React.FC<EventItemProps> = ({ event }) => {
             {/* Overlay showing total detections */}
             <div className="absolute top-3 right-3 bg-black/70 text-white px-2 py-1 rounded-md text-xs">
               {event.cropped_images.length} detection{event.cropped_images.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+        ) : error ? (
+          <div className="w-full h-64 bg-red-50 border border-red-200 rounded-lg mb-3 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <p className="text-red-600 font-medium">Failed to Load Images</p>
+              <p className="text-red-500 text-sm">{event.cropped_images.length} objects detected</p>
             </div>
           </div>
         ) : (
@@ -111,45 +175,78 @@ const EventItem: React.FC<EventItemProps> = ({ event }) => {
               event.cropped_images.length === 4 ? "grid-cols-2" :
               "grid-cols-3"
             )}>
-              {event.cropped_images.slice(0, 5).map((img, index) => (
-                <div 
-                  key={index} 
-                  className={cn(
-                    "relative bg-gray-100 rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-300 transition-colors",
-                    // Special styling for different layouts
-                    event.cropped_images.length === 4 && index === 3 ? "col-span-2" : "",
-                    event.cropped_images.length >= 5 && index === 0 ? "col-span-2 row-span-2" : "",
-                    "aspect-square"
-                  )}
-                >
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
-                    <div className="text-center">
-                      <div className="text-3xl mb-2">
-                        {img.class_name === 'person' ? '👤' :
-                         img.class_name === 'gun' ? '🔫' :
-                         img.class_name === 'backpack' ? '🎒' :
-                         img.class_name === 'car' ? '🚗' :
-                         img.class_name === 'knife' ? '🔪' : '📦'}
+              {event.cropped_images.slice(0, 5).map((img, index) => {
+                const imageUrl = croppedImageUrls[img.image_file_path];
+                
+                return (
+                  <div 
+                    key={index} 
+                    className={cn(
+                      "relative bg-gray-100 rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-300 transition-colors",
+                      // Special styling for different layouts
+                      event.cropped_images.length === 4 && index === 3 ? "col-span-2" : "",
+                      event.cropped_images.length >= 5 && index === 0 ? "col-span-2 row-span-2" : "",
+                      "aspect-square"
+                    )}
+                  >
+                    {imageUrl ? (
+                      <>
+                        <Image
+                          src={imageUrl}
+                          alt={`${img.class_name} detection`}
+                          fill
+                          className="object-cover"
+                        />
+                        {/* Overlay with class name and confidence */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="text-center text-white">
+                            <div className="text-xs font-medium capitalize">
+                              {img.class_name}
+                            </div>
+                            <div className="text-xs">
+                              {Math.round(img.confidence * 100)}%
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                        <div className="text-center">
+                          <div className="text-3xl mb-2">
+                            {img.class_name === 'person' ? '👤' :
+                             img.class_name === 'gun' ? '🔫' :
+                             img.class_name === 'backpack' ? '🎒' :
+                             img.class_name === 'car' ? '🚗' :
+                             img.class_name === 'knife' ? '🔪' : '📦'}
+                          </div>
+                          <div className="text-xs font-medium text-gray-700 capitalize">
+                            {img.class_name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {Math.round(img.confidence * 100)}%
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs font-medium text-gray-700 capitalize">
+                    )}
+                    
+                    {/* Confidence indicator */}
+                    <div className="absolute top-2 right-2">
+                      <div className={cn(
+                        "w-3 h-3 rounded-full border-2 border-white",
+                        img.confidence >= 0.8 ? "bg-green-400" :
+                        img.confidence >= 0.6 ? "bg-yellow-400" : "bg-red-400"
+                      )} />
+                    </div>
+                    
+                    {/* Class label */}
+                    <div className="absolute bottom-2 left-2">
+                      <Badge variant="secondary" className="text-xs">
                         {img.class_name}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {Math.round(img.confidence * 100)}%
-                      </div>
+                      </Badge>
                     </div>
                   </div>
-                  
-                  {/* Confidence indicator */}
-                  <div className="absolute top-2 right-2">
-                    <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      img.confidence >= 0.8 ? "bg-green-400" :
-                      img.confidence >= 0.6 ? "bg-yellow-400" : "bg-red-400"
-                    )} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               
               {/* Show more indicator */}
               {event.cropped_images.length > 5 && (
