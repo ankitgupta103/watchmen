@@ -723,7 +723,7 @@ async def init_lora():
         freq=868,          # Frequency in MHz
         addr=my_lora_addr, # Node address
         power=22,          # Transmission power in dBm
-        rssi=True,         # Enable RSSI reporting
+        rssi=False,         # Enable RSSI reporting
         air_speed=2400,    # Air data rate
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
@@ -733,9 +733,7 @@ async def init_lora():
     print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
 async def lora_radio_read():
-    print("=================In READ METHOD")
     while True:
-        print("Trying to read from serial")
         message = loranode.receive()
         await asyncio.sleep(5)
         if message:
@@ -752,6 +750,7 @@ async def lora_send_messages(n):
     print(f"Sending {n} messages to {target_addr}")
     for i in range(n):
         msg = f"Message from {my_addr},{my_lora_addr}, message num = {i}"
+        print(f"Sending to {target_addr} : {msg}")
         loranode.send(target_addr, msg)
         await asyncio.sleep(10)
 
