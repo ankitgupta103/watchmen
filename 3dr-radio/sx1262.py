@@ -328,9 +328,9 @@ class sx126x:
         if not hasattr(self, 'config_success') or not self.config_success:
             print("Warning: Module not properly configured, send may fail")
             
-        self.M1.value(0)  # LOW
-        self.M0.value(0)  # LOW - Normal operation mode
-        time.sleep_ms(100)
+        #self.M1.value(0)  # LOW
+        #self.M0.value(0)  # LOW - Normal operation mode
+        #time.sleep_ms(100)
        
         offset_frequency = self.freq - (850 if self.freq > 850 else 410)
 
@@ -346,11 +346,11 @@ class sx126x:
 
         #print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
         self.ser.write(data)
-        time.sleep_ms(100)
+        time.sleep_ms(50)
 
     def receive(self):
         if self.ser.any():
-            time.sleep_ms(500)
+            time.sleep_ms(50)
             r_buff = self.ser.read()
             #print(r_buff)
             
