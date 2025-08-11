@@ -22,15 +22,20 @@ export interface Machine {
   model_specifications: Record<string, unknown>;
 }
 
+export interface CroppedImage {
+  class_name: string;
+  confidence: number;
+  image_file_path: string;
+}
+
 export interface MQTTEvent {
   id: string;
   timestamp: Date;
-  eventstr: string;
-  image_c_key?: string;
-  image_f_key?: string;
-  cropped_image_url?: string;
+  original_image_path: string;
+  cropped_images: CroppedImage[];
   full_image_url?: string;
   images_loaded?: boolean;
+  severity?: number;
 }
 
 export interface MachineData {

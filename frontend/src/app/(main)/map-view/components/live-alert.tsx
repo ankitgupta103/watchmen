@@ -30,15 +30,25 @@ import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine } from '@/lib/types/machine';
 import { cn } from '@/lib/utils';
+import { calculateSeverity } from '@/lib/utils/severity';
+import { getPresignedUrl, getMultiplePresignedUrls } from '@/lib/utils/presigned-url';
 
 import { AudioManager } from './audio-manager';
 
 // Types for alert system
+interface CroppedImage {
+  class_name: string;
+  confidence: number;
+  image_file_path: string;
+}
+
 interface EventMessage {
   eventstr?: string;
-  image_c_key: string;
-  image_f_key: string;
-  event_severity: string;
+  original_image_path?: string;
+  cropped_images?: CroppedImage[];
+  image_c_key?: string;
+  image_f_key?: string;
+  event_severity?: string;
   meta?: {
     node_id: string;
     hb_count: string;
@@ -56,9 +66,13 @@ interface EventAlert {
   message: EventMessage;
   croppedImageUrl?: string;
   fullImageUrl?: string;
+  croppedImages?: CroppedImage[];
+  croppedImageUrls?: Record<string, string>; // Map filename to presigned URL
+  fullImagePresignedUrl?: string;
   acknowledged: boolean;
   imagesFetched: boolean;
   fetchingImages: boolean;
+  severity: number;
 }
 
 interface AlertSystemProps {
@@ -101,10 +115,11 @@ export default function CriticalAlertSystem({
     }
 
     const generatedTopics = machines.map(
-      (machine) => `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
+      (machine) => `${organizationId}/_all_/+/${machine.id}/_all_/events/#`,
     );
 
     console.log('🎯 [AlertSystem] Generated topics:', generatedTopics);
+    console.log('🏭 [AlertSystem] Available machines:', machines.map(m => ({ id: m.id, name: m.name })));
     return generatedTopics;
   }, [organizationId, machines]);
 
@@ -209,11 +224,12 @@ export default function CriticalAlertSystem({
     async (topic: string, data: any) => {
       const now = new Date();
 
-      console.log('📥 [AlertSystem] MQTT message received:', {
-        topic,
-        data: JSON.stringify(data).substring(0, 200),
-        timestamp: now.toISOString(),
-      });
+      console.log('🚨 [AlertSystem] MQTT MESSAGE RECEIVED!');
+      console.log('📥 [AlertSystem] Topic:', topic);
+      console.log('📥 [AlertSystem] Data type:', typeof data);
+      console.log('📥 [AlertSystem] Full data:', data);
+      console.log('📥 [AlertSystem] Data string:', JSON.stringify(data, null, 2));
+      console.log('📥 [AlertSystem] Timestamp:', now.toISOString());
 
       try {
         // Extract machine ID from topic
@@ -237,7 +253,16 @@ export default function CriticalAlertSystem({
 
         // Parse event message
         const eventMessage: EventMessage = data;
-        const severity = parseInt(eventMessage.event_severity || '0');
+        
+        // Calculate severity: either use provided severity or calculate from cropped_images
+        let severity = 0;
+        if (eventMessage.event_severity) {
+          severity = parseInt(eventMessage.event_severity);
+        } else if (eventMessage.cropped_images && eventMessage.cropped_images.length > 0) {
+          severity = calculateSeverity(eventMessage.cropped_images);
+        } else {
+          severity = 1; // default
+        }
 
         console.log('📊 [AlertSystem] Event details:', {
           severity,
@@ -246,6 +271,11 @@ export default function CriticalAlertSystem({
           hasImageKeys: !!(
             eventMessage.image_c_key && eventMessage.image_f_key
           ),
+          hasCroppedImages: eventMessage.cropped_images?.length || 0,
+          croppedImages: eventMessage.cropped_images?.map(img => ({
+            class_name: img.class_name,
+            confidence: img.confidence
+          })),
           imageKeys: {
             c_key: eventMessage.image_c_key,
             f_key: eventMessage.image_f_key,
@@ -261,7 +291,9 @@ export default function CriticalAlertSystem({
         }
 
         // Create event key for deduplication
-        const eventKey = `alert_${eventMessage.image_f_key}_${eventMessage.image_c_key}_${machineId}_${severity}`;
+        const imageKeyPart = eventMessage.image_f_key || eventMessage.original_image_path || '';
+        const croppedKeyPart = eventMessage.image_c_key || eventMessage.cropped_images?.map(img => img.class_name).join(',') || '';
+        const eventKey = `alert_${imageKeyPart}_${croppedKeyPart}_${machineId}_${severity}`;
         console.log('🔑 [AlertSystem] Event key:', eventKey);
 
         // Check for duplicates
@@ -289,14 +321,16 @@ export default function CriticalAlertSystem({
 
         // Create alert
         const alert: EventAlert = {
-          id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `alert-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
           timestamp: new Date(),
           machineId,
           machineName,
           message: eventMessage,
+          croppedImages: eventMessage.cropped_images || [],
           acknowledged: false,
-          imagesFetched: false,
+          imagesFetched: !!(eventMessage.image_c_key && eventMessage.image_f_key), // Already have images for legacy format
           fetchingImages: false,
+          severity,
         };
 
         // Add to state
@@ -335,6 +369,11 @@ export default function CriticalAlertSystem({
                   </p>
                   <p className="text-sm text-gray-700">
                     {machineName}: Severity {severity}
+                    {eventMessage.cropped_images && eventMessage.cropped_images.length > 0 && (
+                      <span className="ml-1">
+                        ({eventMessage.cropped_images.map(img => img.class_name).join(', ')})
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -385,12 +424,14 @@ export default function CriticalAlertSystem({
   useEffect(() => {
     if (isConnected) {
       console.log('✅ [AlertSystem] MQTT connected to topics:', topics);
+      console.log('🔍 [AlertSystem] Organization ID:', organizationId);
+      console.log('🔍 [AlertSystem] Machines count:', machines?.length || 0);
     } else if (error) {
       console.error('❌ [AlertSystem] MQTT error:', error);
     } else {
       console.log('🔄 [AlertSystem] MQTT connecting...');
     }
-  }, [isConnected, error, topics]);
+  }, [isConnected, error, topics, organizationId, machines]);
 
   // Test functions
   const testAudio = async () => {
@@ -424,24 +465,65 @@ export default function CriticalAlertSystem({
 
       for (const alert of alertsNeedingImages) {
         try {
-          const imageUrls = await fetchEventImages({
-            image_c_key: alert.message.image_c_key,
-            image_f_key: alert.message.image_f_key,
-          });
+          let croppedImageUrls: Record<string, string> = {};
+          let fullImagePresignedUrl: string | undefined;
+          
+          // Handle new format with cropped_images
+          if (alert.croppedImages && alert.croppedImages.length > 0) {
+            console.log('[AlertSystem] Fetching presigned URLs for cropped images:', alert.croppedImages.length);
+            
+            const filenames = alert.croppedImages.map(img => img.image_file_path);
+            croppedImageUrls = await getMultiplePresignedUrls(filenames, token);
+            
+            // Also get full image if available
+            if (alert.message.original_image_path) {
+              fullImagePresignedUrl = await getPresignedUrl(alert.message.original_image_path, token) || undefined;
+            }
+          }
+          
+          // Handle legacy format with image keys
+          else if (alert.message.image_c_key || alert.message.image_f_key) {
+            console.log('[AlertSystem] Fetching presigned URLs for legacy image keys');
+            
+            const imageUrls = await fetchEventImages({
+              image_c_key: alert.message.image_c_key!,
+              image_f_key: alert.message.image_f_key!,
+            });
+            
+            // Store in legacy format for backward compatibility
+            if (imageUrls) {
+              setAlerts((prev) =>
+                prev.map((a) =>
+                  a.id === alert.id
+                    ? {
+                        ...a,
+                        croppedImageUrl: imageUrls.croppedImageUrl,
+                        fullImageUrl: imageUrls.fullImageUrl,
+                        imagesFetched: true,
+                        fetchingImages: false,
+                      }
+                    : a,
+                ),
+              );
+              continue; // Skip the new format update below
+            }
+          }
 
+          // Update alert with presigned URLs
           setAlerts((prev) =>
             prev.map((a) =>
               a.id === alert.id
                 ? {
                     ...a,
-                    croppedImageUrl: imageUrls?.croppedImageUrl,
-                    fullImageUrl: imageUrls?.fullImageUrl,
+                    croppedImageUrls,
+                    fullImagePresignedUrl,
                     imagesFetched: true,
                     fetchingImages: false,
                   }
                 : a,
             ),
           );
+          
         } catch (error) {
           console.error(`Failed to fetch images for alert ${alert.id}:`, error);
           setAlerts((prev) =>
@@ -677,9 +759,11 @@ export default function CriticalAlertSystem({
                           'rounded-lg border p-4 transition-all',
                           alert.acknowledged
                             ? 'border-gray-200 bg-gray-50'
-                            : parseInt(alert.message.event_severity) >= 3
-                              ? 'border-red-200 bg-red-50 shadow-md'
-                              : 'border-orange-200 bg-orange-50',
+                            : alert.severity === 3
+                              ? 'border-red-200 bg-red-50 shadow-lg ring-1 ring-red-100'
+                              : alert.severity === 2
+                                ? 'border-orange-200 bg-orange-50 shadow-md'
+                                : 'border-yellow-200 bg-yellow-50',
                         )}
                       >
                         <div className="mb-3 flex items-start justify-between">
@@ -715,14 +799,23 @@ export default function CriticalAlertSystem({
                             Event: {alert.message.eventstr || 'No description'}
                           </div>
                           <div className="text-sm text-gray-600">
-                            Severity: {alert.message.event_severity}(
-                            {alert.message.event_severity === '1'
+                            Severity: {alert.severity} (
+                            {alert.severity === 1
                               ? 'Low'
-                              : alert.message.event_severity === '2'
+                              : alert.severity === 2
                                 ? 'High'
-                                : 'Critical'}
+                                : alert.severity === 3
+                                ? 'Critical'
+                                : 'Unknown'}
                             )
                           </div>
+                          {alert.message.cropped_images && alert.message.cropped_images.length > 0 && (
+                            <div className="text-sm text-gray-600">
+                              Detected: {alert.message.cropped_images.map(img => 
+                                `${img.class_name} (${Math.round(img.confidence * 100)}%)`
+                              ).join(', ')}
+                            </div>
+                          )}
                         </div>
 
                         {/* Image Display */}
@@ -732,13 +825,65 @@ export default function CriticalAlertSystem({
                               <Loader2 className="h-4 w-4 animate-spin" />
                               Fetching images...
                             </div>
-                          ) : alert.imagesFetched ? (
+                          ) : alert.croppedImages && alert.croppedImages.length > 0 ? (
+                            <div>
+                              <p className="mb-2 text-sm font-medium text-gray-700">
+                                Detected Objects ({alert.croppedImages.length})
+                              </p>
+                              
+                              {/* Full image if available */}
+                              {alert.fullImagePresignedUrl && (
+                                <div className="mb-3">
+                                  <p className="mb-1 text-xs text-gray-500">Full Scene</p>
+                                  <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
+                                    <Image
+                                      src={alert.fullImagePresignedUrl}
+                                      alt="Full scene"
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Cropped images grid */}
+                              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                                {alert.croppedImages.map((img, index) => {
+                                  const imageUrl = alert.croppedImageUrls?.[img.image_file_path];
+                                  
+                                  return (
+                                    <div key={index} className="text-center">
+                                      <div className="aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mb-2">
+                                        {imageUrl ? (
+                                          <Image
+                                            src={imageUrl}
+                                            alt={`${img.class_name} detection`}
+                                            width={120}
+                                            height={120}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                            <div className="text-center">
+                                              <Camera className="h-8 w-8 mx-auto mb-1 opacity-50" />
+                                              <div className="text-xs">{img.class_name}</div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Badge variant="secondary" className="text-xs">
+                                        {img.class_name} {Math.round(img.confidence * 100)}%
+                                      </Badge>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : alert.imagesFetched && (alert.croppedImageUrl || alert.fullImageUrl) ? (
                             <div className="flex items-center gap-2">
                               {alert.croppedImageUrl && (
                                 <div>
-                                  <p className="mb-1 text-xs text-gray-500">
-                                    Cropped
-                                  </p>
+                                  <p className="mb-1 text-xs text-gray-500">Cropped</p>
                                   <Image
                                     width={100}
                                     height={100}
@@ -750,9 +895,7 @@ export default function CriticalAlertSystem({
                               )}
                               {alert.fullImageUrl && (
                                 <div>
-                                  <p className="mb-1 text-xs text-gray-500">
-                                    Full
-                                  </p>
+                                  <p className="mb-1 text-xs text-gray-500">Full</p>
                                   <Image
                                     width={100}
                                     height={100}
@@ -766,7 +909,7 @@ export default function CriticalAlertSystem({
                           ) : (
                             <div className="flex items-center gap-2 text-sm text-gray-500">
                               <ImageIcon className="h-4 w-4" />
-                              Images not available yet...
+                              No images available
                             </div>
                           )}
                         </div>
