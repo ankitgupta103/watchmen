@@ -218,12 +218,9 @@ def ack_needed(msgtype):
 # === Async Receiver for openmv ===
 async def radio_read():
     while True:
-        if loranode.ser.any() > 0:
-            print(loranode.ser.any())
         message = loranode.receive()
         if message:
             process_message(message)
-        await asyncio.sleep(0.01)
 
 def radio_send(dest, data):
     global sent_count
@@ -407,7 +404,6 @@ def add_chunk(msgbytes):
         log(f"ERROR : Not enough bytes {len(msgbytes)} : {msgbytes}")
         return
     cid = msgbytes[0:3].decode()
-    print(f"")
     citer = int.from_bytes(msgbytes[3:5])
     print(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
