@@ -215,6 +215,7 @@ async def radio_read():
     while True:
         message = loranode.receive()
         if message:
+            message = message.replace(b"{}[]", b"\n")
             process_message(message)
         await asyncio.sleep(0.1)
 
@@ -226,6 +227,7 @@ def radio_send(dest, data):
         print(f"Error msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
     target_addr = NET_ID_MAP[dest]
+    data = data.replace(b"\n", b"{}[]")
     loranode.send(target_addr, data)
     log(f"[SENT at {CURRENT_NETID} {len(data)} bytes] {data} at {time_msec()}")
 
