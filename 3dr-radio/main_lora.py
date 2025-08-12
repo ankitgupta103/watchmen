@@ -36,6 +36,8 @@ TRANSFERRING_IMAGE = False
 RECEIVING_IMAGE = False
 CURRENT_NETID = 0
 
+AIR_SPEED = 62500
+
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 image_count = 0                 # Counter to keep tranck of saved images
@@ -108,7 +110,7 @@ async def init_lora():
         addr=my_lora_addr, # Node address
         power=22,          # Transmission power in dBm
         rssi=False,         # Enable RSSI reporting
-        air_speed=2400,    # Air data rate
+        air_speed=AIR_SPEED,# Air data rate
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
     )
