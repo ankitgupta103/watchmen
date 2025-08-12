@@ -21,7 +21,7 @@
 
 <body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen">
 
-  <div class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-white rounded-xl shadow-lg">
+  <div class="w-full max-w-3xl mx-auto p-6 md:p-8 bg-white rounded-xl shadow-lg">
     <div class="text-center mb-6">
       <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Log Data to CSV Converter</h1>
       <p class="text-gray-600 mt-2">Paste the console output from your sensor script to generate a downloadable CSV
@@ -31,9 +31,10 @@
     <!-- Text area for user to paste log data -->
     <div class="mb-4">
       <label for="logData" class="block text-sm font-medium text-gray-700 mb-1">Paste Log Data Here:</label>
+      <!-- UPDATED: Placeholder text now includes the image_filename column -->
       <textarea id="logData" rows="12"
         class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-        placeholder="timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth&#10;1678886400000,LOC_005,42,True,False&#10;1678886404000,LOC_005,15,False,False&#10;..."></textarea>
+        placeholder="timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth,image_filename&#10;1678886400000,LOC_005,42,True,False,LOC_005-1678886400000-True.jpg&#10;1678886404000,LOC_005,15,False,False,LOC_005-1678886404000-False.jpg&#10;..."></textarea>
     </div>
 
     <!-- Button to trigger the download -->
@@ -64,11 +65,11 @@
         return;
       }
 
-      // 2. Define the CSV header. This should match your Python script's header.
-      const header = "timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth\n";
+      // 2. UPDATED: Define the CSV header to match the new Python script's header.
+      const header = "timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth,image_filename\n";
 
       // 3. Combine the header with the pasted content.
-      // We'll check if the user accidentally pasted the header too. If so, we won't add it again.
+      // This check correctly handles cases where the user might paste the header in.
       const fullCsvContent = logContent.startsWith('timestamp_ms') ? logContent : header + logContent;
 
       try {
