@@ -364,7 +364,7 @@ class sx126x:
         if not hasattr(self, 'config_success') or not self.config_success:
             print("Warning: Module not properly configured, send may fail")
         
-        message = message.replace(b'\n', b'{}{}')
+        # message = message.replace(b'\n', b'{}{}')
 
         offset_frequency = self.freq - (850 if self.freq > 850 else 410)
         # Format: [target_high][target_low][target_freq][own_high][own_low][own_freq][message]
@@ -389,7 +389,7 @@ class sx126x:
                 # print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
                 # Extract message payload (skip first 3 bytes for address and freq)
                 msg = r_buff[3:-1]
-                msg = msg.replace(b'{}{}', b'\n')
+                # msg = msg.replace(b'{}{}', b'\n')
                 return msg
         return None
 
