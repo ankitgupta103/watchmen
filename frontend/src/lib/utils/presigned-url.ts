@@ -2,9 +2,9 @@ import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 
 interface PresignedUrlResponse {
-  success: boolean;
-  url?: string;
-  error?: string;
+  status: number;
+  data: string;
+  message: string;
 }
 
 export async function getPresignedUrl(
@@ -34,11 +34,12 @@ export async function getPresignedUrl(
       }
     );
 
-    if (response?.success && response.url) {
-      console.log('[PresignedURL] Successfully received presigned URL for:', filename);
-      return response.url;
+    console.log('s3-presigned-url response', response);
+
+    if (response?.status === 200) {
+      return response.data;
     } else {
-      console.error('[PresignedURL] Failed to get presigned URL for:', filename, response?.error);
+      console.error('[PresignedURL] Failed to get presigned URL for:', filename, response?.message);
       return null;
     }
   } catch (error) {

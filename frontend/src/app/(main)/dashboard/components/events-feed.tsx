@@ -13,7 +13,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
-import { Machine, S3EventsResponse, FeedEvent } from '@/lib/types/machine';
+import { Machine, S3EventsResponse, FeedEvent, CroppedImage } from '@/lib/types/machine';
 import { getPresignedUrl } from '@/lib/utils/presigned-url';
 import { cn } from '@/lib/utils';
 
@@ -75,6 +75,33 @@ const getPresetDateRange = (preset: string): DateRange => {
   return { startDate, endDate };
 };
 
+// Determine event severity based on detected objects
+const determineEventSeverity = (croppedImages: CroppedImage[]): string => {
+  if (!croppedImages || croppedImages.length === 0) return '0';
+  
+  const detectedClasses = croppedImages.map(img => img.class_name.toLowerCase());
+  
+  // Check for gun first (highest priority)
+  if (detectedClasses.some(cls => cls.includes('gun') || cls.includes('weapon') || cls.includes('firearm'))) {
+    return '3'; // Critical
+  }
+  
+  // Check for person + backpack combination
+  const hasPerson = detectedClasses.some(cls => cls.includes('person') || cls.includes('human'));
+  const hasBackpack = detectedClasses.some(cls => cls.includes('backpack') || cls.includes('bag'));
+  
+  if (hasPerson && hasBackpack) {
+    return '2'; // High
+  }
+  
+  // Check for person only
+  if (hasPerson) {
+    return '1'; // Low
+  }
+  
+  return '0'; // Unknown/No person detected
+};
+
 export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   const { token } = useToken();
   const [events, setEvents] = useState<FeedEvent[]>([]);
@@ -95,6 +122,9 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastEventRef = useRef<HTMLDivElement | null>(null);
+  
+  // Ref to track which events have been processed for image loading
+  const processedEventsRef = useRef<Set<string>>(new Set());
 
   // Sort events by timestamp (newest first)
   const sortedEvents = useMemo(() => {
@@ -132,11 +162,16 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         }
       );
 
+      console.log('response', response);
+
       if (response?.success) {
         const newEvents: FeedEvent[] = response.events.map((event, index) => {
           // Try to find machine info from the event data or fallback to first machine
           const machineId = event.machine_id || machines[0]?.id || 0;
           const machine = machines.find(m => m.id === machineId) || machines[0];
+          
+          // Determine severity based on detected objects in cropped images
+          const severity = determineEventSeverity(event.cropped_images);
           
           return {
             ...event,
@@ -146,7 +181,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
             machineType: machine?.type || 'Unknown Type',
             timestamp: event.timestamp ? new Date(event.timestamp) : new Date(),
             imagesLoaded: false,
-            severity: event.event_severity || '0',
+            severity: severity,
           };
         });
 
@@ -154,6 +189,8 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
           setEvents(prev => [...prev, ...newEvents]);
         } else {
           setEvents(newEvents);
+          // Reset processed events tracking when fetching new events
+          processedEventsRef.current.clear();
         }
 
         setCurrentChunk(response.chunk);
@@ -169,27 +206,35 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   }, [token, orgId, machines, dateRange]);
 
   const fetchImagesForEvent = useCallback(async (event: FeedEvent) => {
-    if (!token || event.imagesLoaded) return;
+    if (!token || event.imagesLoaded || processedEventsRef.current.has(event.id)) return;
 
+    // Mark this event as being processed
+    processedEventsRef.current.add(event.id);
     setLoadingImages(prev => ({ ...prev, [event.id]: true }));
     
     try {
-      let croppedImageUrl: string | null = null;
       let fullImageUrl: string | null = null;
+      const croppedImageUrls: string[] = [];
 
-      // Get presigned URL for cropped image if available
-      if (event.image_c_key) {
-        croppedImageUrl = await getPresignedUrl(event.image_c_key, token);
-      }
-
-      // Get presigned URL for full image if available
-      if (event.image_f_key) {
-        fullImageUrl = await getPresignedUrl(event.image_f_key, token);
-      }
-
-      // If no specific keys, try to get from original_image_path
-      if (!croppedImageUrl && !fullImageUrl && event.original_image_path) {
+      // Get presigned URL for full image from original_image_path
+      if (event.original_image_path) {
         fullImageUrl = await getPresignedUrl(event.original_image_path, token);
+      }
+
+      // Get presigned URLs for all cropped images
+      if (event.cropped_images && event.cropped_images.length > 0) {
+        const croppedUrlPromises = event.cropped_images.map(async (crop) => {
+          if (crop.image_file_path) {
+            const url = await getPresignedUrl(crop.image_file_path, token);
+            return url;
+          }
+          return null;
+        });
+        
+        const urls = await Promise.all(croppedUrlPromises);
+        urls.forEach(url => {
+          if (url) croppedImageUrls.push(url);
+        });
       }
 
       setEvents(prev => 
@@ -197,8 +242,8 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
           e.id === event.id 
             ? { 
                 ...e, 
-                croppedImageUrl: croppedImageUrl || undefined,
                 fullImageUrl: fullImageUrl || undefined,
+                croppedImageUrls: croppedImageUrls,
                 imagesLoaded: true 
               }
             : e
@@ -236,6 +281,8 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
       setEvents([]);
       setCurrentChunk(1);
       setHasNext(true);
+      // Clear processed events tracking
+      processedEventsRef.current.clear();
       // Trigger fetch with new date range
       setTimeout(() => {
         if (machines.length > 0) {
@@ -255,6 +302,8 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
       setEvents([]);
       setCurrentChunk(1);
       setHasNext(true);
+      // Clear processed events tracking
+      processedEventsRef.current.clear();
       // Trigger fetch with new date range
       setTimeout(() => {
         if (machines.length > 0) {
@@ -287,28 +336,30 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   // Fetch images for visible events
   useEffect(() => {
     const visibleEvents = sortedEvents.slice(0, 20); // Load images for first 20 events
-    visibleEvents.forEach(event => {
-      if (!event.imagesLoaded) {
-        fetchImagesForEvent(event);
-      }
+    const unprocessedEvents = visibleEvents.filter(event => 
+      !event.imagesLoaded && !processedEventsRef.current.has(event.id)
+    );
+    
+    unprocessedEvents.forEach(event => {
+      fetchImagesForEvent(event);
     });
-  }, [sortedEvents, fetchImagesForEvent]);
+  }, [sortedEvents.length, fetchImagesForEvent]); // Only depend on events count, not the events array itself
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case '1': return 'bg-yellow-500 text-black';
-      case '2': return 'bg-orange-500 text-white';
-      case '3': return 'bg-red-500 text-white';
-      default: return 'bg-gray-500 text-white';
+      case '1': return 'bg-blue-500 text-white'; // Person detected - blue
+      case '2': return 'bg-orange-500 text-white'; // Person + backpack - orange
+      case '3': return 'bg-red-600 text-white'; // Gun detected - red
+      default: return 'bg-gray-400 text-white'; // No person - gray
     }
   };
 
   const getSeverityText = (severity: string) => {
     switch (severity) {
-      case '1': return 'Low';
-      case '2': return 'High';
-      case '3': return 'Critical';
-      default: return 'Unknown';
+      case '1': return 'Person Detected';
+      case '2': return 'Person + Backpack';
+      case '3': return 'Gun Detected';
+      default: return 'No Person';
     }
   };
 
@@ -405,39 +456,48 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
               <p className="text-gray-700 mb-4">{event.eventstr}</p>
             )}
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              {event.croppedImageUrl && (
-                <div className="relative">
-                  <Image
-                    src={event.croppedImageUrl}
-                    alt="Cropped image"
-                    width={200}
-                    height={200}
-                    className="w-full h-32 object-cover rounded-lg"
-                  />
-                  <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
-                    Cropped
-                  </Badge>
-                </div>
-              )}
-              
+            <div className="space-y-3 mb-4">
               {event.fullImageUrl && (
                 <div className="relative">
                   <Image
                     src={event.fullImageUrl}
                     alt="Full image"
-                    width={200}
-                    height={200}
-                    className="w-full h-32 object-cover rounded-lg"
+                    width={400}
+                    height={300}
+                    className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => window.open(event.fullImageUrl, '_blank')}
                   />
                   <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
-                    Full
+                    Full Image
                   </Badge>
+                </div>
+              )}
+              
+              {event.croppedImageUrls && event.croppedImageUrls.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Detected Objects:</h4>
+                  <div className="grid grid-cols-4 gap-2">
+                    {event.croppedImageUrls.map((url, idx) => (
+                      <div key={idx} className="relative">
+                        <Image
+                          src={url}
+                          alt={`Cropped image ${idx + 1}`}
+                          width={100}
+                          height={100}
+                          className="w-full h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => window.open(url, '_blank')}
+                        />
+                        <Badge variant="secondary" className="absolute top-1 left-1 text-xs">
+                          {idx + 1}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
               {loadingImages[event.id] && (
-                <div className="col-span-2 flex items-center justify-center py-8">
+                <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
                   <span className="ml-2 text-sm text-gray-500">Loading images...</span>
                 </div>
@@ -446,7 +506,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
 
             {event.cropped_images && event.cropped_images.length > 0 && (
               <div className="border-t pt-3">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Detected Objects:</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Detection Details:</h4>
                 <div className="flex flex-wrap gap-2">
                   {event.cropped_images.map((crop, idx) => (
                     <Badge key={idx} variant="outline" className="text-xs">

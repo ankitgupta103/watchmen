@@ -55,7 +55,7 @@ export interface FeedEvent extends S3EventData {
   machineName: string;
   machineType: string;
   timestamp: Date;
-  croppedImageUrl?: string;
+  croppedImageUrls?: string[];
   fullImageUrl?: string;
   imagesLoaded: boolean;
   severity: string;
