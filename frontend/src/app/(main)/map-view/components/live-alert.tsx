@@ -48,7 +48,7 @@ interface EventMessage {
   cropped_images?: CroppedImage[];
   image_c_key?: string;
   image_f_key?: string;
-  event_severity?: string;
+  event_severity?: number;
   meta?: {
     node_id: string;
     hb_count: string;
@@ -256,8 +256,8 @@ export default function CriticalAlertSystem({
         
         // Calculate severity: either use provided severity or calculate from cropped_images
         let severity = 0;
-        if (eventMessage.event_severity) {
-          severity = parseInt(eventMessage.event_severity);
+        if (eventMessage.event_severity !== undefined) {
+          severity = eventMessage.event_severity;
         } else if (eventMessage.cropped_images && eventMessage.cropped_images.length > 0) {
           severity = calculateSeverity(eventMessage.cropped_images);
         } else {
