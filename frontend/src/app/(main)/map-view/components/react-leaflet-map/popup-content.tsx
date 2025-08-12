@@ -50,7 +50,7 @@ export default function PopupContent({
             <strong>Last Event:</strong> {machineData.last_event.eventstr}
             <br />
             <span className="text-gray-500">
-              {new Date(machineData.last_event.timestamp).toLocaleTimeString()}
+              {new Date(Number(machineData.last_event.timestamp) * 1000).toLocaleTimeString()}
             </span>
           </div>
         )}

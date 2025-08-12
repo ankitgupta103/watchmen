@@ -31,7 +31,7 @@ export interface CroppedImage {
 export interface S3EventData {
   original_image_path: string;
   cropped_images: CroppedImage[];
-  timestamp?: string | Date;
+  timestamp?: number; // Epoch seconds (e.g., 1754382946)
   eventstr?: string;
   event_severity?: string;
   image_c_key?: string;
@@ -49,7 +49,7 @@ export interface S3EventsResponse {
   has_next: boolean;
 }
 
-export interface FeedEvent extends S3EventData {
+export interface FeedEvent extends Omit<S3EventData, 'timestamp'> {
   id: string;
   machineId: number;
   machineName: string;

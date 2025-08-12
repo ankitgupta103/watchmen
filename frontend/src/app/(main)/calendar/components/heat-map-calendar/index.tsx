@@ -51,7 +51,7 @@ interface MapBounds {
   west: number;
 }
 
-interface ProcessedEvent extends S3EventData {
+interface ProcessedEvent extends Omit<S3EventData, 'timestamp'> {
   id: string;
   machineId: number;
   machineName: string;
@@ -152,7 +152,7 @@ export default function HeatMapCalendar({
                   machineId: machine.id,
                   machineName: machine.name,
                   timestamp: event.timestamp
-                    ? new Date(event.timestamp)
+                    ? new Date(Number(event.timestamp) * 1000)
                     : new Date(dateStr + 'T12:00:00'),
                   imagesLoaded: false,
                 }));
@@ -320,7 +320,7 @@ export default function HeatMapCalendar({
     () =>
       (events[selectedDate.toLocaleDateString('en-CA')] || []).sort(
         (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+          new Date(Number(b.timestamp) * 1000).getTime() - new Date(Number(a.timestamp) * 1000).getTime(),
       ),
     [events, selectedDate],
   );
@@ -567,7 +567,7 @@ export default function HeatMapCalendar({
                         <div className="text-xs text-gray-600">
                           Time:{' '}
                           <span className="font-medium">
-                            {new Date(event.timestamp).toLocaleTimeString()}
+                            {new Date(Number(event.timestamp) * 1000).toLocaleTimeString()}
                           </span>
                         </div>
                         {event.eventstr && (
