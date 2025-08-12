@@ -27,8 +27,6 @@ FLAKINESS = 0
 
 FRAME_SIZE = 195
 
-TRANSFERRING_IMAGE = False
-RECEIVING_IMAGE = False
 CURRENT_NETID = 0
 
 AIR_SPEED = 62500
@@ -147,10 +145,7 @@ async def person_detection_loop():
                 imgbytes = img.to_jpeg().bytearray()
                 print(f"Sending {len(imgbytes)} bytes to the network")
                 msgbytes = encrypt_if_needed("P", imgbytes)
-                global TRANSFERRING_IMAGE
-                TRANSFERRING_IMAGE = True
                 await send_msg("P", my_addr, msgbytes, peer_addr)
-                TRANSFERRING_IMAGE = False
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
             #print(f"Saving image to {raw_path}")
@@ -375,8 +370,6 @@ async def log_status():
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
 def begin_chunk(msg):
-    global RECEIVING_IMAGE
-    RECEIVING_IMAGE = True
     parts = msg.split(":")
     if len(parts) != 3:
         log(f"ERROR : begin message unparsable {msg}")
@@ -585,8 +578,6 @@ def process_message(data):
     elif mst == "E":
         alldone, retval, cid, recompiled, creator = end_chunk(mid, msg.decode())
         if alldone:
-            global RECEIVING_IMAGE
-            RECEIVING_IMAGE = False
             # Also when it fails
             ackmessage += ":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
@@ -601,10 +592,6 @@ def process_message(data):
 
 async def send_heartbeat():
     while True:
-        if RECEIVING_IMAGE or TRANSFERRING_IMAGE:
-            print(f"Not sending HB because image transfer in progress {TRANSFERRING_IMAGE} {RECEIVING_IMAGE}")
-            await asyncio.sleep(60)
-            continue
         # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
