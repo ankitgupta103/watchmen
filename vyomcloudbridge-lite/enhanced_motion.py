@@ -4,7 +4,7 @@ import time
 import machine
 
 # --- Configuration ---
-LOCATION_ID = "LOC_005"  # An identifier for the camera's location
+LOCATION_ID = "LOC_001"  # An identifier for the camera's location
 PERSON_PRESENT_GROUND_TRUTH = False
 CAPTURE_INTERVAL_MS = 4000  # e.g., 4000ms = 4 seconds
 
@@ -26,10 +26,15 @@ sensor.set_auto_whitebal(False)  # Disable auto white balance for consistent ima
 led = machine.LED("LED_RED")
 
 # --- CSV Logging Setup ---
-header = (
-    "timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth\n"
-)
-print(f"{header}")
+# UPDATED: Added 'image_filename' to the header
+header = "timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth,image_filename\n"
+
+try:
+    # Create image directory if it doesn't exist to prevent errors
+    os.mkdir(IMAGE_DIR)
+except OSError:
+    pass  # Directory likely already exists
+
 try:
     file_info = os.stat(LOG_FILE_PATH)
     write_header = file_info[6] == 0
@@ -44,23 +49,20 @@ if write_header:
     log_file.flush()
     # Also print header to console
     print(header.strip())
-    print(f"-> Created new log file: {LOG_FILE_PATH}")
 else:
     # If file exists, still print header to console for context during a new session
     print(header.strip())
-    print(f"-> Appending to existing log file: {LOG_FILE_PATH}")
 
 
 # --- Background Image Setup ---
 extra_fb = sensor.alloc_extra_fb(sensor.width(), sensor.height(), sensor.RGB565)
-print("Capturing initial background image...")
 sensor.skip_frames(time=2000)
 extra_fb.replace(sensor.snapshot())
-print("Background captured. Starting interval capture loop.")
 # -----------------------------
 
 frame_count = 0
 while True:
+    loop_start_time = time.ticks_ms()
     img = sensor.snapshot()
 
     frame_count += 1
@@ -83,22 +85,34 @@ while True:
     timestamp = time.ticks_ms()
 
     # --- Image Saving (Runs every interval) ---
-    led.on()
-    image_filename = f"{IMAGE_DIR}/{LOCATION_ID}-{timestamp}-{motion_detected}.jpg"
-    original_img.save(image_filename, quality=90)
-    led.off()
+    # Create the base filename first
+    image_filename_base = f"{LOCATION_ID}-{timestamp}-{motion_detected}.jpg"
+    # Create the full path for saving the image
+    full_image_path = f"{IMAGE_DIR}/{image_filename_base}"
 
-    # --- Log Data to File and Console ---
-    # Create the log entry as a CSV-formatted string
-    log_entry = f"{timestamp},{LOCATION_ID},{diff_value},{motion_detected},{PERSON_PRESENT_GROUND_TRUTH}\n"
+    try:
+        led.on()
+        original_img.save(full_image_path, quality=90)
+        led.off()
 
-    # Write the entry to the file
-    log_file.write(log_entry)
-    log_file.flush()
+        # --- Log Data to File and Console ---
+        # UPDATED: Create the log entry with the image filename at the end
+        log_entry = f"{timestamp},{LOCATION_ID},{diff_value},{motion_detected},{PERSON_PRESENT_GROUND_TRUTH},{image_filename_base}\n"
 
-    # Print the exact same entry to the console (without the newline character)
-    print(log_entry.strip())
+        # Write the entry to the file
+        log_file.write(log_entry)
+        log_file.flush()
 
-    # --- Interval Delay ---
-    # Pause the script to create a fixed interval between captures
-    time.sleep_ms(CAPTURE_INTERVAL_MS)
+        # Print the exact same entry to the console (without the newline character)
+        print(log_entry.strip())
+
+    except OSError as e:
+        led.off()
+        print(f"Error writing to SD card: {e}")
+        time.sleep_ms(1000)  # Pause before retrying
+
+    # --- Interval Delay (More Accurate) ---
+    processing_time = time.ticks_diff(time.ticks_ms(), loop_start_time)
+    delay_time = CAPTURE_INTERVAL_MS - processing_time
+    if delay_time > 0:
+        time.sleep_ms(delay_time)
