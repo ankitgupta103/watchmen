@@ -30,7 +30,6 @@ import {
   cn,
   countMachinesByStatus,
   generateEventId,
-  hasCriticalEvents,
   isMachineOnline,
   MAX_EVENT_COUNT_FOR_COLOR,
   MAX_EVENTS_PER_MACHINE,
@@ -288,7 +287,7 @@ export default function LiveFeedWrapper({
         stats_data: stats?.data,
         buffer_size: stats?.buffer ?? 0,
         is_pulsating: pulsatingMachines[machineId] || false,
-        is_critical: hasCriticalEvents(events),
+        is_critical: false,
       };
     },
     [

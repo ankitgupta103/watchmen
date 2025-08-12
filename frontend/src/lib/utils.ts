@@ -1,7 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { MachineEvent } from './types/activity';
 import { Machine, MarkerColors } from './types/machine';
 
 export function cn(...inputs: ClassValue[]) {
@@ -64,13 +63,6 @@ export const isMachineOnline = (machine: Machine): boolean => {
   // const oneHourAgo = new Date(Date.now() - ONE_HOUR_MS);
   // return !!lastSeen && lastSeen > oneHourAgo;
   return !!lastSeen && lastSeen > new Date(Date.now() - 120 * 1000);
-};
-
-/**
- * Checks if any events are critical (severity level 3)
- */
-export const hasCriticalEvents = (events: MachineEvent[]): boolean => {
-  return events.some((event) => event.event_severity === '3');
 };
 
 /**
