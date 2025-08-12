@@ -221,6 +221,7 @@ async def radio_read():
         message = loranode.receive()
         if message:
             process_message(message)
+        await asyncio.sleep(0.1)
 
 def radio_send(dest, data):
     global sent_count
