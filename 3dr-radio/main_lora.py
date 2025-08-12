@@ -22,8 +22,8 @@ print_lock = asyncio.Lock()
 UART_BAUDRATE = 57600
 USBA_BAUDRATE = 57600
 MIN_SLEEP = 0.1
-ACK_SLEEP = 0.5
-CHUNK_SLEEP = 0.5
+ACK_SLEEP = 0.3
+CHUNK_SLEEP = 0.3
 
 HB_WAIT_SEC = 30
 
@@ -315,7 +315,6 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
     if not succ:
         log(f"Failed sending chunk begin")
         return False
-    await asyncio.sleep(5)
     for i in range(len(chunks)):
         if i % 10 == 0:
             print(f"Sending chunk {i}")
