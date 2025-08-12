@@ -36,6 +36,10 @@ TRANSFERRING_IMAGE = False
 RECEIVING_IMAGE = False
 CURRENT_NETID = 0
 
+RECEIVING_IMAGE_START_TIME = 0
+TRANSFERRING_IMAGE_START_TIME = 0
+IMAGE_TRANSFER_TIMEOUT = 180000          # 3 min in ms
+
 AIR_SPEED = 62500
 
 # -------- Start FPS clock -----------
@@ -138,7 +142,7 @@ def detect_person(img):
 
 # ------- Person detection loop ---------
 async def person_detection_loop():
-    global image_count
+    global image_count, TRANSFERRING_IMAGE, TRANSFERRING_IMAGE_START_TIME
     while True:
         img = sensor.snapshot()
         image_count += 1
@@ -152,10 +156,13 @@ async def person_detection_loop():
                 imgbytes = img.to_jpeg().bytearray()
                 print(f"Sending {len(imgbytes)} bytes to the network")
                 msgbytes = encrypt_if_needed("P", imgbytes)
-                global TRANSFERRING_IMAGE
+
+
                 TRANSFERRING_IMAGE = True
+                TRANSFERRING_IMAGE_START_TIME = time_msec()
                 await send_msg("P", my_addr, msgbytes, peer_addr)
                 TRANSFERRING_IMAGE = False
+                TRANSFERRING_IMAGE_START_TIME = 0
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
             #print(f"Saving image to {raw_path}")
@@ -381,8 +388,9 @@ async def log_status():
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
 def begin_chunk(msg):
-    global RECEIVING_IMAGE
+    global RECEIVING_IMAGE, RECEIVING_IMAGE_START_TIME
     RECEIVING_IMAGE = True
+    RECEIVING_IMAGE_START_TIME = time_msec()
     parts = msg.split(":")
     if len(parts) != 3:
         log(f"ERROR : begin message unparsable {msg}")
@@ -448,6 +456,7 @@ def clear_chunkid(cid):
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
 def end_chunk(mid, msg):
+    global RECEIVING_IMAGE, RECEIVING_IMAGE_START_TIME
     cid = msg
     creator = mid[1]
     missing = get_missing_chunks(cid)
@@ -459,6 +468,10 @@ def end_chunk(mid, msg):
                 missing_str += "," + str(missing[i])
         return (False, missing_str, None, None, None)
     else:
+        # reset receiving state when transfer is complete
+        RECEIVING_IMAGE = False
+        RECEIVING_IMAGE_START_TIME = 0
+        
         if cid not in chunk_map:
             print(f"Ignoring this because we dont have an entry for this chunkid, likely because we have already processed this.")
             return (True, None, None, None, None)
@@ -608,6 +621,22 @@ def process_message(data):
 
 async def send_heartbeat():
     while True:
+
+        current_time = time_msec()
+
+        if RECEIVING_IMAGE and RECEIVING_IMAGE_START_TIME > 0:
+            if current_time - RECEIVING_IMAGE_START_TIME > IMAGE_TRANSFER_TIMEOUT:
+                log(f"RECEIVING_IMAGE timeout - resetting")
+                global RECEIVING_IMAGE, RECEIVING_IMAGE_START_TIME
+                RECEIVING_IMAGE = False
+                RECEIVING_IMAGE_START_TIME = 0
+        
+        if TRANSFERRING_IMAGE and TRANSFERRING_IMAGE_START_TIME > 0:
+            if current_time - TRANSFERRING_IMAGE_START_TIME > IMAGE_TRANSFER_TIMEOUT:
+                log(f"TRANSFERRING_IMAGE timeout - resetting")
+                global TRANSFERRING_IMAGE, TRANSFERRING_IMAGE_START_TIME
+                TRANSFERRING_IMAGE = False
+        
         if RECEIVING_IMAGE or TRANSFERRING_IMAGE:
             print(f"Not sending HB because image transfer in progress {TRANSFERRING_IMAGE} {RECEIVING_IMAGE}")
             await asyncio.sleep(60)
