@@ -35,6 +35,8 @@ AIR_SPEED = 62500
 #clock = time.clock()            # measure frame/sec
 image_count = 0                 # Counter to keep tranck of saved images
 
+consecutive_hb_failures = 0
+
 my_addr = None
 peer_addr = None
 
@@ -591,6 +593,7 @@ def process_message(data):
     return True
 
 async def send_heartbeat():
+    global consecutive_hb_failures
     while True:
         # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
@@ -598,7 +601,20 @@ async def send_heartbeat():
             hbmsg = f"{my_addr}:{get_human_ts()}"
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg.encode())
-            await send_msg("H", my_addr, msgbytes, peer_addr)
+            success = await send_msg("H", my_addr, msgbytes, peer_addr)
+            if success:
+                consecutive_hb_failures = 0
+                print(f"heartbeat sent successfully to {peer_addr}")
+            else: 
+                consecutive_hb_failures += 1
+                print(f"Failed to send heartbeat to {peer_addr}, consecutive failures = {consecutive_hb_failures}")
+                if consecutive_hb_failures > 3:
+                    print(f"Too many consecutive failures, reinitializing LoRa")
+                    try:
+                        await init_lora()
+                        consecutive_hb_failures = 0
+                    except Exception as e:
+                        print(f"Error reinitializing LoRa: {e}")
         else:
             print("Not sending right now")
         await asyncio.sleep(HB_WAIT_SEC)
