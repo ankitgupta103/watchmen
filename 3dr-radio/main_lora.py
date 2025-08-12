@@ -23,7 +23,7 @@ UART_BAUDRATE = 57600
 USBA_BAUDRATE = 57600
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.5
-CHUNK_SLEEP = 0.5
+CHUNK_SLEEP = 2
 
 HB_WAIT_SEC = 30
 
@@ -250,7 +250,7 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
     for retry_i in range(3):
         radio_send(dest, databytes)
         await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
-        for i in range(10):
+        for i in range(5):
             at, missing_chunks = ack_time(mid)
             if at > 0:
                 log(f"Msg {mid} : was acked in {at - timesent} msecs")
@@ -371,6 +371,8 @@ async def log_status():
 # === Async Receiver for openmv ===
 async def radio_read():
     while True:
+        if loranode.ser.any() > 0:
+            print(loranode.ser.any())
         message = loranode.receive()
         if message:
             print(f"In Main, message received = {message}")
@@ -666,7 +668,7 @@ async def main():
     log(f"[INFO] Started device {my_addr}, {my_lora_addr}")
     await init_lora()
     asyncio.create_task(radio_read())
-    asyncio.create_task(print_summary())
+    # asyncio.create_task(print_summary())
     # asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())

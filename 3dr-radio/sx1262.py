@@ -375,24 +375,19 @@ class sx126x:
                message
         #print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
         self.ser.write(data)
+        time.sleep_ms(300)
 
     def receive(self):
         if self.ser.any():
             time.sleep_ms(300)
             r_buff = self.ser.read()
-            #print(r_buff)
             if r_buff and len(r_buff) >= 6:
-                sender_addr = (r_buff[0] << 8) + r_buff[1]
-                frequency = r_buff[2] + self.start_freq
+                # sender_addr = (r_buff[0] << 8) + r_buff[1]
+                # frequency = r_buff[2] + self.start_freq
                 # print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
                 # Extract message payload (skip first 3 bytes for address and freq)
-                if len(r_buff) > 3:
-                    message = r_buff[3:]
-                    return message
-            else:
-                print(f"Received short or empty message: {r_buff}")
-                return None
-            return None
+                return r_buff[3:]
+        return None
 
     def get_channel_rssi(self):
         self.M1.value(0)  # LOW
