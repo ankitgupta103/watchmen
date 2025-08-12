@@ -1,43 +1,38 @@
 'use client';
 
-import {
-  LayersControl,
-  MapContainer,
-  ScaleControl,
-  ZoomControl,
-} from 'react-leaflet';
+import { LayersControl, MapContainer, ScaleControl, ZoomControl } from 'react-leaflet';
 import ReactLeafletGoogleLayer from 'react-leaflet-google-layer';
-
 import 'leaflet/dist/leaflet.css';
+import './map-styles.css';
 
 import { MAPS_API_KEY } from '@/lib/constants';
 import { Machine, MachineData } from '@/lib/types/machine';
-import { calculateMapCenter, calculateOptimalZoom } from '@/lib/utils';
+import { calculateMapCenter, calculateOptimalZoom, isMachineOnline } from '@/lib/utils';
 
 import MachineMarker from './machine-marker';
-import MachineConnections from './machine-connections';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { MachineEvent } from '@/lib/types/activity';
 
 interface MapProps {
   machines: Machine[];
-  getMachineData: (machineId: number) => MachineData;
+  machineEvents: Record<number, MachineEvent[]>;
+  pulsatingMachines: Record<number, boolean>;
 }
 
 export default function ReactLeafletMap({
   machines,
-  getMachineData,
+  machineEvents,
+  pulsatingMachines,
 }: MapProps) {
-  const router = useRouter();
   const center = calculateMapCenter(machines);
   const zoom = calculateOptimalZoom(machines);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      router.refresh();
-    }, 5000 ); // 5 seconds
-    return () => clearInterval(interval);
-  }, [router]);
+  
+  // Debug logging
+  console.log('🗺️ [MapView] Rendering map with:', {
+    machinesCount: machines.length,
+    machineEvents: Object.keys(machineEvents).length,
+    pulsatingMachines: Object.keys(pulsatingMachines).length,
+    pulsatingMachinesState: pulsatingMachines
+  });
 
   return (
     <MapContainer
@@ -50,36 +45,50 @@ export default function ReactLeafletMap({
       <ZoomControl position="topleft" />
       <ScaleControl position="bottomleft" />
 
-      {/* LayersControl for base layers */}
+      {/* Simplified layer control */}
       <LayersControl position="topright">
-        <LayersControl.BaseLayer  checked name="Google Maps (Satellite)">
+        <LayersControl.BaseLayer checked name="Satellite">
           <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'satellite'} />
         </LayersControl.BaseLayer>
-
-        <LayersControl.BaseLayer name="Google Maps (Roadmap)">
+        <LayersControl.BaseLayer name="Roadmap">
           <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'roadmap'} />
-        </LayersControl.BaseLayer>
-
-        <LayersControl.BaseLayer name="Google Maps (Hybrid)">
-          <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'hybrid'} />
-        </LayersControl.BaseLayer>
-
-        <LayersControl.BaseLayer name="Google Maps (Terrain)">
-          <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'terrain'} />
         </LayersControl.BaseLayer>
       </LayersControl>
 
-      {/* Machine Connections with Animated Dashed Lines */}
-      <MachineConnections machines={machines} />
+      {/* Machine markers */}
+      {machines.map((machine) => {
+        const events = machineEvents[machine.id] || [];
+        const lastEvent = events[0];
+        const isPulsating = pulsatingMachines[machine.id] || false;
+        
+        console.log(`🔍 [MapView] Creating marker for machine ${machine.id}:`, {
+          isPulsating,
+          pulsatingMachinesState: pulsatingMachines,
+          machineId: machine.id
+        });
+        
+        const machineData: MachineData = {
+          machine_id: machine.id,
+          events: events,
+          event_count: events.length,
+          last_event: lastEvent,
+          last_updated: lastEvent?.timestamp.toISOString() || new Date().toISOString(),
+          is_online: isMachineOnline(machine),
+          is_pulsating: isPulsating,
+          is_critical: lastEvent ? lastEvent.severity >= 3 : false,
+          location: { lat: 0, long: 0, timestamp: '' },
+          stats_data: {},
+          buffer_size: 0,
+        };
 
-      {/* Machine Markers with Status-based Coloring and Pulsating Animation */}
-      {machines.map((machine) => (
-        <MachineMarker
-          key={machine.id}
-          machine={machine}
-          machineData={getMachineData(machine.id)}
-        />
-      ))}
+        return (
+          <MachineMarker
+            key={machine.id}
+            machine={machine}
+            machineData={machineData}
+          />
+        );
+      })}
     </MapContainer>
   );
 }

@@ -4,460 +4,234 @@ import 'leaflet/dist/leaflet.css';
 
 import React, {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import useAllMachineStats from '@/hooks/use-all-machine-stats';
 import useOrganization from '@/hooks/use-organization';
 import { usePubSub } from '@/hooks/use-pub-sub';
-import { Calendar, RefreshCw, Shield } from 'lucide-react';
+import { MapPin, Shield, Zap } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
-import { Machine, MachineData } from '@/lib/types/machine';
+import { CroppedImage, Machine } from '@/lib/types/machine';
 import {
   cn,
   countMachinesByStatus,
   generateEventId,
-  isMachineOnline,
-  MAX_EVENT_COUNT_FOR_COLOR,
   MAX_EVENTS_PER_MACHINE,
-  PULSATING_DURATION_MS,
 } from '@/lib/utils';
-
-interface LiveFeedWrapperProps {
-  machines: Machine[];
-  selectedDate?: Date;
-}
-
-interface MachineEvent {
-  id: string;
-  timestamp: Date;
-  eventstr: string;
-  image_c_key?: string;
-  image_f_key?: string;
-  event_severity?: number;
-}
+import { calculateSeverity } from '@/lib/utils/severity';
+import { MachineEvent } from '@/lib/types/activity';
+// import EventNotification from './event-notification';
 
 interface EventMessage {
   eventstr?: string;
-  image_c_key: string;
-  image_f_key: string;
-  event_severity: number;
+  original_image_path?: string;
+  cropped_images?: CroppedImage[];
 }
 
 const ReactLeafletMap = dynamic(() => import('./react-leaflet-map'), {
   ssr: false,
 });
 
-// Global processed events tracker for live feed
 const globalProcessedEvents = new Set<string>();
 
-export default function LiveFeedWrapper({
-  machines,
-  selectedDate,
-}: LiveFeedWrapperProps) {
+export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
   const { organizationId } = useOrganization();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  const [machineEvents, setMachineEvents] = useState<
-    Record<number, MachineEvent[]>
-  >({});
-
-  // Use ref for processed events to avoid stale closures
+  const [machineEvents, setMachineEvents] = useState<Record<number, MachineEvent[]>>({});
+  const [pulsatingMachines, setPulsatingMachines] = useState<Record<number, boolean>>({});
+  // const [currentNotification, setCurrentNotification] = useState<{
+  //   event: MachineEvent;
+  //   machineName: string;
+  // } | null>(null);
+  
   const processedEventKeysRef = useRef(new Set<string>());
 
-  const [machineEventCounts, setMachineEventCounts] = useState<
-    Record<number, number>
-  >({});
-
-  const [pulsatingMachines, setPulsatingMachines] = useState<
-    Record<number, boolean>
-  >({});
-
-  const machineStats = useAllMachineStats(machines);
-
-  // FIXED: Stable topics array using useMemo - same pattern as alert system
   const mqttTopics = useMemo(() => {
-    if (machines.length === 0) {
-      console.log('⚠️ [LiveFeed] No machines provided');
-      return [];
-    }
-
+    if (!machines.length) return [];
     const topics = machines.map(
-      (machine) => `${organizationId}/_all_/+/${machine.id}/_all_/EVENT/#`,
+      (machine) => `${organizationId}/_all_/+/${machine.id}/_all_/events/#`,
     );
-
-    console.log('🎯 [LiveFeed] Generated topics:', topics);
+    console.log('📡 [MapView] Subscribing to MQTT topics:', topics);
     return topics;
   }, [organizationId, machines]);
 
-  const extractMachineIdFromTopic = useCallback(
-    (topic: string): number | null => {
-      const topicParts = topic.split('/');
-      const machineIdPart = topicParts[3];
-
-      if (machineIdPart && machineIdPart !== '_all_') {
-        const machineId = parseInt(machineIdPart);
-        return !isNaN(machineId) ? machineId : null;
-      }
-      return null;
-    },
-    [],
-  );
-
-  const createMachineEvent = useCallback(
-    (eventMessage: EventMessage): MachineEvent => {
-      return {
-        id: generateEventId(),
-        timestamp: new Date(),
-        eventstr:
-          eventMessage.eventstr ||
-          `Event - Severity ${eventMessage.event_severity}`,
-        image_c_key: eventMessage.image_c_key,
-        image_f_key: eventMessage.image_f_key,
-        event_severity: eventMessage.event_severity,
-      };
-    },
-    [],
-  );
-
-  const addEventToMachine = useCallback(
-    (machineId: number, newEvent: MachineEvent) => {
-      setMachineEvents((prev) => {
-        const currentEvents = prev[machineId] || [];
-        const updatedEvents = [newEvent, ...currentEvents].slice(
-          0,
-          MAX_EVENTS_PER_MACHINE,
-        );
-        return { ...prev, [machineId]: updatedEvents };
-      });
-    },
-    [],
-  );
-
-  const incrementEventCount = useCallback((machineId: number) => {
-    setMachineEventCounts((prev) => ({
-      ...prev,
-      [machineId]: Math.min(
-        (prev[machineId] || 0) + 1,
-        MAX_EVENT_COUNT_FOR_COLOR,
-      ),
-    }));
+  const extractMachineIdFromTopic = useCallback((topic: string): number | null => {
+    const machineId = parseInt(topic.split('/')[3]);
+    return !isNaN(machineId) ? machineId : null;
   }, []);
 
   const startPulsatingAnimation = useCallback((machineId: number) => {
-    setPulsatingMachines((prev) => ({
-      ...prev,
-      [machineId]: true,
-    }));
-    setTimeout(() => {
-      setPulsatingMachines((prev) => ({ ...prev, [machineId]: false }));
-    }, PULSATING_DURATION_MS);
+    console.log('🎯 [MapView] Starting pulsating animation for machine:', machineId);
+    setPulsatingMachines(prev => {
+      console.log('🔄 [MapView] Setting pulsating state for machine:', machineId, 'to true');
+      return { ...prev, [machineId]: true };
+    });
+          setTimeout(() => {
+        console.log('⏹️ [MapView] Stopping pulsating animation for machine:', machineId);
+        setPulsatingMachines(prev => ({ ...prev, [machineId]: false }));
+      }, 3000); // Reduced to 3 seconds for better visibility
   }, []);
 
-  // FIXED: Enhanced message handler with better logging and NO AUDIO
   const handleMqttMessage = useCallback(
-    async (topic: string, data: EventMessage) => {
-      console.log('📥 [LiveFeed] MQTT message received:', {
-        topic,
-        data: JSON.stringify(data).substring(0, 100),
-        timestamp: new Date().toISOString(),
-      });
-
-      try {
-        const machineId = extractMachineIdFromTopic(topic);
-        if (!machineId) {
-          console.log(
-            '⚠️ [LiveFeed] Could not extract machine ID from topic:',
-            topic,
-          );
-          return;
-        }
-
-        // Create event key for deduplication - different prefix than alerts
-        const eventKey = `livefeed_${data.image_f_key}_${data.image_c_key}_${machineId}_${data.event_severity}`;
-
-        console.log('🔍 [LiveFeed] Processing event:', {
-          machineId,
-          eventKey,
-          severity: data.event_severity,
-        });
-
-        // Check both local and global processed events
-        if (
-          !eventKey ||
-          processedEventKeysRef.current.has(eventKey) ||
-          globalProcessedEvents.has(eventKey)
-        ) {
-          console.log(`🔄 [LiveFeed] Duplicate event detected: ${eventKey}`);
-          return;
-        }
-
-        // Add to both local and global processed events
-        processedEventKeysRef.current.add(eventKey);
-        globalProcessedEvents.add(eventKey);
-
-        // Clean up old entries to prevent memory leaks
-        if (globalProcessedEvents.size > 1000) {
-          const entries = Array.from(globalProcessedEvents);
-          const toRemove = entries.slice(0, entries.length - 800);
-          toRemove.forEach((key) => globalProcessedEvents.delete(key));
-          console.log('🧹 [LiveFeed] Cleaned up old processed events');
-        }
-
-        console.log(
-          `✅ [LiveFeed] Processing new event: ${eventKey} for machine ${machineId}`,
-        );
-
-        const newEvent = createMachineEvent(data);
-        addEventToMachine(machineId, newEvent);
-        incrementEventCount(machineId);
-        startPulsatingAnimation(machineId);
-
-        // REMOVED: Audio playing - let alert system handle audio
-        console.log(
-          '🔇 [LiveFeed] Event processed, audio handled by alert system',
-        );
-      } catch (error) {
-        console.error('❌ [LiveFeed] Error processing MQTT message:', error, {
-          topic,
-          data,
-        });
+    (topic: string, data: EventMessage) => {
+      console.log('🔔 [MapView] MQTT message received:', { topic, data });
+      
+      const machineId = extractMachineIdFromTopic(topic);
+      if (!machineId) {
+        console.log('❌ [MapView] Could not extract machine ID from topic:', topic);
+        return;
       }
-    },
-    [
-      extractMachineIdFromTopic,
-      createMachineEvent,
-      addEventToMachine,
-      incrementEventCount,
-      startPulsatingAnimation,
-    ],
-  );
 
-  const { isConnected, error: mqttError } = usePubSub(
-    mqttTopics,
-    handleMqttMessage,
-    { autoReconnect: true, parseJson: true },
-  );
+      console.log('✅ [MapView] Extracted machine ID:', machineId);
 
-  useEffect(() => {
-    if (isConnected) {
-      console.log('✅ [LiveFeed] MQTT connected to topics:', mqttTopics);
-    } else if (mqttError) {
-      console.error('❌ [LiveFeed] MQTT error:', mqttError);
-    } else {
-      console.log('🔄 [LiveFeed] MQTT connecting...');
-    }
-  }, [isConnected, mqttError, mqttTopics]);
+      const eventKey = `livefeed_${data.original_image_path}_${machineId}`;
+      if (processedEventKeysRef.current.has(eventKey) || globalProcessedEvents.has(eventKey)) {
+        console.log('🔄 [MapView] Duplicate event, skipping:', eventKey);
+        return;
+      }
+      
+      processedEventKeysRef.current.add(eventKey);
+      globalProcessedEvents.add(eventKey);
 
-  const getMachineData = useCallback(
-    (machineId: number): MachineData => {
-      const events = machineEvents[machineId] || [];
-      const eventCount = machineEventCounts[machineId] || 0;
-      const lastEvent = events[0];
-      const stats = machineStats[machineId];
-      const machine = machines.find((m) => m.id === machineId);
-
-      return {
-        machine_id: machineId,
-        events: events,
-        event_count: eventCount,
-        last_event: lastEvent,
-        last_updated:
-          lastEvent?.timestamp.toISOString() || new Date().toISOString(),
-        is_online: machine ? isMachineOnline(machine) : false,
-        location: {
-          lat: stats?.data?.message?.location?.lat ?? 0,
-          lng: stats?.data?.message?.location?.long ?? 0,
-          timestamp: stats?.data?.message?.location?.timestamp ?? '',
-        },
-        stats_data: stats?.data,
-        buffer_size: stats?.buffer ?? 0,
-        is_pulsating: pulsatingMachines[machineId] || false,
-        is_critical: false,
+      const severity = calculateSeverity(data.cropped_images || []);
+      const classNames = data.cropped_images?.map(c => c.class_name).join(', ') || 'Event';
+      
+      console.log('📊 [MapView] Event details:', { severity, classNames, machineId });
+      
+      const newEvent: MachineEvent = {
+        id: generateEventId(),
+        timestamp: new Date(),
+        eventstr: data.eventstr || classNames,
+        original_image_path: data.original_image_path,
+        cropped_images: data.cropped_images || [],
+        severity: severity,
       };
+
+      setMachineEvents(prev => ({
+        ...prev,
+        [machineId]: [newEvent, ...(prev[machineId] || [])].slice(0, MAX_EVENTS_PER_MACHINE),
+      }));
+      
+      console.log('🚀 [MapView] Starting pulsating animation for machine:', machineId);
+      startPulsatingAnimation(machineId);
+      
+      // Show notification for new events
+      // const machine = machines.find(m => m.id === machineId);
+      // if (machine && severity > 0) {
+        // setCurrentNotification({
+        //   event: newEvent,
+        //   machineName: machine.name || `Machine ${machineId}`
+        // });
+      // }
     },
-    [
-      machineEvents,
-      machineEventCounts,
-      machineStats,
-      pulsatingMachines,
-      machines,
-    ],
+    [extractMachineIdFromTopic, startPulsatingAnimation, machines],
   );
 
-  const totalEvents = Object.values(machineEventCounts).reduce(
-    (sum, count) => sum + count,
-    0,
-  );
-  const { online: onlineCount, offline: offlineCount } =
-    countMachinesByStatus(machines);
-
-  const filteredMachines = useMemo(() => {
-    if (statusFilter === 'all') return machines;
-    return machines.filter((machine) => {
-      const isOnline = isMachineOnline(machine);
-      if (statusFilter === 'online') return isOnline;
-      if (statusFilter === 'offline') return !isOnline;
-
-      return true;
-    });
-  }, [machines, statusFilter]);
-
+  usePubSub(mqttTopics, handleMqttMessage, { autoReconnect: true, parseJson: true });
+  
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
     setMachineEvents({});
-    setMachineEventCounts({});
     setPulsatingMachines({});
-
-    // Clear processed keys on refresh
     processedEventKeysRef.current.clear();
     globalProcessedEvents.clear();
-
     setTimeout(() => setIsRefreshing(false), 1500);
   }, []);
 
-  const handleClearAllFilters = useCallback(() => {
-    setStatusFilter('all');
-  }, []);
+  const { online: onlineCount, offline: offlineCount } = countMachinesByStatus(machines);
+  const totalEvents = Object.values(machineEvents).reduce((sum, events) => sum + events.length, 0);
+  const criticalEvents = Object.values(machineEvents).flat().filter(event => event.severity >= 2).length;
 
   return (
     <div className="flex h-full w-full flex-col">
-      {/* Map Controls */}
+      {/* Simplified header */}
       <div className="flex items-center justify-between border-b bg-white p-4 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-blue-600" />
-            <span className="font-semibold">Live Event Monitor</span>
+            <MapPin className="h-5 w-5 text-blue-600" />
+            <span className="text-lg font-semibold text-gray-900">Live Map View</span>
           </div>
-
-          {/* Machine Stats */}
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-green-500"></div>
-              <span>
-                {onlineCount} Online
-                {statusFilter === 'online'
-                  ? ` (showing ${filteredMachines.length})`
-                  : ''}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-gray-500"></div>
-              <span>
-                {offlineCount} Offline
-                {statusFilter === 'offline'
-                  ? ` (showing ${filteredMachines.length})`
-                  : ''}
-              </span>
-            </div>
-            {statusFilter === 'all' && (
-              <div className="flex items-center gap-1">
-                <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                <span>{machines.length} Total</span>
-              </div>
-            )}
+          
+          {/* Status indicators */}
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              <div className="h-2 w-2 rounded-full bg-green-500 mr-2"></div>
+              {onlineCount} Online
+            </Badge>
+            <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+              <div className="h-2 w-2 rounded-full bg-gray-500 mr-2"></div>
+              {offlineCount} Offline
+            </Badge>
             {totalEvents > 0 && (
-              <Badge
-                variant="outline"
-                className="border-orange-300 text-xs text-orange-700"
-              >
-                {totalEvents} Event{totalEvents > 1 ? 's' : ''}
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                <Zap className="h-3 w-3 mr-1" />
+                {totalEvents} Events
               </Badge>
             )}
-            <div className="text-xs text-gray-500">
-              Active: {Object.keys(machineEventCounts).length}
-            </div>
+            {criticalEvents > 0 && (
+              <Badge variant="destructive" className="animate-pulse">
+                <Shield className="h-3 w-3 mr-1" />
+                {criticalEvents} Critical
+              </Badge>
+            )}
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          {/* Date Filter */}
-          {selectedDate && (
-            <div className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-1 text-sm">
-              <Calendar className="h-4 w-4 text-blue-600" />
-              <span>{selectedDate.toLocaleDateString()}</span>
-            </div>
-          )}
-
-          {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent className="z-[1000]">
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="online">Online Only</SelectItem>
-              <SelectItem value="offline">Offline Only</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Refresh Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
+        
+        {/* Test and refresh buttons */}
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              // Test ripple effect on first machine
+              if (machines.length > 0) {
+                console.log('🧪 [MapView] Testing ripple effect on machine:', machines[0].id);
+                startPulsatingAnimation(machines[0].id);
+              }
+            }}
+            className="hover:bg-blue-50"
           >
-            <RefreshCw
-              className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')}
-            />
-            Refresh
+            🧪 Test Ripple
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={isRefreshing}
+            className="hover:bg-blue-50"
+          >
+            <div className={cn('mr-2 h-4 w-4 transition-transform', isRefreshing && 'animate-spin')}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
         </div>
       </div>
-
-      {/* Map Container */}
+      
+      {/* Map container */}
       <div className="relative flex-1 overflow-hidden">
         <ReactLeafletMap
-          machines={filteredMachines}
-          getMachineData={getMachineData}
+          machines={machines}
+          machineEvents={machineEvents}
+          pulsatingMachines={pulsatingMachines}
         />
-
-        {/* Filter Results Indicator */}
-        {statusFilter !== 'all' && (
-          <div className="absolute top-4 right-4 rounded-lg border bg-white px-3 py-2 shadow-lg">
-            <div className="text-sm font-medium">
-              Showing {filteredMachines.length} of {machines.length} machines
-            </div>
-            <div className="text-xs text-gray-500">
-              Filter:{' '}
-              {statusFilter === 'online' ? 'Online Only' : 'Offline Only'}
-            </div>
-            <button
-              onClick={handleClearAllFilters}
-              className="mt-1 text-xs text-blue-600 hover:underline"
-            >
-              Clear filter
-            </button>
-          </div>
-        )}
-
-        {/* Event Summary */}
-        {totalEvents > 0 && statusFilter === 'all' && (
-          <div className="absolute top-4 right-4 rounded-lg border bg-white px-3 py-2 shadow-lg">
-            <div className="text-sm font-medium">
-              {totalEvents} Events Detected
-            </div>
-            <div className="text-xs text-gray-500">
-              {Object.keys(machineEventCounts).length} machines active
-            </div>
-          </div>
-        )}
       </div>
+      
+      {/* Event Notifications */}
+      {/* {currentNotification && (
+        <EventNotification
+          event={currentNotification.event}
+          machineName={currentNotification.machineName}
+          onClose={() => setCurrentNotification(null)}
+        />
+      )} */}
     </div>
   );
 }

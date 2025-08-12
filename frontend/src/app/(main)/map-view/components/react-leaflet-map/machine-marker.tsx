@@ -1,131 +1,168 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import L from 'leaflet';
 import { renderToString } from 'react-dom/server';
 import { Marker, Popup } from 'react-leaflet';
 
 import { Machine, MachineData } from '@/lib/types/machine';
-import {
-  cn,
-  formatEventCount,
-  getMarkerColors,
-  isMachineOnline,
-} from '@/lib/utils';
+import { cn, formatEventCount, isMachineOnline } from '@/lib/utils';
 
 import PopupContent from './popup-content';
-import { useRouter } from 'next/navigation';
 
-const createStatusIcon = (machine: Machine, machineData: MachineData) => {
+const createStatusIcon = (machine: Machine, machineData: MachineData, showName: boolean = false) => {
   const isOnline = isMachineOnline(machine);
   const isPulsating = machineData.is_pulsating;
-  const isCritical = machineData.is_critical;
-  const eventCount = machineData.event_count;
-
-  const colors = getMarkerColors(isCritical, eventCount);
+  const severity = machineData.last_event?.severity ?? 0;
 
   const iconHtml = renderToString(
     <div className="relative">
-      {/* Pulsating wave animation for machines with recent events */}
-      {isPulsating && (
+      {/* Enhanced ripple effect based on severity */}
+      {isPulsating && severity > 0 && (
         <>
-          <div
-            className={`absolute inset-0 rounded-full ${colors.bg} animate-ping opacity-75 duration-100`}
-          ></div>
-          <div
-            className={`absolute inset-0 rounded-full ${colors.bg} animate-ping opacity-50 duration-500`}
-          ></div>
-          <div
-            className={`absolute inset-0 rounded-full ${colors.bg} animate-ping opacity-25 duration-1000`}
-          ></div>
+          {/* Base ripple rings */}
+          <div className={cn(
+            'absolute inset-0 rounded-full animate-ping opacity-75',
+            severity === 3 ? 'bg-red-600' : severity === 2 ? 'bg-orange-500' : 'bg-blue-500'
+          )} 
+          style={{ animationDuration: '1.5s' }}></div>
+          
+          <div className={cn(
+            'absolute inset-0 rounded-full animate-ping opacity-50',
+            severity === 3 ? 'bg-red-600' : severity === 2 ? 'bg-orange-500' : 'bg-blue-500'
+          )} 
+          style={{ animationDuration: '1.5s', animationDelay: '0.5s' }}></div>
+          
+          <div className={cn(
+            'absolute inset-0 rounded-full animate-ping opacity-25',
+            severity === 3 ? 'bg-red-600' : severity === 2 ? 'bg-orange-500' : 'bg-blue-500'
+          )} 
+          style={{ animationDuration: '1.5s', animationDelay: '1s' }}></div>
+          
+          {/* Critical event outer ripple */}
+          {severity >= 2 && (
+            <div className={cn(
+              'absolute inset-0 rounded-full opacity-30',
+              severity === 3 ? 'severity-3-ripple bg-red-600' : 'severity-2-ripple bg-orange-500'
+            )} 
+            style={{ 
+              transform: 'scale(1.8)',
+              animationDuration: severity === 3 ? '2s' : '1.8s'
+            }}></div>
+          )}
+          
+          {/* Additional critical ripple for weapons */}
+          {severity === 3 && (
+            <div className="absolute inset-0 rounded-full bg-red-600 opacity-20 severity-3-ripple" 
+                 style={{ 
+                   transform: 'scale(2.2)',
+                   animationDuration: '2.5s',
+                   animationDelay: '0.3s'
+                 }}></div>
+          )}
         </>
       )}
-
-      {/* Main marker */}
+      
+      {/* Main machine marker */}
       <div
         className={cn(
-          `relative flex h-5 w-5 items-center justify-center rounded-full border-1`,
-          isOnline ? 'bg-green-500 text-white' : 'bg-gray-700 text-white',
+          `relative flex h-6 w-6 items-center justify-center rounded-full border-2 shadow-lg transition-all duration-300`,
+          isOnline ? 'border-green-400 bg-green-500 text-white machine-online' : 'border-gray-500 bg-gray-700 text-white machine-offline',
+          isPulsating && severity > 0 ? 'scale-110' : 'scale-100',
+          severity > 0 ? 'ring-2 ring-offset-2' : '',
+          severity === 3 ? 'ring-red-400 machine-critical' : severity === 2 ? 'ring-orange-400' : severity === 1 ? 'ring-blue-400' : ''
         )}
       >
+        {/* Severity indicator dot */}
+        {severity > 0 && (
+          <div className={cn(
+            'absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white shadow-lg',
+            severity === 3 ? 'bg-red-600' : severity === 2 ? 'bg-orange-500' : 'bg-blue-500'
+          )}></div>
+        )}
+        
         <span className="text-xs font-bold">
-          {formatEventCount(eventCount)}
+          {formatEventCount(machineData.event_count)}
         </span>
       </div>
+      
+      {/* Machine name label - only show on hover */}
+      {showName && (
+        <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+          <div className={cn(
+            'px-2 py-1 rounded text-xs font-medium text-white shadow-lg border',
+            isOnline ? 'bg-green-600 border-green-500' : 'bg-gray-600 border-gray-500'
+          )}>
+            {machine.name || `Machine ${machine.id}`}
+          </div>
+        </div>
+      )}
     </div>,
   );
 
   return L.divIcon({
     html: iconHtml,
-    iconSize: [24, 24],
+    iconSize: showName ? [24, 32] : [24, 24], // Original size, larger only when showing name
     popupAnchor: [0, -16],
     className: 'custom-status-marker',
   });
 };
 
-interface MachineMarker {
+interface MachineMarkerProps {
   machine: Machine;
   machineData: MachineData;
 }
 
-export default function MachineMarker({
-  machine,
-  machineData,
-}: MachineMarker) {
-  const router = useRouter();
+export default function MachineMarker({ machine, machineData }: MachineMarkerProps) {
   const markerRef = useRef<L.Marker>(null);
-  let hoverTimeout: NodeJS.Timeout;
-
-  const isOnline = isMachineOnline(machine);
-
-  const handleMouseOver = () => {
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
+  const [showName, setShowName] = useState(false);
+  
+  // Debug logging
+  console.log('📍 [MapView] Machine marker:', {
+    machineId: machine.id,
+    machineName: machine.name,
+    isPulsating: machineData.is_pulsating,
+    severity: machineData.last_event?.severity,
+    eventCount: machineData.event_count
+  });
+  
+  // Force icon update when pulsating state changes
+  useEffect(() => {
+    if (markerRef.current) {
+      console.log('🔄 [MapView] Updating icon for machine:', machine.id, 'pulsating:', machineData.is_pulsating);
+      const newIcon = createStatusIcon(machine, machineData, showName);
+      markerRef.current.setIcon(newIcon);
     }
+  }, [machineData.is_pulsating, machine, machineData, showName]);
 
+  const handleClick = () => {
     if (markerRef.current) {
       markerRef.current.openPopup();
     }
   };
 
-  const handleMouseOut = () => {
-    hoverTimeout = setTimeout(() => {
-      if (markerRef.current) {
-        markerRef.current.closePopup();
-      }
-    }, 100);
+  const handleMouseEnter = () => {
+    setShowName(true);
   };
 
-  const handleClick = () => {
-    if (markerRef.current) {
-      markerRef.current.closePopup();
-    }
-    router.push(`/dashboard/${machine.id}`);
+  const handleMouseLeave = () => {
+    setShowName(false);
   };
 
   return (
     <Marker
       ref={markerRef}
-      icon={createStatusIcon(machine, machineData)}
-      position={[
-        machine?.last_location?.lat ?? 12.9716,
-        machine?.last_location?.long ?? 77.5946,
-      ]}
-      eventHandlers={{
+      icon={createStatusIcon(machine, machineData, showName)}
+      position={[machine?.last_location?.lat ?? 0, machine?.last_location?.long ?? 0]}
+      eventHandlers={{ 
         click: handleClick,
-        mouseover: handleMouseOver,
-        mouseout: handleMouseOut,
+        mouseover: handleMouseEnter,
+        mouseout: handleMouseLeave
       }}
     >
-      <Popup
-        className="custom-popup"
-        closeButton={false}
-        autoClose={false}
-        closeOnClick={false}
-        closeOnEscapeKey={false}
-      >
+      <Popup className="custom-popup" closeButton={false}>
         <PopupContent
           machine={machine}
           machineData={machineData}
-          isOnline={isOnline}
+          isOnline={isMachineOnline(machine)}
         />
       </Popup>
     </Marker>

@@ -1,14 +1,14 @@
+import { CroppedImage } from "./machine";
+
 export interface MachineEvent {
   id: string;
   timestamp: Date;
   eventstr: string;
-  image_c_key?: string;
-  image_f_key?: string;
-  cropped_image_url?: string;
-  full_image_url?: string;
-  images_loaded?: boolean;
-  event_severity?: number;
+  severity: number;
+  original_image_path?: string;
+  cropped_images?: CroppedImage[];
 }
+
 
 export interface EventMessage {
   image_c_key: string;

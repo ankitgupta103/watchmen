@@ -32,7 +32,7 @@ def call_n8n_workflow(image_bytes):
     Calls the n8n workflow to process the image.
     """
     # API call here
-    url = "https://n8n.vyomos.org/webhook-test/watchmen-detect/"
+    url = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 
     date = datetime.datetime.now().strftime("%Y-%m-%d")
     machine_id = 228
