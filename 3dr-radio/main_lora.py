@@ -215,6 +215,17 @@ def ack_needed(msgtype):
         return True
     return False
 
+# === Async Receiver for openmv ===
+async def radio_read():
+    while True:
+        if loranode.ser.any() > 0:
+            print(loranode.ser.any())
+        message = loranode.receive()
+        if message:
+            print(f"In Main, message received = {message}")
+            process_message(message)
+        await asyncio.sleep(0.01)
+
 def radio_send(dest, data):
     global sent_count
     sent_count = sent_count + 1
@@ -367,17 +378,6 @@ async def log_status():
             log(f"[ACK Times] 50% = {mid:.2f}s, 90% = {p90:.2f}s")
             log(f"So far {len(msgs_not_acked)} messsages havent been acked")
             log(msgs_not_acked)
-
-# === Async Receiver for openmv ===
-async def radio_read():
-    while True:
-        if loranode.ser.any() > 0:
-            print(loranode.ser.any())
-        message = loranode.receive()
-        if message:
-            print(f"In Main, message received = {message}")
-            process_message(message)
-        await asyncio.sleep(0.01)
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
