@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log Data to CSV Converter</title>
+  <!-- Tailwind CSS for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Using a common font for a clean look */
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+  <!-- Google Fonts for Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen">
+
+  <div class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-white rounded-xl shadow-lg">
+    <div class="text-center mb-6">
+      <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Log Data to CSV Converter</h1>
+      <p class="text-gray-600 mt-2">Paste the console output from your sensor script to generate a downloadable CSV
+        file.</p>
+    </div>
+
+    <!-- Text area for user to paste log data -->
+    <div class="mb-4">
+      <label for="logData" class="block text-sm font-medium text-gray-700 mb-1">Paste Log Data Here:</label>
+      <textarea id="logData" rows="12"
+        class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
+        placeholder="timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth&#10;1678886400000,LOC_005,42,True,False&#10;1678886404000,LOC_005,15,False,False&#10;..."></textarea>
+    </div>
+
+    <!-- Button to trigger the download -->
+    <button id="downloadBtn"
+      class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-105">
+      Generate and Download .CSV File
+    </button>
+
+    <!-- Message area for feedback -->
+    <div id="message" class="text-center mt-4 text-sm font-medium"></div>
+  </div>
+
+  <script>
+    // Get references to the HTML elements
+    const downloadBtn = document.getElementById('downloadBtn');
+    const logDataTextArea = document.getElementById('logData');
+    const messageDiv = document.getElementById('message');
+
+    // Add a click event listener to the button
+    downloadBtn.addEventListener('click', () => {
+      // 1. Get the text from the textarea
+      const logContent = logDataTextArea.value.trim();
+
+      // Check if the textarea is empty
+      if (!logContent) {
+        messageDiv.textContent = 'Please paste some data into the text area first.';
+        messageDiv.className = 'text-center mt-4 text-sm font-medium text-red-600';
+        return;
+      }
+
+      // 2. Define the CSV header. This should match your Python script's header.
+      const header = "timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth\n";
+
+      // 3. Combine the header with the pasted content.
+      // We'll check if the user accidentally pasted the header too. If so, we won't add it again.
+      const fullCsvContent = logContent.startsWith('timestamp_ms') ? logContent : header + logContent;
+
+      try {
+        // 4. Create a Blob object. A Blob is a file-like object of immutable, raw data.
+        const blob = new Blob([fullCsvContent], { type: 'text/csv;charset=utf-8;' });
+
+        // 5. Create a temporary link element to trigger the download
+        const link = document.createElement("a");
+
+        // Create a URL for the blob object
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+
+        // Set the download attribute with a filename
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        link.setAttribute("download", `datalog_${timestamp}.csv`);
+
+        // Hide the link
+        link.style.visibility = 'hidden';
+
+        // Add the link to the document and trigger a click
+        document.body.appendChild(link);
+        link.click();
+
+        // Clean up by removing the link and revoking the URL
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        // Provide success feedback to the user
+        messageDiv.textContent = 'Success! Your file has been downloaded.';
+        messageDiv.className = 'text-center mt-4 text-sm font-medium text-green-600';
+
+      } catch (error) {
+        console.error("Error generating file:", error);
+        messageDiv.textContent = 'An error occurred while generating the file.';
+        messageDiv.className = 'text-center mt-4 text-sm font-medium text-red-600';
+      }
+    });
+  </script>
+
+</body>
+
+</html>
