@@ -75,12 +75,16 @@ export interface MachineData {
   machine_id: number;
   events: MachineEvent[];
   event_count: number;
-  last_event?: MachineEvent;
+  last_event?: MachineEvent; // This will now use the correct type
   last_updated: string;
   is_online: boolean;
-  location: { lat: number; lng: number; timestamp: string };
+  location: {
+    lat: number;
+    long: number;
+    timestamp: string;
+  };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stats_data: any;
+  stats_data?: any;
   buffer_size: number;
   is_pulsating: boolean;
   is_critical: boolean;

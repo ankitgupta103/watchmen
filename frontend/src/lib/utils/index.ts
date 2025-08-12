@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { Machine, MarkerColors } from './types/machine';
+import { Machine, MarkerColors } from '../types/machine';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
