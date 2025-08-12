@@ -58,11 +58,11 @@ rtc = RTC()
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 print("Running on device : " + uid.decode())
 if uid == b'e076465dd7194025':
-    my_addr = 'Z'
+    my_addr = 'B'
 elif uid == b'e076465dd7091027':
     my_addr = 'A'
 elif uid == b'e076465dd7194211':
-    my_addr = 'B'
+    my_addr = 'Z'
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -605,10 +605,10 @@ async def send_heartbeat():
             if success:
                 consecutive_hb_failures = 0
                 print(f"heartbeat sent successfully to {peer_addr}")
-            else: 
+            else:
                 consecutive_hb_failures += 1
                 print(f"Failed to send heartbeat to {peer_addr}, consecutive failures = {consecutive_hb_failures}")
-                if consecutive_hb_failures > 3:
+                if consecutive_hb_failures > 1:
                     print(f"Too many consecutive failures, reinitializing LoRa")
                     try:
                         await init_lora()
