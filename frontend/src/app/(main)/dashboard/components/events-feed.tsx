@@ -31,7 +31,7 @@ interface DateRange {
   endDate: Date;
 }
 
-// Fallback date formatting function
+// Format time ago
 const formatTimeAgo = (date: Date): string => {
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -42,7 +42,7 @@ const formatTimeAgo = (date: Date): string => {
   return `${Math.floor(diffInSeconds / 86400)}d ago`;
 };
 
-// Format date to YYYY-MM-DD (timezone-safe)
+// Format date for API (YYYY-MM-DD in local timezone)
 const formatDateForAPI = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -50,31 +50,28 @@ const formatDateForAPI = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Get default date range (1 month + 3 days ago to today)
+// Get default date range (30 days ago to today)
 const getDefaultDateRange = (): DateRange => {
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setMonth(startDate.getMonth() - 1);
-  startDate.setDate(startDate.getDate() - 3); // Add 3 more days to be safe
+  startDate.setDate(startDate.getDate() - 30);
   return { startDate, endDate };
 };
 
-// Get preset date ranges (with extra buffer days to account for timezone issues)
+// Get preset date ranges
 const getPresetDateRange = (preset: string): DateRange => {
   const endDate = new Date();
   const startDate = new Date();
   
   switch (preset) {
     case '7days':
-      startDate.setDate(startDate.getDate() - 10); // Add 3 more days to be safe
+      startDate.setDate(startDate.getDate() - 7);
       break;
     case '1month':
-      startDate.setMonth(startDate.getMonth() - 1);
-      startDate.setDate(startDate.getDate() - 3); // Add 3 more days to be safe
+      startDate.setDate(startDate.getDate() - 30);
       break;
     case '3months':
-      startDate.setMonth(startDate.getMonth() - 3);
-      startDate.setDate(startDate.getDate() - 3); // Add 3 more days to be safe
+      startDate.setDate(startDate.getDate() - 90);
       break;
     default:
       return getDefaultDateRange();
@@ -83,31 +80,29 @@ const getPresetDateRange = (preset: string): DateRange => {
   return { startDate, endDate };
 };
 
-// Determine event severity based on detected objects
+// Determine event severity
 const determineEventSeverity = (croppedImages: CroppedImage[]): string => {
-  if (!croppedImages || croppedImages.length === 0) return '0';
+  if (!croppedImages?.length) return '0';
   
   const detectedClasses = croppedImages.map(img => img.class_name.toLowerCase());
   
-  // Check for gun first (highest priority)
-  if (detectedClasses.some(cls => cls.includes('gun') || cls.includes('weapon') || cls.includes('firearm'))) {
-    return '3'; // Critical
+  // Check for weapons (highest priority)
+  if (detectedClasses.some(cls => 
+    cls.includes('gun') || cls.includes('weapon') || cls.includes('firearm') || cls.includes('knife')
+  )) {
+    return '3';
   }
   
-  // Check for person + backpack combination
+  // Check for person + suspicious items
   const hasPerson = detectedClasses.some(cls => cls.includes('person') || cls.includes('human'));
-  const hasBackpack = detectedClasses.some(cls => cls.includes('backpack') || cls.includes('bag'));
+  const hasSuspiciousItem = detectedClasses.some(cls => 
+    cls.includes('backpack') || cls.includes('bag') || cls.includes('suitcase')
+  );
   
-  if (hasPerson && hasBackpack) {
-    return '2'; // High
-  }
+  if (hasPerson && hasSuspiciousItem) return '2';
+  if (hasPerson) return '1';
   
-  // Check for person only
-  if (hasPerson) {
-    return '1'; // Low
-  }
-  
-  return '0'; // Unknown/No person detected
+  return '0';
 };
 
 export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
@@ -132,14 +127,9 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
     title: string;
   } | null>(null);
 
-  const loadingRef = useRef(loading);
-  loadingRef.current = loading;
-
   const observerRef = useRef<IntersectionObserver | null>(null);
-  const lastEventRef = useRef<HTMLDivElement | null>(null);
-  
-  // Ref to track which events have been processed for image loading
   const processedEventsRef = useRef<Set<string>>(new Set());
+  const isInitialLoad = useRef(true);
 
   // Sort events by timestamp (newest first)
   const sortedEvents = useMemo(() => {
@@ -147,15 +137,14 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   }, [events]);
 
   const fetchEvents = useCallback(async (chunk: number, append: boolean = false) => {
-    if (!token || loadingRef.current) return;
+    if (!token || loading || !machines.length) return;
 
     setLoading(true);
     try {
-      const machineIds = machines.filter(m => m.id).map(m => m.id);
+      const machineIds = machines.map(m => m.id).filter(Boolean);
       
-      // If no machines are available, don't make the API call
       if (machineIds.length === 0) {
-        console.warn('No machines available, skipping events fetch');
+        console.warn('No valid machine IDs found');
         setLoading(false);
         return;
       }
@@ -168,14 +157,11 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         end_date: formatDateForAPI(dateRange.endDate),
       };
       
-      // Debug: Log the dates being sent to API
-      console.log('Date range being sent to API:', {
+      console.log('Fetching events with date range:', {
         start_date: formatDateForAPI(dateRange.startDate),
         end_date: formatDateForAPI(dateRange.endDate),
-        startDate_iso: dateRange.startDate.toISOString(),
-        endDate_iso: dateRange.endDate.toISOString(),
-        startDate_local: dateRange.startDate.toLocaleDateString(),
-        endDate_local: dateRange.endDate.toLocaleDateString()
+        chunk,
+        machineIds
       });
       
       const response = await fetcherClient<S3EventsResponse>(
@@ -189,20 +175,17 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
 
       if (response?.success) {
         const newEvents: FeedEvent[] = response.events.map((event, index) => {
-          // Try to find machine info from the event data or fallback to first machine
           const machineId = event.machine_id || machines[0]?.id || 0;
           const machine = machines.find(m => m.id === machineId) || machines[0];
-          
-          // Determine severity based on detected objects in cropped images
           const severity = determineEventSeverity(event.cropped_images);
           
           return {
             ...event,
-            id: `${event.timestamp || Date.now()}-${index}`,
+            id: `${event.timestamp || Date.now()}-${machineId}-${index}`,
             machineId: machineId,
             machineName: machine?.name || 'Unknown Machine',
             machineType: machine?.type || 'Unknown Type',
-            timestamp: event.timestamp ? new Date(Number(event.timestamp) * 1000) : new Date(),
+            timestamp: new Date(Number(event.timestamp) * 1000), // Convert from seconds to milliseconds
             imagesLoaded: false,
             severity: severity,
           };
@@ -212,7 +195,6 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
           setEvents(prev => [...prev, ...newEvents]);
         } else {
           setEvents(newEvents);
-          // Reset processed events tracking when fetching new events
           processedEventsRef.current.clear();
         }
 
@@ -226,39 +208,23 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
     } finally {
       setLoading(false);
     }
-  }, [token, orgId, machines, dateRange]);
+  }, [token, orgId, machines, dateRange, loading]);
 
   const fetchImagesForEvent = useCallback(async (event: FeedEvent) => {
     if (!token || event.imagesLoaded || processedEventsRef.current.has(event.id)) return;
 
-    // Mark this event as being processed
     processedEventsRef.current.add(event.id);
     setLoadingImages(prev => ({ ...prev, [event.id]: true }));
     
     try {
-      let fullImageUrl: string | null = null;
-      const croppedImageUrls: string[] = [];
-
-      // Get presigned URL for full image from original_image_path
-      if (event.original_image_path) {
-        fullImageUrl = await getPresignedUrl(event.original_image_path, token);
-      }
-
-      // Get presigned URLs for all cropped images
-      if (event.cropped_images && event.cropped_images.length > 0) {
-        const croppedUrlPromises = event.cropped_images.map(async (crop) => {
-          if (crop.image_file_path) {
-            const url = await getPresignedUrl(crop.image_file_path, token);
-            return url;
-          }
-          return null;
-        });
-        
-        const urls = await Promise.all(croppedUrlPromises);
-        urls.forEach(url => {
-          if (url) croppedImageUrls.push(url);
-        });
-      }
+      const [fullImageUrl, ...croppedImageUrls] = await Promise.all([
+        // Get presigned URL for full image
+        event.original_image_path ? getPresignedUrl(event.original_image_path, token) : Promise.resolve(null),
+        // Get presigned URLs for cropped images
+        ...(event.cropped_images?.map(crop => 
+          crop.image_file_path ? getPresignedUrl(crop.image_file_path, token) : Promise.resolve(null)
+        ) || [])
+      ]);
 
       setEvents(prev => 
         prev.map(e => 
@@ -266,7 +232,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
             ? { 
                 ...e, 
                 fullImageUrl: fullImageUrl || undefined,
-                croppedImageUrls: croppedImageUrls,
+                croppedImageUrls: croppedImageUrls.filter(Boolean) as string[],
                 imagesLoaded: true 
               }
             : e
@@ -294,47 +260,36 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   // Handle preset date range changes
   const handlePresetChange = useCallback((preset: string) => {
     setSelectedPreset(preset);
+    
     if (preset === 'custom') {
       setShowCustomDatePicker(true);
-    } else {
-      const newDateRange = getPresetDateRange(preset);
-      setDateRange(newDateRange);
-      setShowCustomDatePicker(false);
-      // Reset events and fetch with new date range
-      setEvents([]);
-      setCurrentChunk(1);
-      setHasNext(true);
-      // Clear processed events tracking
-      processedEventsRef.current.clear();
-      // Trigger fetch with new date range
-      setTimeout(() => {
-        if (machines.length > 0) {
-          fetchEvents(1);
-        }
-      }, 100);
+      return;
     }
-  }, [machines, fetchEvents]);
+
+    const newDateRange = getPresetDateRange(preset);
+    setDateRange(newDateRange);
+    setShowCustomDatePicker(false);
+    
+    // Reset and fetch new events
+    setEvents([]);
+    setCurrentChunk(1);
+    setHasNext(true);
+    processedEventsRef.current.clear();
+  }, []);
 
   // Handle custom date selection
   const handleCustomDateSelect = useCallback((start: Date | undefined, end: Date | undefined) => {
     if (start && end) {
-      const newDateRange = { startDate: start, endDate: end };
-      setDateRange(newDateRange);
+      setDateRange({ startDate: start, endDate: end });
       setShowCustomDatePicker(false);
-      // Reset events and fetch with new date range
+      
+      // Reset and fetch new events
       setEvents([]);
       setCurrentChunk(1);
       setHasNext(true);
-      // Clear processed events tracking
       processedEventsRef.current.clear();
-      // Trigger fetch with new date range
-      setTimeout(() => {
-        if (machines.length > 0) {
-          fetchEvents(1);
-        }
-      }, 100);
     }
-  }, [machines, fetchEvents]);
+  }, []);
 
   // Intersection observer for infinite scroll
   const lastEventCallback = useCallback((node: HTMLDivElement | null) => {
@@ -345,53 +300,60 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         if (entries[0].isIntersecting && hasNext && !loading) {
           loadMoreEvents();
         }
+      }, {
+        threshold: 0.1,
+        rootMargin: '50px'
       });
       observerRef.current.observe(node);
     }
-    lastEventRef.current = node;
   }, [hasNext, loading, loadMoreEvents]);
 
-  // Handle image click to open modal
+  // Handle image modal
   const handleImageClick = useCallback((url: string, alt: string, title: string) => {
     setModalImage({ url, alt, title });
   }, []);
 
-  // Close image modal
   const closeImageModal = useCallback(() => {
     setModalImage(null);
   }, []);
 
-  // Initial fetch
+  // Initial fetch and refetch when date range changes
   useEffect(() => {
-    fetchEvents(1);
-  }, [fetchEvents]);
+    if (machines.length > 0) {
+      fetchEvents(1, false);
+    }
+  }, [dateRange]); // This will trigger when dateRange changes
 
-  // Fetch images for visible events
+  // Separate effect for initial load to avoid dependency issues
   useEffect(() => {
-    const visibleEvents = sortedEvents.slice(0, 20); // Load images for first 20 events
-    const unprocessedEvents = visibleEvents.filter(event => 
-      !event.imagesLoaded && !processedEventsRef.current.has(event.id)
-    );
-    
-    unprocessedEvents.forEach(event => {
-      fetchImagesForEvent(event);
-    });
-  }, [sortedEvents.length, fetchImagesForEvent]); // Only depend on events count, not the events array itself
+    if (isInitialLoad.current && machines.length > 0) {
+      isInitialLoad.current = false;
+      fetchEvents(1, false);
+    }
+  }, [machines.length]);
+
+  // Load images for visible events
+  useEffect(() => {
+    const visibleEvents = sortedEvents.slice(0, Math.min(20, sortedEvents.length));
+    visibleEvents
+      .filter(event => !event.imagesLoaded && !processedEventsRef.current.has(event.id))
+      .forEach(event => fetchImagesForEvent(event));
+  }, [sortedEvents.length, fetchImagesForEvent]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case '1': return 'bg-blue-500 text-white'; // Person detected - blue
-      case '2': return 'bg-orange-500 text-white'; // Person + backpack - orange
-      case '3': return 'bg-red-600 text-white'; // Gun detected - red
-      default: return 'bg-gray-400 text-white'; // No person - gray
+      case '1': return 'bg-blue-500 text-white';
+      case '2': return 'bg-orange-500 text-white';
+      case '3': return 'bg-red-600 text-white';
+      default: return 'bg-gray-400 text-white';
     }
   };
 
   const getSeverityText = (severity: string) => {
     switch (severity) {
       case '1': return 'Person Detected';
-      case '2': return 'Person + Backpack';
-      case '3': return 'Gun Detected';
+      case '2': return 'Person + Item';
+      case '3': return 'Weapon Detected';
       default: return 'No Person';
     }
   };
@@ -412,19 +374,19 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Events Feed</h2>
           <p className="text-gray-600 mb-4">
-            {totalEvents} total events • {totalChunks} chunks
+            {totalEvents} total events • Page {currentChunk} of {totalChunks}
           </p>
           
           {/* Date Range Selector */}
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
             <Select value={selectedPreset} onValueChange={handlePresetChange}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Select time range" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="7days">Last 7 days</SelectItem>
-                <SelectItem value="1month">Last month</SelectItem>
-                <SelectItem value="3months">Last 3 months</SelectItem>
+                <SelectItem value="1month">Last 30 days</SelectItem>
+                <SelectItem value="3months">Last 90 days</SelectItem>
                 <SelectItem value="custom">Custom dates</SelectItem>
               </SelectContent>
             </Select>
@@ -458,6 +420,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
           </div>
         </div>
 
+        {/* Events List */}
         {sortedEvents.map((event, index) => (
           <Card key={event.id} className="overflow-hidden">
             <CardHeader className="pb-3">
@@ -491,6 +454,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
               )}
 
               <div className="space-y-3 mb-4">
+                {/* Full Image */}
                 {event.fullImageUrl && (
                   <div className="relative">
                     <Image
@@ -499,11 +463,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                       width={400}
                       height={300}
                       className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => handleImageClick(
-                        event.fullImageUrl!,
-                        'Full image',
-                        'Full Image'
-                      )}
+                      onClick={() => handleImageClick(event.fullImageUrl!, 'Full image', 'Full Image')}
                     />
                     <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
                       Full Image
@@ -511,6 +471,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                   </div>
                 )}
                 
+                {/* Cropped Images */}
                 {event.croppedImageUrls && event.croppedImageUrls.length > 0 && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Detected Objects:</h4>
@@ -526,13 +487,13 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                               <div className="relative">
                                 <Image
                                   src={url}
-                                  alt={`Cropped image ${idx + 1}`}
+                                  alt={`Detected ${className}`}
                                   width={100}
                                   height={100}
                                   className="w-full h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                                   onClick={() => handleImageClick(
                                     url,
-                                    `Cropped image ${idx + 1}`,
+                                    `Detected ${className}`,
                                     `${className} (${Math.round(confidence * 100)}%)`
                                   )}
                                 />
@@ -554,6 +515,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                   </div>
                 )}
 
+                {/* Loading indicator for images */}
                 {loadingImages[event.id] && (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
@@ -562,6 +524,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                 )}
               </div>
 
+              {/* Detection Details */}
               {event.cropped_images && event.cropped_images.length > 0 && (
                 <div className="border-t pt-3">
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Detection Details:</h4>
@@ -575,7 +538,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                 </div>
               )}
 
-              {/* Intersection observer target for infinite scroll */}
+              {/* Intersection observer target */}
               {index === sortedEvents.length - 1 && (
                 <div ref={lastEventCallback} className="h-4" />
               )}
@@ -583,13 +546,15 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
           </Card>
         ))}
 
-        {loading && (
+        {/* Loading more indicator */}
+        {loading && events.length > 0 && (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin" />
             <span className="ml-2">Loading more events...</span>
           </div>
         )}
 
+        {/* No more events */}
         {!hasNext && events.length > 0 && (
           <div className="text-center py-8 text-gray-500">
             <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -597,6 +562,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
           </div>
         )}
 
+        {/* No events found */}
         {events.length === 0 && !loading && (
           <div className="text-center py-20 text-gray-500">
             <Camera className="h-16 w-16 mx-auto mb-4 opacity-30" />
