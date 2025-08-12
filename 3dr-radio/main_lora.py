@@ -222,7 +222,6 @@ async def radio_read():
             print(loranode.ser.any())
         message = loranode.receive()
         if message:
-            print(f"In Main, message received = {message}")
             process_message(message)
         await asyncio.sleep(0.01)
 
@@ -572,7 +571,6 @@ def process_message(data):
     if receiver != "*" and my_addr != receiver:
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
-    log(f"[RECV {len(data)}] MID:{mid}:{msg} at {time_msec()}")
     msgs_recd.append((mid, msg, time_msec()))
     ackmessage = mid
     if mst == "N":

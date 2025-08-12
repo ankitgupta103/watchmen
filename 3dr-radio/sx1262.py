@@ -363,7 +363,9 @@ class sx126x:
     def send(self, target_addr, message):
         if not hasattr(self, 'config_success') or not self.config_success:
             print("Warning: Module not properly configured, send may fail")
-            
+        
+        message = message.replace(b'\n', b'\r\r\r')
+
         offset_frequency = self.freq - (850 if self.freq > 850 else 410)
         # Format: [target_high][target_low][target_freq][own_high][own_low][own_freq][message]
         data = bytes([target_addr >> 8]) + \
@@ -386,7 +388,9 @@ class sx126x:
                 # frequency = r_buff[2] + self.start_freq
                 # print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
                 # Extract message payload (skip first 3 bytes for address and freq)
-                return r_buff[3:-1]
+                msg = r_buff[3:-1]
+                msg = msg.replace(b'\r\r\r', b'\n')
+                return msg
         return None
 
     def get_channel_rssi(self):
