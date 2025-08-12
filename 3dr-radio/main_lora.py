@@ -406,7 +406,7 @@ def get_missing_chunks(cid):
 
 def add_chunk(msgbytes):
     if len(msgbytes) < 5:
-        log(f"ERROR : Not enough bytes {len(msgbytes)} : {msg}")
+        log(f"ERROR : Not enough bytes {len(msgbytes)} : {msgbytes}")
         return
     cid = msgbytes[0:3].decode()
     print(f"")
