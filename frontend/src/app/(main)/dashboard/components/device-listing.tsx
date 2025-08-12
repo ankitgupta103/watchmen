@@ -40,14 +40,12 @@ export default function DeviceListing({ machines }: { machines: Machine[] }) {
             </TableCell>
             <TableCell>{machine.type.replace(/_/g, ' ')}</TableCell>
             <TableCell>
-              <TableCell>
-                <Badge
-                  variant={isMachineOnline(machine) ? 'default' : 'destructive'}
-                  className="capitalize"
-                >
-                  {isMachineOnline(machine) ? 'Online' : 'Offline'}
-                </Badge>
-              </TableCell>
+              <Badge
+                variant={isMachineOnline(machine) ? 'default' : 'destructive'}
+                className="capitalize"
+              >
+                {isMachineOnline(machine) ? 'Online' : 'Offline'}
+              </Badge>
             </TableCell>
             <DeviceBuffer machineId={machine.id} />
             <TableCell>
