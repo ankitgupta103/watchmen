@@ -14,13 +14,8 @@ import sx1262
 import sys
 import random
 
-# Local libraries
-import radio
-
 print_lock = asyncio.Lock()
 
-UART_BAUDRATE = 57600
-USBA_BAUDRATE = 57600
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.3
 CHUNK_SLEEP = 0.5
@@ -90,7 +85,7 @@ shortest_path_to_cc = []
 if my_addr == "A":
     shortest_path_to_cc = ["Z"]
 elif my_addr == "B":
-    shortest_path_to_cc = ["A", "Z"]
+    shortest_path_to_cc = ["Z"]
 else:
     shortest_path_to_cc = ["A"]
 seen_neighbours = []
