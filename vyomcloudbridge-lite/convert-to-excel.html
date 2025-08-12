@@ -4,9 +4,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Log Data to CSV Converter</title>
+  <title>Log Data to XLSX Converter</title>
   <!-- Tailwind CSS for styling -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS library for creating .xlsx files -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     /* Using a common font for a clean look */
     body {
@@ -23,24 +25,23 @@
 
   <div class="w-full max-w-3xl mx-auto p-6 md:p-8 bg-white rounded-xl shadow-lg">
     <div class="text-center mb-6">
-      <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Log Data to CSV Converter</h1>
-      <p class="text-gray-600 mt-2">Paste the console output from your sensor script to generate a downloadable CSV
+      <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Log Data to XLSX Converter</h1>
+      <p class="text-gray-600 mt-2">Paste the console output from your sensor script to generate a downloadable XLSX
         file.</p>
     </div>
 
     <!-- Text area for user to paste log data -->
     <div class="mb-4">
       <label for="logData" class="block text-sm font-medium text-gray-700 mb-1">Paste Log Data Here:</label>
-      <!-- UPDATED: Placeholder text now includes the image_filename column -->
       <textarea id="logData" rows="12"
         class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-        placeholder="timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth,image_filename&#10;1678886400000,LOC_005,42,True,False,LOC_005-1678886400000-True.jpg&#10;1678886404000,LOC_005,15,False,False,LOC_005-1678886404000-False.jpg&#10;..."></textarea>
+        placeholder="timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth,image_filename&#10;1678886400000,LOC_005,42,True,False,LOC_005-1678886400000-True.jpg&#10;..."></textarea>
     </div>
 
     <!-- Button to trigger the download -->
     <button id="downloadBtn"
-      class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-105">
-      Generate and Download .CSV File
+      class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-transform transform hover:scale-105">
+      Generate and Download .XLSX File
     </button>
 
     <!-- Message area for feedback -->
@@ -58,52 +59,50 @@
       // 1. Get the text from the textarea
       const logContent = logDataTextArea.value.trim();
 
-      // Check if the textarea is empty
       if (!logContent) {
         messageDiv.textContent = 'Please paste some data into the text area first.';
         messageDiv.className = 'text-center mt-4 text-sm font-medium text-red-600';
         return;
       }
 
-      // 2. UPDATED: Define the CSV header to match the new Python script's header.
-      const header = "timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth,image_filename\n";
-
-      // 3. Combine the header with the pasted content.
-      // This check correctly handles cases where the user might paste the header in.
-      const fullCsvContent = logContent.startsWith('timestamp_ms') ? logContent : header + logContent;
-
       try {
-        // 4. Create a Blob object. A Blob is a file-like object of immutable, raw data.
-        const blob = new Blob([fullCsvContent], { type: 'text/csv;charset=utf-8;' });
+        // 2. Parse the text data into an array of arrays
+        const header = "timestamp_ms,location_id,diff_value,motion_detected,person_present_ground_truth,image_filename";
+        const lines = logContent.split('\n');
 
-        // 5. Create a temporary link element to trigger the download
-        const link = document.createElement("a");
+        // Start with the header row
+        const data = [header.split(',')];
 
-        // Create a URL for the blob object
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
+        // Check if the first line of pasted data is the header, if so, skip it
+        const startIndex = lines[0].trim().startsWith('timestamp_ms') ? 1 : 0;
 
-        // Set the download attribute with a filename
+        for (let i = startIndex; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line) { // Ensure we don't process empty lines
+            data.push(line.split(','));
+          }
+        }
+
+        // 3. Use SheetJS to create a workbook
+        // Create a new worksheet from our array of arrays
+        const ws = XLSX.utils.aoa_to_sheet(data);
+
+        // Create a new workbook
+        const wb = XLSX.utils.book_new();
+
+        // Append the worksheet to the workbook with a sheet name
+        XLSX.utils.book_append_sheet(wb, ws, "LogData");
+
+        // 4. Trigger the download of the .xlsx file
         const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        link.setAttribute("download", `datalog_${timestamp}.csv`);
-
-        // Hide the link
-        link.style.visibility = 'hidden';
-
-        // Add the link to the document and trigger a click
-        document.body.appendChild(link);
-        link.click();
-
-        // Clean up by removing the link and revoking the URL
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        XLSX.writeFile(wb, `datalog_${timestamp}.xlsx`);
 
         // Provide success feedback to the user
-        messageDiv.textContent = 'Success! Your file has been downloaded.';
+        messageDiv.textContent = 'Success! Your XLSX file has been downloaded.';
         messageDiv.className = 'text-center mt-4 text-sm font-medium text-green-600';
 
       } catch (error) {
-        console.error("Error generating file:", error);
+        console.error("Error generating XLSX file:", error);
         messageDiv.textContent = 'An error occurred while generating the file.';
         messageDiv.className = 'text-center mt-4 text-sm font-medium text-red-600';
       }
