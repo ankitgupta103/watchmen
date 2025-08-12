@@ -42,33 +42,39 @@ const formatTimeAgo = (date: Date): string => {
   return `${Math.floor(diffInSeconds / 86400)}d ago`;
 };
 
-// Format date to YYYY-MM-DD
+// Format date to YYYY-MM-DD (timezone-safe)
 const formatDateForAPI = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
-// Get default date range (1 month ago to today)
+// Get default date range (1 month + 3 days ago to today)
 const getDefaultDateRange = (): DateRange => {
   const endDate = new Date();
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 1);
+  startDate.setDate(startDate.getDate() - 3); // Add 3 more days to be safe
   return { startDate, endDate };
 };
 
-// Get preset date ranges
+// Get preset date ranges (with extra buffer days to account for timezone issues)
 const getPresetDateRange = (preset: string): DateRange => {
   const endDate = new Date();
   const startDate = new Date();
   
   switch (preset) {
     case '7days':
-      startDate.setDate(startDate.getDate() - 7);
+      startDate.setDate(startDate.getDate() - 10); // Add 3 more days to be safe
       break;
     case '1month':
       startDate.setMonth(startDate.getMonth() - 1);
+      startDate.setDate(startDate.getDate() - 3); // Add 3 more days to be safe
       break;
     case '3months':
       startDate.setMonth(startDate.getMonth() - 3);
+      startDate.setDate(startDate.getDate() - 3); // Add 3 more days to be safe
       break;
     default:
       return getDefaultDateRange();
@@ -161,6 +167,16 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         start_date: formatDateForAPI(dateRange.startDate),
         end_date: formatDateForAPI(dateRange.endDate),
       };
+      
+      // Debug: Log the dates being sent to API
+      console.log('Date range being sent to API:', {
+        start_date: formatDateForAPI(dateRange.startDate),
+        end_date: formatDateForAPI(dateRange.endDate),
+        startDate_iso: dateRange.startDate.toISOString(),
+        endDate_iso: dateRange.endDate.toISOString(),
+        startDate_local: dateRange.startDate.toLocaleDateString(),
+        endDate_local: dateRange.endDate.toLocaleDateString()
+      });
       
       const response = await fetcherClient<S3EventsResponse>(
         `${API_BASE_URL}/s3-events/fetch-events/`,
