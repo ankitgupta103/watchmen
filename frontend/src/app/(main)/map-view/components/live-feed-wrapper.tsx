@@ -48,14 +48,14 @@ interface MachineEvent {
   eventstr: string;
   image_c_key?: string;
   image_f_key?: string;
-  event_severity?: string;
+  event_severity?: number;
 }
 
 interface EventMessage {
   eventstr?: string;
   image_c_key: string;
   image_f_key: string;
-  event_severity: string;
+  event_severity: number;
 }
 
 const ReactLeafletMap = dynamic(() => import('./react-leaflet-map'), {
@@ -129,7 +129,7 @@ export default function LiveFeedWrapper({
           `Event - Severity ${eventMessage.event_severity}`,
         image_c_key: eventMessage.image_c_key,
         image_f_key: eventMessage.image_f_key,
-        event_severity: eventMessage.event_severity.toString(),
+        event_severity: eventMessage.event_severity,
       };
     },
     [],

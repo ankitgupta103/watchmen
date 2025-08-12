@@ -58,7 +58,7 @@ export interface FeedEvent extends Omit<S3EventData, 'timestamp'> {
   croppedImageUrls?: string[];
   fullImageUrl?: string;
   imagesLoaded: boolean;
-  severity: string;
+  severity: number;
 }
 
 export interface MQTTEvent {

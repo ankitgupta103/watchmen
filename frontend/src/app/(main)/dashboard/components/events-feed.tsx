@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Camera, Clock, AlertTriangle, Loader2, Calendar } from 'lucide-react';
+import { Camera, Clock, AlertTriangle, Loader2, Calendar, Filter, TrendingUp } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -14,8 +14,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
-import { Machine, S3EventsResponse, FeedEvent, CroppedImage } from '@/lib/types/machine';
+import { Machine, S3EventsResponse, FeedEvent } from '@/lib/types/machine';
 import { getPresignedUrl } from '@/lib/utils/presigned-url';
+import { calculateSeverity, getSeverityLabel, getSeverityColor } from '@/lib/utils/severity';
 import { cn } from '@/lib/utils';
 
 import useToken from '@/hooks/use-token';
@@ -58,7 +59,7 @@ const getDefaultDateRange = (): DateRange => {
   return { startDate, endDate };
 };
 
-// Get preset date ranges
+// Get preset date range
 const getPresetDateRange = (preset: string): DateRange => {
   const endDate = new Date();
   const startDate = new Date();
@@ -78,31 +79,6 @@ const getPresetDateRange = (preset: string): DateRange => {
   }
   
   return { startDate, endDate };
-};
-
-// Determine event severity
-const determineEventSeverity = (croppedImages: CroppedImage[]): string => {
-  if (!croppedImages?.length) return '0';
-  
-  const detectedClasses = croppedImages.map(img => img.class_name.toLowerCase());
-  
-  // Check for weapons (highest priority)
-  if (detectedClasses.some(cls => 
-    cls.includes('gun') || cls.includes('weapon') || cls.includes('firearm') || cls.includes('knife')
-  )) {
-    return '3';
-  }
-  
-  // Check for person + suspicious items
-  const hasPerson = detectedClasses.some(cls => cls.includes('person') || cls.includes('human'));
-  const hasSuspiciousItem = detectedClasses.some(cls => 
-    cls.includes('backpack') || cls.includes('bag') || cls.includes('suitcase')
-  );
-  
-  if (hasPerson && hasSuspiciousItem) return '2';
-  if (hasPerson) return '1';
-  
-  return '0';
 };
 
 export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
@@ -177,7 +153,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         const newEvents: FeedEvent[] = response.events.map((event, index) => {
           const machineId = event.machine_id || machines[0]?.id || 0;
           const machine = machines.find(m => m.id === machineId) || machines[0];
-          const severity = determineEventSeverity(event.cropped_images);
+          const severity = calculateSeverity(event.cropped_images);
           
           return {
             ...event,
@@ -340,24 +316,6 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
       .forEach(event => fetchImagesForEvent(event));
   }, [sortedEvents.length, fetchImagesForEvent]);
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case '1': return 'bg-blue-500 text-white';
-      case '2': return 'bg-orange-500 text-white';
-      case '3': return 'bg-red-600 text-white';
-      default: return 'bg-gray-400 text-white';
-    }
-  };
-
-  const getSeverityText = (severity: string) => {
-    switch (severity) {
-      case '1': return 'Person Detected';
-      case '2': return 'Person + Item';
-      case '3': return 'Weapon Detected';
-      default: return 'No Person';
-    }
-  };
-
   if (events.length === 0 && loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -369,16 +327,16 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
 
   return (
     <>
-      <div className="max-w-2xl mx-auto space-y-4 p-4">
+      <div className="max-w-4xl mx-auto space-y-6 p-4">
         {/* Header with date filter */}
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Events Feed</h2>
-          <p className="text-gray-600 mb-4">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Events Feed</h2>
+          <p className="text-gray-600 mb-6">
             {totalEvents} total events • Page {currentChunk} of {totalChunks}
           </p>
           
           {/* Date Range Selector */}
-          <div className="flex items-center justify-center gap-3 flex-wrap">
+          <div className="flex items-center justify-center gap-3 flex-wrap mb-6">
             <Select value={selectedPreset} onValueChange={handlePresetChange}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Select time range" />
@@ -414,137 +372,157 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
               </Popover>
             )}
 
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
               {formatDateForAPI(dateRange.startDate)} to {formatDateForAPI(dateRange.endDate)}
             </div>
           </div>
         </div>
 
         {/* Events List */}
-        {sortedEvents.map((event, index) => (
-          <Card key={event.id} className="overflow-hidden">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Camera className="h-5 w-5 text-blue-600" />
+        {sortedEvents.map((event, index) => {
+          const severityInfo = getSeverityLabel(event.severity);
+          return (
+            <Card key={event.id} className="overflow-hidden border-l-4" style={{ borderLeftColor: getSeverityColor(event.severity).split(' ')[0].replace('bg-', '') }}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Camera className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 text-lg">{event.machineName}</h3>
+                      <p className="text-sm text-gray-500 capitalize">
+                        {event.machineType.replace(/_/g, ' ')}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{event.machineName}</h3>
-                    <p className="text-sm text-gray-500 capitalize">
-                      {event.machineType.replace(/_/g, ' ')}
-                    </p>
+                  <div className="flex items-center space-x-3">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge className={cn('text-sm px-3 py-1', getSeverityColor(event.severity))}>
+                          <span className="mr-1">{severityInfo.icon}</span>
+                          {severityInfo.label}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-medium">{severityInfo.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                      <Clock className="h-4 w-4 mr-2" />
+                      {formatTimeAgo(event.timestamp)}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge className={cn('text-xs', getSeverityColor(event.severity))}>
-                    {getSeverityText(event.severity)}
-                  </Badge>
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {formatTimeAgo(event.timestamp)}
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
+              </CardHeader>
 
-            <CardContent className="pt-0">
-              {event.eventstr && (
-                <p className="text-gray-700 mb-4">{event.eventstr}</p>
-              )}
-
-              <div className="space-y-3 mb-4">
-                {/* Full Image */}
-                {event.fullImageUrl && (
-                  <div className="relative">
-                    <Image
-                      src={event.fullImageUrl}
-                      alt="Full image"
-                      width={400}
-                      height={300}
-                      className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => handleImageClick(event.fullImageUrl!, 'Full image', 'Full Image')}
-                    />
-                    <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
-                      Full Image
-                    </Badge>
-                  </div>
+              <CardContent className="pt-0">
+                {event.eventstr && (
+                  <p className="text-gray-700 mb-4 bg-gray-50 p-3 rounded-lg">{event.eventstr}</p>
                 )}
-                
-                {/* Cropped Images */}
-                {event.croppedImageUrls && event.croppedImageUrls.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Detected Objects:</h4>
-                    <div className="grid grid-cols-4 gap-2">
-                      {event.croppedImageUrls.map((url, idx) => {
-                        const croppedImage = event.cropped_images?.[idx];
-                        const className = croppedImage?.class_name || 'Unknown';
-                        const confidence = croppedImage?.confidence || 0;
-                        
-                        return (
-                          <Tooltip key={idx}>
-                            <TooltipTrigger asChild>
-                              <div className="relative">
-                                <Image
-                                  src={url}
-                                  alt={`Detected ${className}`}
-                                  width={100}
-                                  height={100}
-                                  className="w-full h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                                  onClick={() => handleImageClick(
-                                    url,
-                                    `Detected ${className}`,
-                                    `${className} (${Math.round(confidence * 100)}%)`
-                                  )}
-                                />
-                                <Badge variant="secondary" className="absolute top-1 left-1 text-xs">
-                                  {idx + 1}
-                                </Badge>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="font-medium">{className}</p>
-                              <p className="text-xs opacity-80">
-                                Confidence: {Math.round(confidence * 100)}%
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })}
+
+                <div className="space-y-4 mb-4">
+                  {/* Full Image */}
+                  {event.fullImageUrl && (
+                    <div className="relative">
+                      <Image
+                        src={event.fullImageUrl}
+                        alt="Full image"
+                        width={400}
+                        height={300}
+                        className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity border"
+                        onClick={() => handleImageClick(event.fullImageUrl!, 'Full image', 'Full Image')}
+                      />
+                      <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
+                        Full Image
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  {/* Cropped Images */}
+                  {event.croppedImageUrls && event.croppedImageUrls.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                        <Filter className="h-4 w-4 mr-2" />
+                        Detected Objects ({event.croppedImageUrls.length})
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {event.croppedImageUrls.map((url, idx) => {
+                          const croppedImage = event.cropped_images?.[idx];
+                          const className = croppedImage?.class_name || 'Unknown';
+                          const confidence = croppedImage?.confidence || 0;
+                          
+                          return (
+                            <Tooltip key={idx}>
+                              <TooltipTrigger asChild>
+                                <div className="relative group">
+                                  <Image
+                                    src={url}
+                                    alt={`Detected ${className}`}
+                                    width={100}
+                                    height={100}
+                                    className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity border group-hover:shadow-md"
+                                    onClick={() => handleImageClick(
+                                      url,
+                                      `Detected ${className}`,
+                                      `${className} (${Math.round(confidence * 100)}%)`
+                                    )}
+                                  />
+                                  <Badge variant="secondary" className="absolute top-1 left-1 text-xs">
+                                    {idx + 1}
+                                  </Badge>
+                                  <div className="absolute bottom-1 right-1 bg-black bg-opacity-70 text-white text-xs px-1 py-0.5 rounded">
+                                    {Math.round(confidence * 100)}%
+                                  </div>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-medium">{className}</p>
+                                <p className="text-xs opacity-80">
+                                  Confidence: {Math.round(confidence * 100)}%
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Loading indicator for images */}
+                  {loadingImages[event.id] && (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                      <span className="ml-2 text-sm text-gray-500">Loading images...</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Detection Details */}
+                {event.cropped_images && event.cropped_images.length > 0 && (
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                      <TrendingUp className="h-4 w-4 mr-2" />
+                      Detection Details
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {event.cropped_images.map((crop, idx) => (
+                        <Badge key={idx} variant="outline" className="text-xs">
+                          {crop.class_name} ({Math.round(crop.confidence * 100)}%)
+                        </Badge>
+                      ))}
                     </div>
                   </div>
                 )}
 
-                {/* Loading indicator for images */}
-                {loadingImages[event.id] && (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                    <span className="ml-2 text-sm text-gray-500">Loading images...</span>
-                  </div>
+                {/* Intersection observer target */}
+                {index === sortedEvents.length - 1 && (
+                  <div ref={lastEventCallback} className="h-4" />
                 )}
-              </div>
-
-              {/* Detection Details */}
-              {event.cropped_images && event.cropped_images.length > 0 && (
-                <div className="border-t pt-3">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Detection Details:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {event.cropped_images.map((crop, idx) => (
-                      <Badge key={idx} variant="outline" className="text-xs">
-                        {crop.class_name} ({Math.round(crop.confidence * 100)}%)
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Intersection observer target */}
-              {index === sortedEvents.length - 1 && (
-                <div ref={lastEventCallback} className="h-4" />
-              )}
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
 
         {/* Loading more indicator */}
         {loading && events.length > 0 && (

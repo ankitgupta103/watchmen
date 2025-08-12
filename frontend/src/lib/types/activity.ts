@@ -7,7 +7,7 @@ export interface MachineEvent {
   cropped_image_url?: string;
   full_image_url?: string;
   images_loaded?: boolean;
-  event_severity?: string;
+  event_severity?: number;
 }
 
 export interface EventMessage {
