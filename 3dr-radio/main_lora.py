@@ -280,10 +280,9 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
 
 def make_chunks(msg):
     chunks = []
-    chunck_size = 200
-    while len(msg) > chunck_size:
-        chunks.append(msg[0:chunck_size])
-        msg = msg[chunck_size:]
+    while len(msg) > 200:
+        chunks.append(msg[0:200])
+        msg = msg[200:]
     if len(msg) > 0:
         chunks.append(msg)
     return chunks
@@ -305,7 +304,7 @@ def encrypt_if_needed(mst, msg):
     return msg
 
 # === Send Function ===
-async def send_msg_internal(msgtype, creator, msgbytes, dest):
+def send_msg_internal(msgtype, creator, msgbytes, dest):
     if msgtype == "P":
         print(f"Sending photo of length {len(msgbytes)}")
     else:
@@ -324,10 +323,8 @@ async def send_msg_internal(msgtype, creator, msgbytes, dest):
         if i % 10 == 0:
             print(f"Sending chunk {i}")
         await asyncio.sleep(CHUNK_SLEEP)
-        chunkbytes = imid.encode() + i.to_bytes(2, 'big') + chunks[i]
-        success = await send_single_msg("I", creator, chunkbytes, dest)
-        if not success:
-            log(f"Failed sending chunk {i}")
+        chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
+        _ = await send_single_msg("I", creator, chunkbytes, dest)
     for retry_i in range(50):
         succ, missing_chunks = await send_single_msg("E", creator, imid, dest)
         if not succ:
@@ -339,8 +336,8 @@ async def send_msg_internal(msgtype, creator, msgbytes, dest):
         log(f"Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}")
         for mc in missing_chunks:
             await asyncio.sleep(CHUNK_SLEEP)
-            chunkbytes = imid.encode() + mc.to_bytes(2, 'big') + chunks[mc]
-            await send_single_msg("I", creator, chunkbytes, dest)
+            chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
+            _ = await send_single_msg("I", creator, chunkbytes, dest)
     return False
 
 async def send_msg(msgtype, creator, msgbytes, dest):
@@ -416,12 +413,11 @@ def add_chunk(msgbytes):
         log(f"ERROR : Not enough bytes {len(msgbytes)} : {msgbytes}")
         return
     cid = msgbytes[0:3].decode()
-    citer = int.from_bytes(msgbytes[3:5], 'big')
+    citer = int.from_bytes(msgbytes[3:5])
     print(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
     if cid not in chunk_map:
         log(f"ERROR : no entry yet for {cid}")
-        return
     chunk_map[cid][2].append((citer, cdata))
     _, expected_chunks, _ = chunk_map[cid]
     missing = get_missing_chunks(cid)
