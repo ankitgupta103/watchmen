@@ -283,7 +283,6 @@ def make_chunks(msg):
     return chunks
 
 def encrypt_if_needed(mst, msg):
-    return msg
     if mst in ["H"]:
         # Must be less than 117 bytes
         if len(msg) > 117:
