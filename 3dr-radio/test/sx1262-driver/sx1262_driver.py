@@ -49,7 +49,15 @@ class sx1262:
     def _init_radio(self):
         """Initializing the radio """
         self.reset_radio()
+        time.sleep_ms(10)
 
+        # set standby mode 
+        self.set_standby()
+
+        # Configure TCX0 (if needed)
+        self._write_command(self.CMD_SET_DIO3_AS_TCX0_CTRL, bytes([0x07, 0x00, 0x00, 0x00]))
+
+        # cali
 
 
     def reset_radio(self):
@@ -67,3 +75,20 @@ class sx1262:
             timeout -= 1
         if timeout == 0:
             raise RuntimeError("Radio busy timeout")
+
+
+    def _write_command(self, cmd, data=None):
+        """write command to the radio"""
+        self._wait_busy()
+        self.cs.value(0)
+
+        if data:
+            self.cmd_buffer[0] = cmd
+            self.cmd_buffer[1:1+len(data)] = data
+            self.spi.write(slef.cmd_buffer[:1+len(data)])
+        else:
+            self.spi.write()
+
+    def set_standby(self):
+        """ set standby mode """
+        self._write_command(self.CMD_SET_STANDBY, bytes([0x00]))
