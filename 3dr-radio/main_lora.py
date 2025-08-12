@@ -643,8 +643,7 @@ async def send_spath():
 
 async def print_summary():
     while True:
-        await asyncio.sleep(10)
-        print(f"My current NETID is {CURRENT_NETID}")
+        await asyncio.sleep(30)
         print(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)}")
         #print(msgs_sent)
         #print(msgs_recd)
@@ -667,7 +666,7 @@ async def main():
     log(f"[INFO] Started device {my_addr}, {my_lora_addr}")
     await init_lora()
     asyncio.create_task(radio_read())
-    # asyncio.create_task(print_summary())
+    asyncio.create_task(print_summary())
     # asyncio.create_task(time_since_last_read())
     if my_addr in ["A", "B", "C"]:
         asyncio.create_task(send_heartbeat())
