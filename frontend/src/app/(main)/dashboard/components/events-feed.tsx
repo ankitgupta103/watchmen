@@ -186,7 +186,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
             machineId: machineId,
             machineName: machine?.name || 'Unknown Machine',
             machineType: machine?.type || 'Unknown Type',
-            timestamp: event.timestamp ? new Date(event.timestamp) : new Date(),
+            timestamp: event.timestamp ? new Date(Number(event.timestamp) * 1000) : new Date(),
             imagesLoaded: false,
             severity: severity,
           };
