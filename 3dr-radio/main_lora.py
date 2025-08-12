@@ -495,8 +495,8 @@ def hb_process(mid, msgbytes):
             hb_map[creator] = 0
         hb_map[creator] += 1
         print(f"HB Counts = {hb_map}")
-        #print(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv())}")
-        print(f"Only for debugging : HB msg = {msgbytes.decode()}")
+        print(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv())}")
+        #print(f"Only for debugging : HB msg = {msgbytes.decode()}")
         return
     if len(shortest_path_to_cc) > 0:
         peer_addr = shortest_path_to_cc[0]
@@ -510,8 +510,8 @@ def img_process(cid, msg, creator):
     # TODO save image
     if running_as_cc():
         print(f"Received image of size {len(msg)}")
-        img_bytes = msg
-        #img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
+        #img_bytes = msg
+        img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         print(len(img_bytes))
         fname = f"cc_{creator}_{cid}.jpg"
