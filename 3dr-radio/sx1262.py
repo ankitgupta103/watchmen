@@ -146,10 +146,10 @@ class sx126x:
             
         time.sleep_ms(30)  # Allow time for UART to stabilize
 
-        Optional: veryfy setting at new baud 
-        After switching to new baud rate, when calling get_settings,
-        it does not work, need to find the issue
-        self.get_settings()                       
+        # Optional: veryfy setting at new baud 
+        # After switching to new baud rate, when calling get_settings,
+        # it does not work, need to find the issue
+        # self.get_settings()                       
 
         self.M0.value(0)  # LOW
         self.M1.value(0)  # LOW - normal mode
