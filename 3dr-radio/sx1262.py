@@ -122,24 +122,24 @@ class sx126x:
         
         self.set(freq, addr, power, rssi, air_speed, net_id, buffer_size, crypt, relay, lbt, wor)
 
-        # print("[INFO] Reopeining UART with target baud rate")
-        # self.ser.deinit()  # Close current UART
-        # time.sleep_ms(300) # Wait for UART to close properly
+        print("[INFO] Reopeining UART with target baud rate")
+        self.ser.deinit()  # Close current UART
+        time.sleep_ms(300) # Wait for UART to close properly
 
 
-        # # critical : put module back in configuration mode for baudrate verification
-        # self.M0.value(0)  # LOW
-        # self.M1.value(1)  # HIGH - config mode 
-        # print("M0=LOW, M1=HIGH (configuration mode)")
+        # critical : put module back in configuration mode for baudrate verification
+        self.M0.value(0)  # LOW
+        self.M1.value(1)  # HIGH - config mode 
+        print("M0=LOW, M1=HIGH (configuration mode)")
 
-        # time.sleep_ms(500)  # Wait for module to enter config mode
+        time.sleep_ms(500)  # Wait for module to enter config mode
 
-        # try:
-        #     self.ser = UART(uart_num, self.target_baud, timeout=2000)
-        #     print(f"UART {uart_num} reopened at {self.target_baud} baud")
-        # except Exception as e:
-        #     print(f"UART initialization failed: {e}")
-        #     raise
+        try:
+            self.ser = UART(uart_num, self.target_baud, timeout=2000)
+            print(f"UART {uart_num} reopened at {self.target_baud} baud")
+        except Exception as e:
+            print(f"UART initialization failed: {e}")
+            raise
 
         while self.ser.any():
             self.ser.read()
@@ -199,7 +199,7 @@ class sx126x:
             self.cfg_reg[3] = high_addr
             self.cfg_reg[4] = low_addr
             self.cfg_reg[5] = net_id_temp
-            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_9600 + air_speed_temp
+            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_115200 + air_speed_temp
             # 
             # it will enable to read noise rssi value when add 0x20 as follow
             # 
@@ -216,7 +216,7 @@ class sx126x:
             self.cfg_reg[3] = 0x01
             self.cfg_reg[4] = 0x02
             self.cfg_reg[5] = 0x03
-            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_9600 + air_speed_temp
+            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_115200 + air_speed_temp
             # 
             # it will enable to read noise rssi value when add 0x20 as follow
             # 
@@ -363,37 +363,35 @@ class sx126x:
     def send(self, target_addr, message):
         if not hasattr(self, 'config_success') or not self.config_success:
             print("Warning: Module not properly configured, send may fail")
-            
+        
+        # message = message.replace(b'\n', b'{}{}')
+
         offset_frequency = self.freq - (850 if self.freq > 850 else 410)
         # Format: [target_high][target_low][target_freq][own_high][own_low][own_freq][message]
         data = bytes([target_addr >> 8]) + \
-
-              bytes([target_addr & 0xff]) + \
+               bytes([target_addr & 0xff]) + \
                bytes([offset_frequency]) + \
                bytes([self.addr >> 8]) + \
                bytes([self.addr & 0xff]) + \
                bytes([self.offset_freq]) + \
-               message
+               message + b'\n'
         #print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
         self.ser.write(data)
+        time.sleep_ms(100)
 
     def receive(self):
         if self.ser.any():
-            time.sleep_ms(300)
-            r_buff = self.ser.read()
-            #print(r_buff)
+            time.sleep_ms(100)
+            r_buff = self.ser.readline()
             if r_buff and len(r_buff) >= 6:
-                sender_addr = (r_buff[0] << 8) + r_buff[1]
-                frequency = r_buff[2] + self.start_freq
+                # sender_addr = (r_buff[0] << 8) + r_buff[1]
+                # frequency = r_buff[2] + self.start_freq
                 # print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
                 # Extract message payload (skip first 3 bytes for address and freq)
-                if len(r_buff) > 3:
-                    message = r_buff[3:]
-                    return message
-            else:
-                print(f"Received short or empty message: {r_buff}")
-                return None
-            return None
+                msg = r_buff[3:-1]
+                # msg = msg.replace(b'{}{}', b'\n')
+                return msg
+        return None
 
     def get_channel_rssi(self):
         self.M1.value(0)  # LOW
