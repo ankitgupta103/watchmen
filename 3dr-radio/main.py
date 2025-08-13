@@ -34,6 +34,7 @@ image_count = 0                 # Counter to keep tranck of saved images
 
 consecutive_hb_failures = 0
 
+COMMAN_CENTER_ADDR = 9
 my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
