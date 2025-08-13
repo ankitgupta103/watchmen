@@ -33,6 +33,7 @@ AIR_SPEED = 62500
 image_count = 0                 # Counter to keep tranck of saved images
 
 consecutive_hb_failures = 0
+lora_reinit_count = 0
 
 COMMAN_CENTER_ADDR = 9
 my_addr = None
@@ -73,7 +74,8 @@ recv_msg_count = {}
 loranode = None
 
 async def init_lora():
-    global loranode
+    global loranode, lora_reinit_count
+    lora_reinit_count += 1
     print(f"Initializing LoRa SX126X module... my lora addr = {my_addr}")
     loranode = sx1262.sx126x(
         uart_num=1,        # UART port number - adjust as needed
@@ -85,7 +87,8 @@ async def init_lora():
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
     )
-    print("LoRa module initialized successfully!")
+    
+    print("LoRa module initialized successfully! (Total reinitializations: {lora_reinit_count})")
     print(f"Node address: {loranode.addr}")
     print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
@@ -625,7 +628,7 @@ async def send_spath():
 async def print_summary():
     while True:
         await asyncio.sleep(30)
-        print(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)}")
+        print(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa reinits: {lora_reinit_count}")
         #print(msgs_sent)
         #print(msgs_recd)
         #print(msgs_unacked)
