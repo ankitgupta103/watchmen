@@ -86,7 +86,7 @@ while True:
 
     # --- Image Saving (Runs every interval) ---
     # Create the base filename first
-    image_filename_base = f"{LOCATION_ID}-{timestamp}-{motion_detected}.jpg"
+    image_filename_base = f"{LOCATION_ID}-{timestamp}.jpg"
     # Create the full path for saving the image
     full_image_path = f"{IMAGE_DIR}/{image_filename_base}"
 
