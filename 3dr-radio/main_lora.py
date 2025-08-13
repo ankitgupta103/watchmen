@@ -17,7 +17,7 @@ import random
 print_lock = asyncio.Lock()
 
 MIN_SLEEP = 0.1
-ACK_SLEEP = 0
+ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.2
 
 HB_WAIT_SEC = 30
