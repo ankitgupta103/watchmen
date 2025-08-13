@@ -476,6 +476,9 @@ def hb_process(mid, msgbytes):
             hb_map[creator] = 0
         hb_map[creator] += 1
         print(f"HB Counts = {hb_map}")
+        print(f"Images saved at cc so far = {len(images_saved_at_cc)}")
+        for i in images_saved_at_cc:
+            print(i)
         #print(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv())}")
         print(f"Only for debugging : HB msg = {msgbytes.decode()}")
         return
@@ -485,6 +488,8 @@ def hb_process(mid, msgbytes):
         asyncio.create_task(send_msg("H", creator, msgbytes, peer_addr))
     else:
         print(f"Can't forward HB because I dont have Spath yet")
+
+images_saved_at_cc = []
 
 def img_process(cid, msg, creator):
     clear_chunkid(cid)
@@ -497,6 +502,7 @@ def img_process(cid, msg, creator):
         print(len(img_bytes))
         fname = f"cc_{creator}_{cid}.jpg"
         print(f"Saving to file {fname}")
+        images_saved_at_cc.append(fname)
         img.save(fname)
     else:
         if len(shortest_path_to_cc) > 0:
