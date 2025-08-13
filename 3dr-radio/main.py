@@ -47,7 +47,7 @@ uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for 
 print("Running on device : " + uid.decode())
 if uid == b'e076465dd7194025':
     my_addr = 2
-    shortest_path_to_cc = [9]
+    shortest_path_to_cc = [1, 9]
 elif uid == b'e076465dd7091027':
     my_addr = 1
     shortest_path_to_cc = [9]
@@ -125,7 +125,7 @@ async def person_detection_loop():
         print(f"Image count: {image_count}")
         person_detected, confidence = detect_person(img)
         print(f"Person detected = {person_detected}, confidence = {confidence}")
-        if True: # person_detected:
+        if person_detected:
             r = get_rand()
             raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             print(f"Saving image to {raw_path}")
