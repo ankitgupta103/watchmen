@@ -122,29 +122,29 @@ class sx126x:
         
         self.set(freq, addr, power, rssi, air_speed, net_id, buffer_size, crypt, relay, lbt, wor)
 
-        # print("[INFO] Reopeining UART with target baud rate")
-        # self.ser.deinit()  # Close current UART
-        # time.sleep_ms(300) # Wait for UART to close properly
+        print("[INFO] Reopeining UART with target baud rate")
+        self.ser.deinit()  # Close current UART
+        time.sleep_ms(300) # Wait for UART to close properly
 
 
-        # # critical : put module back in configuration mode for baudrate verification
-        # self.M0.value(0)  # LOW
-        # self.M1.value(1)  # HIGH - config mode 
-        # print("M0=LOW, M1=HIGH (configuration mode)")
+        # critical : put module back in configuration mode for baudrate verification
+        self.M0.value(0)  # LOW
+        self.M1.value(1)  # HIGH - config mode 
+        print("M0=LOW, M1=HIGH (configuration mode)")
 
-        # time.sleep_ms(500)  # Wait for module to enter config mode
+        time.sleep_ms(500)  # Wait for module to enter config mode
 
-        # try:
-        #     self.ser = UART(uart_num, self.target_baud, timeout=2000)
-        #     print(f"UART {uart_num} reopened at {self.target_baud} baud")
-        # except Exception as e:
-        #     print(f"UART initialization failed: {e}")
-        #     raise
+        try:
+            self.ser = UART(uart_num, self.target_baud, timeout=2000)
+            print(f"UART {uart_num} reopened at {self.target_baud} baud")
+        except Exception as e:
+            print(f"UART initialization failed: {e}")
+            raise
 
-        # while self.ser.any():
-        #     self.ser.read()
+        while self.ser.any():
+            self.ser.read()
             
-        # time.sleep_ms(30)  # Allow time for UART to stabilize
+        time.sleep_ms(30)  # Allow time for UART to stabilize
 
         # Optional: veryfy setting at new baud 
         # After switching to new baud rate, when calling get_settings,
@@ -199,7 +199,7 @@ class sx126x:
             self.cfg_reg[3] = high_addr
             self.cfg_reg[4] = low_addr
             self.cfg_reg[5] = net_id_temp
-            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_9600 + air_speed_temp
+            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_115200 + air_speed_temp
             # 
             # it will enable to read noise rssi value when add 0x20 as follow
             # 
@@ -216,7 +216,7 @@ class sx126x:
             self.cfg_reg[3] = 0x01
             self.cfg_reg[4] = 0x02
             self.cfg_reg[5] = 0x03
-            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_9600 + air_speed_temp
+            self.cfg_reg[6] = self.SX126X_UART_BAUDRATE_115200 + air_speed_temp
             # 
             # it will enable to read noise rssi value when add 0x20 as follow
             # 
