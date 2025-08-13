@@ -126,7 +126,13 @@ async def person_detection_loop():
                 imgbytes = img.to_jpeg().bytearray()
                 print(f"Sending {len(imgbytes)} bytes to the network")
                 msgbytes = encrypt_if_needed("P", imgbytes)
+
+                transmission_start = time_msec()
                 await send_msg("P", my_addr, msgbytes, peer_addr)
+                transmission_end = time_msec()
+
+                transmission_time = transmission_end - transmission_start
+                print(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
             #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
             #print(f"Saving image to {raw_path}")
