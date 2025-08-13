@@ -144,7 +144,7 @@ async def image_sending_loop():
             print(f"Images to send = {len(images_to_send)}")
             imagefile = images_to_send.pop(0)
             img = image.Image(imagefile)
-            imgbytes = img.to_jpeg().bytearray()
+            imgbytes = img.bytearray()
             print(f"Sending {len(imgbytes)} bytes to the network")
             msgbytes = encrypt_if_needed("P", imgbytes)
 
