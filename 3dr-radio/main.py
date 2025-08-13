@@ -9,25 +9,22 @@ import os                   # file system access
 import time
 import binascii
 import machine
-import enc
 import sx1262
 import sys
 import random
+
+import enc
 
 print_lock = asyncio.Lock()
 
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.2
-
 HB_WAIT_SEC = 30
 
 MIDLEN = 7
 FLAKINESS = 0
-
 FRAME_SIZE = 195
-
-CURRENT_NETID = 0
 
 AIR_SPEED = 62500
 
@@ -38,31 +35,20 @@ image_count = 0                 # Counter to keep tranck of saved images
 consecutive_hb_failures = 0
 
 my_addr = None
-peer_addr = None
-
-NET_ID_MAP = {
-        "A" : 1,
-        "B" : 2,
-        "C" : 3,
-        "Z" : 9
-        }
-
-def get_net_id(node_addr=None):
-    if node_addr == None:
-        return NET_ID_MAP[my_addr]
-    return NET_ID_MAP[node_addr]
-
-time_of_last_radio_receive = 0
+shortest_path_to_cc = []
+seen_neighbours = []
 
 rtc = RTC()
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 print("Running on device : " + uid.decode())
 if uid == b'e076465dd7194025':
-    my_addr = 'B'
+    my_addr = 2
+    shortest_path_to_cc = [9]
 elif uid == b'e076465dd7091027':
-    my_addr = 'A'
+    my_addr = 1
+    shortest_path_to_cc = [9]
 elif uid == b'e076465dd7194211':
-    my_addr = 'Z'
+    my_addr = 9
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -72,23 +58,13 @@ clock_start = utime.ticks_ms() # get millisecond counter
 MODEL_PATH = "/rom/person_detect.tflite"
 model = ml.Model(MODEL_PATH)
 print(" Model loaded:", model)
-
-IMG_DIR = "/sdcard/images/"
 CONFIDENCE_THRESHOLD = 0.5
+IMG_DIR = "/sdcard/images/"
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.QVGA)
 sensor.skip_frames(time=2000)
-
-shortest_path_to_cc = []
-if my_addr == "A":
-    shortest_path_to_cc = ["Z"]
-elif my_addr == "B":
-    shortest_path_to_cc = ["Z"]
-else:
-    shortest_path_to_cc = ["A"]
-seen_neighbours = []
 
 sent_count = 0
 recv_msg_count = {}
@@ -114,7 +90,7 @@ async def init_lora():
     print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
 def running_as_cc():
-    return my_addr == "Z"
+    return my_addr == COMMAN_CENTER_ADDR
 
 # ------- Person Detection + snapshot ---------
 # TODO(anand): Test with IR lense for person detection in Night
@@ -229,7 +205,7 @@ def radio_send(dest, data):
     target_addr = NET_ID_MAP[dest]
     data = data.replace(b"\n", b"{}[]")
     loranode.send(target_addr, data)
-    log(f"[SENT at {CURRENT_NETID} {len(data)} bytes] {data} at {time_msec()}")
+    log(f"[SENT at {len(data)} bytes] {data} at {time_msec()}")
 
 def pop_and_get(mid):
     for i in range(len(msgs_unacked)):
@@ -538,10 +514,6 @@ def spath_process(mid, msg):
     if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
         print(f"Updating spath to {spath}")
         shortest_path_to_cc = spath
-        if my_addr == "B":
-            shortest_path_to_cc = ["A", "Z"]
-        elif my_addr == "A":
-            shortest_path_to_cc = ["Z"]
         for n in seen_neighbours:
             nmsg = my_addr + "," + ",".join(spath)
             print(f"Propogating spath from {spath} to {nmsg}")
@@ -664,17 +636,15 @@ async def main():
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary())
-    if my_addr in ["A", "B", "C"]:
+    if my_addr != COMMAN_CENTER_ADDR:
         asyncio.create_task(send_heartbeat())
         #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
-    elif my_addr == "Z":
-        # asyncio.create_task(send_spath())
+    else
+        #asyncio.create_task(send_spath())
         #asyncio.create_task(send_scan())
         await asyncio.sleep(36000)
-    else:
-        print(f"Unknown device : {my_addr}")
 
 try:
     asyncio.run(main())
