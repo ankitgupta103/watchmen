@@ -122,7 +122,7 @@ async def person_detection_loop():
         print(f"Image count: {image_count}")
         person_detected, confidence = detect_person(img)
         print(f"Person detected = {person_detected}, confidence = {confidence}")
-        if person_detected:
+        if True: # person_detected:
             r = get_rand()
             if len(shortest_path_to_cc) > 0:
                 peer_addr = shortest_path_to_cc[0]
