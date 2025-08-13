@@ -109,6 +109,7 @@ def detect_person(img):
                 return (True, p_conf)
     return (False, p_conf)
 
+images_to_send = []
 
 # ------- Person detection loop ---------
 # TODO this should save files and then put them in a queue which radio should send.
@@ -124,30 +125,40 @@ async def person_detection_loop():
         print(f"Person detected = {person_detected}, confidence = {confidence}")
         if True: # person_detected:
             r = get_rand()
-            if len(shortest_path_to_cc) > 0:
-                peer_addr = shortest_path_to_cc[0]
-                imgbytes = img.to_jpeg().bytearray()
-                print(f"Sending {len(imgbytes)} bytes to the network")
-                msgbytes = encrypt_if_needed("P", imgbytes)
+            raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+            print(f"Saving image to {raw_path}")
+            img.save(raw_path)
+            images_to_send.append(raw_path)
+        await asyncio.sleep(10)
 
-                transmission_start = time_msec()
-                await send_msg("P", my_addr, msgbytes, peer_addr)
-                transmission_end = time_msec()
+asyncio def image_sending_loop():
+    global images_to_send
+    while True:
+        await asyncio.sleep(10)
+        if len(shortest_path_to_cc) == 0:
+            print("No shortest path yet so cant send")
+            continue
+        if len(images_to_send) > 0:
+            print(f"Images to send = {len(images_to_send)}")
+            imagefile = images_to_send.pop(0)
+            img = image.Image(imagefile)
+            imgbytes = img.to_jpeg().bytearray()
+            print(f"Sending {len(imgbytes)} bytes to the network")
+            msgbytes = encrypt_if_needed("P", imgbytes)
 
-                transmission_time = transmission_end - transmission_start
-                print(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
-            #raw_path = f"{IMG_DIR}raw_{r}_{person_detected}_{confidence:.2f}.jpg"
-            #img2 = image.Image(320, 240, image.RGB565, buffer=img.bytearray())
-            #print(f"Saving image to {raw_path}")
-            #img2.save(raw_path)
+            peer_addr = shortest_path_to_cc[0]
+            transmission_start = time_msec()
+            await send_msg("P", my_addr, msgbytes, peer_addr)
+            transmission_end = time_msec()
 
+            transmission_time = transmission_end - transmission_start
+            print(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
             # Draw visual annotations on the image
             # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
             # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
             # TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
             # processed_path = f"{IMG_DIR}/processed_{image_count}.jpg"
             # img.save(processed_path)  # Save image with annotations
-        await asyncio.sleep(10)
 
 def get_human_ts():
     _,_,_,_,h,m,s,_ = rtc.datetime()
@@ -660,6 +671,7 @@ async def main():
         asyncio.create_task(send_heartbeat())
         #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
+        asyncio.create_task(image_sending_loop())
         await asyncio.sleep(36000)
     else:
         #asyncio.create_task(send_spath())
