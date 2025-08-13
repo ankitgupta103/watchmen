@@ -6,7 +6,7 @@ import machine
 # --- Configuration ---
 LOCATION_ID = "LOC_001"  # An identifier for the camera's location
 PERSON_PRESENT_GROUND_TRUTH = False
-CAPTURE_INTERVAL_MS = 4000  # e.g., 4000ms = 4 seconds
+CAPTURE_INTERVAL_MS = 30000
 
 # Motion Detection Parameters
 TRIGGER_THRESHOLD = 35  # The minimum difference value to be considered 'motion'
@@ -86,7 +86,7 @@ while True:
 
     # --- Image Saving (Runs every interval) ---
     # Create the base filename first
-    image_filename_base = f"{LOCATION_ID}-{timestamp}.jpg"
+    image_filename_base = f"{LOCATION_ID}-{timestamp}-{diff_value}.jpg"
     # Create the full path for saving the image
     full_image_path = f"{IMAGE_DIR}/{image_filename_base}"
 
