@@ -26,7 +26,7 @@ MIDLEN = 7
 FLAKINESS = 0
 FRAME_SIZE = 195
 
-AIR_SPEED = 62500
+AIR_SPEED = 2400
 
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
