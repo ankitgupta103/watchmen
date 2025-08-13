@@ -216,7 +216,7 @@ def pop_and_get(mid):
 async def send_single_msg(msgtype, creator, msgbytes, dest):
     mid = get_msg_id(msgtype, creator, dest)
     databytes = mid.encode() + b";" + msgbytes
-    ackneeded = dest != "*" and ack_needed(msgtype)
+    ackneeded = ack_needed(msgtype)
     unackedid = 0
     timesent = time_msec()
     if ackneeded:
@@ -443,12 +443,16 @@ def parse_header(data):
         print(f"ERROR PARSING {data[:MIDLEN]} Error : {e}")
         return
     mst = mid[0]
-    creator = mid[1]
-    sender = mid[2]
-    receiver = mid[3]
     for i in range(MIDLEN):
-        if (mid[i] < 'A' or mid[i] > 'Z') and not (i == 3 and mid[i] == "*"):
-            return None
+        if i in [1,2,3]:
+            if (mid[i] < '1' or mid[i] > '9'):
+                return None
+        else:
+            if (mid[i] < 'A' or mid[i] > 'Z'):
+                return None
+    creator = int(mid[1])
+    sender = int(mid[2])
+    receiver = int(mid[3])
     if chr(data[MIDLEN]) != ';':
         return None
     msg = data[MIDLEN+1:]
@@ -531,7 +535,8 @@ def process_message(data):
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
     recv_msg_count[sender] += 1
-    if receiver != "*" and my_addr != receiver:
+    if my_addr != receiver:
+        print(f"Strange that {my_addr} is not as {receiver}")
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
     msgs_recd.append((mid, msg, time_msec()))
@@ -597,7 +602,8 @@ async def send_scan():
     i = 1
     while True:
         scanmsg = f"{my_addr}"
-        await send_msg("N", my_addr, scanmsg.encode(), "*")
+        # -1 is for Broadcast TODO implement this
+        await send_msg("N", my_addr, scanmsg.encode(), -1)
         await asyncio.sleep(60) # reduce after setup
         print(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
