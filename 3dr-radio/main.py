@@ -62,7 +62,7 @@ clock_start = utime.ticks_ms() # get millisecond counter
 MODEL_PATH = "/rom/person_detect.tflite"
 model = ml.Model(MODEL_PATH)
 print(" Model loaded:", model)
-CONFIDENCE_THRESHOLD = 0.5
+CONFIDENCE_THRESHOLD = 0.75
 IMG_DIR = "/sdcard/images/"
 
 sensor.reset()
