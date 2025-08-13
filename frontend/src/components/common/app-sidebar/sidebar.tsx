@@ -8,6 +8,7 @@ import {
   ChevronDown,
   HomeIcon,
   LogOut,
+  Monitor,
   NetworkIcon,
   User,
 } from 'lucide-react';
@@ -48,6 +49,11 @@ const items = [
     title: 'Dashboard',
     url: '/dashboard',
     icon: HomeIcon,
+  },
+    {
+    title: 'Devices',
+    url: '/devices',
+    icon: Monitor,
   },
   {
     title: 'Map View',

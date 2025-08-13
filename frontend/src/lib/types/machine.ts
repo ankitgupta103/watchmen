@@ -20,6 +20,7 @@ export interface Machine {
   model_uid: string;
   manufacturer_id: number;
   model_specifications: Record<string, unknown>;
+  tags?: string[]; // Add tags field
 }
 
 export interface CroppedImage {

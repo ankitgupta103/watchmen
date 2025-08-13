@@ -88,8 +88,6 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
   const [currentChunk, setCurrentChunk] = useState(1);
   const [hasNext, setHasNext] = useState(true);
-  const [totalEvents, setTotalEvents] = useState(0);
-  const [totalChunks, setTotalChunks] = useState(0);
   
   // Date filtering state
   const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange());
@@ -176,8 +174,6 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
 
         setCurrentChunk(response.chunk);
         setHasNext(response.has_next);
-        setTotalEvents(response.total_events);
-        setTotalChunks(response.total_chunks);
       }
     } catch (error) {
       console.error('Failed to fetch events:', error);
@@ -331,10 +327,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         {/* Header with date filter */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Events Feed</h2>
-          <p className="text-gray-600 mb-6">
-            {totalEvents} total events • Page {currentChunk} of {totalChunks}
-          </p>
-          
+
           {/* Date Range Selector */}
           <div className="flex items-center justify-center gap-3 flex-wrap mb-6">
             <Select value={selectedPreset} onValueChange={handlePresetChange}>
