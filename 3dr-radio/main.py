@@ -28,7 +28,7 @@ FRAME_SIZE = 195
 
 AIR_SPEED = 62500
 
-ENCRYPTION_ENABLED = False
+ENCRYPTION_ENABLED = True
 
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
