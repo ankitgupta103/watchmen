@@ -89,7 +89,7 @@ async def init_lora():
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
     )
-    
+
     print(f"LoRa module initialized successfully! (Total reinitializations: {lora_reinit_count})")
     print(f"Node address: {loranode.addr}")
     print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
@@ -526,7 +526,8 @@ def img_process(cid, msg, creator):
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
             print(f"Propogating Image to {peer_addr}")
-            await send_msg("P", creator, msg, peer_addr)
+            #await send_msg("P", creator, msg, peer_addr)
+            asyncio.create_task(send_msg("P", creator, msg, peer_addr))
         else:
             print(f"Can't forward Photo because I dont have Spath yet")
 
