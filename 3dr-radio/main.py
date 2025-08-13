@@ -70,15 +70,14 @@ sent_count = 0
 recv_msg_count = {}
 
 loranode = None
-my_lora_addr = NET_ID_MAP[my_addr]
 
 async def init_lora():
     global loranode
-    print(f"Initializing LoRa SX126X module... my lora addr = {my_lora_addr}")
+    print(f"Initializing LoRa SX126X module... my lora addr = {my_addr}")
     loranode = sx1262.sx126x(
         uart_num=1,        # UART port number - adjust as needed
         freq=868,          # Frequency in MHz
-        addr=my_lora_addr, # Node address
+        addr=my_addr,      # Node address
         power=22,          # Transmission power in dBm
         rssi=False,         # Enable RSSI reporting
         air_speed=AIR_SPEED,# Air data rate
@@ -202,9 +201,8 @@ def radio_send(dest, data):
     if len(data) > 254:
         print(f"Error msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
-    target_addr = NET_ID_MAP[dest]
     data = data.replace(b"\n", b"{}[]")
-    loranode.send(target_addr, data)
+    loranode.send(dest, data)
     log(f"[SENT at {len(data)} bytes] {data} at {time_msec()}")
 
 def pop_and_get(mid):
@@ -632,7 +630,7 @@ def image_test():
     im3.save(f"reconstructed_jpeg_{r}.jpg")
 
 async def main():
-    log(f"[INFO] Started device {my_addr}, {my_lora_addr}")
+    log(f"[INFO] Started device {my_addr}")
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary())
@@ -641,7 +639,7 @@ async def main():
         #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
         await asyncio.sleep(36000)
-    else
+    else:
         #asyncio.create_task(send_spath())
         #asyncio.create_task(send_scan())
         await asyncio.sleep(36000)
