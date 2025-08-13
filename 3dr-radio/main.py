@@ -131,7 +131,7 @@ async def person_detection_loop():
             images_to_send.append(raw_path)
         await asyncio.sleep(10)
 
-asyncio def image_sending_loop():
+async def image_sending_loop():
     global images_to_send
     while True:
         await asyncio.sleep(10)
