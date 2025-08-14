@@ -191,6 +191,121 @@ def set_power(power_dbm=14):
     print(f"✓ Power: {power_dbm}dBm ({power_mw}mW)\n")
 
 # === SEND/RECEIVE FUNCTIONS ===
+def set_rx_mode():
+    """Set module to receive mode"""
+    print("📡 Setting RX (Receive) mode...")
+    send_command([0x82, 0x00, 0x00, 0x00])  # SetRx with no timeout
+    print("  📝 RX Timeout: Continuous (0x000000)")
+    get_status()
+    print("✅ Ready to receive!\n")
+
+def check_for_message():
+    """Check if a message has been received"""
+    # Check IRQ status by reading DIO1 pin
+    # Note: This is a simple check - in practice you'd use interrupts
+    
+    # Read packet status to see if we have data
+    wait_ready()
+    cs.off()
+    cmd = bytearray([0x14, 0x00, 0x00, 0x00])  # GetPacketStatus
+    response = bytearray(4)
+    spi.write_readinto(cmd, response)
+    cs.on()
+    
+    # For now, let's try to read the buffer anyway
+    return read_received_message()
+
+def read_received_message():
+    """Read received message from buffer"""
+    try:
+        # Get RX buffer status
+        wait_ready()
+        cs.off()
+        cmd = bytearray([0x13, 0x00])  # GetRxBufferStatus
+        response = bytearray(3)
+        spi.write_readinto(cmd, response)
+        cs.on()
+        
+        payload_length = response[1]
+        rx_start_pointer = response[2]
+        
+        if payload_length > 0:
+            print(f"📨 RECEIVED MESSAGE DETECTED!")
+            print(f"  📝 Payload Length: {payload_length} bytes")
+            print(f"  📝 Buffer Start: 0x{rx_start_pointer:02X}")
+            
+            # Read the actual data
+            wait_ready()
+            cs.off()
+            read_cmd = bytearray([0x1E, rx_start_pointer] + [0x00] * payload_length)
+            read_response = bytearray(len(read_cmd))
+            spi.write_readinto(read_cmd, read_response)
+            cs.on()
+            
+            # Extract message data (skip command bytes)
+            message_data = read_response[2:]
+            
+            print(f"  📝 Raw Data: {[hex(b) for b in message_data[:20]]}..." if len(message_data) > 20 else f"  📝 Raw Data: {[hex(b) for b in message_data]}")
+            
+            # Try to decode as text
+            try:
+                message_text = message_data.decode('utf-8')
+                print(f"  📝 Message Text: '{message_text[:50]}...'" if len(message_text) > 50 else f"  📝 Message Text: '{message_text}'")
+            except:
+                print("  📝 Message Text: [Binary data - not UTF-8]")
+            
+            # Get packet statistics
+            get_packet_stats()
+            
+            return message_data
+        else:
+            return None
+            
+    except Exception as e:
+        print(f"❌ Error reading message: {e}")
+        return None
+
+def get_packet_stats():
+    """Get packet statistics (RSSI, SNR, etc.)"""
+    wait_ready()
+    cs.off()
+    cmd = bytearray([0x14, 0x00, 0x00, 0x00])  # GetPacketStatus
+    response = bytearray(4)
+    spi.write_readinto(cmd, response)
+    cs.on()
+    
+    rssi_pkt = -response[1] / 2  # RSSI of last packet
+    snr_pkt = response[2] / 4 if response[2] < 128 else (response[2] - 256) / 4  # SNR
+    signal_rssi = -response[3] / 2  # Signal RSSI
+    
+    print(f"  📊 PACKET STATS:")
+    print(f"    ├─ RSSI: {rssi_pkt:.1f} dBm")
+    print(f"    ├─ SNR: {snr_pkt:.1f} dB")
+    print(f"    └─ Signal RSSI: {signal_rssi:.1f} dBm")
+
+def receive_mode_loop():
+    """Continuous receive mode - call this on the receiving module"""
+    print("🎯 RECEIVE MODE - Waiting for 240-byte messages...")
+    print("Press Ctrl+C to stop\n")
+    
+    # Set to receive mode
+    set_rx_mode()
+    
+    message_count = 0
+    
+    while True:
+        # Check for received messages
+        received_data = check_for_message()
+        
+        if received_data:
+            message_count += 1
+            print(f"✅ Message #{message_count} received ({len(received_data)} bytes)\n")
+            
+            # Reset to receive mode for next message
+            time.sleep_ms(100)
+            set_rx_mode()
+        
+        time.sleep_ms(100)  # Check every 100ms
 def send_message(message):
     """Send a text message with detailed transmission info"""
     print(f"📡 SENDING MESSAGE: '{message}'")
@@ -253,20 +368,36 @@ def init_lora(freq=868, speed="medium", power=14):
     print("✅ LoRa ready!")
 
 # === MAIN PROGRAM ===
+def run_transmitter():
+    """Run as transmitter - sends 240-byte messages"""
+    print("📡 TRANSMITTER MODE")
+    init_lora(freq=868, speed="fast", power=22)
+    
+    counter = 0
+    while True:
+        counter += 1
+        large_message = f"OpenMV Large Data Packet #{counter:03d} - " + "X" * 200
+        large_message = large_message[:240]  # Ensure exactly 240 bytes
+        send_message(large_message)
+        time.sleep(5)
+
+def run_receiver():
+    """Run as receiver - receives 240-byte messages"""
+    print("📡 RECEIVER MODE")
+    init_lora(freq=868, speed="fast", power=22)
+    receive_mode_loop()
+
 if __name__ == "__main__":
     try:
-        # Initialize LoRa with MAXIMUM SPEED and POWER
-        # Options: freq=868/915, speed="fast"/"medium"/"slow", power=0-22
-        init_lora(freq=868, speed="fast", power=22)
+        # CHOOSE MODE:
+        # For TRANSMITTING module: run_transmitter()
+        # For RECEIVING module: run_receiver()
         
-        # Send messages every 5 seconds
-        counter = 0
-        while True:
-            counter += 1
-            message = f"OpenMV #{counter}"
-            send_message(message)
-            
-            time.sleep(5)  # Wait 5 seconds
+        # Default: Transmitter mode
+        run_transmitter()
+        
+        # To run receiver mode instead, comment above and uncomment below:
+        # run_receiver()
             
     except KeyboardInterrupt:
         print("⏹️ Stopped")
@@ -274,27 +405,34 @@ if __name__ == "__main__":
         print(f"❌ Error: {e}")
 
 # === QUICK TEST FUNCTIONS ===
-def test_speeds():
-    """Test different speeds"""
-    speeds = ["fast", "medium", "slow"]
+def test_240_bytes():
+    """Test sending exactly 240 bytes"""
+    print("🔧 Testing 240-byte transmission...")
+    init_lora(freq=868, speed="fast", power=22)
     
-    for speed in speeds:
-        print(f"\n--- Testing {speed} speed ---")
-        init_lora(speed=speed)
-        send_message(f"Test {speed} speed")
+    # Create exactly 240 bytes
+    test_data = "TEST_240_BYTES: " + "A" * 224  # 16 + 224 = 240 bytes
+    
+    print(f"📏 Data length: {len(test_data)} bytes")
+    send_message(test_data)
+    
+    print("✅ 240-byte test complete!")
+
+def test_large_data_sizes():
+    """Test different large data sizes"""
+    init_lora(freq=868, speed="fast", power=22)
+    
+    sizes = [50, 100, 200, 240, 255]  # 255 is max for LoRa
+    
+    for size in sizes:
+        print(f"\n--- Testing {size} bytes ---")
+        data = f"Size{size}: " + "D" * (size - 10)
+        data = data[:size]  # Ensure exact size
+        
+        print(f"📏 Actual length: {len(data)} bytes")
+        send_message(data)
         time.sleep(3)
 
-def test_connection():
-    """Simple connection test"""
-    print("🔧 Testing LoRa connection...")
-    init_lora()
-    
-    for i in range(3):
-        send_message(f"Test message {i+1}")
-        time.sleep(2)
-    
-    print("✅ Connection test complete!")
-
 # Uncomment to run tests:
-# test_connection()
-# test_speeds()
+# test_240_bytes()
+# test_large_data_sizes()
