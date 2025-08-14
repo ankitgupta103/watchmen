@@ -123,7 +123,7 @@ class SIM7600X:
             for i in range(0, len(data), chunk_size):
                 chunk = data[i:i+chunk_size]
                 self.uart.write(chunk)
-                time.sleep(0.1)  # Small delay between chunks
+                time.sleep(0.3)  # Small delay between chunks
             
             print(f"✓ Data upload completed")
             time.sleep(3)  # Wait for data processing
