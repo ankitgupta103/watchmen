@@ -32,32 +32,16 @@ def call_n8n_workflow(image_bytes):
     Calls the n8n workflow to process the image.
     """
     # API call here
-    url = "https://n8n.vyomos.org/webhook/watchmen-detect/"
+    url = "https://n8n.vyomos.org/webhook-test/watchmen-detect/"
 
     date = datetime.datetime.now().strftime("%Y-%m-%d")
     machine_id = 228
 
     # Set headers for binary data
     payload = {
-        "date": date,
-        "s3_bucket": "vyomos",
-        "organization_id": 20,
         "message_type": "event",
         "machine_id": machine_id,
-        "file_path": f"20/_all_/{date}/{machine_id}/_all_/images",
-        "topic": f"20/_all_/{date}/{machine_id}/_all_/events/{int(time.time())}.json",
-        "timestamp": int(time.time()),
         "image": image_bytes,
-        "email_list": [
-            "caleb@vyomos.org",
-            "anand@vyomos.org",
-            "vaseka@vyomos.org",
-            "amardeep@vyomos.org",
-        ],
-        "phone_list": [
-            "+917597050815",
-            "+919044268425",
-        ],
     }
 
     try:
