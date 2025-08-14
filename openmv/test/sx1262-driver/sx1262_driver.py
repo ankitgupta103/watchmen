@@ -74,6 +74,14 @@ def init_lora(freq=868, speed="fast", power=22):
     power_mw = round(10 ** (power / 10), 1)
     print(f"✓ Power: {power}dBm ({power_mw}mW)")
     
+    # Set sync word (important for matching)
+    send_command([0x98, 0x34, 0x44])  # SetSyncWord - both modules must match
+    print("✓ Sync word: 0x3444")
+    
+    # Set buffer base addresses
+    send_command([0x8F, 0x00, 0x00])  # TX base=0, RX base=0
+    print("✓ Buffer addresses set")
+    
     print("✅ LoRa ready!\n")
 
 # === SEND FUNCTION ===
@@ -84,6 +92,9 @@ def send(message):
         data = message.encode('utf-8')
     else:
         data = message
+    
+    # Clear IRQ status first
+    send_command([0x02, 0xFF, 0xFF])  # ClearIrqStatus
     
     # Set buffer address
     send_command([0x8F, 0x00, 0x00])
@@ -99,6 +110,9 @@ def send(message):
     
     # Start transmission
     send_command([0x83, 0x00, 0x00, 0x00])
+    
+    # Wait for TX done
+    time.sleep_ms(100)  # Give time for transmission
     
     print(f"📡 Sent: {len(data)} bytes")
 
@@ -198,18 +212,38 @@ def receiver_example():
     init_lora(freq=868, speed="fast", power=22)
     
     print("📡 Starting receiver...")
+    print("🔄 Checking for messages every 1 second...")
     
     while True:
-        # Set RX mode before each receive attempt
-        send_command([0x82, 0x00, 0x00, 0x00])  # SetRx continuous
+        # Clear any previous IRQ status
+        send_command([0x02, 0xFF, 0xFF])  # ClearIrqStatus
         
-        # Wait a bit for potential message
-        time.sleep_ms(200)
+        # Set RX mode with timeout
+        send_command([0x82, 0x00, 0x0F, 0xFF])  # SetRx with ~1 second timeout
         
-        # Check for message
-        message = receive()
-        if message:
-            print(f"Message: {message[:50]}..." if len(message) > 50 else f"Message: {message}")
+        # Wait for potential message
+        time.sleep(1)
+        
+        # Check IRQ status
+        wait_ready()
+        cs.off()
+        spi.write(bytearray([0x12, 0x00, 0x00]))
+        irq_status = bytearray(3)
+        spi.readinto(irq_status)
+        cs.on()
+        
+        irq = (irq_status[1] << 8) | irq_status[2]
+        
+        # Check if RX done (bit 1) or timeout (bit 9)
+        if irq & 0x02:  # RX Done
+            print("📨 RX Done detected!")
+            message = receive()
+            if message:
+                print(f"SUCCESS! Message: {message[:50]}..." if len(message) > 50 else f"SUCCESS! Message: {message}")
+        elif irq & 0x200:  # RX Timeout
+            print("⏰ RX Timeout - no message received")
+        else:
+            print(f"🔍 IRQ Status: 0x{irq:04X}")
             
         time.sleep_ms(100)
 
