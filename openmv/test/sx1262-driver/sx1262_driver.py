@@ -115,9 +115,9 @@ def receive():
         # Get RX buffer status
         wait_ready()
         cs.off()
-        cmd = bytearray([0x13, 0x00])
+        spi.write(bytearray([0x13, 0x00]))
         response = bytearray(3)
-        spi.write_readinto(cmd, response)
+        spi.readinto(response)
         cs.on()
         
         payload_length = response[1]
@@ -127,13 +127,10 @@ def receive():
             # Read the actual data
             wait_ready()
             cs.off()
-            read_cmd = bytearray([0x1E, rx_start_pointer] + [0x00] * payload_length)
-            read_response = bytearray(len(read_cmd))
-            spi.write_readinto(read_cmd, read_response)
+            spi.write(bytearray([0x1E, rx_start_pointer]))
+            message_data = bytearray(payload_length)
+            spi.readinto(message_data)
             cs.on()
-            
-            # Extract message data (skip command bytes)
-            message_data = read_response[2:]
             
             print(f"📨 Received: {len(message_data)} bytes")
             
