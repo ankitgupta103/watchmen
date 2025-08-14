@@ -31,12 +31,7 @@ headers = {"Content-Type": "application/json"}
 
 # Define the payload (TODO: Make it dynamic {Anand})
 machine_id = 228  # Hardcoded for now, extract from machine.id
-organization_id = 20  # Hardcoded for now, extract from organization.id
-date = "2025-08-05"  # YYYY-MM-DD format (Hardcoded for now, extract from datetime.now().strftime("%Y-%m-%d") handle for micropython)
-s3_bucket = "vyomos"  # Always the same
-message_type = "test"  # Can be event or test (Hardcoded for now)
-topic = f"20/_all_/{date}/{machine_id}/_all_/events/{int(time.time())}.json"  # Topic will be the same for all events
-file_path = f"20/_all_/{date}/{machine_id}/_all_/images"  # File path will be the same for all images
+message_type = "event"  # Can be event or test (Hardcoded for now)
 example_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII"
 
 # Send some files
