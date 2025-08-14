@@ -106,13 +106,7 @@ def send(message):
 def receive():
     """Receive a message - returns message data or None"""
     try:
-        # Set to RX mode
-        send_command([0x82, 0x00, 0x00, 0x00])
-        
-        # Small delay to receive
-        time.sleep_ms(50)
-        
-        # Get RX buffer status
+        # Get RX buffer status (don't set RX mode here)
         wait_ready()
         cs.off()
         spi.write(bytearray([0x13, 0x00]))
@@ -124,6 +118,8 @@ def receive():
         rx_start_pointer = response[2]
         
         if payload_length > 0:
+            print(f"📨 Found message: {payload_length} bytes at position {rx_start_pointer}")
+            
             # Read the actual data
             wait_ready()
             cs.off()
@@ -152,6 +148,37 @@ def start_continuous_receive():
     print("📡 Continuous receive mode started")
 
 # === SIMPLE USAGE EXAMPLES ===
+def test_simple_send():
+    """Simple test - send small message"""
+    init_lora(freq=868, speed="fast", power=22)
+    
+    counter = 0
+    while True:
+        counter += 1
+        message = f"Test #{counter}"
+        send(message)
+        print(f"Sent: {message}")
+        time.sleep(2)
+
+def test_simple_receive():
+    """Simple test - receive any message"""
+    init_lora(freq=868, speed="fast", power=22)
+    
+    print("📡 Waiting for messages... (send test_simple_send from other module)")
+    
+    while True:
+        # Set RX mode
+        send_command([0x82, 0x00, 0x00, 0x00])
+        time.sleep_ms(500)  # Wait longer
+        
+        message = receive()
+        if message:
+            print(f"SUCCESS! Received: {message}")
+        else:
+            print(".", end="")  # Show we're checking
+            
+        time.sleep_ms(100)
+
 def transmitter_example():
     """Example: Send 240-byte messages every 5 seconds"""
     init_lora(freq=868, speed="fast", power=22)
@@ -159,7 +186,7 @@ def transmitter_example():
     counter = 0
     while True:
         counter += 1
-        # Create 240-byte message
+        # Create exactly 240-byte message
         message = f"Data packet #{counter:03d}: " + "X" * 220
         message = message[:240]  # Ensure exactly 240 bytes
         
@@ -169,12 +196,21 @@ def transmitter_example():
 def receiver_example():
     """Example: Continuously receive messages"""
     init_lora(freq=868, speed="fast", power=22)
-    start_continuous_receive()
+    
+    print("📡 Starting receiver...")
     
     while True:
+        # Set RX mode before each receive attempt
+        send_command([0x82, 0x00, 0x00, 0x00])  # SetRx continuous
+        
+        # Wait a bit for potential message
+        time.sleep_ms(200)
+        
+        # Check for message
         message = receive()
         if message:
             print(f"Message: {message[:50]}..." if len(message) > 50 else f"Message: {message}")
+            
         time.sleep_ms(100)
 
 # === MAIN PROGRAM ===
