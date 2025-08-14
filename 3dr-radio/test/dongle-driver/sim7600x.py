@@ -1,6 +1,3 @@
-# SIM7600X 4G DONGLE Integration with OpenMV RT1062 (Simplified)
-# Save this file as: sim7600x.py
-
 import time
 from machine import UART
 

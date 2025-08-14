@@ -2,19 +2,19 @@
 # Copyright (c) 2013-2023 OpenMV LLC. All rights reserved.
 # https://github.com/openmv/openmv/blob/master/LICENSE
 #
-# Post files with HTTP/Post requests module example - Modified for 4G connectivity
+# Post files with HTTP/Post requests module example 
 
 import time
 import json
 
-# Import the SIM7600X class (save the previous code as sim7600x.py)
+# Import the SIM7600X class (save the sim7600x.py in the internal memory of OpenMV)
 from sim7600x import SIM7600X
 
 # API Configuration
-URL = "https://n8n.vyomos.org/webhook/watchmen-detect"
-# URL = "https://n8n.vyomos.org/webhook/test/watchmen-detect"
+URL = "https://n8n.vyomos.org/webhook/watchmen-detect"        # production URL
+# URL = "https://n8n.vyomos.org/webhook/test/watchmen-detect" # test URL
 
-# Initialize 4G modem instead of WiFi
+# Initialize 4G modem 
 print("Initializing 4G connection...")
 sim = SIM7600X(uart_id=1, baudrate=115200)
 
