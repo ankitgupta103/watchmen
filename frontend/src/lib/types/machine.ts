@@ -1,5 +1,14 @@
 import { MachineEvent } from './activity';
 
+export interface MachineTag {
+  id: number;
+  name: string;
+  key: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Machine {
   id: number;
   name: string;
@@ -20,7 +29,7 @@ export interface Machine {
   model_uid: string;
   manufacturer_id: number;
   model_specifications: Record<string, unknown>;
-  tags?: string[]; // Add tags field
+  tags?: MachineTag[]; 
 }
 
 export interface CroppedImage {
