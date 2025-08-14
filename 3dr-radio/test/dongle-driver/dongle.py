@@ -1,6 +1,3 @@
-# SIM7600X 4G DONGLE Integration with OpenMV RT1062 (Simplified)
-# Using machine module for UART communication
-
 import time
 from machine import UART
 
@@ -122,7 +119,7 @@ class SIM7600X:
         self.send_command("AT+HTTPTERM")
         return ""
 
-# Simple usage example
+# testing 
 def main():
     # Initialize module
     sim = SIM7600X(uart_id=1, baudrate=115200)  # Using UART1
@@ -143,19 +140,6 @@ def main():
     
     print("Done!")
 
-# Hardware connections:
-"""
-SIM7600X DONGLE → OpenMV RT1062:
-- TX → RX (UART1)
-- RX → TX (UART1) 
-- GND → GND
-- Power via USB
-
-Don't forget:
-1. Insert 4G SIM card
-2. Connect 4G antenna
-3. Change APN for your carrier
-"""
 
 if __name__ == "__main__":
     main()
