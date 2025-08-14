@@ -23,7 +23,9 @@ print_lock = asyncio.Lock()
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.2
-HB_WAIT_SEC = 30
+HB_WAIT_SEC = 60
+PHOTO_TAKING_DELAY = 300
+PHOTO_SENDING_DELAY = 60
 
 MIDLEN = 7
 FLAKINESS = 0
@@ -49,10 +51,10 @@ rtc = RTC()
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 print("Running on device : " + uid.decode())
 if uid == b'e076465dd7194025':
-    my_addr = 2
+    my_addr = 222
     shortest_path_to_cc = [1, 9]
 elif uid == b'e076465dd7091027':
-    my_addr = 1
+    my_addr = 221
     shortest_path_to_cc = [9]
 elif uid == b'e076465dd7194211':
     my_addr = 9
@@ -165,18 +167,19 @@ async def person_detection_loop():
         print(f"Image count: {image_count}")
         person_detected, confidence = detect_person(img)
         print(f"Person detected = {person_detected}, confidence = {confidence}")
-        if person_detected:
+        #if person_detected:
+        if True:
             r = get_rand()
             raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             print(f"Saving image to {raw_path}")
             img.save(raw_path)
             images_to_send.append(raw_path)
-        await asyncio.sleep(10)
+        await asyncio.sleep(PHOTO_TAKING_DELAY)
 
 async def image_sending_loop():
     global images_to_send
     while True:
-        await asyncio.sleep(10)
+        await asyncio.sleep(5)
         if len(shortest_path_to_cc) == 0:
             print("No shortest path yet so cant send")
             continue
@@ -191,10 +194,12 @@ async def image_sending_loop():
             peer_addr = shortest_path_to_cc[0]
             transmission_start = time_msec()
             await send_msg("P", my_addr, msgbytes, peer_addr)
+            # If failure, retry and put it back in queue
             transmission_end = time_msec()
 
             transmission_time = transmission_end - transmission_start
             print(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
+            await asyncio.sleep(PHOTO_SENDING_DELAY)
             # Draw visual annotations on the image
             # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
             # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
@@ -726,12 +731,13 @@ async def main():
         #asyncio.create_task(send_scan())
         asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
-        await asyncio.sleep(36000)
     else:
-        #await init_sim()
+        await init_sim()
         #asyncio.create_task(send_spath())
         #asyncio.create_task(send_scan())
-        await asyncio.sleep(36000)
+    for i in range(24*7):
+        await asyncio.sleep(3600)
+        print(f"Finished HOUR {i}")
 
 try:
     asyncio.run(main())
