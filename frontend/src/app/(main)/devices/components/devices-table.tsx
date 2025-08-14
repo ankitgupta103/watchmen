@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MoreHorizontal, Plus, Tag, X, MapPin } from 'lucide-react';
 
-import { Machine } from '@/lib/types/machine';
-import { mockTagService } from '@/lib/mock-api';
+import { Machine, MachineTag } from '@/lib/types/machine';
+import { MachineTagsService } from '@/lib/services/machine-tags';
+import useOrganization from '@/hooks/use-organization';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,24 +39,26 @@ interface DevicesTableProps {
 
 interface AddTagsModalProps {
   machine: Machine;
-  onAddTags: (machineId: number, tags: string[]) => void;
+  onAddTags: (machineId: number, tags: { name: string; description?: string }[]) => void;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 const AddTagsModal: React.FC<AddTagsModalProps> = ({ machine, onAddTags, isOpen, onOpenChange }) => {
   const [newTag, setNewTag] = useState('');
-  const [tagsToAdd, setTagsToAdd] = useState<string[]>([]);
+  const [newTagDescription, setNewTagDescription] = useState('');
+  const [tagsToAdd, setTagsToAdd] = useState<{ name: string; description?: string }[]>([]);
 
   const handleAddTag = () => {
-    if (newTag.trim() && !tagsToAdd.includes(newTag.trim())) {
-      setTagsToAdd([...tagsToAdd, newTag.trim()]);
+    if (newTag.trim() && !tagsToAdd.some(tag => tag.name === newTag.trim())) {
+      setTagsToAdd([...tagsToAdd, { name: newTag.trim(), description: newTagDescription.trim() || undefined }]);
       setNewTag('');
+      setNewTagDescription('');
     }
   };
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTagsToAdd(tagsToAdd.filter(tag => tag !== tagToRemove));
+  const handleRemoveTag = (tagToRemove: { name: string; description?: string }) => {
+    setTagsToAdd(tagsToAdd.filter(tag => tag.name !== tagToRemove.name));
   };
 
   const handleSubmit = () => {
@@ -66,17 +69,12 @@ const AddTagsModal: React.FC<AddTagsModalProps> = ({ machine, onAddTags, isOpen,
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTag();
-    }
-  };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setTagsToAdd([]);
       setNewTag('');
+      setNewTagDescription('');
     }
     onOpenChange(open);
   };
@@ -93,15 +91,28 @@ const AddTagsModal: React.FC<AddTagsModalProps> = ({ machine, onAddTags, isOpen,
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="new-tag" className="text-right">
-              New Tag
+              Tag Name
             </Label>
-            <div className="col-span-3 flex gap-2">
+            <div className="col-span-3">
               <Input
                 id="new-tag"
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
                 placeholder="Enter tag name"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="new-tag-desc" className="text-right">
+              Description
+            </Label>
+            <div className="col-span-3 flex gap-2">
+              <Input
+                id="new-tag-desc"
+                value={newTagDescription}
+                onChange={(e) => setNewTagDescription(e.target.value)}
+                placeholder="Enter tag description (optional)"
                 className="flex-1"
               />
               <Button type="button" onClick={handleAddTag} size="sm">
@@ -116,13 +127,16 @@ const AddTagsModal: React.FC<AddTagsModalProps> = ({ machine, onAddTags, isOpen,
                 {tagsToAdd.map((tag, index) => (
                   <Badge key={index} variant="secondary" className="flex items-center gap-1">
                     <Tag className="h-3 w-3" />
-                    {tag}
+                    <div className="flex flex-col">
+                      <span>{tag.name}</span>
+                      {tag.description && <span className="text-xs opacity-70">{tag.description}</span>}
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(tag)}
                       className="ml-1 hover:text-destructive"
-                      aria-label={`Remove tag ${tag}`}
-                      title={`Remove tag ${tag}`}
+                      aria-label={`Remove tag ${tag.name}`}
+                      title={`Remove tag ${tag.name}`}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -147,42 +161,52 @@ const AddTagsModal: React.FC<AddTagsModalProps> = ({ machine, onAddTags, isOpen,
 
 interface EditTagsModalProps {
   machine: Machine;
-  onUpdateTags: (machineId: number, tags: string[]) => void;
+  onUpdateTags: (machineId: number, updatedTags: MachineTag[], deletedTagIds: number[]) => void;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 const EditTagsModal: React.FC<EditTagsModalProps> = ({ machine, onUpdateTags, isOpen, onOpenChange }) => {
-  const [tags, setTags] = useState<string[]>(machine.tags || []);
+  const [tags, setTags] = useState<MachineTag[]>(machine.tags || []);
   const [newTag, setNewTag] = useState('');
+  const [newTagDescription, setNewTagDescription] = useState('');
+  const [deletedTagIds, setDeletedTagIds] = useState<number[]>([]);
 
   const handleAddTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
+    if (newTag.trim() && !tags.some(tag => tag.name === newTag.trim())) {
+      const newTagObj: MachineTag = {
+        id: 0,
+        key: newTag.trim().toLowerCase().replace(/\s+/g, '_'),
+        name: newTag.trim(),
+        description: newTagDescription.trim() || undefined,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setTags([...tags, newTagObj]);
       setNewTag('');
+      setNewTagDescription('');
     }
   };
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+  const handleRemoveTag = (tagToRemove: MachineTag) => {
+    if (tagToRemove.id > 0) {
+      setDeletedTagIds([...deletedTagIds, tagToRemove.id]);
+    }
+    setTags(tags.filter(tag => tag.name !== tagToRemove.name));
   };
 
   const handleSubmit = () => {
-    onUpdateTags(machine.id, tags);
+    onUpdateTags(machine.id, tags, deletedTagIds);
     onOpenChange(false);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTag();
-    }
-  };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setTags(machine.tags || []);
       setNewTag('');
+      setNewTagDescription('');
+      setDeletedTagIds([]);
     }
     onOpenChange(open);
   };
@@ -198,16 +222,29 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ machine, onUpdateTags, is
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="new-tag" className="text-right">
-              New Tag
+            <Label htmlFor="edit-new-tag" className="text-right">
+              Tag Name
+            </Label>
+            <div className="col-span-3">
+              <Input
+                id="edit-new-tag"
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                placeholder="Enter tag name"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit-new-tag-desc" className="text-right">
+              Description
             </Label>
             <div className="col-span-3 flex gap-2">
               <Input
-                id="new-tag"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter tag name"
+                id="edit-new-tag-desc"
+                value={newTagDescription}
+                onChange={(e) => setNewTagDescription(e.target.value)}
+                placeholder="Enter tag description (optional)"
                 className="flex-1"
               />
               <Button type="button" onClick={handleAddTag} size="sm">
@@ -222,13 +259,16 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ machine, onUpdateTags, is
                 tags.map((tag, index) => (
                   <Badge key={index} variant="secondary" className="flex items-center gap-1">
                     <Tag className="h-3 w-3" />
-                    {tag}
+                    <div className="flex flex-col">
+                      <span>{tag.name}</span>
+                      {tag.description && <span className="text-xs opacity-70">{tag.description}</span>}
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(tag)}
                       className="ml-1 hover:text-destructive"
-                      aria-label={`Remove tag ${tag}`}
-                      title={`Remove tag ${tag}`}
+                      aria-label={`Remove tag ${tag.name}`}
+                      title={`Remove tag ${tag.name}`}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -254,21 +294,54 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ machine, onUpdateTags, is
 };
 
 const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
+  const { organizationUid } = useOrganization();
   const [machinesData, setMachinesData] = useState<Machine[]>(machines);
   const [addTagsModalOpen, setAddTagsModalOpen] = useState<{ machine: Machine; open: boolean } | null>(null);
   const [editTagsModalOpen, setEditTagsModalOpen] = useState<{ machine: Machine; open: boolean } | null>(null);
 
-  const handleAddTags = async (machineId: number, newTags: string[]) => {
-    try {
-      // Call mock API to add tags
-      const success = await mockTagService.addTags(machineId, newTags);
+  useEffect(() => {
+    const loadMachineTags = async () => {
+      if (!organizationUid) return;
       
-      if (success) {
-        // Update local state
+      const updatedMachines = await Promise.all(
+        machines.map(async (machine) => {
+          const tags = await MachineTagsService.getMachineTags(machine.id, organizationUid);
+          return { ...machine, tags };
+        })
+      );
+      
+      setMachinesData(updatedMachines);
+    };
+
+    loadMachineTags();
+  }, [machines, organizationUid]);
+
+  const handleAddTags = async (machineId: number, newTags: { name: string; description?: string }[]) => {
+    if (!organizationUid) {
+      console.error('Organization UID not found');
+      return;
+    }
+
+    try {
+      const addedTags: MachineTag[] = [];
+      
+      for (const tag of newTags) {
+        const result = await MachineTagsService.createOrUpdateTag(machineId, {
+          organization_uid: organizationUid,
+          name: tag.name,
+          description: tag.description,
+        });
+        
+        if (result) {
+          addedTags.push(result);
+        }
+      }
+      
+      if (addedTags.length > 0) {
         setMachinesData(prev => 
           prev.map(machine => 
             machine.id === machineId 
-              ? { ...machine, tags: [...(machine.tags || []), ...newTags] }
+              ? { ...machine, tags: [...(machine.tags || []), ...addedTags] }
               : machine
           )
         );
@@ -278,19 +351,75 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
     }
   };
 
-  const handleUpdateTags = async (machineId: number, updatedTags: string[]) => {
+  const handleDeleteTag = async (machineId: number, tagId: number) => {
+    if (!organizationUid) {
+      console.error('Organization UID not found');
+      return;
+    }
+
     try {
-      // For now, we'll just update the local state
-      // In a real implementation, you'd call the API to update tags
+      const success = await MachineTagsService.deleteTag(machineId, {
+        organization_uid: organizationUid,
+        tag_id: tagId,
+        delete_completely: false,
+      });
+
+      if (success) {
+        setMachinesData(prev => 
+          prev.map(machine => 
+            machine.id === machineId 
+              ? { ...machine, tags: machine.tags?.filter(tag => tag.id !== tagId) || [] }
+              : machine
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Failed to delete tag:', error);
+    }
+  };
+
+  const handleUpdateTags = async (machineId: number, updatedTags: MachineTag[], deletedTagIds: number[]) => {
+    if (!organizationUid) {
+      console.error('Organization UID not found');
+      return;
+    }
+
+    try {
+      // Delete removed tags
+      for (const tagId of deletedTagIds) {
+        await MachineTagsService.deleteTag(machineId, {
+          organization_uid: organizationUid,
+          tag_id: tagId,
+          delete_completely: false,
+        });
+      }
+
+      // Create new tags (those with id: 0)
+      const newTags = updatedTags.filter(tag => tag.id === 0);
+      const finalTags: MachineTag[] = [...updatedTags.filter(tag => tag.id > 0)];
+
+      for (const tag of newTags) {
+        const result = await MachineTagsService.createOrUpdateTag(machineId, {
+          organization_uid: organizationUid,
+          name: tag.name,
+          description: tag.description,
+        });
+        
+        if (result) {
+          finalTags.push(result);
+        }
+      }
+      
+      // Update local state with final tags
       setMachinesData(prev => 
         prev.map(machine => 
           machine.id === machineId 
-            ? { ...machine, tags: updatedTags }
+            ? { ...machine, tags: finalTags }
             : machine
         )
       );
       
-      console.log(`Updated tags for machine ${machineId}:`, updatedTags);
+      console.log(`Updated tags for machine ${machineId}`);
     } catch (error) {
       console.error('Failed to update tags:', error);
     }
@@ -310,8 +439,10 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
   };
 
   const formatLocation = (location: { lat: number; long: number; timestamp: string }) => {
-    return `${location?.lat ? location.lat.toFixed(2) : '0'}, ${location?.long ? location.long.toFixed(2) : '0'}`;
+    return `${location?.lat }, ${location?.long }`;
   };
+
+  console.log(machinesData);
 
   return (
     <div className="w-full">
@@ -349,9 +480,21 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
                 <div className="flex flex-wrap gap-1">
                   {machine.tags && machine.tags.length > 0 ? (
                     machine.tags.map((tag, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        <Tag className="h-3 w-3 mr-1" />
-                        {tag}
+                      <Badge key={index} variant="secondary" className="text-xs flex items-center gap-1">
+                        <Tag className="h-3 w-3" />
+                        <div className="flex flex-col">
+                          <span>{tag.name}</span>
+                          {tag.description && <span className="text-xs opacity-70">{tag.description}</span>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTag(machine.id, tag.id)}
+                          className="ml-1 hover:text-destructive"
+                          aria-label={`Remove tag ${tag.name}`}
+                          title={`Remove tag ${tag.name}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </Badge>
                     ))
                   ) : (
