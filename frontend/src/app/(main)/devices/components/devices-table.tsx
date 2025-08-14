@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { MoreHorizontal, Plus, Tag, X, MapPin } from 'lucide-react';
 
 import { Machine, MachineTag } from '@/lib/types/machine';
-import { MachineTagsService } from '@/lib/services/machine-tags';
+import { fetcherClient } from '@/lib/fetcher-client';
+import { API_BASE_URL } from '@/lib/constants';
 import useOrganization from '@/hooks/use-organization';
+import useToken from '@/hooks/use-token';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +34,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+
+interface TagResponse {
+  success: boolean;
+  data: MachineTag[] | MachineTag | { message: string };
+}
+
+interface CreateTagRequest {
+  organization_uid: string;
+  name: string;
+  description?: string;
+  tag_id?: number;
+}
+
+interface DeleteTagRequest {
+  organization_uid: string;
+  tag_id: number;
+  delete_completely?: boolean;
+}
 
 interface DevicesTableProps {
   machines: Machine[];
@@ -293,19 +313,83 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({ machine, onUpdateTags, is
   );
 };
 
+// Tag API Functions
+const getMachineTags = async (
+  machineId: number,
+  organizationUid: string,
+  token: string
+): Promise<MachineTag[]> => {
+  try {
+    const url = `${API_BASE_URL}/machines/${machineId}/tags/?organization_uid=${organizationUid}`;
+    const response = await fetcherClient<TagResponse>(url, token);
+    
+    if (response?.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch machine tags:', error);
+    return [];
+  }
+};
+
+const createOrUpdateTag = async (
+  machineId: number,
+  request: CreateTagRequest,
+  token: string
+): Promise<MachineTag | null> => {
+  try {
+    const url = `${API_BASE_URL}/machines/${machineId}/tags/manage/`;
+    const response = await fetcherClient<TagResponse>(url, token, {
+      method: 'POST',
+      body: request,
+    });
+    
+    if (response?.success && !Array.isArray(response.data) && response.data && 'id' in response.data) {
+      return response.data as MachineTag;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Failed to create/update tag:', error);
+    return null;
+  }
+};
+
+const deleteTag = async (
+  machineId: number,
+  request: DeleteTagRequest,
+  token: string
+): Promise<boolean> => {
+  try {
+    const url = `${API_BASE_URL}/machines/${machineId}/tags/manage/`;
+    const response = await fetcherClient<TagResponse>(url, token, {
+      method: 'DELETE',
+      body: request,
+    });
+    
+    return response?.success ?? false;
+  } catch (error) {
+    console.error('Failed to delete tag:', error);
+    return false;
+  }
+};
+
 const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
   const { organizationUid } = useOrganization();
+  const { token } = useToken();
   const [machinesData, setMachinesData] = useState<Machine[]>(machines);
   const [addTagsModalOpen, setAddTagsModalOpen] = useState<{ machine: Machine; open: boolean } | null>(null);
   const [editTagsModalOpen, setEditTagsModalOpen] = useState<{ machine: Machine; open: boolean } | null>(null);
 
   useEffect(() => {
     const loadMachineTags = async () => {
-      if (!organizationUid) return;
+      if (!organizationUid || !token) return;
       
       const updatedMachines = await Promise.all(
         machines.map(async (machine) => {
-          const tags = await MachineTagsService.getMachineTags(machine.id, organizationUid);
+          const tags = await getMachineTags(machine.id, organizationUid, token);
           return { ...machine, tags };
         })
       );
@@ -314,11 +398,11 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
     };
 
     loadMachineTags();
-  }, [machines, organizationUid]);
+  }, [machines, organizationUid, token]);
 
   const handleAddTags = async (machineId: number, newTags: { name: string; description?: string }[]) => {
-    if (!organizationUid) {
-      console.error('Organization UID not found');
+    if (!organizationUid || !token) {
+      console.error('Organization UID or token not found');
       return;
     }
 
@@ -326,11 +410,11 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
       const addedTags: MachineTag[] = [];
       
       for (const tag of newTags) {
-        const result = await MachineTagsService.createOrUpdateTag(machineId, {
+        const result = await createOrUpdateTag(machineId, {
           organization_uid: organizationUid,
           name: tag.name,
           description: tag.description,
-        });
+        }, token);
         
         if (result) {
           addedTags.push(result);
@@ -352,17 +436,17 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
   };
 
   const handleDeleteTag = async (machineId: number, tagId: number) => {
-    if (!organizationUid) {
-      console.error('Organization UID not found');
+    if (!organizationUid || !token) {
+      console.error('Organization UID or token not found');
       return;
     }
 
     try {
-      const success = await MachineTagsService.deleteTag(machineId, {
+      const success = await deleteTag(machineId, {
         organization_uid: organizationUid,
         tag_id: tagId,
         delete_completely: false,
-      });
+      }, token);
 
       if (success) {
         setMachinesData(prev => 
@@ -379,19 +463,19 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
   };
 
   const handleUpdateTags = async (machineId: number, updatedTags: MachineTag[], deletedTagIds: number[]) => {
-    if (!organizationUid) {
-      console.error('Organization UID not found');
+    if (!organizationUid || !token) {
+      console.error('Organization UID or token not found');
       return;
     }
 
     try {
       // Delete removed tags
       for (const tagId of deletedTagIds) {
-        await MachineTagsService.deleteTag(machineId, {
+        await deleteTag(machineId, {
           organization_uid: organizationUid,
           tag_id: tagId,
           delete_completely: false,
-        });
+        }, token);
       }
 
       // Create new tags (those with id: 0)
@@ -399,11 +483,11 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
       const finalTags: MachineTag[] = [...updatedTags.filter(tag => tag.id > 0)];
 
       for (const tag of newTags) {
-        const result = await MachineTagsService.createOrUpdateTag(machineId, {
+        const result = await createOrUpdateTag(machineId, {
           organization_uid: organizationUid,
           name: tag.name,
           description: tag.description,
-        });
+        }, token);
         
         if (result) {
           finalTags.push(result);
