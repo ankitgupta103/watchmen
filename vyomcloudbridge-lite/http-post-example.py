@@ -42,24 +42,8 @@ example_image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+w
 # Send some files
 payload = {
     "machine_id": machine_id,
-    "organization_id": organization_id,
-    "date": date,
-    "s3_bucket": s3_bucket,
     "message_type": message_type,
-    "file_path": file_path,
     "image": example_image,
-    "topic": topic,
-    "timestamp": int(time.time()),
-    "email_list": [
-        "caleb@vyomos.org",
-        "anand@vyomos.org",
-        "vaseka@vyomos.org",
-        "amardeep@vyomos.org",
-    ],
-    "phone_list": [
-        "+917597050815",
-        "+919044268425",
-    ],
 }
 
 # Manually convert the dictionary to a JSON string
