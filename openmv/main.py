@@ -9,11 +9,13 @@ import os                   # file system access
 import time
 import binascii
 import machine
-import sx1262
 import sys
 import random
+import json
 
 import enc
+from sim7600x import SIM7600X
+import sx1262
 
 print_lock = asyncio.Lock()
 
@@ -72,6 +74,39 @@ sensor.skip_frames(time=2000)
 
 sent_count = 0
 recv_msg_count = {}
+
+URL = "https://n8n.vyomos.org/webhook/watchmen-detect"
+
+sim = None
+
+async def init_sim():
+    global sim
+    print("Initializing 4G connection...")
+    sim = SIM7600X(uart_id=1, baudrate=115200)
+    if not sim.init_module(apn="airtelgprs.com"):  # Use your carrier's APN
+        print("4G connection failed!")
+        return False
+    print("4G Connected successfully!")
+
+async def sim_send_image(creator, fname):
+    global sim
+    img = image.Image(fname)
+    imgbytes = img.bytearray()
+    payload = {
+        "machine_id": creator,
+        "message_type": "event",
+        "image": imgbytes,
+    }
+    json_payload = json.dumps(payload)
+    success, response = sim.http_post(URL, json_payload)
+    if success:
+        print(f"HB Data uploaded to server successfully")
+        return True
+    else:
+        print(f"Failure uploading HB {response}")
+        return False
+
+# TODO add heartbeat also to sim
 
 loranode = None
 
@@ -522,6 +557,7 @@ def img_process(cid, msg, creator):
         print(f"Saving to file {fname}")
         images_saved_at_cc.append(fname)
         img.save(fname)
+        asyncio.create_task(sim_send_image(creator, fname))
     else:
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
@@ -672,6 +708,11 @@ def image_test():
 
 async def main():
     log(f"[INFO] Started device {my_addr}")
+    #img = sensor.snapshot()
+    #img.save("sim_test_image.jpg")
+    #await init_sim()
+    #await sim_send_image(1, "sim_test_image.jpg")
+    #return
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary())
@@ -682,6 +723,7 @@ async def main():
         asyncio.create_task(image_sending_loop())
         await asyncio.sleep(36000)
     else:
+        #await init_sim()
         #asyncio.create_task(send_spath())
         #asyncio.create_task(send_scan())
         await asyncio.sleep(36000)
