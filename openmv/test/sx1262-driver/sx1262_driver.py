@@ -3,9 +3,9 @@ import time
 
 # --- Pin setup ---
 cs    = Pin('P3', Pin.OUT)
-busy  = Pin('P4', Pin.IN)
-reset = Pin('P5', Pin.OUT)
-dio1  = Pin('P6', Pin.IN)
+busy  = Pin('P7', Pin.IN)
+reset = Pin('P6', Pin.OUT)  # Changed P6 reset
+dio1  = Pin('P13', Pin.IN)
 
 # SPI init (OpenMV SPI1)
 spi = SPI(1, baudrate=8000000, polarity=0, phase=0, bits=8, firstbit=SPI.MSB)
