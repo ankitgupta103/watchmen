@@ -1,154 +1,127 @@
-"""
-Simple SX1262 LoRa Module Connection Test for OpenMV RT1062
-Pin connections:
-- P0: MOSI
-- P1: MISO  
-- P2: SCK
-- P3: NSS/CS
-- P6: RESET
-- P7: BUSY (DIO1)
-"""
-
+from machine import Pin, SPI
 import time
-from machine import SPI, Pin
 
-# Pin definitions
-PIN_MOSI = 'P0'
-PIN_MISO = 'P1'
-PIN_SCK = 'P2'
-PIN_NSS = 'P3'
-PIN_RESET = 'P6'
-PIN_BUSY = 'P7'
+# --- Pin setup ---
+cs    = Pin('P3', Pin.OUT)
+busy  = Pin('P4', Pin.IN)
+reset = Pin('P5', Pin.OUT)
+dio1  = Pin('P6', Pin.IN)
 
-# SX1262 Commands
-CMD_GET_STATUS = 0xC0
-CMD_GET_VERSION = 0x01
+# SPI init (OpenMV SPI1)
+spi = SPI(1, baudrate=8000000, polarity=0, phase=0, bits=8, firstbit=SPI.MSB)
 
-class SX1262Test:
-    def __init__(self):
-        # Initialize GPIO pins first
-        self.nss = Pin(PIN_NSS, Pin.OUT)
-        self.reset = Pin(PIN_RESET, Pin.OUT)
-        self.busy = Pin(PIN_BUSY, Pin.IN, Pin.PULL_UP)
-        
-        # Initialize SPI (SPI bus 1) - simplified for OpenMV RT1062
-        try:
-            self.spi = SPI(1, baudrate=1000000)
-        except:
-            # Fallback initialization
-            self.spi = SPI(1)
-        
-        # Set NSS high (inactive)
-        self.nss.on()
-        
-        print("SX1262 Test Initialized")
-        
-    def reset_module(self):
-        """Reset the SX1262 module"""
-        print("Resetting SX1262...")
-        self.reset.off()
-        time.sleep_ms(10)
-        self.reset.on()
-        time.sleep_ms(20)
-        print("Reset complete")
-        
-    def wait_busy(self, timeout_ms=1000):
-        """Wait for BUSY pin to go low"""
-        start = time.ticks_ms()
-        while self.busy.value() == 1:
-            if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
-                return False
-        return True
-        
-    def spi_transfer(self, data):
-        """Perform SPI transfer"""
-        if not self.wait_busy():
-            print("ERROR: BUSY timeout before transfer")
-            return None
-            
-        self.nss.off()  # CS low
-        result = bytearray(len(data))
-        self.spi.write_readinto(data, result)
-        self.nss.on()   # CS high
-        
-        if not self.wait_busy():
-            print("ERROR: BUSY timeout after transfer")
-            return None
-            
-        return result
-        
-    def get_status(self):
-        """Get SX1262 status"""
-        result = self.spi_transfer(bytearray([CMD_GET_STATUS, 0x00]))
-        if result:
-            return result[1]
-        return None
-        
-    def test_connection(self):
-        """Test if SX1262 is connected and responding"""
-        print("\n=== SX1262 Connection Test ===")
-        
-        # Reset the module
-        self.reset_module()
-        
-        # Check BUSY pin
-        print(f"BUSY pin state: {'HIGH' if self.busy.value() else 'LOW'}")
-        
-        # Try to get status
-        print("Getting module status...")
-        status = self.get_status()
-        
-        if status is not None:
-            print(f"Status received: 0x{status:02X}")
-            
-            # Decode status bits
-            chip_mode = (status >> 4) & 0x07
-            cmd_status = (status >> 1) & 0x07
-            
-            mode_names = {
-                0: "SLEEP", 1: "STBY_RC", 2: "STBY_XOSC", 
-                3: "FS", 4: "RX", 5: "TX", 6: "RESERVED"
-            }
-            
-            cmd_names = {
-                0: "RESERVED", 1: "RFU", 2: "DATA_AVAILABLE",
-                3: "CMD_TIMEOUT", 4: "CMD_PROCESSING_ERROR",
-                5: "EXEC_FAILURE", 6: "CMD_TX_DONE"
-            }
-            
-            print(f"Chip Mode: {mode_names.get(chip_mode, 'UNKNOWN')} ({chip_mode})")
-            print(f"Command Status: {cmd_names.get(cmd_status, 'UNKNOWN')} ({cmd_status})")
-            
-            if chip_mode in [1, 2]:  # STBY_RC or STBY_XOSC
-                print("✓ SX1262 is connected and responding!")
-                return True
-            else:
-                print("⚠ SX1262 responding but in unexpected mode")
-                return True
-        else:
-            print("✗ No response from SX1262")
-            return False
+# --- Low-level helpers ---
+def wait_busy():
+    while busy.value() == 1:
+        pass
 
-def main():
-    """Main test function"""
-    print("OpenMV RT1062 + SX1262 LoRa Module Test")
-    print("=" * 40)
-    
-    try:
-        # Create test instance
-        sx1262 = SX1262Test()
-        
-        # Run connection test
-        if sx1262.test_connection():
-            print("\n🎉 Test PASSED - LoRa module is working!")
-        else:
-            print("\n❌ Test FAILED - Check connections")
-            
-    except Exception as e:
-        print(f"Error during test: {e}")
-        
-    print("\nTest complete.")
+def sx1262_reset():
+    reset.value(0)
+    time.sleep_ms(1)
+    reset.value(1)
+    time.sleep_ms(10)
 
-# Run the test
-if __name__ == "__main__":
-    main()
+def write_cmd(cmd, data=[]):
+    wait_busy()
+    cs.value(0)
+    spi.write(bytearray([cmd] + data))
+    cs.value(1)
+    wait_busy()
+
+def read_cmd(cmd, nbytes, dummy=0x00):
+    wait_busy()
+    cs.value(0)
+    spi.write(bytearray([cmd, dummy]))
+    val = spi.read(nbytes, 0x00)
+    cs.value(1)
+    wait_busy()
+    return val
+
+def write_register(addr, value):
+    write_cmd(0x0D, [(addr >> 8) & 0xFF, addr & 0xFF, value])
+
+def read_register(addr):
+    wait_busy()
+    cs.value(0)
+    spi.write(bytearray([0x1D, (addr >> 8) & 0xFF, addr & 0xFF, 0x00]))
+    val = spi.read(1, 0x00)
+    cs.value(1)
+    wait_busy()
+    return val[0]
+
+# --- LoRa config ---
+def set_standby():
+    write_cmd(0x80, [0x00])  # STDBY_RC
+
+def set_packet_type():
+    write_cmd(0x8A, [0x01])  # LoRa packet type
+
+def set_rf_frequency(freq_hz):
+    frf = int(freq_hz / (32e6 / (1 << 25)))
+    write_cmd(0x86, [(frf >> 24) & 0xFF, (frf >> 16) & 0xFF, (frf >> 8) & 0xFF, frf & 0xFF])
+
+def set_modulation_params(sf=7, bw=0x04, cr=0x01):
+    # bw: 0x04 = 125kHz, cr: 0x01 = 4/5
+    write_cmd(0x8B, [sf, bw, cr, 0x00])  # Low data rate optimize off
+
+def set_packet_params(preamble_len=12, payload_len=16):
+    write_cmd(0x8C, [
+        (preamble_len >> 8) & 0xFF, preamble_len & 0xFF,
+        0x00,  # Explicit header
+        payload_len,
+        0x00,  # CRC on
+        0x00   # IQ standard
+    ])
+
+def set_tx_power(power=14):
+    write_cmd(0x8E, [power])
+
+def write_fifo(data):
+    write_cmd(0x0E, [0x00])  # FIFO base addr = 0
+    write_cmd(0x0F, [0x00])  # FIFO ptr = 0
+    write_cmd(0x00, data)    # Write payload
+
+def read_fifo(size):
+    write_cmd(0x0F, [0x00])
+    return read_cmd(0x00, size)
+
+def set_tx(timeout_ms=3000):
+    timeout_ticks = int(timeout_ms / 15.625)
+    write_cmd(0x83, [(timeout_ticks >> 8) & 0xFF, timeout_ticks & 0xFF])
+
+def set_rx(timeout_ms=0):
+    if timeout_ms == 0:
+        write_cmd(0x82, [0xFF, 0xFF])  # Continuous RX
+    else:
+        timeout_ticks = int(timeout_ms / 15.625)
+        write_cmd(0x82, [(timeout_ticks >> 8) & 0xFF, timeout_ticks & 0xFF])
+
+# --- Init ---
+sx1262_reset()
+print("Chip version:", hex(read_register(0x0918)))  # should not be 0xFF
+
+set_standby()
+set_packet_type()
+set_rf_frequency(868100000)
+set_modulation_params(sf=7, bw=0x04, cr=0x01)
+set_packet_params(preamble_len=12, payload_len=5)
+set_tx_power(14)
+
+# --- Choose mode ---
+SEND_MODE = True  # Set False for receiver
+
+if SEND_MODE:
+    while True:
+        msg = b"Hello"
+        write_fifo(list(msg))
+        set_tx()
+        print("Sent:", msg)
+        time.sleep(2)
+
+else:
+    set_rx()
+    while True:
+        if dio1.value() == 1:
+            payload = read_fifo(5)
+            print("Received:", payload)
+            set_rx()
