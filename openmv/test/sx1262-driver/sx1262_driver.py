@@ -1,7 +1,12 @@
 from machine import Pin, SPI
 import time
 
-# --- Pin setup ---
+# # --- Pin setup ---
+# cs    = Pin('P3', Pin.OUT)
+# busy  = Pin('P4', Pin.IN)
+# reset = Pin('P5', Pin.OUT)
+# dio1  = Pin('P6', Pin.IN)
+
 cs    = Pin('P3', Pin.OUT)
 busy  = Pin('P7', Pin.IN)
 reset = Pin('P6', Pin.OUT)  # Changed P6 reset
@@ -60,26 +65,25 @@ def set_rf_frequency(freq_hz):
     frf = int(freq_hz / (32e6 / (1 << 25)))
     write_cmd(0x86, [(frf >> 24) & 0xFF, (frf >> 16) & 0xFF, (frf >> 8) & 0xFF, frf & 0xFF])
 
-def set_modulation_params(sf=7, bw=0x04, cr=0x01):
-    # bw: 0x04 = 125kHz, cr: 0x01 = 4/5
+def set_modulation_params(sf=5, bw=0x06, cr=0x01):
     write_cmd(0x8B, [sf, bw, cr, 0x00])  # Low data rate optimize off
 
-def set_packet_params(preamble_len=12, payload_len=16):
+def set_packet_params(preamble_len=8, payload_len=16):
     write_cmd(0x8C, [
         (preamble_len >> 8) & 0xFF, preamble_len & 0xFF,
         0x00,  # Explicit header
         payload_len,
-        0x00,  # CRC on
+        0x01,  # CRC on
         0x00   # IQ standard
     ])
 
-def set_tx_power(power=14):
-    write_cmd(0x8E, [power])
+def set_tx_power(power=22):
+    write_cmd(0x8E, [power, 0xE0])  # Ramp time = 200us
 
 def write_fifo(data):
-    write_cmd(0x0E, [0x00])  # FIFO base addr = 0
-    write_cmd(0x0F, [0x00])  # FIFO ptr = 0
-    write_cmd(0x00, data)    # Write payload
+    write_cmd(0x0E, [0x00])  # FIFO base addr
+    write_cmd(0x0F, [0x00])  # FIFO ptr
+    write_cmd(0x00, list(data))    # Write payload
 
 def read_fifo(size):
     write_cmd(0x0F, [0x00])
@@ -98,14 +102,19 @@ def set_rx(timeout_ms=0):
 
 # --- Init ---
 sx1262_reset()
-print("Chip version:", hex(read_register(0x0918)))  # should not be 0xFF
+chip_ver = read_register(0x0918)
+print("Chip version:", hex(chip_ver))
 
 set_standby()
 set_packet_type()
 set_rf_frequency(868100000)
-set_modulation_params(sf=7, bw=0x04, cr=0x01)
-set_packet_params(preamble_len=12, payload_len=5)
-set_tx_power(14)
+set_modulation_params(sf=5, bw=0x06, cr=0x01)  # Max speed
+set_packet_params(preamble_len=8, payload_len=5)
+set_tx_power(22)
+
+# Confirm settings
+print("RF frequency bytes:", read_register(0x086))  # Just a sample
+print("TX power reg:", read_register(0x08E))
 
 # --- Choose mode ---
 SEND_MODE = True  # Set False for receiver
@@ -113,10 +122,10 @@ SEND_MODE = True  # Set False for receiver
 if SEND_MODE:
     while True:
         msg = b"Hello"
-        write_fifo(list(msg))
+        write_fifo(msg)
         set_tx()
         print("Sent:", msg)
-        time.sleep(2)
+        time.sleep(1)
 
 else:
     set_rx()
@@ -125,3 +134,12 @@ else:
             payload = read_fifo(5)
             print("Received:", payload)
             set_rx()
+
+
+
+
+
+cs    = Pin('P3', Pin.OUT)
+busy  = Pin('P7', Pin.IN)
+reset = Pin('P6', Pin.OUT)  # Changed P6 reset
+dio1  = Pin('P13', Pin.IN)
