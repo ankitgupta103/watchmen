@@ -14,13 +14,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
-import { Machine, S3EventsResponse, FeedEvent } from '@/lib/types/machine';
+import { Machine, S3EventsResponse, FeedEvent, MachineTag } from '@/lib/types/machine';
 import { getPresignedUrl } from '@/lib/utils/presigned-url';
 import { calculateSeverity, getSeverityLabel, getSeverityColor } from '@/lib/utils/severity';
 import { cn } from '@/lib/utils';
 
 import useToken from '@/hooks/use-token';
 import ImageModal from './image-modal';
+import TagFilter from './tag-filter';
+import TagDisplay from '../../devices/components/tag-display';
 
 interface EventsFeedProps {
   machines: Machine[];
@@ -93,6 +95,9 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange());
   const [selectedPreset, setSelectedPreset] = useState<string>('1month');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  
+  // Tag filtering state
+  const [selectedTags, setSelectedTags] = useState<MachineTag[]>([]);
 
   // Image modal state
   const [modalImage, setModalImage] = useState<{
@@ -105,10 +110,25 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   const processedEventsRef = useRef<Set<string>>(new Set());
   const isInitialLoad = useRef(true);
 
-  // Sort events by timestamp (newest first)
+  // Sort events by timestamp (newest first) and filter by tags
   const sortedEvents = useMemo(() => {
-    return [...events].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [events]);
+    let filteredEvents = [...events];
+    
+    // Filter by selected tags if any are selected
+    if (selectedTags.length > 0) {
+      filteredEvents = events.filter(event => {
+        const machine = machines.find(m => m.id === event.machineId);
+        if (!machine?.tags || machine.tags.length === 0) return false;
+        
+        // Check if the machine has any of the selected tags
+        return selectedTags.some(selectedTag => 
+          machine.tags?.some(machineTag => machineTag.id === selectedTag.id)
+        );
+      });
+    }
+    
+    return filteredEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }, [events, selectedTags, machines]);
 
   const fetchEvents = useCallback(async (chunk: number, append: boolean = false) => {
     if (!token || loading || !machines.length) return;
@@ -369,7 +389,49 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
               {formatDateForAPI(dateRange.startDate)} to {formatDateForAPI(dateRange.endDate)}
             </div>
           </div>
+
+          {/* Tag Filter */}
+          <div className="flex items-center justify-center mb-6">
+            <TagFilter selectedTags={selectedTags} onTagsChange={setSelectedTags} />
+          </div>
         </div>
+
+        {/* Results Summary */}
+        {selectedTags.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">
+                  Showing {sortedEvents.length} events from machines with selected tags
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedTags([])}
+                className="text-blue-600 hover:text-blue-700"
+              >
+                Clear Filters
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* No Results Message */}
+        {sortedEvents.length === 0 && selectedTags.length > 0 && (
+          <div className="text-center py-12">
+            <Filter className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
+            <p className="text-gray-500 mb-4">No events found for machines with the selected tags.</p>
+            <Button
+              variant="outline"
+              onClick={() => setSelectedTags([])}
+            >
+              Clear Tag Filters
+            </Button>
+          </div>
+        )}
 
         {/* Events List */}
         {sortedEvents.map((event, index) => {
@@ -387,6 +449,13 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                       <p className="text-sm text-gray-500 capitalize">
                         {event.machineType.replace(/_/g, ' ')}
                       </p>
+                      {/* Machine Tags */}
+                      <div className="mt-2">
+                        <TagDisplay 
+                          tags={machines.find(m => m.id === event.machineId)?.tags || []} 
+                          showDeleteButtons={false}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
