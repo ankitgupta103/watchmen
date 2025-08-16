@@ -50,7 +50,7 @@ const items = [
     url: '/dashboard',
     icon: HomeIcon,
   },
-    {
+  {
     title: 'Devices',
     url: '/devices',
     icon: Monitor,

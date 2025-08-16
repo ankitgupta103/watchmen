@@ -1,24 +1,33 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Filter, Tag as TagIcon } from 'lucide-react';
-
-import { MachineTag } from '@/lib/types/machine';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { getAllTags } from '../../devices/components/tag-api-utils';
+import React, { useEffect, useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
 import useToken from '@/hooks/use-token';
+import { Filter, Tag as TagIcon, X } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+
+import { MachineTag } from '@/lib/types/machine';
+
+import { getAllTags } from '../../devices/components/tag-api-utils';
 
 interface TagFilterProps {
   selectedTags: MachineTag[];
   onTagsChange: (tags: MachineTag[]) => void;
 }
 
-const TagFilter: React.FC<TagFilterProps> = ({ selectedTags, onTagsChange }) => {
+const TagFilter: React.FC<TagFilterProps> = ({
+  selectedTags,
+  onTagsChange,
+}) => {
   const { token } = useToken();
   const { organizationUid } = useOrganization();
   const [availableTags, setAvailableTags] = useState<MachineTag[]>([]);
@@ -28,7 +37,7 @@ const TagFilter: React.FC<TagFilterProps> = ({ selectedTags, onTagsChange }) => 
   useEffect(() => {
     const loadTags = async () => {
       if (!organizationUid || !token) return;
-      
+
       setLoading(true);
       try {
         const tags = await getAllTags(organizationUid, token);
@@ -44,10 +53,10 @@ const TagFilter: React.FC<TagFilterProps> = ({ selectedTags, onTagsChange }) => 
   }, [organizationUid, token]);
 
   const handleTagToggle = (tag: MachineTag) => {
-    const isSelected = selectedTags.some(t => t.id === tag.id);
-    
+    const isSelected = selectedTags.some((t) => t.id === tag.id);
+
     if (isSelected) {
-      onTagsChange(selectedTags.filter(t => t.id !== tag.id));
+      onTagsChange(selectedTags.filter((t) => t.id !== tag.id));
     } else {
       onTagsChange([...selectedTags, tag]);
     }
@@ -58,14 +67,14 @@ const TagFilter: React.FC<TagFilterProps> = ({ selectedTags, onTagsChange }) => 
   };
 
   const isTagSelected = (tag: MachineTag) => {
-    return selectedTags.some(t => t.id === tag.id);
+    return selectedTags.some((t) => t.id === tag.id);
   };
 
   return (
     <div className="flex items-center gap-2">
       {/* Selected Tags Display */}
       {selectedTags.length > 0 && (
-        <div className="flex items-center gap-1 mr-2">
+        <div className="mr-2 flex items-center gap-1">
           {selectedTags.map((tag) => (
             <Badge
               key={tag.id}
@@ -88,7 +97,7 @@ const TagFilter: React.FC<TagFilterProps> = ({ selectedTags, onTagsChange }) => 
             variant="ghost"
             size="sm"
             onClick={handleClearAll}
-            className="text-xs h-6 px-2"
+            className="h-6 px-2 text-xs"
           >
             Clear All
           </Button>
@@ -127,16 +136,20 @@ const TagFilter: React.FC<TagFilterProps> = ({ selectedTags, onTagsChange }) => 
                 </Button>
               )}
             </div>
-            
+
             <Separator />
-            
+
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-muted-foreground">Loading tags...</div>
+                <div className="text-muted-foreground text-sm">
+                  Loading tags...
+                </div>
               </div>
             ) : availableTags.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="text-sm text-muted-foreground">No tags found</div>
+              <div className="py-8 text-center">
+                <div className="text-muted-foreground text-sm">
+                  No tags found
+                </div>
               </div>
             ) : (
               <ScrollArea className="h-64">
@@ -146,9 +159,9 @@ const TagFilter: React.FC<TagFilterProps> = ({ selectedTags, onTagsChange }) => 
                     return (
                       <div
                         key={tag.id}
-                        className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${
-                          isSelected 
-                            ? 'bg-primary/10 border border-primary/30' 
+                        className={`flex cursor-pointer items-center justify-between rounded-md p-2 transition-colors ${
+                          isSelected
+                            ? 'bg-primary/10 border-primary/30 border'
                             : 'hover:bg-accent'
                         }`}
                         onClick={() => handleTagToggle(tag)}
@@ -156,18 +169,20 @@ const TagFilter: React.FC<TagFilterProps> = ({ selectedTags, onTagsChange }) => 
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <TagIcon className="h-3 w-3" />
-                            <span className="font-medium text-sm">{tag.name}</span>
+                            <span className="text-sm font-medium">
+                              {tag.name}
+                            </span>
                           </div>
                           {tag.description && (
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <p className="text-muted-foreground mt-1 text-xs">
                               {tag.description}
                             </p>
                           )}
                         </div>
                         {isSelected && (
-                          <div className="flex items-center ml-2">
-                            <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                              <div className="w-2 h-2 bg-white rounded-full" />
+                          <div className="ml-2 flex items-center">
+                            <div className="bg-primary flex h-4 w-4 items-center justify-center rounded-full">
+                              <div className="h-2 w-2 rounded-full bg-white" />
                             </div>
                           </div>
                         )}

@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Tag, X } from 'lucide-react';
 
-import { Machine, MachineTag } from '@/lib/types/machine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,18 +16,24 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import { Machine, MachineTag } from '@/lib/types/machine';
+
 interface EditTagsModalProps {
   machine: Machine;
-  onUpdateTags: (machineId: number, updatedTags: MachineTag[], deletedTagIds: number[]) => void;
+  onUpdateTags: (
+    machineId: number,
+    updatedTags: MachineTag[],
+    deletedTagIds: number[],
+  ) => void;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const EditTagsModal: React.FC<EditTagsModalProps> = ({ 
-  machine, 
-  onUpdateTags, 
-  isOpen, 
-  onOpenChange 
+const EditTagsModal: React.FC<EditTagsModalProps> = ({
+  machine,
+  onUpdateTags,
+  isOpen,
+  onOpenChange,
 }) => {
   const [tags, setTags] = useState<MachineTag[]>(machine.tags || []);
   const [newTag, setNewTag] = useState('');
@@ -36,7 +41,7 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
   const [deletedTagIds, setDeletedTagIds] = useState<number[]>([]);
 
   const handleAddTag = () => {
-    if (newTag.trim() && !tags.some(tag => tag.name === newTag.trim())) {
+    if (newTag.trim() && !tags.some((tag) => tag.name === newTag.trim())) {
       const newTagObj: MachineTag = {
         id: 0,
         key: newTag.trim().toLowerCase().replace(/\s+/g, '_'),
@@ -55,7 +60,7 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
     if (tagToRemove.id > 0) {
       setDeletedTagIds([...deletedTagIds, tagToRemove.id]);
     }
-    setTags(tags.filter(tag => tag.name !== tagToRemove.name));
+    setTags(tags.filter((tag) => tag.name !== tagToRemove.name));
   };
 
   const handleSubmit = () => {
@@ -92,7 +97,9 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
                 id="edit-new-tag"
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                onKeyDown={(e) =>
+                  e.key === 'Enter' && (e.preventDefault(), handleAddTag())
+                }
                 placeholder="Enter tag name"
               />
             </div>
@@ -119,16 +126,24 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
             <div className="col-span-3 flex flex-wrap gap-2">
               {tags.length > 0 ? (
                 tags.map((tag, index) => (
-                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                  <Badge
+                    key={index}
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
                     <Tag className="h-3 w-3" />
                     <div className="flex flex-col">
                       <span>{tag.name}</span>
-                      {tag.description && <span className="text-xs opacity-70">{tag.description}</span>}
+                      {tag.description && (
+                        <span className="text-xs opacity-70">
+                          {tag.description}
+                        </span>
+                      )}
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(tag)}
-                      className="ml-1 hover:text-destructive"
+                      className="hover:text-destructive ml-1"
                       aria-label={`Remove tag ${tag.name}`}
                       title={`Remove tag ${tag.name}`}
                     >
@@ -143,7 +158,11 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
           <Button type="button" onClick={handleSubmit}>

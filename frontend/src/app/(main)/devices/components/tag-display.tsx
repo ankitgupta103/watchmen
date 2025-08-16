@@ -3,8 +3,9 @@
 import React from 'react';
 import { Tag, X } from 'lucide-react';
 
-import { MachineTag } from '@/lib/types/machine';
 import { Badge } from '@/components/ui/badge';
+
+import { MachineTag } from '@/lib/types/machine';
 
 interface TagDisplayProps {
   tags?: MachineTag[];
@@ -12,24 +13,22 @@ interface TagDisplayProps {
   showDeleteButtons?: boolean;
 }
 
-const TagDisplay: React.FC<TagDisplayProps> = ({ 
-  tags, 
-  onDeleteTag, 
-  showDeleteButtons = false 
+const TagDisplay: React.FC<TagDisplayProps> = ({
+  tags,
+  onDeleteTag,
+  showDeleteButtons = false,
 }) => {
   if (!tags || tags.length === 0) {
-    return (
-      <span className="text-muted-foreground text-sm">No tags</span>
-    );
+    return <span className="text-muted-foreground text-sm">No tags</span>;
   }
 
   return (
     <div className="flex flex-wrap gap-1">
       {tags.map((tag, index) => (
-        <Badge 
-          key={tag.id || index} 
-          variant="secondary" 
-          className={`text-xs flex items-center gap-1 ${showDeleteButtons ? 'pr-1' : ''}`}
+        <Badge
+          key={tag.id || index}
+          variant="secondary"
+          className={`flex items-center gap-1 text-xs ${showDeleteButtons ? 'pr-1' : ''}`}
         >
           <Tag className="h-3 w-3" />
           <div className="flex flex-col">
@@ -42,7 +41,7 @@ const TagDisplay: React.FC<TagDisplayProps> = ({
             <button
               type="button"
               onClick={() => onDeleteTag(tag.id)}
-              className="ml-1 hover:text-destructive"
+              className="hover:text-destructive ml-1"
               aria-label={`Remove tag ${tag.name}`}
               title={`Remove tag ${tag.name}`}
             >

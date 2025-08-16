@@ -1,9 +1,8 @@
 'use client';
 
 import React from 'react';
-import { MoreHorizontal, Plus, Tag, MapPin } from 'lucide-react';
+import { MapPin, MoreHorizontal, Plus, Tag } from 'lucide-react';
 
-import { Machine } from '@/lib/types/machine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +12,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TableCell, TableRow } from '@/components/ui/table';
+
+import { Machine } from '@/lib/types/machine';
+
 import TagDisplay from './tag-display';
 
 interface DevicesTableRowProps {
@@ -41,7 +43,11 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
     }
   };
 
-  const formatLocation = (location: { lat: number; long: number; timestamp: string }) => {
+  const formatLocation = (location: {
+    lat: number;
+    long: number;
+    timestamp: string;
+  }) => {
     return `${location?.lat}, ${location?.long}`;
   };
 
@@ -50,8 +56,8 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
       <TableCell className="font-medium">{machine.name}</TableCell>
       <TableCell>{machine.type}</TableCell>
       <TableCell>
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className={`border ${getConnectionStatusColor(machine.connection_status)}`}
         >
           {machine.connection_status}
@@ -59,8 +65,10 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm">{formatLocation(machine.last_location)}</span>
+          <MapPin className="text-muted-foreground h-4 w-4" />
+          <span className="text-sm">
+            {formatLocation(machine.last_location)}
+          </span>
         </div>
       </TableCell>
       <TableCell>
@@ -80,11 +88,11 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onAddTags(machine)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="mr-2 h-4 w-4" />
               Add Tags
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEditTags(machine)}>
-              <Tag className="h-4 w-4 mr-2" />
+              <Tag className="mr-2 h-4 w-4" />
               Edit Tags
             </DropdownMenuItem>
           </DropdownMenuContent>

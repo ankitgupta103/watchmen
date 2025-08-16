@@ -46,7 +46,14 @@ export async function fetcher<TResponse = unknown, TRequest = unknown>(
   options?: FetchOptions<TRequest>,
 ): Promise<TResponse> {
   const token = await getToken();
-  const { method = 'GET', body, headers, cache, next, ...restOptions } = options || {};
+  const {
+    method = 'GET',
+    body,
+    headers,
+    cache,
+    next,
+    ...restOptions
+  } = options || {};
 
   try {
     const res = await fetch(url, {
