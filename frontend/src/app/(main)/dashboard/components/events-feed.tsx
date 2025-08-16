@@ -421,10 +421,10 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Criticality</SelectItem>
-                  <SelectItem value="0">No Person</SelectItem>
-                  <SelectItem value="1">Person Detected</SelectItem>
-                  <SelectItem value="2">Person + Item</SelectItem>
-                  <SelectItem value="3">Weapon Detected</SelectItem>
+                  <SelectItem value="0">Low</SelectItem>
+                  <SelectItem value="1">Medium</SelectItem>
+                  <SelectItem value="2">High</SelectItem>
+                  <SelectItem value="3">Critical</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -562,10 +562,10 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                   Showing {sortedEvents.length} events
                   {searchQuery && ` matching "${searchQuery}"`}
                   {selectedSeverity !== 'all' && ` with ${
-                    selectedSeverity === '0' ? 'No Person' :
-                    selectedSeverity === '1' ? 'Person Detected' :
-                    selectedSeverity === '2' ? 'Person + Item' :
-                    'Weapon Detected'
+                    selectedSeverity === '0' ? 'Low' :
+                    selectedSeverity === '1' ? 'Medium' :
+                    selectedSeverity === '2' ? 'High' :
+                    'Critical'
                   } criticality`}
                   {selectedMachine !== 'all' && ` from ${machines.find(m => m.id.toString() === selectedMachine)?.name || 'selected machine'}`}
                   {selectedTags.length > 0 && ` with selected tags`}
@@ -626,8 +626,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                   <div className="flex items-center space-x-3">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Badge className={cn('text-sm px-3 py-1', getSeverityColor(event.severity))}>
-                          <span className="mr-1">{severityInfo.icon}</span>
+                        <Badge className={cn('text-xs font-semibold px-2 py-1', severityInfo.className)}>
                           {severityInfo.label}
                         </Badge>
                       </TooltipTrigger>
