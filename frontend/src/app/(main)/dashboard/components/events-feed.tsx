@@ -95,7 +95,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   // Date filtering state
   const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange());
   const [selectedPreset, setSelectedPreset] = useState<string>('1month');
-  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [tempDateRange, setTempDateRange] = useState<DateRange | null>(null);
   
   // Tag filtering state
   const [selectedTags, setSelectedTags] = useState<MachineTag[]>([]);
@@ -283,14 +283,8 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   const handlePresetChange = useCallback((preset: string) => {
     setSelectedPreset(preset);
     
-    if (preset === 'custom') {
-      setShowCustomDatePicker(true);
-      return;
-    }
-
     const newDateRange = getPresetDateRange(preset);
     setDateRange(newDateRange);
-    setShowCustomDatePicker(false);
     
     // Reset and fetch new events
     setEvents([]);
@@ -299,11 +293,22 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
     processedEventsRef.current.clear();
   }, []);
 
-  // Handle custom date selection
-  const handleCustomDateSelect = useCallback((start: Date | undefined, end: Date | undefined) => {
-    if (start && end) {
-      setDateRange({ startDate: start, endDate: end });
-      setShowCustomDatePicker(false);
+  // Handle custom date selection (temporary)
+  const handleCustomDateSelect = useCallback((range: { from?: Date; to?: Date } | undefined) => {
+    if (range?.from) {
+      setTempDateRange({
+        startDate: range.from,
+        endDate: range.to || range.from
+      });
+    }
+  }, []);
+
+  // Apply custom date range
+  const applyCustomDateRange = useCallback(() => {
+    if (tempDateRange) {
+      setDateRange(tempDateRange);
+      setSelectedPreset('custom');
+      setTempDateRange(null);
       
       // Reset and fetch new events
       setEvents([]);
@@ -311,7 +316,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
       setHasNext(true);
       processedEventsRef.current.clear();
     }
-  }, []);
+  }, [tempDateRange]);
 
   // Intersection observer for infinite scroll
   const lastEventCallback = useCallback((node: HTMLDivElement | null) => {
@@ -433,41 +438,92 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                 </SelectContent>
               </Select>
 
-              {/* Date Range Selector */}
-              <Select value={selectedPreset} onValueChange={handlePresetChange}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Select time range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7days">Last 7 days</SelectItem>
-                  <SelectItem value="1month">Last 30 days</SelectItem>
-                  <SelectItem value="3months">Last 90 days</SelectItem>
-                  <SelectItem value="custom">Custom dates</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {selectedPreset === 'custom' && (
-                <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-40">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Custom dates
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="center">
-                    <CalendarComponent
-                      mode="range"
-                      selected={{
-                        from: dateRange.startDate,
-                        to: dateRange.endDate,
-                      }}
-                      onSelect={(range) => handleCustomDateSelect(range?.from, range?.to)}
-                      numberOfMonths={2}
-                      disabled={(date) => date > new Date()}
-                    />
-                  </PopoverContent>
-                </Popover>
-              )}
+              {/* Date Range Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-48 justify-start">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    <span className="truncate">
+                      {selectedPreset === 'custom' 
+                        ? `${formatDateForAPI(dateRange.startDate)} - ${formatDateForAPI(dateRange.endDate)}`
+                        : selectedPreset === '7days' ? 'Last 7 days'
+                        : selectedPreset === '1month' ? 'Last 30 days'
+                        : 'Last 90 days'
+                      }
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <div className="p-4">
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-medium text-sm mb-3">Quick filters</h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          <Button
+                            variant={selectedPreset === '7days' ? 'default' : 'ghost'}
+                            className="justify-start h-8"
+                            onClick={() => handlePresetChange('7days')}
+                          >
+                            Last 7 days
+                          </Button>
+                          <Button
+                            variant={selectedPreset === '1month' ? 'default' : 'ghost'}
+                            className="justify-start h-8"
+                            onClick={() => handlePresetChange('1month')}
+                          >
+                            Last 30 days
+                          </Button>
+                          <Button
+                            variant={selectedPreset === '3months' ? 'default' : 'ghost'}
+                            className="justify-start h-8"
+                            onClick={() => handlePresetChange('3months')}
+                          >
+                            Last 90 days
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="border-t pt-4">
+                        <h4 className="font-medium text-sm mb-3">Custom range</h4>
+                        <CalendarComponent
+                          mode="range"
+                          selected={{
+                            from: tempDateRange?.startDate || dateRange.startDate,
+                            to: tempDateRange?.endDate || dateRange.endDate,
+                          }}
+                          onSelect={handleCustomDateSelect}
+                          numberOfMonths={2}
+                          disabled={(date) => date > new Date()}
+                          className="rounded-md"
+                        />
+                        
+                        {tempDateRange && (
+                          <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                            <div className="text-sm text-gray-600">
+                              {formatDateForAPI(tempDateRange.startDate)} - {formatDateForAPI(tempDateRange.endDate)}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setTempDateRange(null)}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={applyCustomDateRange}
+                              >
+                                Apply
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
