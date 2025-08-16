@@ -43,7 +43,6 @@ export default function EventNotification({ event, machineName, onClose }: Event
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">{severityInfo.icon}</span>
             <div>
               <h4 className="font-semibold text-gray-900 text-sm">
                 {severityInfo.label}
