@@ -318,6 +318,11 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
     }
   }, [tempDateRange]);
 
+  // Clear custom date selection
+  const clearCustomDateRange = useCallback(() => {
+    setTempDateRange(null);
+  }, []);
+
   // Intersection observer for infinite scroll
   const lastEventCallback = useCallback((node: HTMLDivElement | null) => {
     if (observerRef.current) observerRef.current.disconnect();
@@ -438,6 +443,8 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                 </SelectContent>
               </Select>
 
+            <TagFilter selectedTags={selectedTags} onTagsChange={setSelectedTags} />
+
               {/* Date Range Filter */}
               <Popover>
                 <PopoverTrigger asChild>
@@ -488,12 +495,11 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                         <CalendarComponent
                           mode="range"
                           selected={{
-                            from: tempDateRange?.startDate || dateRange.startDate,
-                            to: tempDateRange?.endDate || dateRange.endDate,
+                            from: tempDateRange?.startDate,
+                            to: tempDateRange?.endDate,
                           }}
                           onSelect={handleCustomDateSelect}
                           numberOfMonths={2}
-                          disabled={(date) => date > new Date()}
                           className="rounded-md"
                         />
                         
@@ -511,6 +517,13 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                                 Cancel
                               </Button>
                               <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={clearCustomDateRange}
+                              >
+                                Clear
+                              </Button>
+                              <Button
                                 size="sm"
                                 onClick={applyCustomDateRange}
                               >
@@ -525,16 +538,6 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                 </PopoverContent>
               </Popover>
             </div>
-          </div>
-
-          {/* Tag Filter - Below search and filters */}
-          <div className="flex items-center justify-center mb-6">
-            <TagFilter selectedTags={selectedTags} onTagsChange={setSelectedTags} />
-          </div>
-
-          {/* Active filters display */}
-          <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full text-center mb-4">
-            {formatDateForAPI(dateRange.startDate)} to {formatDateForAPI(dateRange.endDate)}
           </div>
         </div>
 
