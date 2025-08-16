@@ -2,11 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Camera, Clock, AlertTriangle, Loader2, Calendar, Filter, TrendingUp } from 'lucide-react';
+import { Camera, Clock, AlertTriangle, Loader2, Calendar, Filter, TrendingUp, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -98,6 +99,11 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   
   // Tag filtering state
   const [selectedTags, setSelectedTags] = useState<MachineTag[]>([]);
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
+  const [selectedMachine, setSelectedMachine] = useState<string>('all');
 
   // Image modal state
   const [modalImage, setModalImage] = useState<{
@@ -110,13 +116,37 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   const processedEventsRef = useRef<Set<string>>(new Set());
   const isInitialLoad = useRef(true);
 
-  // Sort events by timestamp (newest first) and filter by tags
+  // Sort events by timestamp (newest first) and filter by all criteria
   const sortedEvents = useMemo(() => {
     let filteredEvents = [...events];
     
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filteredEvents = filteredEvents.filter(event => 
+        event.machineName.toLowerCase().includes(query) ||
+        event.eventstr?.toLowerCase().includes(query) ||
+        event.cropped_images?.some(img => 
+          img.class_name.toLowerCase().includes(query)
+        )
+      );
+    }
+    
+    // Filter by severity
+    if (selectedSeverity !== 'all') {
+      const severityLevel = parseInt(selectedSeverity);
+      filteredEvents = filteredEvents.filter(event => event.severity === severityLevel);
+    }
+    
+    // Filter by machine
+    if (selectedMachine !== 'all') {
+      const machineId = parseInt(selectedMachine);
+      filteredEvents = filteredEvents.filter(event => event.machineId === machineId);
+    }
+    
     // Filter by selected tags if any are selected
     if (selectedTags.length > 0) {
-      filteredEvents = events.filter(event => {
+      filteredEvents = filteredEvents.filter(event => {
         const machine = machines.find(m => m.id === event.machineId);
         if (!machine?.tags || machine.tags.length === 0) return false;
         
@@ -128,7 +158,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
     }
     
     return filteredEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [events, selectedTags, machines]);
+  }, [events, searchQuery, selectedSeverity, selectedMachine, selectedTags, machines]);
 
   const fetchEvents = useCallback(async (chunk: number, append: boolean = false) => {
     if (!token || loading || !machines.length) return;
@@ -309,6 +339,14 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
     setModalImage(null);
   }, []);
 
+  // Clear all filters
+  const clearAllFilters = useCallback(() => {
+    setSearchQuery('');
+    setSelectedSeverity('all');
+    setSelectedMachine('all');
+    setSelectedTags([]);
+  }, []);
+
   // Initial fetch and refetch when date range changes
   useEffect(() => {
     if (machines.length > 0) {
@@ -343,92 +381,149 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
 
   return (
     <>
-      <div className="max-w-4xl mx-auto space-y-6 p-4">
-        {/* Header with date filter */}
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Events Feed</h2>
+      <div className="max-w-6xl mx-auto space-y-6 p-4">
+        {/* Header with search and filters */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">Events Feed</h2>
+          
+          {/* Search and Filters Row */}
+          <div className="flex items-center justify-between gap-6 mb-6 flex-wrap">
+            {/* Left side - Search */}
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search events, machines, or objects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            {/* Right side - Filters */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Criticality Filter */}
+              <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="All Criticality" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Criticality</SelectItem>
+                  <SelectItem value="0">No Person</SelectItem>
+                  <SelectItem value="1">Person Detected</SelectItem>
+                  <SelectItem value="2">Person + Item</SelectItem>
+                  <SelectItem value="3">Weapon Detected</SelectItem>
+                </SelectContent>
+              </Select>
 
-          {/* Date Range Selector */}
-          <div className="flex items-center justify-center gap-3 flex-wrap mb-6">
-            <Select value={selectedPreset} onValueChange={handlePresetChange}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Select time range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7days">Last 7 days</SelectItem>
-                <SelectItem value="1month">Last 30 days</SelectItem>
-                <SelectItem value="3months">Last 90 days</SelectItem>
-                <SelectItem value="custom">Custom dates</SelectItem>
-              </SelectContent>
-            </Select>
+              {/* Machine Filter */}
+              <Select value={selectedMachine} onValueChange={setSelectedMachine}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="All Machines" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Machines</SelectItem>
+                  {machines.map((machine) => (
+                    <SelectItem key={machine.id} value={machine.id.toString()}>
+                      {machine.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            {selectedPreset === 'custom' && (
-              <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-40">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Custom dates
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="center">
-                  <CalendarComponent
-                    mode="range"
-                    selected={{
-                      from: dateRange.startDate,
-                      to: dateRange.endDate,
-                    }}
-                    onSelect={(range) => handleCustomDateSelect(range?.from, range?.to)}
-                    numberOfMonths={2}
-                    disabled={(date) => date > new Date()}
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
+              {/* Date Range Selector */}
+              <Select value={selectedPreset} onValueChange={handlePresetChange}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Select time range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7days">Last 7 days</SelectItem>
+                  <SelectItem value="1month">Last 30 days</SelectItem>
+                  <SelectItem value="3months">Last 90 days</SelectItem>
+                  <SelectItem value="custom">Custom dates</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {formatDateForAPI(dateRange.startDate)} to {formatDateForAPI(dateRange.endDate)}
+              {selectedPreset === 'custom' && (
+                <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-40">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Custom dates
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center">
+                    <CalendarComponent
+                      mode="range"
+                      selected={{
+                        from: dateRange.startDate,
+                        to: dateRange.endDate,
+                      }}
+                      onSelect={(range) => handleCustomDateSelect(range?.from, range?.to)}
+                      numberOfMonths={2}
+                      disabled={(date) => date > new Date()}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
           </div>
 
-          {/* Tag Filter */}
+          {/* Tag Filter - Below search and filters */}
           <div className="flex items-center justify-center mb-6">
             <TagFilter selectedTags={selectedTags} onTagsChange={setSelectedTags} />
+          </div>
+
+          {/* Active filters display */}
+          <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full text-center mb-4">
+            {formatDateForAPI(dateRange.startDate)} to {formatDateForAPI(dateRange.endDate)}
           </div>
         </div>
 
         {/* Results Summary */}
-        {selectedTags.length > 0 && (
+        {(searchQuery || selectedSeverity !== 'all' || selectedMachine !== 'all' || selectedTags.length > 0) && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-blue-600" />
                 <span className="text-sm font-medium text-blue-900">
-                  Showing {sortedEvents.length} events from machines with selected tags
+                  Showing {sortedEvents.length} events
+                  {searchQuery && ` matching "${searchQuery}"`}
+                  {selectedSeverity !== 'all' && ` with ${
+                    selectedSeverity === '0' ? 'No Person' :
+                    selectedSeverity === '1' ? 'Person Detected' :
+                    selectedSeverity === '2' ? 'Person + Item' :
+                    'Weapon Detected'
+                  } criticality`}
+                  {selectedMachine !== 'all' && ` from ${machines.find(m => m.id.toString() === selectedMachine)?.name || 'selected machine'}`}
+                  {selectedTags.length > 0 && ` with selected tags`}
                 </span>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSelectedTags([])}
+                onClick={clearAllFilters}
                 className="text-blue-600 hover:text-blue-700"
               >
-                Clear Filters
+                Clear All Filters
               </Button>
             </div>
           </div>
         )}
 
         {/* No Results Message */}
-        {sortedEvents.length === 0 && selectedTags.length > 0 && (
+        {sortedEvents.length === 0 && (searchQuery || selectedSeverity !== 'all' || selectedMachine !== 'all' || selectedTags.length > 0) && (
           <div className="text-center py-12">
             <Filter className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
-            <p className="text-gray-500 mb-4">No events found for machines with the selected tags.</p>
+            <p className="text-gray-500 mb-4">No events found matching the current filters.</p>
             <Button
               variant="outline"
-              onClick={() => setSelectedTags([])}
+              onClick={clearAllFilters}
             >
-              Clear Tag Filters
+              Clear All Filters
             </Button>
           </div>
         )}
@@ -483,16 +578,16 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                   <p className="text-gray-700 mb-4 bg-gray-50 p-3 rounded-lg">{event.eventstr}</p>
                 )}
 
-                <div className="space-y-4 mb-4">
+                <div className="space-y-4 mb-4 grid grid-cols-5 gap-4">
                   {/* Full Image */}
                   {event.fullImageUrl && (
-                    <div className="relative">
+                    <div className="relative col-span-3">
                       <Image
                         src={event.fullImageUrl}
                         alt="Full image"
                         width={400}
                         height={300}
-                        className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity border"
+                        className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity border"
                         onClick={() => handleImageClick(event.fullImageUrl!, 'Full image', 'Full Image')}
                       />
                       <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
@@ -503,12 +598,12 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                   
                   {/* Cropped Images */}
                   {event.croppedImageUrls && event.croppedImageUrls.length > 0 && (
-                    <div>
+                    <div className="col-span-2">
                       <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
                         <Filter className="h-4 w-4 mr-2" />
                         Detected Objects ({event.croppedImageUrls.length})
                       </h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 gap-2">
                         {event.croppedImageUrls.map((url, idx) => {
                           const croppedImage = event.cropped_images?.[idx];
                           const className = croppedImage?.class_name || 'Unknown';
@@ -523,7 +618,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                                     alt={`Detected ${className}`}
                                     width={100}
                                     height={100}
-                                    className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity border group-hover:shadow-md"
+                                    className="w-24 h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity border group-hover:shadow-md"
                                     onClick={() => handleImageClick(
                                       url,
                                       `Detected ${className}`,
@@ -550,7 +645,6 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                       </div>
                     </div>
                   )}
-
                   {/* Loading indicator for images */}
                   {loadingImages[event.id] && (
                     <div className="flex items-center justify-center py-8">
