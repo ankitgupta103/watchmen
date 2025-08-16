@@ -1,6 +1,6 @@
 import { fetcherClient } from '@/lib/fetcher-client';
 import { API_BASE_URL } from '@/lib/constants';
-import { MachineTag } from '@/lib/types/machine';
+import { Machine, MachineTag } from '@/lib/types/machine';
 
 export interface TagResponse {
   success: boolean;
@@ -19,6 +19,47 @@ export interface DeleteTagRequest {
   tag_id: number;
   delete_completely?: boolean;
 }
+
+export interface AddExistingTagRequest {
+  organization_uid: string;
+  tag_id: number;
+}
+
+export const getAllTags = async (
+  organizationUid: string,
+  token: string
+): Promise<MachineTag[]> => {
+  try {
+    // Since there's no dedicated tags endpoint, we'll fetch tags from all machines
+    // and aggregate unique tags
+    const url = `${API_BASE_URL}/machines?organization_uid=${organizationUid}`;
+    const response = await fetcherClient<{ data: Machine[] }>(url, token);
+    
+    if (response?.data) {
+      // Extract all unique tags from all machines
+      const allTags: MachineTag[] = [];
+      const tagMap = new Map<number, MachineTag>();
+      
+      response.data.forEach(machine => {
+        if (machine.tags) {
+          machine.tags.forEach(tag => {
+            if (!tagMap.has(tag.id)) {
+              tagMap.set(tag.id, tag);
+              allTags.push(tag);
+            }
+          });
+        }
+      });
+      
+      return allTags;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch all tags:', error);
+    return [];
+  }
+};
 
 export const getMachineTags = async (
   machineId: number,
@@ -59,6 +100,29 @@ export const createOrUpdateTag = async (
     return null;
   } catch (error) {
     console.error('Failed to create/update tag:', error);
+    return null;
+  }
+};
+
+export const addExistingTagToMachine = async (
+  machineId: number,
+  request: AddExistingTagRequest,
+  token: string
+): Promise<MachineTag | null> => {
+  try {
+    const url = `${API_BASE_URL}/machines/${machineId}/tags/manage/`;
+    const response = await fetcherClient<TagResponse>(url, token, {
+      method: 'POST',
+      body: request,
+    });
+    
+    if (response?.success && !Array.isArray(response.data) && response.data && 'id' in response.data) {
+      return response.data as MachineTag;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Failed to add existing tag to machine:', error);
     return null;
   }
 };
