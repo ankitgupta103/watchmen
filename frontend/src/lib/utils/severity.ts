@@ -52,43 +52,37 @@ export function getSeverityLabel(severity: number): {
   label: string;
   className: string;
   description: string;
-  icon: string;
 } {
   switch (severity) {
     case 0:
       return {
-        label: 'No Person',
-        className: 'border-gray-500 bg-gray-400 text-white',
-        description: 'No person detected in the image',
-        icon: '👁️'
+        label: 'LOW',
+        className: 'bg-slate-100 text-slate-700 border border-slate-200',
+        description: 'No person detected in the image'
       };
     case 1:
       return {
-        label: 'Person Detected',
-        className: 'border-blue-500 bg-blue-500 text-white',
-        description: 'Person detected in the image',
-        icon: '👤'
+        label: 'MEDIUM',
+        className: 'bg-blue-100 text-blue-700 border border-blue-200',
+        description: 'Person detected in the image'
       };
     case 2:
       return {
-        label: 'Person + Backpack',
-        className: 'border-orange-600 bg-orange-500 text-white',
-        description: 'Person detected with suspicious item',
-        icon: '⚠️'
+        label: 'HIGH',
+        className: 'bg-orange-100 text-orange-700 border border-orange-200',
+        description: 'Person detected with suspicious item'
       };
     case 3:
       return {
-        label: 'Weapon Detected',
-        className: 'border-red-700 bg-red-600 text-white',
-        description: 'Weapon or dangerous object detected',
-        icon: '🚨'
+        label: 'CRITICAL',
+        className: 'bg-red-100 text-red-700 border border-red-200',
+        description: 'Weapon or dangerous object detected'
       };
     default:
       return {
-        label: 'Unknown',
-        className: 'border-gray-500 bg-gray-400 text-white',
-        description: 'Unable to determine severity',
-        icon: '❓'
+        label: 'UNKNOWN',
+        className: 'bg-gray-100 text-gray-700 border border-gray-200',
+        description: 'Unable to determine severity'
       };
   }
 }
