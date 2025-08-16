@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 import { Machine, MachineTag } from '@/lib/types/machine';
 import useOrganization from '@/hooks/use-organization';
@@ -13,7 +13,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { 
-  getMachineTags, 
   createOrUpdateTag, 
   deleteTag
 } from './tag-api-utils';
@@ -23,66 +22,16 @@ import DevicesTableRow from './devices-table-row';
 
 interface DevicesTableProps {
   machines: Machine[];
+  onRefreshMachines?: () => Promise<void>;
 }
 
-const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
-  const { organizationUid } = useOrganization();
+const DevicesTable: React.FC<DevicesTableProps> = ({ machines, onRefreshMachines }) => {
   const { token } = useToken();
-  const [machinesData, setMachinesData] = useState<Machine[]>(machines);
+  const { organizationUid } = useOrganization();
   const [addTagsModalOpen, setAddTagsModalOpen] = useState<{ machine: Machine; open: boolean } | null>(null);
   const [editTagsModalOpen, setEditTagsModalOpen] = useState<{ machine: Machine; open: boolean } | null>(null);
 
-  useEffect(() => {
-    const loadMachineTags = async () => {
-      if (!organizationUid || !token) return;
-      
-      const updatedMachines = await Promise.all(
-        machines.map(async (machine) => {
-          const tags = await getMachineTags(machine.id, organizationUid, token);
-          return { ...machine, tags };
-        })
-      );
-      
-      setMachinesData(updatedMachines);
-    };
 
-    loadMachineTags();
-  }, [machines, organizationUid, token]);
-
-  const handleAddTags = async (machineId: number, newTags: { name: string; description?: string }[]) => {
-    if (!organizationUid || !token) {
-      console.error('Organization UID or token not found');
-      return;
-    }
-
-    try {
-      const addedTags: MachineTag[] = [];
-      
-      for (const tag of newTags) {
-        const result = await createOrUpdateTag(machineId, {
-          organization_uid: organizationUid,
-          name: tag.name,
-          description: tag.description,
-        }, token);
-        
-        if (result) {
-          addedTags.push(result);
-        }
-      }
-      
-      if (addedTags.length > 0) {
-        setMachinesData(prev => 
-          prev.map(machine => 
-            machine.id === machineId 
-              ? { ...machine, tags: [...(machine.tags || []), ...addedTags] }
-              : machine
-          )
-        );
-      }
-    } catch (error) {
-      console.error('Failed to add tags:', error);
-    }
-  };
 
   const handleDeleteTag = async (machineId: number, tagId: number) => {
     if (!organizationUid || !token) {
@@ -97,14 +46,8 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
         delete_completely: false,
       }, token);
 
-      if (success) {
-        setMachinesData(prev => 
-          prev.map(machine => 
-            machine.id === machineId 
-              ? { ...machine, tags: machine.tags?.filter(tag => tag.id !== tagId) || [] }
-              : machine
-          )
-        );
+      if (success && onRefreshMachines) {
+        await onRefreshMachines();
       }
     } catch (error) {
       console.error('Failed to delete tag:', error);
@@ -143,16 +86,10 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
         }
       }
       
-      // Update local state with final tags
-      setMachinesData(prev => 
-        prev.map(machine => 
-          machine.id === machineId 
-            ? { ...machine, tags: finalTags }
-            : machine
-        )
-      );
-      
-      console.log(`Updated tags for machine ${machineId}`);
+      // Refresh machines data
+      if (onRefreshMachines) {
+        await onRefreshMachines();
+      }
     } catch (error) {
       console.error('Failed to update tags:', error);
     }
@@ -180,7 +117,7 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {machinesData.map((machine) => (
+          {machines.map((machine) => (
             <DevicesTableRow
               key={machine.id}
               machine={machine}
@@ -196,9 +133,14 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
       {addTagsModalOpen && (
         <AddTagsModal
           machine={addTagsModalOpen.machine}
-          onAddTags={handleAddTags}
           isOpen={addTagsModalOpen.open}
           onOpenChange={(open) => setAddTagsModalOpen(open ? addTagsModalOpen : null)}
+          onTagsAdded={() => {
+            // Refresh machines data to show updated tags
+            if (onRefreshMachines) {
+              onRefreshMachines();
+            }
+          }}
         />
       )}
 
