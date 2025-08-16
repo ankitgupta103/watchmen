@@ -1,16 +1,26 @@
 'use client';
 
-import { LayersControl, MapContainer, ScaleControl, ZoomControl } from 'react-leaflet';
+import {
+  LayersControl,
+  MapContainer,
+  ScaleControl,
+  ZoomControl,
+} from 'react-leaflet';
 import ReactLeafletGoogleLayer from 'react-leaflet-google-layer';
+
 import 'leaflet/dist/leaflet.css';
 import './map-styles.css';
 
 import { MAPS_API_KEY } from '@/lib/constants';
+import { MachineEvent } from '@/lib/types/activity';
 import { Machine, MachineData } from '@/lib/types/machine';
-import { calculateMapCenter, calculateOptimalZoom, isMachineOnline } from '@/lib/utils';
+import {
+  calculateMapCenter,
+  calculateOptimalZoom,
+  isMachineOnline,
+} from '@/lib/utils';
 
 import MachineMarker from './machine-marker';
-import { MachineEvent } from '@/lib/types/activity';
 
 interface MapProps {
   machines: Machine[];
@@ -25,13 +35,13 @@ export default function ReactLeafletMap({
 }: MapProps) {
   const center = calculateMapCenter(machines);
   const zoom = calculateOptimalZoom(machines);
-  
+
   // Debug logging
   console.log('🗺️ [MapView] Rendering map with:', {
     machinesCount: machines.length,
     machineEvents: Object.keys(machineEvents).length,
     pulsatingMachines: Object.keys(pulsatingMachines).length,
-    pulsatingMachinesState: pulsatingMachines
+    pulsatingMachinesState: pulsatingMachines,
   });
 
   return (
@@ -60,19 +70,20 @@ export default function ReactLeafletMap({
         const events = machineEvents[machine.id] || [];
         const lastEvent = events[0];
         const isPulsating = pulsatingMachines[machine.id] || false;
-        
+
         console.log(`🔍 [MapView] Creating marker for machine ${machine.id}:`, {
           isPulsating,
           pulsatingMachinesState: pulsatingMachines,
-          machineId: machine.id
+          machineId: machine.id,
         });
-        
+
         const machineData: MachineData = {
           machine_id: machine.id,
           events: events,
           event_count: events.length,
           last_event: lastEvent,
-          last_updated: lastEvent?.timestamp.toISOString() || new Date().toISOString(),
+          last_updated:
+            lastEvent?.timestamp.toISOString() || new Date().toISOString(),
           is_online: isMachineOnline(machine),
           is_pulsating: isPulsating,
           is_critical: lastEvent ? lastEvent.severity >= 3 : false,

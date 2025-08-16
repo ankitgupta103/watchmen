@@ -1,4 +1,4 @@
-import { CroppedImage } from "./machine";
+import { CroppedImage } from './machine';
 
 export interface MachineEvent {
   id: string;
@@ -8,7 +8,6 @@ export interface MachineEvent {
   original_image_path?: string;
   cropped_images?: CroppedImage[];
 }
-
 
 export interface EventMessage {
   image_c_key: string;

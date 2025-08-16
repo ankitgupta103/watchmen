@@ -14,7 +14,7 @@ export default async function LiveFeed() {
     status: string;
     data: Machine[];
   }>(`${API_BASE_URL}/machines?organization_uid=${organization_uid}`, {
-    cache: 'no-store',  
+    cache: 'no-store',
   });
 
   return (

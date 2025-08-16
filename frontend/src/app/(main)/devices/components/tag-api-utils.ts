@@ -1,5 +1,5 @@
-import { fetcherClient } from '@/lib/fetcher-client';
 import { API_BASE_URL } from '@/lib/constants';
+import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine, MachineTag } from '@/lib/types/machine';
 
 export interface TagResponse {
@@ -27,22 +27,22 @@ export interface AddExistingTagRequest {
 
 export const getAllTags = async (
   organizationUid: string,
-  token: string
+  token: string,
 ): Promise<MachineTag[]> => {
   try {
     // Since there's no dedicated tags endpoint, we'll fetch tags from all machines
     // and aggregate unique tags
     const url = `${API_BASE_URL}/machines?organization_uid=${organizationUid}`;
     const response = await fetcherClient<{ data: Machine[] }>(url, token);
-    
+
     if (response?.data) {
       // Extract all unique tags from all machines
       const allTags: MachineTag[] = [];
       const tagMap = new Map<number, MachineTag>();
-      
-      response.data.forEach(machine => {
+
+      response.data.forEach((machine) => {
         if (machine.tags) {
-          machine.tags.forEach(tag => {
+          machine.tags.forEach((tag) => {
             if (!tagMap.has(tag.id)) {
               tagMap.set(tag.id, tag);
               allTags.push(tag);
@@ -50,10 +50,10 @@ export const getAllTags = async (
           });
         }
       });
-      
+
       return allTags;
     }
-    
+
     return [];
   } catch (error) {
     console.error('Failed to fetch all tags:', error);
@@ -64,16 +64,16 @@ export const getAllTags = async (
 export const getMachineTags = async (
   machineId: number,
   organizationUid: string,
-  token: string
+  token: string,
 ): Promise<MachineTag[]> => {
   try {
     const url = `${API_BASE_URL}/machines/${machineId}/tags/?organization_uid=${organizationUid}`;
     const response = await fetcherClient<TagResponse>(url, token);
-    
+
     if (response?.success && Array.isArray(response.data)) {
       return response.data;
     }
-    
+
     return [];
   } catch (error) {
     console.error('Failed to fetch machine tags:', error);
@@ -84,7 +84,7 @@ export const getMachineTags = async (
 export const createOrUpdateTag = async (
   machineId: number,
   request: CreateTagRequest,
-  token: string
+  token: string,
 ): Promise<MachineTag | null> => {
   try {
     const url = `${API_BASE_URL}/machines/${machineId}/tags/manage/`;
@@ -92,11 +92,16 @@ export const createOrUpdateTag = async (
       method: 'POST',
       body: request,
     });
-    
-    if (response?.success && !Array.isArray(response.data) && response.data && 'id' in response.data) {
+
+    if (
+      response?.success &&
+      !Array.isArray(response.data) &&
+      response.data &&
+      'id' in response.data
+    ) {
       return response.data as MachineTag;
     }
-    
+
     return null;
   } catch (error) {
     console.error('Failed to create/update tag:', error);
@@ -107,7 +112,7 @@ export const createOrUpdateTag = async (
 export const addExistingTagToMachine = async (
   machineId: number,
   request: AddExistingTagRequest,
-  token: string
+  token: string,
 ): Promise<MachineTag | null> => {
   try {
     const url = `${API_BASE_URL}/machines/${machineId}/tags/manage/`;
@@ -115,11 +120,16 @@ export const addExistingTagToMachine = async (
       method: 'POST',
       body: request,
     });
-    
-    if (response?.success && !Array.isArray(response.data) && response.data && 'id' in response.data) {
+
+    if (
+      response?.success &&
+      !Array.isArray(response.data) &&
+      response.data &&
+      'id' in response.data
+    ) {
       return response.data as MachineTag;
     }
-    
+
     return null;
   } catch (error) {
     console.error('Failed to add existing tag to machine:', error);
@@ -130,7 +140,7 @@ export const addExistingTagToMachine = async (
 export const deleteTag = async (
   machineId: number,
   request: DeleteTagRequest,
-  token: string
+  token: string,
 ): Promise<boolean> => {
   try {
     const url = `${API_BASE_URL}/machines/${machineId}/tags/manage/`;
@@ -138,7 +148,7 @@ export const deleteTag = async (
       method: 'DELETE',
       body: request,
     });
-    
+
     return response?.success ?? false;
   } catch (error) {
     console.error('Failed to delete tag:', error);

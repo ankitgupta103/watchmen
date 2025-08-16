@@ -199,7 +199,7 @@ export default function HeatMapCalendar({
       try {
         const imagePromises = eventsToFetch.map(async (event) => {
           if (signal.aborted) return;
-          
+
           try {
             let croppedImageUrl: string | null = null;
             let fullImageUrl: string | null = null;
@@ -215,8 +215,15 @@ export default function HeatMapCalendar({
             }
 
             // If no specific keys, try to get from original_image_path
-            if (!croppedImageUrl && !fullImageUrl && event.original_image_path) {
-              fullImageUrl = await getPresignedUrl(event.original_image_path, token);
+            if (
+              !croppedImageUrl &&
+              !fullImageUrl &&
+              event.original_image_path
+            ) {
+              fullImageUrl = await getPresignedUrl(
+                event.original_image_path,
+                token,
+              );
             }
 
             const updatedEvent = {
@@ -234,17 +241,13 @@ export default function HeatMapCalendar({
             });
           } catch (err) {
             if (err instanceof Error && err.name !== 'AbortError') {
-              console.warn(
-                `Image fetch failed for event: ${event.id} ${err}`,
-              );
+              console.warn(`Image fetch failed for event: ${event.id} ${err}`);
             }
             // Mark as loaded even if failed to prevent infinite retries
             const updatedEvent = { ...event, imagesLoaded: true };
             setEvents((prev) => {
               const newDayEvents = [...(prev[dateStr] || [])];
-              const index = newDayEvents.findIndex(
-                (e) => e.id === event.id,
-              );
+              const index = newDayEvents.findIndex((e) => e.id === event.id);
               if (index !== -1) newDayEvents[index] = updatedEvent;
               return { ...prev, [dateStr]: newDayEvents };
             });
@@ -320,7 +323,8 @@ export default function HeatMapCalendar({
     () =>
       (events[selectedDate.toLocaleDateString('en-CA')] || []).sort(
         (a, b) =>
-          new Date(Number(b.timestamp) * 1000).getTime() - new Date(Number(a.timestamp) * 1000).getTime(),
+          new Date(Number(b.timestamp) * 1000).getTime() -
+          new Date(Number(a.timestamp) * 1000).getTime(),
       ),
     [events, selectedDate],
   );
@@ -499,7 +503,7 @@ export default function HeatMapCalendar({
                         <div className="flex flex-wrap gap-1">
                           <Badge
                             variant="secondary"
-                            className="px-1 py-0.5 text-[10px] bg-blue-200 text-blue-700"
+                            className="bg-blue-200 px-1 py-0.5 text-[10px] text-blue-700"
                           >
                             {dayEventsCount} Events
                           </Badge>
@@ -559,7 +563,7 @@ export default function HeatMapCalendar({
                           </div>
                           <Badge
                             variant="outline"
-                            className="text-xs border-gray-300 bg-gray-100 text-gray-700"
+                            className="border-gray-300 bg-gray-100 text-xs text-gray-700"
                           >
                             Event
                           </Badge>
@@ -567,12 +571,17 @@ export default function HeatMapCalendar({
                         <div className="text-xs text-gray-600">
                           Time:{' '}
                           <span className="font-medium">
-                            {new Date(Number(event.timestamp) * 1000).toLocaleTimeString()}
+                            {new Date(
+                              Number(event.timestamp) * 1000,
+                            ).toLocaleTimeString()}
                           </span>
                         </div>
                         {event.eventstr && (
-                          <div className="text-xs text-gray-600 mt-1">
-                            Event: <span className="font-medium">{event.eventstr}</span>
+                          <div className="mt-1 text-xs text-gray-600">
+                            Event:{' '}
+                            <span className="font-medium">
+                              {event.eventstr}
+                            </span>
                           </div>
                         )}
                         <div className="mt-3 grid grid-cols-2 gap-2">

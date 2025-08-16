@@ -10,16 +10,19 @@ interface PresignedUrlResponse {
 export async function getPresignedUrl(
   filename: string,
   token: string | null,
-  bucket: string = 'vyomos'
+  bucket: string = 'vyomos',
 ): Promise<string | null> {
   if (!token || !filename) {
-    console.warn('[PresignedURL] Missing token or filename:', { token: !!token, filename });
+    console.warn('[PresignedURL] Missing token or filename:', {
+      token: !!token,
+      filename,
+    });
     return null;
   }
 
   try {
     console.log('[PresignedURL] Requesting presigned URL for:', filename);
-    
+
     // Use GET request with query parameters
     const queryParams = new URLSearchParams({
       bucket,
@@ -31,7 +34,7 @@ export async function getPresignedUrl(
       token,
       {
         method: 'GET',
-      }
+      },
     );
 
     console.log('s3-presigned-url response', response);
@@ -39,11 +42,19 @@ export async function getPresignedUrl(
     if (response?.status === 200) {
       return response.data;
     } else {
-      console.error('[PresignedURL] Failed to get presigned URL for:', filename, response?.message);
+      console.error(
+        '[PresignedURL] Failed to get presigned URL for:',
+        filename,
+        response?.message,
+      );
       return null;
     }
   } catch (error) {
-    console.error('[PresignedURL] Error requesting presigned URL for:', filename, error);
+    console.error(
+      '[PresignedURL] Error requesting presigned URL for:',
+      filename,
+      error,
+    );
     return null;
   }
 }
@@ -51,13 +62,16 @@ export async function getPresignedUrl(
 export async function getMultiplePresignedUrls(
   filenames: string[],
   token: string | null,
-  bucket: string = 'vyomos'
+  bucket: string = 'vyomos',
 ): Promise<Record<string, string>> {
   if (!token || !filenames.length) {
     return {};
   }
 
-  console.log('[PresignedURL] Requesting multiple presigned URLs:', filenames.length);
+  console.log(
+    '[PresignedURL] Requesting multiple presigned URLs:',
+    filenames.length,
+  );
 
   const urlPromises = filenames.map(async (filename) => {
     const url = await getPresignedUrl(filename, token, bucket);
@@ -65,7 +79,7 @@ export async function getMultiplePresignedUrls(
   });
 
   const results = await Promise.allSettled(urlPromises);
-  
+
   const urlMap: Record<string, string> = {};
   results.forEach((result, index) => {
     if (result.status === 'fulfilled' && result.value.url) {
@@ -75,6 +89,10 @@ export async function getMultiplePresignedUrls(
     }
   });
 
-  console.log('[PresignedURL] Successfully retrieved', Object.keys(urlMap).length, 'URLs');
+  console.log(
+    '[PresignedURL] Successfully retrieved',
+    Object.keys(urlMap).length,
+    'URLs',
+  );
   return urlMap;
 }
