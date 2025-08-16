@@ -495,40 +495,51 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                         <CalendarComponent
                           mode="range"
                           selected={{
-                            from: tempDateRange?.startDate,
-                            to: tempDateRange?.endDate,
+                            from: tempDateRange?.startDate || (selectedPreset === 'custom' ? dateRange.startDate : undefined),
+                            to: tempDateRange?.endDate || (selectedPreset === 'custom' ? dateRange.endDate : undefined),
                           }}
                           onSelect={handleCustomDateSelect}
                           numberOfMonths={2}
                           className="rounded-md"
                         />
                         
-                        {tempDateRange && (
+                        {(tempDateRange || selectedPreset === 'custom') && (
                           <div className="mt-4 pt-4 border-t flex items-center justify-between">
                             <div className="text-sm text-gray-600">
-                              {formatDateForAPI(tempDateRange.startDate)} - {formatDateForAPI(tempDateRange.endDate)}
+                              {tempDateRange 
+                                ? `${formatDateForAPI(tempDateRange.startDate)} - ${formatDateForAPI(tempDateRange.endDate)}`
+                                : `Current: ${formatDateForAPI(dateRange.startDate)} - ${formatDateForAPI(dateRange.endDate)}`
+                              }
                             </div>
                             <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setTempDateRange(null)}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={clearCustomDateRange}
-                              >
-                                Clear
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={applyCustomDateRange}
-                              >
-                                Apply
-                              </Button>
+                              {tempDateRange ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setTempDateRange(null)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearCustomDateRange}
+                                  >
+                                    Clear
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={applyCustomDateRange}
+                                  >
+                                    Apply
+                                  </Button>
+                                </>
+                              ) : (
+                                <div className="text-xs text-gray-500">
+                                  Select new dates to modify
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
