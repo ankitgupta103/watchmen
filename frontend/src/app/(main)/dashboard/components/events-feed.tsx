@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -102,7 +103,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
+  const [selectedSeverities, setSelectedSeverities] = useState<number[]>([]);
   const [selectedMachine, setSelectedMachine] = useState<string>('all');
 
   // Image modal state
@@ -133,9 +134,8 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
     }
     
     // Filter by severity
-    if (selectedSeverity !== 'all') {
-      const severityLevel = parseInt(selectedSeverity);
-      filteredEvents = filteredEvents.filter(event => event.severity === severityLevel);
+    if (selectedSeverities.length > 0) {
+      filteredEvents = filteredEvents.filter(event => selectedSeverities.includes(event.severity));
     }
     
     // Filter by machine
@@ -158,7 +158,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
     }
     
     return filteredEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [events, searchQuery, selectedSeverity, selectedMachine, selectedTags, machines]);
+  }, [events, searchQuery, selectedSeverities, selectedMachine, selectedTags, machines]);
 
   const fetchEvents = useCallback(async (chunk: number, append: boolean = false) => {
     if (!token || loading || !machines.length) return;
@@ -352,9 +352,18 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
   // Clear all filters
   const clearAllFilters = useCallback(() => {
     setSearchQuery('');
-    setSelectedSeverity('all');
+    setSelectedSeverities([]);
     setSelectedMachine('all');
     setSelectedTags([]);
+  }, []);
+
+  // Handle severity checkbox change
+  const handleSeverityChange = useCallback((severity: number, checked: boolean) => {
+    setSelectedSeverities(prev => 
+      checked 
+        ? [...prev, severity]
+        : prev.filter(s => s !== severity)
+    );
   }, []);
 
   // Initial fetch and refetch when date range changes
@@ -415,18 +424,62 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
             {/* Right side - Filters */}
             <div className="flex items-center gap-3 flex-wrap">
               {/* Criticality Filter */}
-              <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="All Criticality" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Criticality</SelectItem>
-                  <SelectItem value="0">Low</SelectItem>
-                  <SelectItem value="1">Medium</SelectItem>
-                  <SelectItem value="2">High</SelectItem>
-                  <SelectItem value="3">Critical</SelectItem>
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-44 justify-start">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <span className="truncate">
+                      {selectedSeverities.length === 0 
+                        ? 'All Criticality' 
+                        : selectedSeverities.length === 1
+                        ? ['Low', 'Medium', 'High', 'Critical'][selectedSeverities[0]]
+                        : `${selectedSeverities.length} selected`
+                      }
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-3" align="start">
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm">Criticality Levels</h4>
+                    <div className="space-y-2">
+                      {[
+                        { value: 0, label: 'Low' },
+                        { value: 1, label: 'Medium' },
+                        { value: 2, label: 'High' },
+                        { value: 3, label: 'Critical' }
+                      ].map((severity) => (
+                        <div key={severity.value} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`severity-${severity.value}`}
+                            checked={selectedSeverities.includes(severity.value)}
+                            onCheckedChange={(checked) => 
+                              handleSeverityChange(severity.value, checked as boolean)
+                            }
+                          />
+                          <label
+                            htmlFor={`severity-${severity.value}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {severity.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    {selectedSeverities.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedSeverities([])}
+                          className="h-7 text-xs"
+                        >
+                          Clear All
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               {/* Machine Filter */}
               <Select value={selectedMachine} onValueChange={setSelectedMachine}>
@@ -553,7 +606,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         </div>
 
         {/* Results Summary */}
-        {(searchQuery || selectedSeverity !== 'all' || selectedMachine !== 'all' || selectedTags.length > 0) && (
+        {(searchQuery || selectedSeverities.length > 0 || selectedMachine !== 'all' || selectedTags.length > 0) && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -561,11 +614,13 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
                 <span className="text-sm font-medium text-blue-900">
                   Showing {sortedEvents.length} events
                   {searchQuery && ` matching "${searchQuery}"`}
-                  {selectedSeverity !== 'all' && ` with ${
-                    selectedSeverity === '0' ? 'Low' :
-                    selectedSeverity === '1' ? 'Medium' :
-                    selectedSeverity === '2' ? 'High' :
-                    'Critical'
+                  {selectedSeverities.length > 0 && ` with ${
+                    selectedSeverities.map(s => 
+                      s === 0 ? 'Low' :
+                      s === 1 ? 'Medium' :
+                      s === 2 ? 'High' :
+                      'Critical'
+                    ).join(', ')
                   } criticality`}
                   {selectedMachine !== 'all' && ` from ${machines.find(m => m.id.toString() === selectedMachine)?.name || 'selected machine'}`}
                   {selectedTags.length > 0 && ` with selected tags`}
@@ -584,7 +639,7 @@ export default function EventsFeed({ machines, orgId }: EventsFeedProps) {
         )}
 
         {/* No Results Message */}
-        {sortedEvents.length === 0 && (searchQuery || selectedSeverity !== 'all' || selectedMachine !== 'all' || selectedTags.length > 0) && (
+        {sortedEvents.length === 0 && (searchQuery || selectedSeverities.length > 0 || selectedMachine !== 'all' || selectedTags.length > 0) && (
           <div className="text-center py-12">
             <Filter className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
