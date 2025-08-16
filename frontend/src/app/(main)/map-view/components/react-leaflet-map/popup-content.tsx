@@ -99,7 +99,6 @@ export default function PopupContent({ machine, machineData, isOnline }: PopupCo
           {/* Severity Badge */}
           {severityInfo && (
             <div className="flex items-center gap-2">
-              <span className="text-2xl">{severityInfo.icon}</span>
               <Badge 
                 className={cn(
                   'text-xs font-medium',
