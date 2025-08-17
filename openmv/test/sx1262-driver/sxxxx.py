@@ -89,6 +89,7 @@ class SX1262:
             data = bytes(data)
         self.spi.write(data)
         self.nss.on()   # Deselect device
+        time.sleep_ms(1)  # Small delay after SPI transaction
     
     def spi_read(self, cmd, length):
         """Read data via SPI"""
@@ -103,66 +104,134 @@ class SX1262:
         # Read response
         data = self.spi.read(length, 0x00)
         self.nss.on()   # Deselect device
+        time.sleep_ms(1)  # Small delay after SPI transaction
         return data
+    
+    def get_status(self):
+        """Get device status for debugging"""
+        try:
+            status = self.spi_read([0xC0, 0x00], 1)
+            return status[0] if status else 0
+        except:
+            return 0
     
     def init_lora(self):
         """Initialize LoRa configuration"""
         print("Initializing SX1262...")
         
-        # Set standby mode
+        # Check initial status
+        status = self.get_status()
+        print(f"Initial status: 0x{status:02X}")
+        
+        # Set standby mode (STDBY_RC)
         self.spi_write([self.CMD_SET_STANDBY, 0x00])
+        time.sleep_ms(50)
+        
+        # Check if we're in standby
+        status = self.get_status()
+        print(f"After standby command: 0x{status:02X}")
+        
+        # Set regulator mode to LDO (more reliable than DC-DC for initial testing)
+        self.spi_write([self.CMD_SET_REGULATOR_MODE, 0x00])  # 0x00 = LDO only
         time.sleep_ms(10)
         
-        # Set regulator mode (DC-DC)
-        self.spi_write([self.CMD_SET_REGULATOR_MODE, 0x01])
-        
-        # Calibrate
+        # Calibrate all blocks - IMPORTANT for proper operation
+        print("Calibrating...")
         self.spi_write([self.CMD_CALIBRATE, 0x7F])
-        time.sleep_ms(10)
+        time.sleep_ms(500)  # Give more time for calibration
         
-        # Set PA config for SX1262
+        # Check status after calibration
+        status = self.get_status()
+        print(f"After calibration: 0x{status:02X}")
+        
+        # CRITICAL: Set PA config for SX1262 BEFORE other RF settings
+        print("Setting PA config...")
         self.spi_write([self.CMD_SET_PA_CONFIG, 0x04, 0x07, 0x00, 0x01])
+        time.sleep_ms(10)
         
         # Set packet type to LoRa
+        print("Setting packet type...")
         self.spi_write([self.CMD_SET_PACKET_TYPE, self.PACKET_TYPE_LORA])
+        time.sleep_ms(10)
         
         # Set RF frequency (868 MHz)
-        freq_raw = int((868000000 * (1 << 25)) / 32000000)
+        freq_raw = int((868000000 * 33554432) // 32000000)
+        print(f"Setting frequency: {freq_raw} (0x{freq_raw:08X})")
         self.spi_write([self.CMD_SET_RF_FREQUENCY, 
                        (freq_raw >> 24) & 0xFF,
                        (freq_raw >> 16) & 0xFF, 
                        (freq_raw >> 8) & 0xFF,
                        freq_raw & 0xFF])
+        time.sleep_ms(10)
         
-        # Set TX power (22 dBm) and ramp time
-        self.spi_write([self.CMD_SET_TX_PARAMS, 22, 0x02])  # 22dBm, 40us ramp
-        
-        # Set modulation params (SF7, BW125, CR4/5, LDRO off)
+        # Set modulation params - MUST be done before packet params
+        print("Setting modulation params...")
         self.spi_write([self.CMD_SET_MODULATION_PARAMS, 
                        0x07,  # SF7
-                       0x04,  # BW125
+                       0x04,  # BW125kHz
                        0x01,  # CR4/5
                        0x00]) # LDRO off
+        time.sleep_ms(10)
         
-        # Set packet params (12 symbols preamble, explicit header, 255 max payload, CRC on, normal IQ)
+        # Set packet params
+        print("Setting packet params...")
         self.spi_write([self.CMD_SET_PACKET_PARAMS,
-                       0x00, 0x0C,  # Preamble length (12)
+                       0x00, 0x08,  # Preamble length (8 symbols)
                        0x00,        # Explicit header
-                       0xFF,        # Payload length (255 max)
+                       0x20,        # Payload length (32 bytes default)
                        0x01,        # CRC on
                        0x00])       # Normal IQ
+        time.sleep_ms(10)
         
         # Set buffer base addresses
+        print("Setting buffer addresses...")
         self.spi_write([self.CMD_SET_BUFFER_BASE_ADDRESS, 0x00, 0x00])
+        time.sleep_ms(10)
         
-        # Set DIO IRQ params
+        # Set TX power (start with lower power for testing)
+        print("Setting TX power...")
+        self.spi_write([self.CMD_SET_TX_PARAMS, 10, 0x02])  # 10dBm, 40us ramp
+        time.sleep_ms(10)
+        
+        # Configure DIO IRQ params
+        print("Setting IRQ params...")
         self.spi_write([self.CMD_SET_DIO_IRQ_PARAMS,
-                       0x02, 0x03,  # IRQ mask (TX_DONE | RX_DONE | TIMEOUT)
-                       0x02, 0x03,  # DIO1 mask
-                       0x00, 0x00,  # DIO2 mask
+                       0x03, 0xFF,  # IRQ mask (enable TX_DONE, RX_DONE, TIMEOUT)
+                       0x03, 0xFF,  # DIO1 mask
+                       0x00, 0x00,  # DIO2 mask  
                        0x00, 0x00]) # DIO3 mask
+        time.sleep_ms(10)
         
-        print("SX1262 initialized successfully!")
+        # Clear any pending IRQs
+        self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
+        time.sleep_ms(10)
+        
+        # Test going to FS mode (intermediate step to TX)
+        print("Testing FS mode...")
+        self.spi_write([0xC1])  # SetFs command
+        time.sleep_ms(50)
+        
+        status = self.get_status()
+        fs_mode = (status >> 4) & 0x7
+        print(f"FS mode test - Status: 0x{status:02X}, Mode: {fs_mode}")
+        
+        # Return to standby
+        self.spi_write([self.CMD_SET_STANDBY, 0x00])
+        time.sleep_ms(10)
+        
+        # Final status check
+        status = self.get_status()
+        print(f"Final status: 0x{status:02X}")
+        chip_mode = (status >> 4) & 0x7
+        cmd_status = (status >> 1) & 0x7
+        print(f"Chip mode: {chip_mode}, Command status: {cmd_status}")
+        
+        if cmd_status == 1:  # Command success
+            print("SX1262 initialized successfully!")
+        else:
+            print(f"WARNING: Command status indicates issue: {cmd_status}")
+        
+        return cmd_status == 1
     
     def send_data(self, data):
         """Send data via LoRa"""
@@ -171,45 +240,96 @@ class SX1262:
         
         print(f"Sending: {data}")
         
+        # Ensure we're in standby mode first
+        self.spi_write([self.CMD_SET_STANDBY, 0x00])
+        time.sleep_ms(10)
+        
+        # Clear any pending IRQs
+        self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
+        time.sleep_ms(10)
+        
         # Write data to buffer
         cmd = [self.CMD_WRITE_BUFFER, 0x00] + list(data)
         self.spi_write(cmd)
+        time.sleep_ms(10)
         
-        # Update packet params with actual payload length
+        # Update packet params with actual payload length (keep it simple)
         self.spi_write([self.CMD_SET_PACKET_PARAMS,
-                       0x00, 0x0C,  # Preamble length
+                       0x00, 0x08,  # Preamble length (8 symbols)
                        0x00,        # Explicit header
                        len(data),   # Actual payload length
                        0x01,        # CRC on
                        0x00])       # Normal IQ
+        time.sleep_ms(10)
         
-        # Set TX mode with timeout (5 seconds)
-        timeout = 5000000 // 15.625  # Convert to internal units
+        # Check status before TX
+        status = self.get_status()
+        print(f"Status before TX: 0x{status:02X}")
+        
+        # Set TX mode with shorter timeout (3 seconds)
+        timeout = int(3000000 // 15.625)  # Convert to internal units
         self.spi_write([self.CMD_SET_TX,
                        (timeout >> 16) & 0xFF,
                        (timeout >> 8) & 0xFF,
                        timeout & 0xFF])
         
-        # Wait for TX done
-        start_time = time.ticks_ms()
-        while time.ticks_diff(time.ticks_ms(), start_time) < 5000:
-            if self.dio1.value():
-                # Check IRQ status
-                irq_status = self.spi_read([self.CMD_GET_IRQ_STATUS, 0x00], 3)
-                irq = (irq_status[1] << 8) | irq_status[2]
-                
-                if irq & self.IRQ_TX_DONE:
-                    print("TX Done!")
-                    # Clear IRQ
-                    self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0x02, 0x03])
-                    return True
-                elif irq & self.IRQ_TIMEOUT:
-                    print("TX Timeout!")
-                    self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0x02, 0x03])
-                    return False
-            time.sleep_ms(10)
+        print("TX command sent, waiting for completion...")
         
-        print("TX failed - no response")
+        # Wait a moment for the command to be processed
+        time.sleep_ms(100)
+        
+        # Check if we entered TX mode
+        status = self.get_status()
+        chip_mode = (status >> 4) & 0x7
+        cmd_status = (status >> 1) & 0x7
+        print(f"Status after TX command: 0x{status:02X} (mode: {chip_mode}, cmd: {cmd_status})")
+        
+        if chip_mode != 6:  # 6 = TX mode
+            print(f"ERROR: Device not in TX mode! Current mode: {chip_mode}")
+            return False
+        
+        # Wait for TX done with monitoring
+        start_time = time.ticks_ms()
+        last_check = 0
+        
+        while time.ticks_diff(time.ticks_ms(), start_time) < 5000:  # 5 second timeout
+            current_time = time.ticks_diff(time.ticks_ms(), start_time)
+            
+            # Check DIO1 state
+            dio1_state = self.dio1.value()
+            
+            # Print status every second
+            if current_time - last_check >= 1000:
+                status = self.get_status()
+                mode = (status >> 4) & 0x7
+                print(f"Time: {current_time}ms, DIO1: {dio1_state}, Mode: {mode}")
+                last_check = current_time
+            
+            if dio1_state:
+                # Check IRQ status
+                try:
+                    irq_data = self.spi_read([self.CMD_GET_IRQ_STATUS, 0x00], 3)
+                    irq = (irq_data[1] << 8) | irq_data[2]
+                    print(f"IRQ Status: 0x{irq:04X}")
+                    
+                    if irq & self.IRQ_TX_DONE:
+                        print("TX Done!")
+                        # Clear IRQ
+                        self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
+                        return True
+                    elif irq & self.IRQ_TIMEOUT:
+                        print("TX Timeout!")
+                        self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
+                        return False
+                except Exception as e:
+                    print(f"Error reading IRQ: {e}")
+            
+            time.sleep_ms(100)
+        
+        print("TX failed - no response within timeout")
+        # Clear any IRQs and return to standby
+        self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
+        self.spi_write([self.CMD_SET_STANDBY, 0x00])
         return False
     
     def receive_data(self, timeout_ms=30000):
@@ -217,7 +337,7 @@ class SX1262:
         print("Listening for data...")
         
         # Set RX mode with timeout
-        timeout = timeout_ms * 1000 // 15.625  # Convert to internal units
+        timeout = int(timeout_ms * 1000 // 15.625)  # Convert to internal units
         if timeout > 0xFFFFFF:
             timeout = 0xFFFFFF
             
@@ -289,4 +409,4 @@ def main():
         print(f"Error: {e}")
 
 # Uncomment to run the main function
-# main()
+main()
