@@ -2,7 +2,7 @@ import time
 from machine import SPI, Pin
 
 class SX1262:
-    """SX1262 LoRa driver for OpenMV RT1062 - SPI Bus 1 Configuration"""
+    """SX1262 LoRa driver - Diagnostic version for transmission debugging"""
     
     # Command opcodes
     CMD_SET_STANDBY = 0x80
@@ -34,20 +34,20 @@ class SX1262:
     IRQ_TX_DONE = 0x0001
     IRQ_RX_DONE = 0x0002
     IRQ_TIMEOUT = 0x0200
+    IRQ_PREAMBLE_DETECTED = 0x0004
+    IRQ_SYNC_WORD_VALID = 0x0008
+    IRQ_HEADER_VALID = 0x0010
+    IRQ_HEADER_ERR = 0x0020
+    IRQ_CRC_ERR = 0x0040
+    IRQ_CAD_DONE = 0x0080
+    IRQ_CAD_DETECTED = 0x0100
     
     def __init__(self, nss_pin='P3', reset_pin='P6', busy_pin='P7', dio1_pin='P13'):
-        """
-        Initialize SX1262 with OpenMV RT1062 - SPI Bus 1
-        Your connections:
-        P0 = MOSI, P1 = MISO, P2 = SCLK, P3 = NSS/CS
-        P6 = RESET, P7 = BUSY, P13 = DIO1
-        """
+        """Initialize SX1262 with diagnostic features"""
         
-        print("=== Initializing SX1262 on OpenMV RT1062 ===")
-        print("SPI Bus 1: P0=MOSI, P1=MISO, P2=SCLK, P3=NSS")
-        print(f"Control pins: RESET={reset_pin}, BUSY={busy_pin}, DIO1={dio1_pin}")
+        print("=== SX1262 Diagnostic Initialization ===")
         
-        # Initialize SPI Bus 1 (matches your connections)
+        # Initialize SPI Bus 1
         self.spi = SPI(1, baudrate=1000000, polarity=0, phase=0, bits=8, firstbit=SPI.MSB)
         
         # Initialize control pins
@@ -57,38 +57,30 @@ class SX1262:
         self.dio1 = Pin(dio1_pin, Pin.IN)
         
         # Set initial pin states
-        self.nss.on()    # NSS high (deselected)
-        self.reset.on()  # Reset inactive (high)
+        self.nss.on()
+        self.reset.on()
         
-        print("Hardware pins initialized")
-        
-        # Perform hardware reset and initialization
+        # Reset and initialize
         self.hardware_reset()
         success = self.init_lora()
         
         if success:
-            print("✓ SX1262 initialization completed successfully!")
+            print("✓ Diagnostic initialization completed!")
         else:
-            print("✗ SX1262 initialization failed!")
+            print("✗ Diagnostic initialization failed!")
     
     def hardware_reset(self):
-        """Perform hardware reset sequence"""
-        print("Performing hardware reset...")
-        
-        # Reset sequence
-        self.reset.off()  # Reset active (low)
-        time.sleep_ms(20)  # Hold reset for 20ms
-        self.reset.on()   # Release reset (high)
-        time.sleep_ms(50)  # Wait for reset to complete
-        
-        # Wait for device to be ready
-        if self.wait_busy():
-            print("✓ Hardware reset completed")
-        else:
-            print("⚠ Warning: Device still busy after reset")
+        """Hardware reset with status monitoring"""
+        print("Hardware reset...")
+        self.reset.off()
+        time.sleep_ms(20)
+        self.reset.on()
+        time.sleep_ms(50)
+        self.wait_busy()
+        print("✓ Reset completed")
     
     def wait_busy(self, timeout_ms=1000):
-        """Wait for BUSY pin to go low"""
+        """Wait for BUSY with status reporting"""
         start_time = time.ticks_ms()
         while self.busy.value():
             if time.ticks_diff(time.ticks_ms(), start_time) > timeout_ms:
@@ -98,52 +90,81 @@ class SX1262:
         return True
     
     def spi_transaction(self, data_out, read_length=0):
-        """Perform complete SPI transaction with proper timing"""
-        
-        # Wait for device to be ready
+        """SPI transaction with enhanced debugging"""
         if not self.wait_busy():
-            print("ERROR: Device busy before SPI transaction")
+            print("ERROR: Device busy before SPI")
             return None
         
-        # Convert data to bytes if needed
         if isinstance(data_out, list):
             data_out = bytes(data_out)
         
-        # Start transaction
-        self.nss.off()  # Select device
-        time.sleep_us(1)  # Brief setup time
+        self.nss.off()
+        time.sleep_us(1)
         
         try:
-            # Write command/data
             self.spi.write(data_out)
-            
-            # Read response if requested
             if read_length > 0:
                 response = self.spi.read(read_length, 0x00)
                 time.sleep_us(1)
-                self.nss.on()  # Deselect device
-                time.sleep_us(10)  # Brief hold time
+                self.nss.on()
+                time.sleep_us(10)
                 return response
             else:
                 time.sleep_us(1)
-                self.nss.on()  # Deselect device
+                self.nss.on()
                 time.sleep_us(10)
                 return True
-                
         except Exception as e:
-            print(f"SPI transaction error: {e}")
-            self.nss.on()  # Ensure deselection
+            print(f"SPI error: {e}")
+            self.nss.on()
             return None
     
     def get_status(self):
-        """Get device status register"""
+        """Get status with detailed decoding"""
         response = self.spi_transaction([self.CMD_GET_STATUS, 0x00], 1)
         if response:
-            return response[0]
-        return 0
+            status = response[0]
+            mode = (status >> 4) & 0x7
+            cmd_status = (status >> 1) & 0x7
+            
+            mode_names = {0: "SLEEP", 1: "STBY_RC", 2: "STBY_XOSC", 3: "FS", 4: "RX", 5: "TX"}
+            cmd_names = {0: "Reserved", 1: "RFU", 2: "Data Available", 3: "Timeout", 4: "Processing Error", 5: "Execution Failure", 6: "TX Done"}
+            
+            return {
+                'raw': status,
+                'mode': mode,
+                'mode_name': mode_names.get(mode, f"Unknown({mode})"),
+                'cmd_status': cmd_status,
+                'cmd_name': cmd_names.get(cmd_status, f"Unknown({cmd_status})")
+            }
+        return None
+    
+    def get_irq_status(self):
+        """Get IRQ status with detailed decoding"""
+        response = self.spi_transaction([self.CMD_GET_IRQ_STATUS, 0x00], 3)
+        if response and len(response) >= 3:
+            irq_flags = (response[1] << 8) | response[2]
+            
+            active_irqs = []
+            if irq_flags & self.IRQ_TX_DONE: active_irqs.append("TX_DONE")
+            if irq_flags & self.IRQ_RX_DONE: active_irqs.append("RX_DONE")
+            if irq_flags & self.IRQ_TIMEOUT: active_irqs.append("TIMEOUT")
+            if irq_flags & self.IRQ_PREAMBLE_DETECTED: active_irqs.append("PREAMBLE")
+            if irq_flags & self.IRQ_SYNC_WORD_VALID: active_irqs.append("SYNC_WORD")
+            if irq_flags & self.IRQ_HEADER_VALID: active_irqs.append("HEADER_VALID")
+            if irq_flags & self.IRQ_HEADER_ERR: active_irqs.append("HEADER_ERR")
+            if irq_flags & self.IRQ_CRC_ERR: active_irqs.append("CRC_ERR")
+            if irq_flags & self.IRQ_CAD_DONE: active_irqs.append("CAD_DONE")
+            if irq_flags & self.IRQ_CAD_DETECTED: active_irqs.append("CAD_DETECTED")
+            
+            return {
+                'raw': irq_flags,
+                'active': active_irqs
+            }
+        return None
     
     def get_device_errors(self):
-        """Get device error flags"""
+        """Get device errors"""
         response = self.spi_transaction([self.CMD_GET_DEVICE_ERRORS, 0x00], 3)
         if response and len(response) >= 3:
             errors = (response[1] << 8) | response[2]
@@ -151,417 +172,299 @@ class SX1262:
         return 0
     
     def clear_device_errors(self):
-        """Clear all device error flags"""
+        """Clear device errors"""
         return self.spi_transaction([self.CMD_CLEAR_DEVICE_ERRORS, 0x00, 0x00])
     
-    def check_device_communication(self):
-        """Verify device is responding to SPI commands"""
-        print("Checking device communication...")
+    def print_status(self, prefix=""):
+        """Print comprehensive status information"""
+        status = self.get_status()
+        irq = self.get_irq_status()
+        errors = self.get_device_errors()
+        dio1_state = self.dio1.value()
         
-        for attempt in range(5):
-            status = self.get_status()
-            if status != 0:
-                mode = (status >> 4) & 0x7
-                cmd_status = (status >> 1) & 0x7
-                print(f"✓ Device responds: Status=0x{status:02X}, Mode={mode}, CmdStatus={cmd_status}")
-                
-                # Check for errors
-                errors = self.get_device_errors()
-                if errors:
-                    print(f"⚠ Device errors detected: 0x{errors:04X}")
-                    self.clear_device_errors()
-                    
-                return True
-            else:
-                print(f"  Attempt {attempt + 1}: No response (status=0x{status:02X})")
-                time.sleep_ms(100)
-        
-        print("✗ ERROR: Device not responding to SPI commands!")
-        print("Check your wiring:")
-        print("  VCC  → 3.3V")
-        print("  GND  → GND") 
-        print("  P0   → MOSI")
-        print("  P1   → MISO")
-        print("  P2   → SCLK")
-        print("  P3   → NSS/CS")
-        print("  P6   → RESET")
-        print("  P7   → BUSY")
-        print("  P13  → DIO1")
-        return False
+        if status:
+            print(f"{prefix}Status: 0x{status['raw']:02X} - {status['mode_name']} - {status['cmd_name']}")
+        if irq:
+            print(f"{prefix}IRQ: 0x{irq['raw']:04X} - {irq['active']}")
+        if errors:
+            print(f"{prefix}Errors: 0x{errors:04X}")
+        print(f"{prefix}DIO1: {dio1_state}")
     
     def init_lora(self):
-        """Initialize LoRa modem with comprehensive error checking"""
-        print("\n=== Starting LoRa Initialization ===")
+        """Simplified initialization for testing"""
+        print("Starting LoRa initialization...")
         
-        # Step 1: Check basic communication
-        if not self.check_device_communication():
-            return False
-        
-        # Step 2: Set standby mode (RC oscillator)
-        print("Setting STDBY_RC mode...")
-        if not self.spi_transaction([self.CMD_SET_STANDBY, 0x00]):
-            print("ERROR: Failed to set STDBY_RC mode")
-            return False
+        # Basic initialization steps
+        self.spi_transaction([self.CMD_SET_STANDBY, 0x00])
         time.sleep_ms(10)
         
-        # Step 3: Set regulator mode (LDO for stability)
-        print("Setting regulator mode (LDO)...")
-        if not self.spi_transaction([self.CMD_SET_REGULATOR_MODE, 0x00]):
-            print("ERROR: Failed to set regulator mode")
-            return False
+        self.clear_device_errors()
+        
+        self.spi_transaction([self.CMD_SET_REGULATOR_MODE, 0x00])
         time.sleep_ms(10)
         
-        # Step 4: Calibrate all blocks
-        print("Calibrating device...")
-        if not self.spi_transaction([self.CMD_CALIBRATE, 0x7F]):  # Calibrate all
-            print("ERROR: Failed to start calibration")
-            return False
-        time.sleep_ms(1000)  # Wait for calibration to complete
+        self.spi_transaction([self.CMD_CALIBRATE, 0x7F])
+        time.sleep_ms(500)
         
-        # Step 5: Configure PA for SX1262
-        print("Configuring Power Amplifier...")
-        # paDutyCycle=0x04, hpMax=0x07, deviceSel=0x00 (SX1262), paLut=0x01
-        if not self.spi_transaction([self.CMD_SET_PA_CONFIG, 0x04, 0x07, 0x00, 0x01]):
-            print("ERROR: Failed to configure PA")
-            return False
+        self.spi_transaction([self.CMD_SET_PA_CONFIG, 0x04, 0x07, 0x00, 0x01])
         time.sleep_ms(10)
         
-        # Step 6: Set packet type to LoRa
-        print("Setting packet type to LoRa...")
-        if not self.spi_transaction([self.CMD_SET_PACKET_TYPE, self.PACKET_TYPE_LORA]):
-            print("ERROR: Failed to set packet type")
-            return False
+        self.spi_transaction([self.CMD_SET_PACKET_TYPE, self.PACKET_TYPE_LORA])
         time.sleep_ms(10)
         
-        # Step 7: Set RF frequency (868 MHz)
-        print("Setting RF frequency to 868 MHz...")
+        # Set frequency
         freq_raw = int((868000000 * (2**25)) // 32000000)
-        freq_bytes = [
-            self.CMD_SET_RF_FREQUENCY,
-            (freq_raw >> 24) & 0xFF,
-            (freq_raw >> 16) & 0xFF, 
-            (freq_raw >> 8) & 0xFF,
-            freq_raw & 0xFF
-        ]
-        if not self.spi_transaction(freq_bytes):
-            print("ERROR: Failed to set frequency")
-            return False
+        self.spi_transaction([self.CMD_SET_RF_FREQUENCY, 
+                             (freq_raw >> 24) & 0xFF, (freq_raw >> 16) & 0xFF, 
+                             (freq_raw >> 8) & 0xFF, freq_raw & 0xFF])
         time.sleep_ms(10)
         
-        # Step 8: Set modulation parameters (SF7, BW125, CR4/5)
-        print("Setting modulation parameters...")
-        if not self.spi_transaction([self.CMD_SET_MODULATION_PARAMS, 0x07, 0x04, 0x01, 0x00]):
-            print("ERROR: Failed to set modulation parameters")
-            return False
+        # Set modulation
+        self.spi_transaction([self.CMD_SET_MODULATION_PARAMS, 0x07, 0x04, 0x01, 0x00])
         time.sleep_ms(10)
         
-        # Step 9: Set packet parameters
-        print("Setting packet parameters...")
-        packet_params = [
-            self.CMD_SET_PACKET_PARAMS,
-            0x00, 0x0C,  # Preamble length: 12 symbols
-            0x00,        # Explicit header
-            0xFF,        # Max payload length
-            0x01,        # CRC enabled
-            0x00         # Standard IQ
-        ]
-        if not self.spi_transaction(packet_params):
-            print("ERROR: Failed to set packet parameters")
-            return False
+        # Set packet params
+        self.spi_transaction([self.CMD_SET_PACKET_PARAMS, 0x00, 0x0C, 0x00, 0xFF, 0x01, 0x00])
         time.sleep_ms(10)
         
-        # Step 10: Set buffer base addresses
-        print("Setting buffer base addresses...")
-        if not self.spi_transaction([self.CMD_SET_BUFFER_BASE_ADDRESS, 0x00, 0x00]):
-            print("ERROR: Failed to set buffer addresses")
-            return False
+        # Set buffer addresses
+        self.spi_transaction([self.CMD_SET_BUFFER_BASE_ADDRESS, 0x00, 0x00])
         time.sleep_ms(10)
         
-        # Step 11: Set TX parameters (14dBm power)
-        print("Setting TX parameters...")
-        if not self.spi_transaction([self.CMD_SET_TX_PARAMS, 14, 0x02]):
-            print("ERROR: Failed to set TX parameters")
-            return False
+        # Set TX params
+        self.spi_transaction([self.CMD_SET_TX_PARAMS, 14, 0x02])
         time.sleep_ms(10)
         
-        # Step 12: Configure DIO and IRQ
-        print("Configuring IRQ and DIO pins...")
-        irq_config = [
-            self.CMD_SET_DIO_IRQ_PARAMS,
-            0x03, 0xFF,  # IRQ mask (TX_DONE | RX_DONE | TIMEOUT)
-            0x03, 0xFF,  # DIO1 mask (same as IRQ mask)
-            0x00, 0x00,  # DIO2 mask (none)
-            0x00, 0x00   # DIO3 mask (none)
-        ]
-        if not self.spi_transaction(irq_config):
-            print("ERROR: Failed to configure IRQ")
-            return False
+        # Set IRQ params - Enable all IRQs on DIO1
+        self.spi_transaction([self.CMD_SET_DIO_IRQ_PARAMS,
+                             0xFF, 0xFF,  # Enable all IRQs
+                             0xFF, 0xFF,  # Map all to DIO1
+                             0x00, 0x00,  # None to DIO2
+                             0x00, 0x00]) # None to DIO3
         time.sleep_ms(10)
         
-        # Step 13: Clear any pending IRQs
-        print("Clearing IRQ flags...")
-        if not self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF]):
-            print("ERROR: Failed to clear IRQ flags")
-            return False
+        self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
         
-        # Final verification
-        final_status = self.get_status()
-        print(f"Initialization complete. Final status: 0x{final_status:02X}")
-        
+        print("✓ Basic initialization completed")
+        self.print_status("Init: ")
         return True
     
-    def send_data(self, data):
-        """Send data via LoRa"""
+    def send_data_diagnostic(self, data):
+        """Send data with comprehensive diagnostics"""
         if isinstance(data, str):
             data = data.encode('utf-8')
         
-        print(f"Sending {len(data)} bytes: {data}")
+        print(f"\n=== DIAGNOSTIC TRANSMISSION ===")
+        print(f"Data: {data} ({len(data)} bytes)")
         
-        # Set standby mode
-        if not self.spi_transaction([self.CMD_SET_STANDBY, 0x00]):
-            print("ERROR: Failed to set standby mode")
-            return False
+        # Pre-transmission status
+        print("\n1. Pre-transmission status:")
+        self.print_status("  ")
+        
+        # Set standby
+        print("\n2. Setting standby mode...")
+        result = self.spi_transaction([self.CMD_SET_STANDBY, 0x00])
+        print(f"  Standby command result: {result}")
         time.sleep_ms(10)
+        self.print_status("  ")
         
-        # Clear IRQ flags
-        if not self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF]):
-            print("ERROR: Failed to clear IRQ flags")
-            return False
+        # Clear IRQs
+        print("\n3. Clearing IRQ flags...")
+        self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
+        time.sleep_ms(10)
+        self.print_status("  ")
         
         # Write data to buffer
+        print("\n4. Writing data to buffer...")
         write_cmd = [self.CMD_WRITE_BUFFER, 0x00] + list(data)
-        if not self.spi_transaction(write_cmd):
-            print("ERROR: Failed to write data to buffer")
-            return False
+        result = self.spi_transaction(write_cmd)
+        print(f"  Buffer write result: {result}")
         
         # Update packet length
-        packet_update = [
-            self.CMD_SET_PACKET_PARAMS,
-            0x00, 0x0C,  # Preamble length
-            0x00,        # Explicit header
-            len(data),   # Actual payload length
-            0x01,        # CRC enabled
-            0x00         # Standard IQ
-        ]
-        if not self.spi_transaction(packet_update):
-            print("ERROR: Failed to update packet length")
-            return False
+        print("\n5. Setting packet parameters...")
+        result = self.spi_transaction([self.CMD_SET_PACKET_PARAMS, 0x00, 0x0C, 0x00, len(data), 0x01, 0x00])
+        print(f"  Packet params result: {result}")
+        
+        # Check status before TX
+        print("\n6. Status before transmission:")
+        self.print_status("  ")
         
         # Start transmission
-        if not self.spi_transaction([self.CMD_SET_TX, 0x00, 0x00, 0x00]):
-            print("ERROR: Failed to start transmission")
-            return False
+        print("\n7. Starting transmission...")
+        result = self.spi_transaction([self.CMD_SET_TX, 0x00, 0x00, 0x00])
+        print(f"  TX command result: {result}")
+        time.sleep_ms(50)  # Give it time to start
         
-        # Wait for transmission to complete
-        print("Waiting for transmission...")
-        start_time = time.ticks_ms()
-        while time.ticks_diff(time.ticks_ms(), start_time) < 5000:  # 5 second timeout
+        # Monitor transmission
+        print("\n8. Monitoring transmission...")
+        for i in range(100):  # Check for 10 seconds
+            self.print_status(f"  Check {i:2d}: ")
             
-            # Check DIO1 pin for IRQ
+            # Check if DIO1 is high
             if self.dio1.value():
-                irq_response = self.spi_transaction([self.CMD_GET_IRQ_STATUS, 0x00], 3)
-                if irq_response and len(irq_response) >= 3:
-                    irq_flags = (irq_response[1] << 8) | irq_response[2]
+                print("  >>> DIO1 is HIGH - Checking IRQ status...")
+                irq_info = self.get_irq_status()
+                if irq_info and irq_info['raw'] != 0:
+                    print(f"  >>> Active IRQs detected!")
                     
-                    if irq_flags & self.IRQ_TX_DONE:
-                        print("✓ Transmission completed successfully!")
+                    if self.IRQ_TX_DONE & irq_info['raw']:
+                        print("  ✓ TX_DONE detected!")
                         self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
                         return True
-                    elif irq_flags & self.IRQ_TIMEOUT:
-                        print("✗ Transmission timeout!")
+                    elif self.IRQ_TIMEOUT & irq_info['raw']:
+                        print("  ✗ TIMEOUT detected!")
                         self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
                         return False
+                    else:
+                        print(f"  >>> Other IRQ: {irq_info['active']}")
             
-            time.sleep_ms(10)
+            time.sleep_ms(100)
         
-        print("✗ Transmission failed - no response within timeout")
+        print("\n9. Final status:")
+        self.print_status("  ")
+        print("✗ Transmission monitoring timeout")
         return False
     
-    def receive_data(self, timeout_ms=10000):
-        """Receive data via LoRa"""
-        print(f"Starting reception (timeout: {timeout_ms}ms)...")
+    def receive_data_diagnostic(self, timeout_ms=10000):
+        """Receive data with diagnostics"""
+        print(f"\n=== DIAGNOSTIC RECEPTION ===")
+        print(f"Timeout: {timeout_ms}ms")
         
-        # Set standby mode
-        if not self.spi_transaction([self.CMD_SET_STANDBY, 0x00]):
-            print("ERROR: Failed to set standby mode")
-            return None
+        # Pre-reception status
+        print("\n1. Pre-reception status:")
+        self.print_status("  ")
+        
+        # Set standby
+        self.spi_transaction([self.CMD_SET_STANDBY, 0x00])
         time.sleep_ms(10)
         
-        # Clear IRQ flags
-        if not self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF]):
-            print("ERROR: Failed to clear IRQ flags")
-            return None
+        # Clear IRQs
+        self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
+        time.sleep_ms(10)
         
-        # Calculate timeout value for SX1262
-        timeout_steps = int(timeout_ms * 1000 / 15.625)  # Convert to 15.625µs steps
+        # Calculate timeout
+        timeout_steps = int(timeout_ms * 1000 / 15.625)
         if timeout_steps > 0xFFFFFF:
             timeout_steps = 0xFFFFFF
         
         # Start reception
-        rx_cmd = [
-            self.CMD_SET_RX,
-            (timeout_steps >> 16) & 0xFF,
-            (timeout_steps >> 8) & 0xFF,
-            timeout_steps & 0xFF
-        ]
-        if not self.spi_transaction(rx_cmd):
-            print("ERROR: Failed to start reception")
-            return None
+        print("\n2. Starting reception...")
+        rx_cmd = [self.CMD_SET_RX, (timeout_steps >> 16) & 0xFF, (timeout_steps >> 8) & 0xFF, timeout_steps & 0xFF]
+        result = self.spi_transaction(rx_cmd)
+        print(f"  RX command result: {result}")
+        time.sleep_ms(50)
         
-        print("Listening for packets...")
+        print("\n3. Status after RX start:")
+        self.print_status("  ")
+        
+        # Monitor reception
+        print("\n4. Monitoring reception...")
         start_time = time.ticks_ms()
+        check_count = 0
         
         while time.ticks_diff(time.ticks_ms(), start_time) < timeout_ms:
+            check_count += 1
             
-            # Check for IRQ on DIO1
-            try:
-                irq_response = self.spi_transaction([self.CMD_GET_IRQ_STATUS, 0x00], 3)
-                if not irq_response or len(irq_response) < 3:
-                    time.sleep_ms(50)
-                    continue
+            if check_count % 50 == 0:  # Print status every 5 seconds
+                print(f"  Check {check_count}: Still listening...")
+                self.print_status("    ")
+            
+            # Check IRQ status
+            irq_info = self.get_irq_status()
+            if irq_info and irq_info['raw'] != 0:
+                print(f"\n  >>> IRQ detected: {irq_info['active']}")
                 
-                irq_flags = (irq_response[1] << 8) | irq_response[2]
-                
-                if irq_flags & self.IRQ_RX_DONE:
-                    print("✓ Packet received!")
+                if self.IRQ_RX_DONE & irq_info['raw']:
+                    print("  ✓ RX_DONE detected!")
                     
                     # Get buffer status
                     buffer_response = self.spi_transaction([self.CMD_GET_RX_BUFFER_STATUS, 0x00], 3)
-                    if not buffer_response or len(buffer_response) < 3:
-                        print("ERROR: Failed to get buffer status")
-                        return None
-                    
-                    payload_length = buffer_response[1]
-                    buffer_offset = buffer_response[2]
-                    
-                    print(f"Payload: {payload_length} bytes at offset {buffer_offset}")
-                    
-                    if payload_length > 0 and payload_length <= 255:
-                        # Read the received data
-                        read_cmd = [self.CMD_READ_BUFFER, buffer_offset]
-                        data_response = self.spi_transaction(read_cmd, payload_length)
+                    if buffer_response and len(buffer_response) >= 3:
+                        payload_length = buffer_response[1]
+                        buffer_offset = buffer_response[2]
+                        print(f"  Payload: {payload_length} bytes at offset {buffer_offset}")
                         
-                        if data_response:
-                            # Clear IRQ flags
-                            self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
-                            
-                            try:
-                                decoded = bytes(data_response).decode('utf-8', errors='ignore')
-                                print(f"✓ Received: '{decoded}'")
-                            except:
-                                print(f"✓ Received: {bytes(data_response)}")
-                            
-                            return bytes(data_response)
-                    
-                elif irq_flags & self.IRQ_TIMEOUT:
-                    print("Reception timeout")
+                        if payload_length > 0:
+                            # Read data
+                            data_response = self.spi_transaction([self.CMD_READ_BUFFER, buffer_offset], payload_length)
+                            if data_response:
+                                self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
+                                try:
+                                    decoded = bytes(data_response).decode('utf-8', errors='ignore')
+                                    print(f"  ✓ Received: '{decoded}'")
+                                except:
+                                    print(f"  ✓ Received: {bytes(data_response)}")
+                                return bytes(data_response)
+                
+                elif self.IRQ_TIMEOUT & irq_info['raw']:
+                    print("  Reception timeout")
                     self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
                     break
-                
-                elif irq_flags != 0:
-                    # Clear any other IRQ flags
+                else:
+                    # Clear other IRQs and continue
                     self.spi_transaction([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
-                
-            except Exception as e:
-                print(f"Reception error: {e}")
-                time.sleep_ms(100)
-                continue
             
-            time.sleep_ms(50)
+            time.sleep_ms(100)
         
-        print("No packet received within timeout")
+        print("\nNo packet received")
         return None
 
 
-def test_two_modules():
-    """Test communication between two SX1262 modules"""
-    print("=== SX1262 Two Module Communication Test ===")
-    print("Make sure you have TWO Core1262 modules connected!")
-    print("Connection for each module:")
-    print("  VCC → 3.3V, GND → GND")
-    print("  P0 → MOSI, P1 → MISO, P2 → SCLK, P3 → NSS")
-    print("  P6 → RESET, P7 → BUSY, P13 → DIO1")
-    print()
+def test_diagnostic():
+    """Run diagnostic tests"""
+    print("=== SX1262 DIAGNOSTIC TEST ===")
     
     try:
-        # Initialize the LoRa module
         lora = SX1262()
         
-        print("\nSelect test mode:")
-        print("1. Transmitter mode")
-        print("2. Receiver mode") 
-        print("3. Ping-pong mode (recommended)")
+        print("\nSelect diagnostic mode:")
+        print("1. Send diagnostic test")
+        print("2. Receive diagnostic test")
+        print("3. Status monitoring only")
         
-        # Auto-select ping-pong mode for testing
-        mode = 3
+        mode = 1  # Default to send test
         
         if mode == 1:
-            # Transmitter mode
-            print("\n=== TRANSMITTER MODE ===")
+            print("\n=== DIAGNOSTIC SEND TEST ===")
             counter = 0
             while True:
-                message = f"Hello-{counter:03d}"
-                print(f"\n--- Transmission {counter} ---")
+                message = f"TEST-{counter:03d}"
+                print(f"\n{'='*60}")
+                print(f"DIAGNOSTIC SEND ATTEMPT {counter}")
+                print(f"{'='*60}")
                 
-                if lora.send_data(message):
-                    print("✓ Message sent successfully!")
+                success = lora.send_data_diagnostic(message)
+                
+                if success:
+                    print(f"\n✓ DIAGNOSTIC: Message '{message}' sent successfully!")
                 else:
-                    print("✗ Failed to send message")
+                    print(f"\n✗ DIAGNOSTIC: Failed to send '{message}'")
                 
                 counter += 1
-                time.sleep(3)
+                time.sleep(5)
                 
         elif mode == 2:
-            # Receiver mode
-            print("\n=== RECEIVER MODE ===") 
-            print("Listening for messages...")
-            
+            print("\n=== DIAGNOSTIC RECEIVE TEST ===")
             while True:
-                received = lora.receive_data(timeout_ms=30000)
+                received = lora.receive_data_diagnostic(timeout_ms=30000)
                 if received:
-                    print("=" * 40)
+                    print("✓ DIAGNOSTIC: Message received!")
                 else:
-                    print("- Still listening...")
-                    
+                    print("- DIAGNOSTIC: No message in timeout period")
+                
         elif mode == 3:
-            # Ping-pong mode
-            print("\n=== PING-PONG MODE ===")
-            print("Sends message, then listens for response")
-            
-            counter = 0
+            print("\n=== STATUS MONITORING ===")
             while True:
-                print(f"\n{'='*50}")
-                print(f"Round {counter}")
-                print(f"{'='*50}")
-                
-                # Send ping
-                message = f"PING-{counter:03d}"
-                print(f"Sending: {message}")
-                
-                if lora.send_data(message):
-                    print("✓ Ping sent successfully")
-                    
-                    # Listen for response
-                    print("Listening for response...")
-                    received = lora.receive_data(timeout_ms=8000)
-                    
-                    if received:
-                        print("✓ Got response!")
-                    else:
-                        print("- No response received")
-                else:
-                    print("✗ Failed to send ping")
-                
-                counter += 1
+                lora.print_status("Monitor: ")
                 time.sleep(2)
         
     except KeyboardInterrupt:
-        print("\nTest stopped by user")
+        print("\nDiagnostic stopped by user")
     except Exception as e:
-        print(f"Error during test: {e}")
+        print(f"Diagnostic error: {e}")
         import traceback
         traceback.print_exc()
 
-# Main execution
+# Run diagnostic
 if __name__ == "__main__":
-    test_two_modules()
+    test_diagnostic()
