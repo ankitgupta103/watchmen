@@ -1,434 +1,336 @@
 import time
 from machine import SPI, Pin
 
-class SX1262:
-    """SX1262 Hardware Diagnostic Tests"""
-    
-    # Command opcodes
-    CMD_SET_STANDBY = 0x80
-    CMD_SET_PACKET_TYPE = 0x8A
-    CMD_SET_RF_FREQUENCY = 0x86
-    CMD_SET_TX_PARAMS = 0x8E
-    CMD_SET_MODULATION_PARAMS = 0x8B
-    CMD_SET_PACKET_PARAMS = 0x8C
-    CMD_SET_DIO_IRQ_PARAMS = 0x08
-    CMD_SET_BUFFER_BASE_ADDRESS = 0x8F
-    CMD_WRITE_BUFFER = 0x0E
-    CMD_SET_TX = 0x83
-    CMD_SET_RX = 0x82
-    CMD_GET_IRQ_STATUS = 0x12
-    CMD_CLEAR_IRQ_STATUS = 0x02
-    CMD_READ_BUFFER = 0x1E
-    CMD_GET_RX_BUFFER_STATUS = 0x13
-    CMD_SET_REGULATOR_MODE = 0x96
-    CMD_CALIBRATE = 0x89
-    CMD_SET_PA_CONFIG = 0x95
-    CMD_GET_STATUS = 0xC0
-    CMD_GET_DEVICE_ERRORS = 0x17
-    CMD_CLEAR_DEVICE_ERRORS = 0x07
-    CMD_SET_FS = 0xC1
-    CMD_SET_TX_CONTINUOUS_WAVE = 0xD1
-    
-    # Packet types
-    PACKET_TYPE_LORA = 0x01
+class SX1262_ModuleTest:
+    """Final definitive test to determine if module is defective"""
     
     def __init__(self, nss_pin='P3', reset_pin='P6', busy_pin='P7', dio1_pin='P13'):
-        """Initialize for hardware diagnostics"""
+        print("=== SX1262 MODULE HEALTH CHECK ===")
+        print("This will definitively determine if your module is defective\n")
         
-        print("=== SX1262 Hardware Diagnostic Setup ===")
-        
-        # Initialize SPI Bus 1
+        # Initialize SPI
         self.spi = SPI(1, baudrate=1000000, polarity=0, phase=0, bits=8, firstbit=SPI.MSB)
         
-        # Initialize control pins
+        # Initialize pins
         self.nss = Pin(nss_pin, Pin.OUT)
         self.reset = Pin(reset_pin, Pin.OUT)
         self.busy = Pin(busy_pin, Pin.IN)
         self.dio1 = Pin(dio1_pin, Pin.IN)
         
-        # Set initial pin states
         self.nss.on()
         self.reset.on()
-        
-        # Basic setup
-        self.hardware_reset()
-        self.basic_init()
     
     def hardware_reset(self):
         """Hardware reset"""
-        print("Hardware reset...")
         self.reset.off()
         time.sleep_ms(10)
         self.reset.on()
-        time.sleep_ms(20)
-        self.wait_busy()
-        print("✓ Reset completed")
+        time.sleep_ms(50)
+        
+        # Wait for BUSY
+        timeout = 20000
+        while self.busy.value() and timeout > 0:
+            time.sleep_us(100)
+            timeout -= 1
+        
+        return timeout > 0
     
-    def wait_busy(self, timeout_ms=1000):
-        """Wait for BUSY pin"""
+    def spi_transaction(self, data_out, read_length=0):
+        """Basic SPI transaction"""
+        # Wait for BUSY
         timeout = 10000
         while self.busy.value() and timeout > 0:
             time.sleep_us(100)
             timeout -= 1
-        return timeout > 0
-    
-    def spi_write(self, data):
-        """SPI write"""
-        self.wait_busy()
+        
+        if timeout == 0:
+            return None
+        
         self.nss.off()
         time.sleep_us(10)
         
-        if isinstance(data, list):
-            data = bytes(data)
-        
         try:
-            self.spi.write(data)
-            time.sleep_us(10)
-        except Exception as e:
-            print(f"SPI write error: {e}")
-            self.nss.on()
-            return False
-        finally:
-            self.nss.on()
+            if isinstance(data_out, list):
+                data_out = bytes(data_out)
             
-        time.sleep_ms(1)
-        return True
-    
-    def spi_read(self, cmd, length):
-        """SPI read"""
-        self.wait_busy()
-        self.nss.off()
-        time.sleep_us(10)
-        
-        try:
-            if isinstance(cmd, list):
-                cmd = bytes(cmd)
-            self.spi.write(cmd)
-            time.sleep_us(10)
-            data = self.spi.read(length, 0x00)
-            time.sleep_us(10)
+            self.spi.write(data_out)
+            
+            if read_length > 0:
+                response = self.spi.read(read_length, 0x00)
+                self.nss.on()
+                time.sleep_ms(1)
+                return response
+            else:
+                self.nss.on()
+                time.sleep_ms(1)
+                return True
+                
         except Exception as e:
-            print(f"SPI read error: {e}")
             self.nss.on()
             return None
-        finally:
-            self.nss.on()
+    
+    def test_basic_communication(self):
+        """Test if module responds at all"""
+        print("1. TESTING BASIC SPI COMMUNICATION...")
+        
+        # Reset module
+        reset_ok = self.hardware_reset()
+        if not reset_ok:
+            print("   ✗ BUSY pin never went low after reset")
+            return False
+        
+        # Try to read status multiple times
+        responses = []
+        for i in range(5):
+            status = self.spi_transaction([0xC0, 0x00], 1)
+            if status:
+                responses.append(status[0])
+            else:
+                responses.append(None)
+            time.sleep_ms(10)
+        
+        print(f"   Status responses: {responses}")
+        
+        # Check if we get consistent non-zero responses
+        valid_responses = [r for r in responses if r is not None and r != 0]
+        
+        if len(valid_responses) >= 3:
+            print("   ✓ Module responds to SPI commands")
+            return True
+        else:
+            print("   ✗ Module does not respond reliably to SPI")
+            return False
+    
+    def test_register_access(self):
+        """Test if we can read/write registers"""
+        print("\n2. TESTING REGISTER ACCESS...")
+        
+        # Try to read a known register (like XTA trim register at 0x0911)
+        read_result = self.spi_transaction([0x1D, 0x09, 0x11, 0x00], 1)
+        
+        if read_result:
+            original_value = read_result[0]
+            print(f"   Read register 0x0911: 0x{original_value:02X}")
             
-        time.sleep_ms(1)
-        return data
+            # Try to write a different value
+            new_value = (original_value + 1) & 0xFF
+            write_result = self.spi_transaction([0x0D, 0x09, 0x11, new_value])
+            
+            if write_result:
+                time.sleep_ms(10)
+                # Read it back
+                verify_result = self.spi_transaction([0x1D, 0x09, 0x11, 0x00], 1)
+                
+                if verify_result and verify_result[0] == new_value:
+                    print(f"   ✓ Register write/read successful (0x{original_value:02X} → 0x{new_value:02X})")
+                    
+                    # Restore original value
+                    self.spi_transaction([0x0D, 0x09, 0x11, original_value])
+                    return True
+                else:
+                    print(f"   ✗ Register write failed (wrote 0x{new_value:02X}, read 0x{verify_result[0] if verify_result else 'None':02X})")
+                    return False
+            else:
+                print("   ✗ Register write command failed")
+                return False
+        else:
+            print("   ✗ Cannot read registers")
+            return False
     
-    def get_status(self):
-        """Get status"""
-        try:
-            status = self.spi_read([self.CMD_GET_STATUS, 0x00], 1)
-            return status[0] if status else 0
-        except:
-            return 0
-    
-    def get_errors(self):
-        """Get device errors"""
-        try:
-            error_data = self.spi_read([self.CMD_GET_DEVICE_ERRORS, 0x00], 3)
-            if error_data and len(error_data) >= 3:
-                return (error_data[1] << 8) | error_data[2]
-        except:
-            pass
-        return 0
-    
-    def clear_errors(self):
-        """Clear errors"""
-        self.spi_write([self.CMD_CLEAR_DEVICE_ERRORS, 0x00, 0x00])
-    
-    def basic_init(self):
-        """Basic initialization for testing"""
-        print("Basic initialization...")
+    def test_standby_command(self):
+        """Test if basic standby command works"""
+        print("\n3. TESTING STANDBY COMMAND...")
         
-        # Clear errors
-        self.clear_errors()
-        
-        # STDBY_RC
-        self.spi_write([self.CMD_SET_STANDBY, 0x00])
+        # Clear any errors first
+        self.spi_transaction([0x07, 0x00, 0x00])
         time.sleep_ms(10)
         
-        # LDO regulator
-        self.spi_write([self.CMD_SET_REGULATOR_MODE, 0x00])
-        time.sleep_ms(10)
+        # Try standby command
+        standby_result = self.spi_transaction([0x80, 0x00])
         
-        # Calibrate
-        self.spi_write([self.CMD_CALIBRATE, 0x7F])
-        time.sleep_ms(500)
-        
-        print("✓ Basic initialization complete")
-    
-    def test_different_pa_configs(self):
-        """Test different PA configurations to find working one"""
-        print("\n=== Testing Different PA Configurations ===")
-        
-        # Test configurations from most conservative to original
-        configs = [
-            # [paDutyCycle, hpMax, deviceSel, paLut] - Description
-            ([0x01, 0x00, 0x00, 0x01], "Minimal SX1262 (duty=1, hp=0)"),
-            ([0x02, 0x02, 0x00, 0x01], "Low SX1262 (duty=2, hp=2)"),
-            ([0x02, 0x03, 0x00, 0x01], "Medium SX1262 (duty=2, hp=3)"),
-            ([0x04, 0x07, 0x00, 0x01], "Original SX1262 (duty=4, hp=7)"),
-            ([0x04, 0x00, 0x01, 0x01], "SX1261 config test"),
-        ]
-        
-        for config, description in configs:
-            print(f"\nTesting: {description}")
-            print(f"  Config: {config}")
-            
-            # Reset to clean state
-            self.basic_init()
-            
-            # Set LoRa packet type
-            self.spi_write([self.CMD_SET_PACKET_TYPE, self.PACKET_TYPE_LORA])
-            time.sleep_ms(10)
-            
-            # Set frequency
-            freq_raw = int((868000000 * 33554432) // 32000000)
-            self.spi_write([self.CMD_SET_RF_FREQUENCY, 
-                           (freq_raw >> 24) & 0xFF, (freq_raw >> 16) & 0xFF, 
-                           (freq_raw >> 8) & 0xFF, freq_raw & 0xFF])
-            time.sleep_ms(10)
-            
-            # Test this PA config
-            pa_cmd = [self.CMD_SET_PA_CONFIG] + config
-            result = self.spi_write(pa_cmd)
-            time.sleep_ms(10)
-            
-            if not result:
-                print("  ✗ PA config command failed")
-                continue
-            
-            # Set low TX power
-            self.spi_write([self.CMD_SET_TX_PARAMS, 0, 0x02])  # 0dBm
-            time.sleep_ms(10)
-            
-            # Check errors after PA config
-            errors = self.get_errors()
-            if errors:
-                print(f"  ⚠ Errors after PA config: 0x{errors:04X}")
-                self.clear_errors()
-            
-            # Try to enter FS mode first (safer than TX)
-            print("    Testing FS mode...")
-            fs_result = self.spi_write([self.CMD_SET_FS])
+        if standby_result:
             time.sleep_ms(50)
             
-            status = self.get_status()
-            mode = (status >> 4) & 0x7
-            cmd_status = (status >> 1) & 0x7
-            errors = self.get_errors()
-            
-            print(f"    FS result: mode={mode}, cmd_status={cmd_status}, errors=0x{errors:04X}")
-            
-            if mode == 3 and cmd_status != 5:  # FS mode, no execution failure
-                print("    ✓ FS mode successful!")
-                
-                # Now try TX mode
-                print("    Testing TX mode...")
-                self.spi_write([self.CMD_SET_STANDBY, 0x00])
-                time.sleep_ms(10)
-                
-                tx_result = self.spi_write([self.CMD_SET_TX, 0x00, 0x00, 0x00])
-                time.sleep_ms(50)
-                
-                status = self.get_status()
+            # Check status
+            status_result = self.spi_transaction([0xC0, 0x00], 1)
+            if status_result:
+                status = status_result[0]
                 mode = (status >> 4) & 0x7
                 cmd_status = (status >> 1) & 0x7
-                errors = self.get_errors()
                 
-                print(f"    TX result: mode={mode}, cmd_status={cmd_status}, errors=0x{errors:04X}")
+                print(f"   Status after STDBY: 0x{status:02X} (mode={mode}, cmd_status={cmd_status})")
                 
-                if mode == 5 and cmd_status != 5:  # TX mode, no execution failure
-                    print("    ✓ TX mode successful with this config!")
-                    print(f"  *** WORKING PA CONFIG FOUND: {config} ***")
-                    return config
+                if cmd_status != 5:  # Not execution failure
+                    print("   ✓ Standby command accepted")
+                    return True
                 else:
-                    print("    ✗ TX mode failed")
+                    print("   ✗ Standby command rejected (execution failure)")
+                    return False
             else:
-                print("    ✗ FS mode failed")
-        
-        print("\n✗ No working PA configuration found")
-        return None
-    
-    def test_frequency_synthesis_only(self):
-        """Test if frequency synthesis works without PA"""
-        print("\n=== Testing Frequency Synthesis Only ===")
-        
-        # Basic init
-        self.basic_init()
-        
-        # Set packet type
-        self.spi_write([self.CMD_SET_PACKET_TYPE, self.PACKET_TYPE_LORA])
-        time.sleep_ms(10)
-        
-        # Set frequency
-        freq_raw = int((868000000 * 33554432) // 32000000)
-        self.spi_write([self.CMD_SET_RF_FREQUENCY, 
-                       (freq_raw >> 24) & 0xFF, (freq_raw >> 16) & 0xFF, 
-                       (freq_raw >> 8) & 0xFF, freq_raw & 0xFF])
-        time.sleep_ms(10)
-        
-        # Try FS mode (frequency synthesis without TX)
-        print("Entering FS mode...")
-        result = self.spi_write([self.CMD_SET_FS])
-        time.sleep_ms(100)
-        
-        status = self.get_status()
-        mode = (status >> 4) & 0x7
-        cmd_status = (status >> 1) & 0x7
-        errors = self.get_errors()
-        
-        print(f"FS result: mode={mode}, cmd_status={cmd_status}, errors=0x{errors:04X}")
-        
-        if mode == 3:  # FS mode
-            print("✓ Frequency synthesis works!")
-            print("  This means:")
-            print("    - SPI communication is good")
-            print("    - Crystal oscillator is working")
-            print("    - PLL can lock to frequency")
-            print("    - Problem is likely in PA/TX circuitry")
-            return True
+                print("   ✗ Cannot read status after standby")
+                return False
         else:
-            print("✗ Frequency synthesis failed")
-            print("  This indicates deeper hardware issues")
+            print("   ✗ Standby command failed")
             return False
     
-    def test_rx_mode(self):
-        """Test if RX mode works (doesn't use PA)"""
-        print("\n=== Testing RX Mode ===")
+    def test_calibration_individual(self):
+        """Test individual calibration commands"""
+        print("\n4. TESTING INDIVIDUAL CALIBRATIONS...")
         
-        # Basic init
-        self.basic_init()
-        
-        # Set packet type and frequency
-        self.spi_write([self.CMD_SET_PACKET_TYPE, self.PACKET_TYPE_LORA])
+        # Set to standby first
+        self.spi_transaction([0x80, 0x00])
         time.sleep_ms(10)
         
-        freq_raw = int((868000000 * 33554432) // 32000000)
-        self.spi_write([self.CMD_SET_RF_FREQUENCY, 
-                       (freq_raw >> 24) & 0xFF, (freq_raw >> 16) & 0xFF, 
-                       (freq_raw >> 8) & 0xFF, freq_raw & 0xFF])
-        time.sleep_ms(10)
+        # Test each calibration individually
+        calibrations = [
+            (0x01, "RC64k"),
+            (0x02, "RC13M"), 
+            (0x08, "ADC Pulse"),
+            (0x10, "ADC Bulk N"),
+            (0x20, "ADC Bulk P"),
+        ]
         
-        # Set modulation
-        self.spi_write([self.CMD_SET_MODULATION_PARAMS, 0x07, 0x04, 0x01, 0x00])
-        time.sleep_ms(10)
+        results = {}
         
-        # Try RX mode
-        print("Entering RX mode...")
-        result = self.spi_write([self.CMD_SET_RX, 0x00, 0x10, 0x00])  # Short timeout
-        time.sleep_ms(100)
+        for cal_mask, cal_name in calibrations:
+            print(f"   Testing {cal_name} calibration...")
+            
+            # Clear errors
+            self.spi_transaction([0x07, 0x00, 0x00])
+            time.sleep_ms(10)
+            
+            # Start this calibration
+            cal_result = self.spi_transaction([0x89, cal_mask])
+            
+            if cal_result:
+                # Wait for calibration
+                time.sleep_ms(300)
+                
+                # Check errors
+                error_result = self.spi_transaction([0x17, 0x00], 3)
+                if error_result and len(error_result) >= 3:
+                    errors = (error_result[1] << 8) | error_result[2]
+                    
+                    if errors == 0:
+                        print(f"      ✓ {cal_name} calibration successful")
+                        results[cal_name] = True
+                    else:
+                        print(f"      ✗ {cal_name} calibration failed (errors: 0x{errors:04X})")
+                        results[cal_name] = False
+                else:
+                    print(f"      ? {cal_name} calibration status unknown")
+                    results[cal_name] = None
+            else:
+                print(f"      ✗ {cal_name} calibration command failed")
+                results[cal_name] = False
         
-        status = self.get_status()
-        mode = (status >> 4) & 0x7
-        cmd_status = (status >> 1) & 0x7
-        errors = self.get_errors()
-        
-        print(f"RX result: mode={mode}, cmd_status={cmd_status}, errors=0x{errors:04X}")
-        
-        if mode == 4:  # RX mode
-            print("✓ RX mode works!")
-            print("  This confirms:")
-            print("    - Receiver circuitry is functional")
-            print("    - Problem is specifically with PA/transmitter")
-            return True
-        else:
-            print("✗ RX mode failed")
-            return False
+        return results
     
-    def hardware_diagnostic_summary(self):
-        """Run complete hardware diagnostic"""
+    def run_comprehensive_test(self):
+        """Run all tests and provide verdict"""
+        print("Testing module comprehensively...\n")
+        
+        # Test 1: Basic communication
+        comm_ok = self.test_basic_communication()
+        
+        # Test 2: Register access
+        reg_ok = self.test_register_access() if comm_ok else False
+        
+        # Test 3: Standby command
+        standby_ok = self.test_standby_command() if reg_ok else False
+        
+        # Test 4: Individual calibrations
+        cal_results = self.test_calibration_individual() if standby_ok else {}
+        
+        # Analysis
         print("\n" + "="*60)
-        print("HARDWARE DIAGNOSTIC SUMMARY")
+        print("MODULE HEALTH ASSESSMENT")
         print("="*60)
         
-        print("\n1. TESTING FREQUENCY SYNTHESIS...")
-        fs_works = self.test_frequency_synthesis_only()
+        print(f"✓ Basic SPI Communication: {'PASS' if comm_ok else 'FAIL'}")
+        print(f"✓ Register Read/Write: {'PASS' if reg_ok else 'FAIL'}")
+        print(f"✓ Command Processing: {'PASS' if standby_ok else 'FAIL'}")
         
-        print("\n2. TESTING RECEIVER...")
-        rx_works = self.test_rx_mode()
-        
-        print("\n3. TESTING PA CONFIGURATIONS...")
-        working_config = self.test_different_pa_configs()
-        
-        print("\n" + "="*60)
-        print("DIAGNOSTIC RESULTS:")
-        print("="*60)
-        
-        print(f"✓ Frequency Synthesis: {'WORKING' if fs_works else 'FAILED'}")
-        print(f"✓ Receiver Mode: {'WORKING' if rx_works else 'FAILED'}")
-        print(f"✓ Transmitter: {'WORKING' if working_config else 'FAILED'}")
-        
-        if working_config:
-            print(f"✓ Working PA Config: {working_config}")
+        if cal_results:
+            print("✓ Calibration Results:")
+            for cal_name, result in cal_results.items():
+                status = "PASS" if result else ("FAIL" if result is False else "UNKNOWN")
+                print(f"   - {cal_name}: {status}")
         
         print("\n" + "="*60)
-        print("RECOMMENDATIONS:")
+        print("VERDICT")
         print("="*60)
         
-        if not fs_works:
-            print("❌ CRITICAL: Basic frequency synthesis failed")
-            print("   → Check power supply, crystal, and SPI connections")
-            print("   → Module may be defective")
-        
-        elif not rx_works:
-            print("❌ ISSUE: Receiver not working")
-            print("   → Check RF circuitry and antenna connections")
-        
-        elif not working_config:
-            print("❌ ISSUE: No working PA configuration found")
-            print("   → Check antenna connection (CRITICAL!)")
-            print("   → Check power supply current capability (need >100mA)")
-            print("   → Try connecting a simple wire antenna (8.6cm for 868MHz)")
-            print("   → Module PA may be defective")
-        
+        if not comm_ok:
+            print("🔴 CRITICAL FAILURE: Module does not respond to SPI")
+            print("   → Check wiring, power supply, module may be completely dead")
+            
+        elif not reg_ok:
+            print("🔴 CRITICAL FAILURE: Cannot access registers")
+            print("   → Module internal bus failure, module is defective")
+            
+        elif not standby_ok:
+            print("🔴 COMMAND FAILURE: Basic commands rejected")
+            print("   → Module firmware/control logic failure, module is defective")
+            
+        elif cal_results and not any(cal_results.values()):
+            print("🔴 CALIBRATION FAILURE: All calibrations fail")
+            print("   → Module analog/RF circuitry defective")
+            print("   → This explains the 0x200A error you've been seeing")
+            
+        elif cal_results and cal_results.get('RC13M') == False:
+            print("🔴 RC13M CALIBRATION FAILURE")
+            print("   → This is the root cause of your 0x200A error")
+            print("   → RC13M oscillator circuit is defective")
+            print("   → Module cannot generate stable internal timing")
+            
         else:
-            print("✅ HARDWARE APPEARS FUNCTIONAL!")
-            print(f"   → Use PA config: {working_config}")
-            print("   → Try transmission with working configuration")
+            print("🟡 PARTIAL FUNCTIONALITY")
+            print("   → Some systems work, others don't")
+            print("   → Module may be partially defective")
         
         print("\n" + "="*60)
-        return working_config
+        print("RECOMMENDATION")
+        print("="*60)
+        
+        if not comm_ok or not reg_ok or not standby_ok:
+            print("🚫 MODULE IS DEFECTIVE - Cannot be used")
+            print("   → Request replacement from supplier")
+            print("   → Try your second module")
+            
+        elif cal_results and cal_results.get('RC13M') == False:
+            print("🚫 MODULE IS DEFECTIVE - RC13M oscillator failed")
+            print("   → This is a hardware defect, cannot be fixed in software")
+            print("   → Request replacement from supplier") 
+            print("   → Try your second module")
+            
+        else:
+            print("🤔 MODULE STATUS UNCLEAR")
+            print("   → Try your second module for comparison")
+            print("   → If second module works, first is defective")
+        
+        return comm_ok, reg_ok, standby_ok, cal_results
 
 
-def run_hardware_diagnostics():
-    """Run comprehensive hardware diagnostics"""
-    print("=== SX1262 HARDWARE DIAGNOSTICS ===")
-    print("This will test different aspects of the hardware")
-    print("to identify what's working and what's not.\n")
-    
+def test_module_health():
+    """Test current module health"""
     try:
-        # Initialize diagnostic system
-        sx1262 = SX1262()
+        tester = SX1262_ModuleTest()
+        tester.run_comprehensive_test()
         
-        # Run full diagnostic
-        working_config = sx1262.hardware_diagnostic_summary()
-        
-        if working_config:
-            print(f"\n🎉 GOOD NEWS: Found working PA configuration!")
-            print(f"Use this in your main code: {working_config}")
-            print("\nTry modifying your PA config to:")
-            print(f"self.spi_write([self.CMD_SET_PA_CONFIG, {working_config[0]}, {working_config[1]}, {working_config[2]}, {working_config[3]}])")
-        else:
-            print(f"\n😞 No working PA configuration found.")
-            print("\nTRY THESE HARDWARE FIXES:")
-            print("1. 🔌 Connect an antenna (most likely cause!)")
-            print("   - Simple wire: 8.6cm long for 868MHz")
-            print("   - Connect to antenna pad/SMA connector")
-            print("2. 🔋 Check power supply:")
-            print("   - Measure actual voltage (should be 3.3V)")
-            print("   - Ensure >150mA current capability")
-            print("3. 🔍 Try the other module to compare")
-            print("4. 📏 Check all wire connections")
+        print(f"\n{'='*60}")
+        print("NEXT STEPS")
+        print("="*60)
+        print("1. 🔄 Test your SECOND Core1262 module with this same code")
+        print("2. 📋 Compare results between both modules") 
+        print("3. 📞 Contact supplier if module is defective")
+        print("4. 🔁 If both modules fail the same way, recheck power supply")
         
     except Exception as e:
-        print(f"Diagnostic error: {e}")
+        print(f"Test error: {e}")
         import traceback
         traceback.print_exc()
 
-# Run diagnostics
+# Run the definitive module test
 if __name__ == "__main__":
-    run_hardware_diagnostics()
+    test_module_health()
