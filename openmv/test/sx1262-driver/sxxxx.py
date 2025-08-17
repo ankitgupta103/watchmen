@@ -123,33 +123,37 @@ class SX1262:
         status = self.get_status()
         print(f"Initial status: 0x{status:02X}")
         
-        # Set standby mode (STDBY_RC)
-        self.spi_write([self.CMD_SET_STANDBY, 0x00])
-        time.sleep_ms(50)
+        # IMPORTANT: Set standby mode to XOSC instead of RC to avoid RC13M issues
+        print("Setting standby XOSC mode...")
+        self.spi_write([self.CMD_SET_STANDBY, 0x01])  # 0x01 = STDBY_XOSC
+        time.sleep_ms(200)  # Give XOSC time to start
         
-        # Check if we're in standby
+        # Check if we're in standby XOSC
         status = self.get_status()
-        print(f"After standby command: 0x{status:02X}")
+        print(f"After standby XOSC command: 0x{status:02X}")
+        mode = (status >> 4) & 0x7
+        if mode != 3:  # 3 = STDBY_XOSC
+            print(f"WARNING: Not in STDBY_XOSC mode. Current mode: {mode}")
         
-        # Set regulator mode to LDO (more reliable than DC-DC for initial testing)
+        # Set regulator mode to LDO 
         self.spi_write([self.CMD_SET_REGULATOR_MODE, 0x00])  # 0x00 = LDO only
         time.sleep_ms(10)
         
         # Check for device errors before calibration
         self.check_device_errors("Before calibration")
         
-        # Calibrate all blocks - IMPORTANT for proper operation
-        print("Calibrating...")
+        # Calibrate with XOSC running - this should fix RC13M issues
+        print("Calibrating with XOSC...")
         self.spi_write([self.CMD_CALIBRATE, 0x7F])
-        time.sleep_ms(500)  # Give more time for calibration
+        time.sleep_ms(1000)  # Give more time for calibration with XOSC
         
         # Check status and errors after calibration
         status = self.get_status()
         print(f"After calibration: 0x{status:02X}")
         self.check_device_errors("After calibration")
         
-        # CRITICAL: Set PA config for SX1262 BEFORE other RF settings
-        print("Setting PA config...")
+        # CRITICAL: Set PA config for SX1262 (confirmed HF variant)
+        print("Setting PA config for HF variant...")
         self.spi_write([self.CMD_SET_PA_CONFIG, 0x04, 0x07, 0x00, 0x01])
         time.sleep_ms(10)
         
@@ -158,12 +162,12 @@ class SX1262:
         self.spi_write([self.CMD_SET_PACKET_TYPE, self.PACKET_TYPE_LORA])
         time.sleep_ms(10)
         
-        # Try multiple frequencies to see which one works
+        # Test HF frequencies first since you confirmed HF variant
         frequencies = [
-            (433000000, "433 MHz (LF band)"),
-            (490000000, "490 MHz (LF band)"), 
-            (868000000, "868 MHz (HF band)"),
-            (915000000, "915 MHz (HF band)")
+            (868000000, "868 MHz (HF)"),
+            (915000000, "915 MHz (HF)"),
+            (869000000, "869 MHz (HF)"),
+            (870000000, "870 MHz (HF)")
         ]
         
         working_freq = None
@@ -179,31 +183,42 @@ class SX1262:
                            freq_raw & 0xFF])
             time.sleep_ms(10)
             
+            # Clear any previous errors
+            self.spi_write([0x07, 0x00, 0x00])  # ClearDeviceErrors
+            time.sleep_ms(10)
+            
             # Test FS mode
+            print(f"  Testing FS mode for {freq_name}...")
             self.spi_write([0xC1])  # SetFs command
             time.sleep_ms(100)
             
             status = self.get_status()
             fs_mode = (status >> 4) & 0x7
-            print(f"  FS test result - Status: 0x{status:02X}, Mode: {fs_mode}")
+            cmd_status = (status >> 1) & 0x7
+            print(f"  FS result - Status: 0x{status:02X}, Mode: {fs_mode}, Cmd: {cmd_status}")
+            
+            # Check for PLL lock errors
+            self.check_device_errors(f"After {freq_name} FS test")
             
             if fs_mode == 4:  # FS mode successful
                 print(f"  SUCCESS: {freq_name} works!")
                 working_freq = freq_hz
-                # Return to standby
-                self.spi_write([self.CMD_SET_STANDBY, 0x00])
+                # Return to standby XOSC
+                self.spi_write([self.CMD_SET_STANDBY, 0x01])
                 time.sleep_ms(10)
                 break
             else:
-                print(f"  FAILED: {freq_name} doesn't work")
-                # Return to standby
-                self.spi_write([self.CMD_SET_STANDBY, 0x00])
+                print(f"  FAILED: {freq_name} - Mode: {fs_mode}, Cmd: {cmd_status}")
+                # Return to standby XOSC
+                self.spi_write([self.CMD_SET_STANDBY, 0x01])
                 time.sleep_ms(10)
-                # Check for errors
-                self.check_device_errors(f"After {freq_name} test")
         
         if working_freq is None:
-            print("ERROR: No frequency worked! This may be a hardware issue.")
+            print("ERROR: No HF frequency worked!")
+            print("This could indicate:")
+            print("  1. Hardware issue with crystal oscillator")
+            print("  2. Incorrect module variant (maybe LF instead of HF?)")
+            print("  3. Power supply issues")
             return False
         
         print(f"Using working frequency: {working_freq} Hz")
@@ -232,9 +247,9 @@ class SX1262:
         self.spi_write([self.CMD_SET_BUFFER_BASE_ADDRESS, 0x00, 0x00])
         time.sleep_ms(10)
         
-        # Set TX power (start with lower power for testing)
+        # Set TX power for HF variant
         print("Setting TX power...")
-        self.spi_write([self.CMD_SET_TX_PARAMS, 10, 0x02])  # 10dBm, 40us ramp
+        self.spi_write([self.CMD_SET_TX_PARAMS, 14, 0x02])  # 14dBm, 40us ramp
         time.sleep_ms(10)
         
         # Configure DIO IRQ params
@@ -259,8 +274,13 @@ class SX1262:
         fs_mode = (status >> 4) & 0x7
         print(f"Final FS test - Status: 0x{status:02X}, Mode: {fs_mode}")
         
-        # Return to standby
-        self.spi_write([self.CMD_SET_STANDBY, 0x00])
+        if fs_mode == 4:
+            print("Final FS test: SUCCESS")
+        else:
+            print("Final FS test: FAILED")
+        
+        # Return to standby XOSC
+        self.spi_write([self.CMD_SET_STANDBY, 0x01])
         time.sleep_ms(10)
         
         # Final status check
@@ -270,7 +290,7 @@ class SX1262:
         cmd_status = (status >> 1) & 0x7
         print(f"Chip mode: {chip_mode}, Command status: {cmd_status}")
         
-        success = (cmd_status == 1) and (working_freq is not None)
+        success = (cmd_status == 1) and (working_freq is not None) and (fs_mode == 4)
         if success:
             print("SX1262 initialized successfully!")
         else:
@@ -310,8 +330,8 @@ class SX1262:
         
         print(f"Sending: {data}")
         
-        # Ensure we're in standby mode first
-        self.spi_write([self.CMD_SET_STANDBY, 0x00])
+        # Ensure we're in standby XOSC mode first
+        self.spi_write([self.CMD_SET_STANDBY, 0x01])  # STDBY_XOSC
         time.sleep_ms(10)
         
         # Clear any pending IRQs
@@ -356,7 +376,10 @@ class SX1262:
         
         if chip_mode != 6:  # 6 = TX mode
             print(f"ERROR: Device not in TX mode! Current mode: {chip_mode}")
+            self.check_device_errors("After TX command")
             return False
+        
+        print("SUCCESS: Device entered TX mode!")
         
         # Wait for TX done with monitoring
         start_time = time.ticks_ms()
@@ -399,7 +422,7 @@ class SX1262:
         print("TX failed - no response within timeout")
         # Clear any IRQs and return to standby
         self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
-        self.spi_write([self.CMD_SET_STANDBY, 0x00])
+        self.spi_write([self.CMD_SET_STANDBY, 0x01])
         return False
     
     def receive_data(self, timeout_ms=30000):
