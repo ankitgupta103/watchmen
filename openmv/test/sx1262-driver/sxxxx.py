@@ -135,14 +135,18 @@ class SX1262:
         self.spi_write([self.CMD_SET_REGULATOR_MODE, 0x00])  # 0x00 = LDO only
         time.sleep_ms(10)
         
+        # Check for device errors before calibration
+        self.check_device_errors("Before calibration")
+        
         # Calibrate all blocks - IMPORTANT for proper operation
         print("Calibrating...")
         self.spi_write([self.CMD_CALIBRATE, 0x7F])
         time.sleep_ms(500)  # Give more time for calibration
         
-        # Check status after calibration
+        # Check status and errors after calibration
         status = self.get_status()
         print(f"After calibration: 0x{status:02X}")
+        self.check_device_errors("After calibration")
         
         # CRITICAL: Set PA config for SX1262 BEFORE other RF settings
         print("Setting PA config...")
@@ -154,15 +158,55 @@ class SX1262:
         self.spi_write([self.CMD_SET_PACKET_TYPE, self.PACKET_TYPE_LORA])
         time.sleep_ms(10)
         
-        # Set RF frequency (868 MHz)
-        freq_raw = int((868000000 * 33554432) // 32000000)
-        print(f"Setting frequency: {freq_raw} (0x{freq_raw:08X})")
-        self.spi_write([self.CMD_SET_RF_FREQUENCY, 
-                       (freq_raw >> 24) & 0xFF,
-                       (freq_raw >> 16) & 0xFF, 
-                       (freq_raw >> 8) & 0xFF,
-                       freq_raw & 0xFF])
-        time.sleep_ms(10)
+        # Try multiple frequencies to see which one works
+        frequencies = [
+            (433000000, "433 MHz (LF band)"),
+            (490000000, "490 MHz (LF band)"), 
+            (868000000, "868 MHz (HF band)"),
+            (915000000, "915 MHz (HF band)")
+        ]
+        
+        working_freq = None
+        for freq_hz, freq_name in frequencies:
+            print(f"Testing {freq_name}...")
+            freq_raw = int((freq_hz * 33554432) // 32000000)
+            print(f"  Raw value: {freq_raw} (0x{freq_raw:08X})")
+            
+            self.spi_write([self.CMD_SET_RF_FREQUENCY, 
+                           (freq_raw >> 24) & 0xFF,
+                           (freq_raw >> 16) & 0xFF, 
+                           (freq_raw >> 8) & 0xFF,
+                           freq_raw & 0xFF])
+            time.sleep_ms(10)
+            
+            # Test FS mode
+            self.spi_write([0xC1])  # SetFs command
+            time.sleep_ms(100)
+            
+            status = self.get_status()
+            fs_mode = (status >> 4) & 0x7
+            print(f"  FS test result - Status: 0x{status:02X}, Mode: {fs_mode}")
+            
+            if fs_mode == 4:  # FS mode successful
+                print(f"  SUCCESS: {freq_name} works!")
+                working_freq = freq_hz
+                # Return to standby
+                self.spi_write([self.CMD_SET_STANDBY, 0x00])
+                time.sleep_ms(10)
+                break
+            else:
+                print(f"  FAILED: {freq_name} doesn't work")
+                # Return to standby
+                self.spi_write([self.CMD_SET_STANDBY, 0x00])
+                time.sleep_ms(10)
+                # Check for errors
+                self.check_device_errors(f"After {freq_name} test")
+        
+        if working_freq is None:
+            print("ERROR: No frequency worked! This may be a hardware issue.")
+            return False
+        
+        print(f"Using working frequency: {working_freq} Hz")
         
         # Set modulation params - MUST be done before packet params
         print("Setting modulation params...")
@@ -206,14 +250,14 @@ class SX1262:
         self.spi_write([self.CMD_CLEAR_IRQ_STATUS, 0xFF, 0xFF])
         time.sleep_ms(10)
         
-        # Test going to FS mode (intermediate step to TX)
-        print("Testing FS mode...")
+        # Final test: Try FS mode again with working frequency
+        print("Final FS mode test...")
         self.spi_write([0xC1])  # SetFs command
         time.sleep_ms(50)
         
         status = self.get_status()
         fs_mode = (status >> 4) & 0x7
-        print(f"FS mode test - Status: 0x{status:02X}, Mode: {fs_mode}")
+        print(f"Final FS test - Status: 0x{status:02X}, Mode: {fs_mode}")
         
         # Return to standby
         self.spi_write([self.CMD_SET_STANDBY, 0x00])
@@ -226,12 +270,38 @@ class SX1262:
         cmd_status = (status >> 1) & 0x7
         print(f"Chip mode: {chip_mode}, Command status: {cmd_status}")
         
-        if cmd_status == 1:  # Command success
+        success = (cmd_status == 1) and (working_freq is not None)
+        if success:
             print("SX1262 initialized successfully!")
         else:
-            print(f"WARNING: Command status indicates issue: {cmd_status}")
+            print(f"WARNING: Initialization issues detected")
         
-        return cmd_status == 1
+        return success
+    
+    def check_device_errors(self, context=""):
+        """Check for device errors and print them"""
+        try:
+            error_data = self.spi_read([0x17, 0x00], 3)  # GetDeviceErrors
+            errors = (error_data[1] << 8) | error_data[2]
+            if errors != 0:
+                print(f"Device errors {context}: 0x{errors:04X}")
+                error_names = []
+                if errors & 0x01: error_names.append("RC64K_CALIB_ERR")
+                if errors & 0x02: error_names.append("RC13M_CALIB_ERR") 
+                if errors & 0x04: error_names.append("PLL_CALIB_ERR")
+                if errors & 0x08: error_names.append("ADC_CALIB_ERR")
+                if errors & 0x10: error_names.append("IMG_CALIB_ERR")
+                if errors & 0x20: error_names.append("XOSC_START_ERR")
+                if errors & 0x40: error_names.append("PLL_LOCK_ERR")
+                if errors & 0x100: error_names.append("PA_RAMP_ERR")
+                print(f"  Specific errors: {', '.join(error_names)}")
+                
+                # Clear errors for next test
+                self.spi_write([0x07, 0x00, 0x00])  # ClearDeviceErrors
+            else:
+                print(f"No device errors {context}")
+        except Exception as e:
+            print(f"Error checking device errors: {e}")
     
     def send_data(self, data):
         """Send data via LoRa"""
