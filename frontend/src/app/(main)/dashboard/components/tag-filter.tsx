@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
 import useToken from '@/hooks/use-token';
-import {  Tag as TagIcon, X } from 'lucide-react';
+import { Tag as TagIcon, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,10 @@ import {
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { getAllTags } from '../../devices/components/tag-api-utils';
+
 import { MachineTag } from '@/lib/types/machine';
+
+import { getAllTags } from '../../devices/components/tag-api-utils';
 
 // Types
 
@@ -142,11 +144,15 @@ const TagFilter: React.FC<TagFilterProps> = ({
 
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground text-sm">Loading tags...</div>
+                <div className="text-muted-foreground text-sm">
+                  Loading tags...
+                </div>
               </div>
             ) : availableTags.length === 0 ? (
               <div className="py-8 text-center">
-                <div className="text-muted-foreground text-sm">No tags found</div>
+                <div className="text-muted-foreground text-sm">
+                  No tags found
+                </div>
               </div>
             ) : (
               <ScrollArea className="h-64">
@@ -166,7 +172,9 @@ const TagFilter: React.FC<TagFilterProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <TagIcon className="h-3 w-3" />
-                            <span className="text-sm font-medium">{tag.name}</span>
+                            <span className="text-sm font-medium">
+                              {tag.name}
+                            </span>
                           </div>
                           {tag.description && (
                             <p className="text-muted-foreground mt-1 text-xs">
