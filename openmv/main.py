@@ -410,10 +410,8 @@ async def send_msg(msgtype, creator, msgbytes, dest):
     return retval
 
 def ack_time(smid):
-    print(f"Finding {smid} in {msgs_recd}")
     for (rmid, msgbytes, t) in msgs_recd:
         if chr(rmid[0]) == "A":
-            print(f"Found an ack {rmid} : {msgbytes}")
             if smid == msgbytes[:MIDLEN]:
                 missingids = []
                 if chr(msgbytes[0]) == 'E' and len(msg) > (MIDLEN+1):
@@ -740,8 +738,8 @@ async def main():
     if my_addr != COMMAN_CENTER_ADDR:
         asyncio.create_task(send_heartbeat())
         # asyncio.create_task(send_scan())
-        # asyncio.create_task(person_detection_loop())
-        # asyncio.create_task(image_sending_loop())
+        asyncio.create_task(person_detection_loop())
+        asyncio.create_task(image_sending_loop())
     else:
         print(f"Starting command center")
         # await init_sim()
