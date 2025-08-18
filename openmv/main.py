@@ -100,6 +100,7 @@ async def sim_send_image(creator, fname):
     global sim
     if sim is None:
         print("Skipping uploading since i dont have a sim card")
+        return False
     img = image.Image(fname)
     imb = img.bytearray()
     encimb = encrypt_if_needed("P", imb)
