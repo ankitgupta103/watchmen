@@ -30,7 +30,7 @@ PHOTO_TAKING_DELAY = 10
 PHOTO_SENDING_DELAY = 60
 
 MIDLEN = 7
-FLAKINESS = 0
+FLAKINESS = 10
 FRAME_SIZE = 195
 
 AIR_SPEED = 62500
@@ -414,7 +414,7 @@ def ack_time(smid):
         if chr(rmid[0]) == "A":
             if smid == msgbytes[:MIDLEN]:
                 missingids = []
-                if chr(msgbytes[0]) == 'E' and len(msg) > (MIDLEN+1):
+                if chr(msgbytes[0]) == 'E' and len(msgbytes) > (MIDLEN+1):
                     print(f"Checking for missing IDs in {msgbytes[MIDLEN+1:]}")
                     missingstr = msgbytes[MIDLEN+1:]
                     missingids = [int(i) for i in missingstr.split(',')]
@@ -650,15 +650,15 @@ def process_message(data):
         alldone, retval, cid, recompiled, creator = end_chunk(mid, msg.decode())
         if alldone:
             # Also when it fails
-            ackmessage += ":-1"
-            asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
+            ackmessage += b":-1"
+            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             if recompiled:
                 img_process(cid, recompiled, creator)
             else:
                 print(f"No recompiled, so not sending")
         else:
-            ackmessage += f":{retval}"
-            asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
+            ackmessage += b":{retval}"
+            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     else:
         print(f"Unseen messages type {mst} in {msg}")
     return True
