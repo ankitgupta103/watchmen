@@ -657,7 +657,7 @@ def process_message(data):
             else:
                 print(f"No recompiled, so not sending")
         else:
-            ackmessage += b":" + retval.encode()
+            ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     else:
         print(f"Unseen messages type {mst} in {msg}")
