@@ -52,10 +52,10 @@ uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for 
 print("Running on device : " + uid.decode())
 if uid == b'e076465dd7194025':
     my_addr = 222
-    shortest_path_to_cc = [1, 9]
+    #shortest_path_to_cc = [1, 9]
 elif uid == b'e076465dd7091027':
     my_addr = 221
-    shortest_path_to_cc = [9]
+    #shortest_path_to_cc = [9]
 elif uid == b'e076465dd7194211':
     my_addr = 9
 else:
@@ -682,9 +682,9 @@ async def send_scan():
     i = 1
     while True:
         scanmsg = f"{my_addr}"
-        # -1 is for Broadcast TODO implement this
-        await send_msg("N", my_addr, scanmsg.encode(), -1)
-        await asyncio.sleep(60) # reduce after setup
+        # 0 is for Broadcast
+        await send_msg("N", my_addr, scanmsg.encode(), 0)
+        await asyncio.sleep(30) # reduce after setup
         print(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
@@ -728,13 +728,13 @@ async def main():
     asyncio.create_task(print_summary())
     if my_addr != COMMAN_CENTER_ADDR:
         asyncio.create_task(send_heartbeat())
-        #asyncio.create_task(send_scan())
-        asyncio.create_task(person_detection_loop())
-        asyncio.create_task(image_sending_loop())
+        asyncio.create_task(send_scan())
+        #asyncio.create_task(person_detection_loop())
+        #asyncio.create_task(image_sending_loop())
     else:
-        await init_sim()
-        #asyncio.create_task(send_spath())
-        #asyncio.create_task(send_scan())
+        #await init_sim()
+        asyncio.create_task(send_spath())
+        asyncio.create_task(send_scan())
     for i in range(24*7):
         await asyncio.sleep(3600)
         print(f"Finished HOUR {i}")
