@@ -737,14 +737,14 @@ async def main():
     asyncio.create_task(print_summary())
     if my_addr != COMMAN_CENTER_ADDR:
         asyncio.create_task(send_heartbeat())
-        asyncio.create_task(send_scan())
-        asyncio.create_task(person_detection_loop())
-        asyncio.create_task(image_sending_loop())
+        # asyncio.create_task(send_scan())
+        # asyncio.create_task(person_detection_loop())
+        # asyncio.create_task(image_sending_loop())
     else:
         print(f"Starting command center")
-        #await init_sim()
-        asyncio.create_task(send_spath())
-        asyncio.create_task(send_scan())
+        # await init_sim()
+        # asyncio.create_task(send_spath())
+        # asyncio.create_task(send_scan())
     for i in range(24*7):
         await asyncio.sleep(3600)
         print(f"Finished HOUR {i}")
