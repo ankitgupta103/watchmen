@@ -641,7 +641,7 @@ def process_message(data):
     ackmessage = mid
     if mst == "N":
         scan_process(mid, msg)
-    if mst == "V":
+    elif mst == "V":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif mst == "S":
         spath_process(mid, msg.decode())
@@ -674,6 +674,7 @@ def process_message(data):
     return True
 
 async def validate_and_remove_neighbours():
+    global shortest_path_to_cc
     while True:
         print(f"Going to validate neighbours : {seen_neighbours}")
         to_be_removed = []
