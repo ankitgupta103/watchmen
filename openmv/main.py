@@ -24,6 +24,8 @@ MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.2
 HB_WAIT_SEC = 60
+SPATH_WAIT = 20
+SCAN_WAIT = 10
 PHOTO_TAKING_DELAY = 300
 PHOTO_SENDING_DELAY = 60
 
@@ -239,33 +241,30 @@ def get_rand():
 def get_msg_id(msgtype, creator, dest):
     rrr = get_rand()
     if dest == 0 or dest == 65535:
-        mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + b'\xffff' + rrr.encode()
+        mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + b'*' + rrr.encode()
     else:
         mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + dest.to_bytes() + rrr.encode()
     return mid
 
 def parse_header(data):
+    mid = b""
     if data == None:
         print(f"Weird that data is none")
         return None
     if len(data) < 9:
         return None
     try:
-        mid = data[:MIDLEN].decode()
+        mid = data[:MIDLEN]
     except Exception as e:
-        print(f"ERROR PARSING {data[:MIDLEN]} Error : {e}")
+        print(f"ERROR PARSING {data[:MIDLEN]}  :  Error : {e}")
         return
-    mst = mid[0]
-    for i in range(MIDLEN):
-        if i in [1,2,3]:
-            if (mid[i] < '1' or mid[i] > '9'):
-                return None
-        else:
-            if (mid[i] < 'A' or mid[i] > 'Z'):
-                return None
+    mst = chr(mid[0])
     creator = int(mid[1])
     sender = int(mid[2])
-    receiver = int(mid[3])
+    if mid[3] == b"*":
+        receiver = -1
+    else:
+        receiver=int(mid[3])
     if chr(data[MIDLEN]) != ';':
         return None
     msg = data[MIDLEN+1:]
@@ -409,7 +408,7 @@ async def send_msg(msgtype, creator, msgbytes, dest):
 
 def ack_time(smid):
     for (rmid, msgbytes, t) in msgs_recd:
-        if rmid[0] == "A":
+        if rmid[0] == b"A":
             msg = msgbytes.decode()
             if smid == msg[:MIDLEN]:
                 missingids = []
@@ -427,7 +426,7 @@ async def log_status():
     ackts = []
     msgs_not_acked = []
     for mid, msg, t in msgs_sent:
-        if mid[0] == "A":
+        if mid[0] == b"A":
             continue
         #log("Getting ackt for " + s + "which was sent at " + str(t))
         ackt, _ = ack_time(mid)
@@ -513,7 +512,7 @@ def clear_chunkid(cid):
 # Assumption is that subsequent end chunks would get the rest
 def end_chunk(mid, msg):
     cid = msg
-    creator = mid[1]
+    creator = int(mid[1])
     missing = get_missing_chunks(cid)
     log(f"I am missing {len(missing)} chunks : {missing}")
     if len(missing) > 0:
@@ -532,7 +531,7 @@ def end_chunk(mid, msg):
 hb_map = {}
 
 def hb_process(mid, msgbytes):
-    creator = mid[1]
+    creator = int(mid[1])
     if running_as_cc():
         if creator not in hb_map:
             hb_map[creator] = 0
@@ -603,7 +602,7 @@ def spath_process(mid, msg):
         for n in seen_neighbours:
             nmsg = my_addr + "," + ",".join(spath)
             print(f"Propogating spath from {spath} to {nmsg}")
-            asyncio.create_task(send_msg("S", mid[1], nmsg.encode(), n))
+            asyncio.create_task(send_msg("S", int(mid[1]), nmsg.encode(), n))
 
 def process_message(data):
     log(f"[RECV {len(data)}] {data} at {time_msec()}")
@@ -618,10 +617,12 @@ def process_message(data):
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
     recv_msg_count[sender] += 1
-    if my_addr != receiver:
+    if receiver != -1 and my_addr != receiver:
         print(f"Strange that {my_addr} is not as {receiver}")
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
+    if receiver == -1 :
+        print(f"processing broadcast message : {data} : {parsed}")
     msgs_recd.append((mid, msg, time_msec()))
     ackmessage = mid
     if mst == "N":
@@ -687,7 +688,7 @@ async def send_scan():
         scanmsg = my_addr.to_bytes()
         # 0 is for Broadcast
         await send_msg("N", my_addr, scanmsg, 65535)
-        await asyncio.sleep(30) # reduce after setup
+        await asyncio.sleep(SCAN_WAIT) # reduce after setup
         print(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
@@ -697,7 +698,7 @@ async def send_spath():
         for n in seen_neighbours:
             print(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp.encode(), n)
-        await asyncio.sleep(60)
+        await asyncio.sleep(SPATH_WAIT)
 
 async def print_summary():
     while True:
