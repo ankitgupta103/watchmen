@@ -27,21 +27,35 @@ def image_to_compressed_bytes(image_path, format="JPEG"):
     return base64_string
 
 
-def call_n8n_workflow(image_bytes):
+def call_n8n_workflow(image_bytes=None):
     """
     Calls the n8n workflow to process the image.
     """
     # API call here
     url = "https://n8n.vyomos.org/webhook-test/watchmen-detect/"
-
-    date = datetime.datetime.now().strftime("%Y-%m-%d")
     machine_id = 228
 
     # Set headers for binary data
+    # payload = {
+    #     "message_type": "event",
+    #     "machine_id": machine_id,
+    #     "image": image_bytes,
+    # }
+
     payload = {
-        "message_type": "event",
+        "message_type": "heartbeat",
         "machine_id": machine_id,
-        "image": image_bytes,
+        "location": {
+            "lat": 0.0,
+            "long": 0.0,
+            "alt": 15.123000000000005,
+        },
+        "device_info": {
+            "neighbours": [],
+            "total_events": 0,
+            "shortest_path": [],
+            "device_type": "modem",  # or GPS
+        },
     }
 
     try:
@@ -54,10 +68,10 @@ def call_n8n_workflow(image_bytes):
 
 
 if __name__ == "__main__":
-    image_path = "/Users/caleb/Downloads/gun-men.jpg"
-    image_bytes = image_to_compressed_bytes(image_path)
+    # image_path = "/Users/caleb/Downloads/gun-men.jpg"
+    # image_bytes = image_to_compressed_bytes(image_path)
     try:
-        response = call_n8n_workflow(image_bytes)
+        response = call_n8n_workflow(None)
         print(response)
     except Exception as e:
         print(f"Error calling n8n workflow: {e}")

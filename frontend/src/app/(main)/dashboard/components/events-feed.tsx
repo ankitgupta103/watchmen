@@ -191,7 +191,6 @@ const getSeverityInfo = (severity: number) => {
   return severityMap[severity as keyof typeof severityMap] || severityMap[0];
 };
 
-// Main component
 export default function EventsFeed({ machines, organizationId }: EventsFeedProps) {
   const { token } = useToken();
   const [events, setEvents] = useState<FeedEvent[]>([]);
@@ -202,7 +201,6 @@ export default function EventsFeed({ machines, organizationId }: EventsFeedProps
   const [hasNext, setHasNext] = useState(true);
   const [totalEvents, setTotalEvents] = useState(0);
 
-  // Filter states
   const [filters, setFilters] = useState<EventFilters>({
     searchQuery: '',
     severityLevels: [],
@@ -210,12 +208,10 @@ export default function EventsFeed({ machines, organizationId }: EventsFeedProps
     machineId: undefined,
   });
 
-  // Date filtering state
   const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange());
   const [selectedPreset, setSelectedPreset] = useState<string>('1month');
   const [tempDateRange, setTempDateRange] = useState<DateRange | null>(null);
 
-  // Image modal state
   const [modalImage, setModalImage] = useState<{
     url: string;
     alt: string;
@@ -226,10 +222,8 @@ export default function EventsFeed({ machines, organizationId }: EventsFeedProps
   const processedEventsRef = useRef<Set<string>>(new Set());
   const isInitialLoad = useRef(true);
 
-  // Use filteredEvents for display instead of events
   const displayEvents = filteredEvents;
 
-  // Client-side search filtering
   useEffect(() => {
     if (!filters.searchQuery.trim()) {
       setFilteredEvents(events);

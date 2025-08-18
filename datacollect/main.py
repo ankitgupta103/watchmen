@@ -2,9 +2,13 @@ import sensor
 import os
 import time
 import machine
+import random
 
 # --- Configuration ---
-LOCATION_ID = "LOC_001"  # An identifier for the camera's location
+# Generate a random location ID using timestamp for uniqueness
+timestamp = time.time()
+random.seed(int(timestamp * 1000))  # Use milliseconds for better randomness
+LOCATION_ID = f"LOC_{random.randint(100000, 999999)}"  # Random 6-digit number
 PERSON_PRESENT_GROUND_TRUTH = False
 CAPTURE_INTERVAL_MS = 30000
 
