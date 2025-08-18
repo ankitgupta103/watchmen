@@ -191,7 +191,8 @@ class GPS:
             return self.latitude, self.longitude
         return None, None
 
-def main():
+
+def example_usage():
     """Main GPS coordinate reader"""
     print("GPS Coordinate Reader")
     print("Initializing...")
@@ -231,5 +232,3 @@ def main():
     except KeyboardInterrupt:
         print("\nStopped.")
 
-if __name__ == "__main__":
-    main()
