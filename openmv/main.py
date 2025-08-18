@@ -261,7 +261,7 @@ def parse_header(data):
     mst = chr(mid[0])
     creator = int(mid[1])
     sender = int(mid[2])
-    if mid[3] == b"*":
+    if mid[3] == 42 or mid:
         receiver = -1
     else:
         receiver=int(mid[3])
@@ -581,8 +581,10 @@ def img_process(cid, msg, creator):
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
-    if msg not in seen_neighbours:
-        seen_neighbours.append(msg)
+    nodeaddr = int.from_bytes(msg)
+    if nodeaddr not in seen_neighbours:
+        print(f"Adding nodeaddr {nodeaddr} to seen_neighbours")
+        seen_neighbours.append(nodeaddr)
 
 def spath_process(mid, msg):
     global shortest_path_to_cc
@@ -626,13 +628,13 @@ def process_message(data):
     msgs_recd.append((mid, msg, time_msec()))
     ackmessage = mid
     if mst == "N":
-        scan_process(mid, msg.decode())
-    if mst == "S":
+        scan_process(mid, msg)
+    elif mst == "S":
         spath_process(mid, msg.decode())
-    if mst == "H":
+    elif mst == "H":
         asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
         hb_process(mid, msg)
-    if mst == "B":
+    elif mst == "B":
         asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
         try:
             begin_chunk(msg.decode())
@@ -653,6 +655,8 @@ def process_message(data):
         else:
             ackmessage += f":{retval}"
             asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
+    else:
+        print(f"Unseen messages type {mst} in {msg}")
     return True
 
 async def send_heartbeat():
@@ -683,6 +687,7 @@ async def send_heartbeat():
         await asyncio.sleep(HB_WAIT_SEC)
 
 async def send_scan():
+    global seen_neighbours
     i = 1
     while True:
         scanmsg = my_addr.to_bytes()
