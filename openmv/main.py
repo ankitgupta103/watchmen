@@ -26,10 +26,12 @@ CHUNK_SLEEP = 0.2
 HB_WAIT_SEC = 30
 SPATH_WAIT = 20
 SCAN_WAIT = 10
+VALIDATE_WAIT_SEC = 60
 PHOTO_TAKING_DELAY = 10
 PHOTO_SENDING_DELAY = 60
 
 MIDLEN = 7
+# TODO Remove
 FLAKINESS = 10
 FRAME_SIZE = 195
 
@@ -54,14 +56,17 @@ uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for 
 print("Running on device : " + uid.decode())
 if uid == b'e076465dd7194025':
     my_addr = 222
+    # TODO Remove
     #shortest_path_to_cc = [1, 9]
 elif uid == b'e076465dd7091027':
     my_addr = 221
+    # TODO Remove
     #shortest_path_to_cc = [9]
 elif uid == b'e076465dd7194211':
     my_addr = 9
 elif uid == b'e076465dd7193a09':
     my_addr = 223
+    # TODO Remove
     shortest_path_to_cc = [9]
 else:
     print("Unknown device ID for " + omv.board_id())
@@ -284,7 +289,7 @@ def ellepsis(msg):
 def ack_needed(msgtype):
     if msgtype == "A":
         return False
-    if msgtype in ["H", "B", "E"]:
+    if msgtype in ["H", "B", "E", "V"]:
         return True
     return False
 
@@ -636,6 +641,8 @@ def process_message(data):
     ackmessage = mid
     if mst == "N":
         scan_process(mid, msg)
+    if mst == "V":
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif mst == "S":
         spath_process(mid, msg.decode())
     elif mst == "H":
@@ -665,6 +672,25 @@ def process_message(data):
     else:
         print(f"Unseen messages type {mst} in {msg}")
     return True
+
+async def validate_and_remove_neighbours():
+    while True:
+        print(f"Going to validate neighbours : {seen_neighbours}")
+        to_be_removed = []
+        for n in seen_neighbours:
+            msgbytes = b"Nothing"
+            success = await send_msg("V", my_addr, msgbytes, n)
+            if success:
+                print(f"Glad to see that neighbour {n} is still within reach")
+            else:
+                print(f"Ohno, will have to drop this neighbour : {n}")
+                to_be_removed.append(n)
+                if n in shortest_path_to_cc:
+                    print(f"Even sadder that this was my shortest path to CC which I am now clearing")
+                    shortest_path_to_cc = []
+        for x in to_be_removed:
+            seen_neighbours.remove(x)
+        await asyncio.sleep(VALIDATE_WAIT_SEC)
 
 async def send_heartbeat():
     global consecutive_hb_failures
@@ -738,16 +764,17 @@ async def main():
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary())
+    asyncio.create_task(validate_and_remove_neighbours())
     if my_addr != COMMAN_CENTER_ADDR:
         asyncio.create_task(send_heartbeat())
-        # asyncio.create_task(send_scan())
-        asyncio.create_task(person_detection_loop())
-        asyncio.create_task(image_sending_loop())
+        asyncio.create_task(send_scan())
+        # asyncio.create_task(person_detection_loop())
+        # asyncio.create_task(image_sending_loop())
     else:
         print(f"Starting command center")
         # await init_sim()
-        # asyncio.create_task(send_spath())
-        # asyncio.create_task(send_scan())
+        asyncio.create_task(send_spath())
+        asyncio.create_task(send_scan())
     for i in range(24*7):
         await asyncio.sleep(3600)
         print(f"Finished HOUR {i}")
