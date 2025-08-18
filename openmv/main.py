@@ -416,7 +416,7 @@ def ack_time(smid):
             print(f"Found an ack {rmid} : {msgbytes}")
             if smid == msgbytes[:MIDLEN]:
                 missingids = []
-                if msg[0] == 'E' and len(msg) > (MIDLEN+1):
+                if chr(msgbytes[0]) == 'E' and len(msg) > (MIDLEN+1):
                     print(f"Checking for missing IDs in {msgbytes[MIDLEN+1:]}")
                     missingstr = msgbytes[MIDLEN+1:]
                     missingids = [int(i) for i in missingstr.split(',')]
