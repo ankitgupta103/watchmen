@@ -412,7 +412,7 @@ async def send_msg(msgtype, creator, msgbytes, dest):
 def ack_time(smid):
     print(f"Finding {smid} in {msgs_recd}")
     for (rmid, msgbytes, t) in msgs_recd:
-        if rmid[0] == b"A":
+        if chr(rmid[0]) == "A":
             print(f"Found an ack {rmid} : {msgbytes}")
             msg = msgbytes.decode()
             if smid == msg[:MIDLEN]:
