@@ -17,22 +17,22 @@ export default function Event({
   event: FeedEvent;
   machines: Machine[];
 }) {
+  const machine = machines.find((machine) => machine.id === event.machine_id);
+
   return (
     <div
       key={event.timestamp.toString()}
       className="space-y-2 rounded-md border p-4"
     >
       <div className="flex gap-2">
-        <h3 className="font-mono text-lg font-semibold">
-          {machines.find((machine) => machine.id === event.machine_id)?.name}
-        </h3>
-        {machines
-          .find((machine) => machine.id === event.machine_id)
-          ?.tags?.map((tag) => (
+        <h3 className="font-mono text-lg font-semibold">{machine?.name}</h3>
+        <div className="flex gap-2">
+          {machine?.tags?.map((tag) => (
             <Badge variant="outline" key={tag.id}>
               {tag.name}
             </Badge>
           ))}
+        </div>
       </div>
       <div className="flex flex-col gap-4 md:flex-row">
         <EventImage

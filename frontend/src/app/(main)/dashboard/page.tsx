@@ -15,7 +15,7 @@ export default async function DashboardPage() {
     `${API_BASE_URL}/machines?organization_uid=${organization_uid}`,
   );
 
-    const {data: allTags} = await fetcher<{data: MachineTag[]}>(
+  const { data: allTags } = await fetcher<{ data: MachineTag[] }>(
     `${API_BASE_URL}/tags?organization_uid=${organization_uid}`,
   );
 
