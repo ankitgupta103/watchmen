@@ -602,7 +602,7 @@ def spath_process(mid, msg):
         print(f"Updating spath to {spath}")
         shortest_path_to_cc = spath
         for n in seen_neighbours:
-            nmsg = my_addr + "," + ",".join(spath)
+            nmsg = f"{my_addr}," + ",".join(spath)
             print(f"Propogating spath from {spath} to {nmsg}")
             asyncio.create_task(send_msg("S", int(mid[1]), nmsg.encode(), n))
 
