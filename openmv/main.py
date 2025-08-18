@@ -17,6 +17,7 @@ import ubinascii
 import enc
 from sim7600x import SIM7600X
 import sx1262
+import gps_driver
 
 print_lock = asyncio.Lock()
 
@@ -29,6 +30,7 @@ SCAN_WAIT = 10
 VALIDATE_WAIT_SEC = 60
 PHOTO_TAKING_DELAY = 10
 PHOTO_SENDING_DELAY = 60
+GPS_WAIT_SEC = 30
 
 MIDLEN = 7
 # TODO Remove
@@ -42,6 +44,7 @@ ENCRYPTION_ENABLED = True
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 image_count = 0                 # Counter to keep tranck of saved images
+gps_str = ""
 
 consecutive_hb_failures = 0
 lora_reinit_count = 0
@@ -180,8 +183,7 @@ async def person_detection_loop():
         print(f"Image count: {image_count}")
         person_detected, confidence = detect_person(img)
         print(f"Person detected = {person_detected}, confidence = {confidence}")
-        #if person_detected:
-        if True:
+        if person_detected:
             r = get_rand()
             raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             print(f"Saving image to {raw_path}")
@@ -699,6 +701,7 @@ async def send_heartbeat():
         # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
+            # my_addr : uptime : photos taken : events seen : gps : gps_staleness : neighbours : shortest_path
             hbmsgstr = f"{my_addr}:{get_human_ts()}"
             hbmsg = hbmsgstr.encode()
             peer_addr = shortest_path_to_cc[0]
@@ -748,6 +751,27 @@ async def print_summary():
         #print(msgs_recd)
         #print(msgs_unacked)
 
+async def keep_updating_gps():
+    global gps_str
+    print("Initializing GPS...")
+    uart = gps_driver.SC16IS750(spi_bus=1, cs_pin="P3")
+    uart.init_gps()
+    gps = gps_driver.GPS(uart)
+    while True:
+        gps.update()
+        print(f"Trying to update gps")
+        if gps.has_fix():
+            lat, lon = gps.get_coordinates()
+            if lat is not None and lon is not None:
+                gps_str = f"LAT: {lat:.6f}, LON: {lon:.6f}"
+                print(gps_str)
+                # TODO add time also here.
+            else:
+                print(f"Empty latlong")
+        else:
+            print(f"GPS has no fix")
+        await asyncio.sleep(GPS_WAIT_SEC)
+
 def image_test():
     r = get_rand()
     print(r)
@@ -769,11 +793,12 @@ async def main():
     if my_addr != COMMAN_CENTER_ADDR:
         asyncio.create_task(send_heartbeat())
         asyncio.create_task(send_scan())
-        # asyncio.create_task(person_detection_loop())
-        # asyncio.create_task(image_sending_loop())
+        asyncio.create_task(keep_updating_gps())
+        #asyncio.create_task(person_detection_loop())
+        #asyncio.create_task(image_sending_loop())
     else:
         print(f"Starting command center")
-        # await init_sim()
+        #await init_sim()
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
     for i in range(24*7):
