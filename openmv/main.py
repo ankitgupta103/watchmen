@@ -67,7 +67,7 @@ elif uid == b'e076465dd7194211':
 elif uid == b'e076465dd7193a09':
     my_addr = 223
     # TODO Remove
-    shortest_path_to_cc = [9]
+    # shortest_path_to_cc = [9]
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
