@@ -666,7 +666,7 @@ async def send_heartbeat():
         # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
-            hbmsgstr = f"{my_addr}:get_human_ts()"
+            hbmsgstr = f"{my_addr}:{get_human_ts()}"
             hbmsg = hbmsgstr.encode()
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg)
