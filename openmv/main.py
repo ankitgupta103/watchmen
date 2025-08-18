@@ -602,7 +602,8 @@ def spath_process(mid, msg):
         print(f"Updating spath to {spath}")
         shortest_path_to_cc = spath
         for n in seen_neighbours:
-            nmsg = f"{my_addr}," + ",".join(spath)
+            nsp = [my_addr] + spath
+            nmsg = f"{nsp}"
             print(f"Propogating spath from {spath} to {nmsg}")
             asyncio.create_task(send_msg("S", int(mid[1]), nmsg.encode(), n))
 
@@ -632,10 +633,10 @@ def process_message(data):
     elif mst == "S":
         spath_process(mid, msg.decode())
     elif mst == "H":
-        asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
         hb_process(mid, msg)
     elif mst == "B":
-        asyncio.create_task(send_msg("A", my_addr, ackmessage.encode(), sender))
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
         try:
             begin_chunk(msg.decode())
         except Exception as e:
