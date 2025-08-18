@@ -71,8 +71,8 @@ def eval_dir(detector, dname):
 def main():
     detector = Detector()
     detector.set_debug_mode()
-    detector.ImageHasPerson(sys.argv[1])
-    # eval_dir(detector, "/Users/ankitgupta/yolo/testdata/images_cv/")
+    #detector.ImageHasPerson(sys.argv[1])
+    eval_dir(detector, "/Users/ankitgupta/watchmen/src/testdata/t11/")
 
 if __name__=="__main__":
     main()
