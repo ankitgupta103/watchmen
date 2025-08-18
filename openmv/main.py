@@ -238,8 +238,35 @@ def get_rand():
 # TypeSourceDestRRRandom
 def get_msg_id(msgtype, creator, dest):
     rrr = get_rand()
-    mid = f"{msgtype}{creator}{my_addr}{dest}{rrr}"
+    mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + dest.to_bytes() + rrr.encode()
     return mid
+
+def parse_header(data):
+    if data == None:
+        print(f"Weird that data is none")
+        return None
+    if len(data) < 9:
+        return None
+    try:
+        mid = data[:MIDLEN].decode()
+    except Exception as e:
+        print(f"ERROR PARSING {data[:MIDLEN]} Error : {e}")
+        return
+    mst = mid[0]
+    for i in range(MIDLEN):
+        if i in [1,2,3]:
+            if (mid[i] < '1' or mid[i] > '9'):
+                return None
+        else:
+            if (mid[i] < 'A' or mid[i] > 'Z'):
+                return None
+    creator = int(mid[1])
+    sender = int(mid[2])
+    receiver = int(mid[3])
+    if chr(data[MIDLEN]) != ';':
+        return None
+    msg = data[MIDLEN+1:]
+    return (mid, mst, creator, sender, receiver, msg)
 
 def ellepsis(msg):
     if len(msg) > 200:
@@ -282,7 +309,7 @@ def pop_and_get(mid):
 
 async def send_single_msg(msgtype, creator, msgbytes, dest):
     mid = get_msg_id(msgtype, creator, dest)
-    databytes = mid.encode() + b";" + msgbytes
+    databytes = mid + b";" + msgbytes
     ackneeded = ack_needed(msgtype)
     unackedid = 0
     timesent = time_msec()
@@ -499,33 +526,6 @@ def end_chunk(mid, msg):
         recompiled = recompile_msg(cid)
         return (True, None, cid, recompiled, creator)
 
-def parse_header(data):
-    if data == None:
-        print(f"Weird that data is none")
-        return None
-    if len(data) < 9:
-        return None
-    try:
-        mid = data[:MIDLEN].decode()
-    except Exception as e:
-        print(f"ERROR PARSING {data[:MIDLEN]} Error : {e}")
-        return
-    mst = mid[0]
-    for i in range(MIDLEN):
-        if i in [1,2,3]:
-            if (mid[i] < '1' or mid[i] > '9'):
-                return None
-        else:
-            if (mid[i] < 'A' or mid[i] > 'Z'):
-                return None
-    creator = int(mid[1])
-    sender = int(mid[2])
-    receiver = int(mid[3])
-    if chr(data[MIDLEN]) != ';':
-        return None
-    msg = data[MIDLEN+1:]
-    return (mid, mst, creator, sender, receiver, msg)
-
 hb_map = {}
 
 def hb_process(mid, msgbytes):
@@ -657,9 +657,9 @@ async def send_heartbeat():
         # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
-            hbmsg = f"{my_addr}:{get_human_ts()}"
+            hbmsg = my_addr.encode() + b":" + get_human_ts().encode()
             peer_addr = shortest_path_to_cc[0]
-            msgbytes = encrypt_if_needed("H", hbmsg.encode())
+            msgbytes = encrypt_if_needed("H", hbmsg)
             success = await send_msg("H", my_addr, msgbytes, peer_addr)
             if success:
                 consecutive_hb_failures = 0
@@ -681,9 +681,9 @@ async def send_heartbeat():
 async def send_scan():
     i = 1
     while True:
-        scanmsg = f"{my_addr}"
+        scanmsg = my_addr.to_bytes()
         # 0 is for Broadcast
-        await send_msg("N", my_addr, scanmsg.encode(), 0)
+        await send_msg("N", my_addr, scanmsg, 0)
         await asyncio.sleep(30) # reduce after setup
         print(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
@@ -694,7 +694,7 @@ async def send_spath():
         for n in seen_neighbours:
             print(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp.encode(), n)
-            await asyncio.sleep(60)
+        await asyncio.sleep(60)
 
 async def print_summary():
     while True:
@@ -718,11 +718,6 @@ def image_test():
 
 async def main():
     log(f"[INFO] Started device {my_addr}")
-    #img = sensor.snapshot()
-    #img.save("sim_test_image.jpg")
-    #await init_sim()
-    #await sim_send_image(228, "sim_test_image.jpg")
-    #return
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary())
@@ -732,6 +727,7 @@ async def main():
         #asyncio.create_task(person_detection_loop())
         #asyncio.create_task(image_sending_loop())
     else:
+        print(f"Starting command center")
         #await init_sim()
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
