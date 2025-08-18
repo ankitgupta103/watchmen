@@ -414,12 +414,12 @@ def ack_time(smid):
     for (rmid, msgbytes, t) in msgs_recd:
         if chr(rmid[0]) == "A":
             print(f"Found an ack {rmid} : {msgbytes}")
-            msg = msgbytes.decode()
-            if smid == msg[:MIDLEN]:
+            if smid == msgbytes[:MIDLEN]:
                 missingids = []
                 print(f"Checking for missing IDs in {msg[MIDLEN+1:]}")
                 if msg[0] == 'E' and len(msg) > (MIDLEN+1):
-                    missingids = [int(i) for i in msg[MIDLEN+1:].split(',')]
+                    missingstr = msgbytes[MIDLEN+1:]
+                    missingids = [int(i) for i in missingstr.split(',')]
                 return (t, missingids)
     return (-1, None)
 
