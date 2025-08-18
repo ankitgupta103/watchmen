@@ -1,14 +1,10 @@
-# cellular_driver.py
-# Production Bulk Cellular Transfer System
-# Save this as a separate file to import
-
 import time
 import json
 from machine import SPI, Pin
 import gc
 
 class SC16IS750:
-    """Optimized SC16IS750 driver for production use"""
+    """ Optimized SC16IS750 driver """
     
     def __init__(self, spi_bus=1, cs_pin="P3", baudrate=115200):
         self.cs = Pin(cs_pin, Pin.OUT)
@@ -81,8 +77,8 @@ class SC16IS750:
                 
         return data.strip()
 
-class ProductionBulkCellular:
-    """Production cellular system - initialize once, use continuously"""
+class Cellular:
+    """cellular system - initialize once, use continuously"""
     
     def __init__(self, machine_id=228):
         self.uart = SC16IS750()
@@ -94,6 +90,9 @@ class ProductionBulkCellular:
         self.upload_count = 0
         
         # Proven APN configurations (ordered by success probability)
+        # APN is failing sometimes, so I have added multiple configurations
+        # to increase chances of successful connection.
+        # These are based on common APNs used in India, especially for Airtel.
         self.apn_configs = [
             {"apn": "airtelgprs", "name": "Airtel Primary"},
             {"apn": "airtelgprs.com", "name": "Airtel .com"},
@@ -145,7 +144,7 @@ class ProductionBulkCellular:
                     ip_part = response.split("+CGPADDR:")[1]
                     ip_address = ip_part.split(",")[1].strip().strip('"')
                     if ip_address and ip_address != "0.0.0.0":
-                        print(f"  ✓ Connected! IP: {ip_address}")
+                        print(f"Connected! IP: {ip_address}")
                         self.ip_address = ip_address
                         self.working_apn = apn
                         return True
@@ -155,18 +154,18 @@ class ProductionBulkCellular:
             return False
             
         except Exception as e:
-            print(f"  ✗ Exception: {e}")
+            print(f"    Exception: {e}")
             return False
     
     def initialize(self):
         """One-time initialization - call this at startup"""
-        print("=== Production System Initialization ===")
+        print("=== Initialization ===")
         
         try:
             # Basic setup
             success, _ = self._send_at("AT", timeout_ms=2000)
             if not success:
-                print("✗ Modem not responding")
+                print("Modem not responding")
                 return False
             
             self._send_at("ATE0")
@@ -174,16 +173,16 @@ class ProductionBulkCellular:
             # Check SIM
             success, response = self._send_at("AT+CPIN?", timeout_ms=5000)
             if "READY" not in response:
-                print("✗ SIM card not ready")
+                print("SIM card not ready")
                 return False
-            print("✓ SIM card ready")
+            print("SIM card ready")
                 
             # Check signal
             success, response = self._send_at("AT+CSQ")
             if "+CSQ:" in response:
                 signal = response.split("+CSQ:")[1].split(",")[0].strip()
                 if signal.isdigit() and int(signal) > 0:
-                    print(f"✓ Signal strength: {signal}/31")
+                    print(f"Signal strength: {signal}/31")
                     
             # Set network mode
             self._send_at("AT+CNMP=38")
@@ -193,11 +192,11 @@ class ProductionBulkCellular:
             for attempt in range(30):
                 success, response = self._send_at("AT+CREG?")
                 if "+CREG:" in response and (",1" in response or ",5" in response):
-                    print("✓ Network registered")
+                    print("Network registered")
                     break
                 time.sleep_ms(1000)
             else:
-                print("✗ Registration timeout")
+                print("Registration timeout")
                 return False
             
             # Try APNs
@@ -205,19 +204,19 @@ class ProductionBulkCellular:
             for apn_config in self.apn_configs:
                 if self._test_apn(apn_config):
                     self.connected = True
-                    print(f"✓ Connected with {apn_config['name']}")
+                    print(f"Connected with {apn_config['name']}")
                     break
                 time.sleep_ms(1000)
             
             if not self.connected:
-                print("✗ All APNs failed")
+                print("All APNs failed")
                 return False
             
             # Initialize HTTP
             if not self._init_http():
                 return False
             
-            print(f"\n✓ SYSTEM READY")
+            print(f"\nSYSTEM READY")
             print(f"APN: {self.working_apn}")
             print(f"IP: {self.ip_address}")
             print(f"Ready for data uploads\n")
@@ -252,7 +251,7 @@ class ProductionBulkCellular:
         time.sleep_ms(500)
         
         self.http_initialized = True
-        print("✓ HTTP ready")
+        print("HTTP ready")
         return True
     
     def _send_data_raw(self, data):
@@ -264,9 +263,9 @@ class ProductionBulkCellular:
         return "OK" in response or len(response) > 0
     
     def upload_data(self, data_payload, url="https://n8n.vyomos.org/webhook/watchmen-detect"):
-        """Upload data - call this whenever you need to send data"""
+        """Upload data"""
         if not self.connected or not self.http_initialized:
-            print("✗ System not initialized")
+            print("  System not initialized")
             return None
         
         try:
@@ -287,7 +286,7 @@ class ProductionBulkCellular:
             # Set URL
             success, response = self._send_at(f'AT+HTTPPARA="URL","{url}"', timeout_ms=5000)
             if not success:
-                print("✗ Failed to set URL")
+                print("Failed to set URL")
                 return None
             
             # Set content type
@@ -303,7 +302,7 @@ class ProductionBulkCellular:
                 upload_time = time.ticks_diff(time.ticks_ms(), upload_start) / 1000
                 
                 if upload_success:
-                    print(f"✓ Data uploaded in {upload_time:.2f}s")
+                    print(f"Data uploaded in {upload_time:.2f}s")
                     
                     # Execute POST
                     success, response = self._send_at("AT+HTTPACTION=1", timeout_ms=30000)
@@ -348,19 +347,19 @@ class ProductionBulkCellular:
                         }
                         
                         if status_code == 200:
-                            print(f"✓ SUCCESS: Upload #{self.upload_count}")
+                            print(f"SUCCESS: Upload #{self.upload_count}")
                         else:
-                            print(f"⚠ HTTP {status_code}: Upload #{self.upload_count}")
+                            print(f"HTTP {status_code}: Upload #{self.upload_count}")
                         
                         return result
                     else:
-                        print("✗ POST execution failed")
+                        print("POST execution failed")
                         return None
                 else:
-                    print("✗ Data upload failed")
+                    print("Data upload failed")
                     return None
             else:
-                print(f"✗ No DOWNLOAD prompt")
+                print(f"No DOWNLOAD prompt")
                 return None
                 
         except Exception as e:
@@ -392,4 +391,4 @@ class ProductionBulkCellular:
         if self.connected:
             self._send_at("AT+CGACT=0,1")
             self.connected = False
-        print("✓ System shutdown")
+        print("  System shutdown")

@@ -1,7 +1,3 @@
-# main_camera_cellular.py
-# Main script for device e076465dd7194025 (machine_id: 222)
-# Captures and uploads images every 30 seconds via cellular
-
 import sensor
 import image
 import time
@@ -12,12 +8,11 @@ import binascii
 import sys
 import enc
 
-# Import the cellular driver module
-from cellular_driver import ProductionBulkCellular
+from cellular_driver import Cellular
 
 # Constants
-MACHINE_ID = 222  # For device e076465dd7194025
-IMAGE_CAPTURE_INTERVAL = 30  # seconds
+MACHINE_ID = 222                                          # For device e076465dd7194025
+IMAGE_CAPTURE_INTERVAL = 30                               # seconds
 URL = "https://n8n.vyomos.org/webhook/watchmen-detect"
 
 # Global variables
@@ -27,11 +22,13 @@ image_count = 0
 def init_camera():
     """Initialize the camera sensor"""
     print("Initializing camera...")
+
     sensor.reset()
     sensor.set_pixformat(sensor.RGB565)
-    sensor.set_framesize(sensor.WQXGA2)  # 320x240
+    sensor.set_framesize(sensor.HD)
     sensor.skip_frames(time=2000)
-    print("✓ Camera initialized")
+
+    print("  Camera initialized")
 
 def capture_image():
     """Capture an image from the camera"""
@@ -43,6 +40,7 @@ def capture_image():
 
     # Convert to JPEG for smaller size
     img_jpeg = img.compress(quality=70)
+
 
     return img_jpeg
 
@@ -68,7 +66,11 @@ def prepare_image_payload(img_jpeg):
         }
     }
 
+    print(f"Payload prepared: {payload}")
+
     return payload
+
+
 
 def encrypt_if_needed(mst, msg):
     # if not ENCRYPTION_ENABLED:
@@ -92,13 +94,13 @@ def init_cellular():
     global cellular_system
 
     print("\n=== Initializing Cellular System ===")
-    cellular_system = ProductionBulkCellular(machine_id=MACHINE_ID)
+    cellular_system = Cellular(machine_id=MACHINE_ID)
 
     if not cellular_system.initialize():
-        print("✗ Cellular initialization failed!")
+        print("Cellular initialization failed!")
         return False
 
-    print("✓ Cellular system ready")
+    print("Cellular system ready")
     return True
 
 def upload_image(img_jpeg):
@@ -106,14 +108,14 @@ def upload_image(img_jpeg):
     global cellular_system
 
     if not cellular_system:
-        print("✗ Cellular system not initialized")
+        print("Cellular system not initialized")
         return False
 
     # Check connection health
     if not cellular_system.check_connection():
         print("Connection lost - attempting reconnect...")
         if not cellular_system.reconnect():
-            print("✗ Reconnection failed")
+            print("  Reconnection failed")
             return False
 
     # Prepare payload
@@ -123,35 +125,35 @@ def upload_image(img_jpeg):
     result = cellular_system.upload_data(payload, URL)
 
     if result and result.get('status_code') == 200:
-        print(f"✓ Image #{image_count} uploaded successfully")
-        print(f"  Upload time: {result.get('upload_time', 0):.2f}s")
-        print(f"  Data size: {result.get('data_size', 0)/1024:.2f} KB")
+        print(f"Image #{image_count} uploaded successfully")
+        print(f"Upload time: {result.get('upload_time', 0):.2f}s")
+        print(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
         return True
     else:
-        print(f"✗ Failed to upload image #{image_count}")
+        print(f"Failed to upload image #{image_count}")
         if result:
-            print(f"  HTTP Status: {result.get('status_code', 'Unknown')}")
+            print(f"HTTP Status: {result.get('status_code', 'Unknown')}")
         return False
 
 def main():
-    """Main function - captures and uploads images every 30 seconds"""
-
+   
+    # Image every 30 seconds
     # Verify device ID
     uid = binascii.hexlify(machine.unique_id())
     print(f"Running on device: {uid.decode()}")
 
     if uid != b'e076465dd7194025':
-        print("✗ Error: This script is configured for device e076465dd7194025")
+        print("  Error: This script is configured for device e076465dd7194025")
         print(f"  Current device: {uid.decode()}")
         sys.exit(1)
 
-    print(f"✓ Device verified: Machine ID {MACHINE_ID}")
+    print(f"  Device verified: Machine ID {MACHINE_ID}")
 
     # Initialize systems
     init_camera()
 
     if not init_cellular():
-        print("✗ Failed to initialize cellular - exiting")
+        print("Failed to initialize cellular - exiting")
         return
 
     print(f"\n=== Starting Image Capture Loop ===")
@@ -167,9 +169,9 @@ def main():
             # Capture image
             try:
                 img_jpeg = capture_image()
-                print(f"✓ Image captured: {len(img_jpeg.bytearray())} bytes")
+                print(f"Image captured: {len(img_jpeg.bytearray())} bytes")
             except Exception as e:
-                print(f"✗ Image capture error: {e}")
+                print(f"Image capture error: {e}")
                 consecutive_failures += 1
                 if consecutive_failures >= max_failures:
                     print("Too many failures - restarting...")
@@ -195,7 +197,7 @@ def main():
                         consecutive_failures = 0
 
             except Exception as e:
-                print(f"✗ Upload error: {e}")
+                print(f"  Upload error: {e}")
                 consecutive_failures += 1
 
             # Memory cleanup
@@ -214,7 +216,7 @@ def main():
         print("\n=== Shutting Down ===")
         if cellular_system:
             cellular_system.shutdown()
-        print("✓ System stopped")
+        print(" System stopped")
     except Exception as e:
         print(f"\n=== System Error ===")
         print(f"Error: {e}")
@@ -223,7 +225,12 @@ def main():
         # Restart the system after critical error
         machine.reset()
 
-# Optional: Create a simple async version if you prefer asyncio
+# Asyncio version
+# Need to confirm how much efficient it is to use asyncio with OpenMV
+# OpenMV has limited support for asyncio, so this is a basic implementation
+
+
+# from tests {asynch upload is more efficient, need less time to upload images through AT commmands}
 import uasyncio as asyncio
 
 async def async_capture_and_upload():
@@ -243,9 +250,9 @@ async def async_capture_and_upload():
             result = cellular_system.upload_data(payload, URL)
 
             if result and result.get('status_code') == 200:
-                print(f"✓ Async upload successful")
+                print(f"  Async upload successful")
             else:
-                print(f"✗ Async upload failed")
+                print(f"  Async upload failed")
 
             # Cleanup
             gc.collect()
