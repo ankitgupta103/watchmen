@@ -594,7 +594,7 @@ def spath_process(mid, msg):
     if len(msg) == 0:
         print(f"Empty spath")
         return
-    spath = msg.split(",")
+    spath = [int(x) for x in msg.split(",")]
     if my_addr in spath:
         print(f"Cyclic, ignoring {my_addr} already in {spath}")
         return
@@ -665,7 +665,8 @@ async def send_heartbeat():
         # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
-            hbmsg = my_addr.encode() + b":" + get_human_ts().encode()
+            hbmsgstr = f"{my_addr}:get_human_ts()"
+            hbmsg = hbmsgstr.encode()
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg)
             success = await send_msg("H", my_addr, msgbytes, peer_addr)
