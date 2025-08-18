@@ -238,7 +238,10 @@ def get_rand():
 # TypeSourceDestRRRandom
 def get_msg_id(msgtype, creator, dest):
     rrr = get_rand()
-    mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + dest.to_bytes() + rrr.encode()
+    if dest == 0 or dest == 65535:
+        mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + b'\xffff' + rrr.encode()
+    else:
+        mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + dest.to_bytes() + rrr.encode()
     return mid
 
 def parse_header(data):
@@ -675,7 +678,7 @@ async def send_heartbeat():
                     except Exception as e:
                         print(f"Error reinitializing LoRa: {e}")
         else:
-            print("Not sending right now")
+            print("Not sending heartbeat right now because i dont know my shortest path")
         await asyncio.sleep(HB_WAIT_SEC)
 
 async def send_scan():
@@ -683,7 +686,7 @@ async def send_scan():
     while True:
         scanmsg = my_addr.to_bytes()
         # 0 is for Broadcast
-        await send_msg("N", my_addr, scanmsg, 0)
+        await send_msg("N", my_addr, scanmsg, 65535)
         await asyncio.sleep(30) # reduce after setup
         print(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
