@@ -47,25 +47,25 @@ const isMachineOnline = (machine: Machine): boolean => {
   if (machine.is_online !== undefined) {
     return machine.is_online;
   }
-  
+
   if (!machine.last_seen) {
     return false;
   }
-  
+
   const lastSeen = new Date(machine.last_seen);
   const now = new Date();
   const diffInMinutes = (now.getTime() - lastSeen.getTime()) / (1000 * 60);
-  
+
   // Consider machine online if last seen within 5 minutes
   return diffInMinutes <= 5;
 };
 
 const formatBufferSize = (bytes?: number): string => {
   if (!bytes || bytes === 0) return '0 B';
-  
+
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  
+
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
 };
 
@@ -75,7 +75,7 @@ function DeviceBuffer({ machineId }: { machineId: number }) {
   // For now, returning a placeholder
   console.log('machineId', machineId);
   const buffer = 0; // Replace with actual buffer data from your hook
-  
+
   return <TableCell>{formatBufferSize(buffer)}</TableCell>;
 }
 
@@ -118,8 +118,8 @@ export default function DeviceListing({ machines }: DeviceListingProps) {
         {machines.map((machine) => (
           <TableRow key={machine.id}>
             <TableCell className="font-medium">
-              <Link 
-                href={`/dashboard/${machine.id}`} 
+              <Link
+                href={`/dashboard/${machine.id}`}
                 className="text-blue-600 hover:text-blue-800 hover:underline"
               >
                 {machine.name}

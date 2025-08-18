@@ -1,24 +1,35 @@
-import { CroppedImage } from './machine';
-
-export interface MachineEvent {
-  id: string;
-  timestamp: Date;
-  eventstr: string;
-  severity: number;
-  original_image_path?: string;
-  cropped_images?: CroppedImage[];
+export interface CroppedImage {
+  class_name: string;
+  confidence: number;
+  image_file_path: string;
 }
 
-export interface EventMessage {
-  image_c_key: string;
-  image_f_key: string;
-  eventstr: string;
-  event_severity: number;
-  meta: {
-    node_id: string;
-    hb_count: string;
-    last_hb_time: string;
-    photos_taken: string;
-    events_seen: string;
+export interface EventFeedFilters {
+  search_query: string;
+  severity_levels: number[];
+  tag_ids: number[];
+}
+
+export interface FeedEvent {
+  original_image_path: string;
+  annotated_image_path: string;
+  cropped_images: CroppedImage[];
+  timestamp: number;
+  machine_id: number;
+  severity: number;
+}
+
+export interface S3EventFeedResponse {
+  success: boolean;
+  events: FeedEvent[];
+  chunk: number;
+  events_per_chunk: number;
+  total_events: number;
+  total_chunks: number;
+  has_next: boolean;
+  applied_filters: EventFeedFilters;
+  date_range: {
+    start_date: string;
+    end_date: string;
   };
 }

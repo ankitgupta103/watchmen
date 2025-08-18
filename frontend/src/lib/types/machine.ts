@@ -1,12 +1,8 @@
-import { MachineEvent } from './activity';
-
 export interface MachineTag {
   id: number;
   name: string;
   key: string;
-  description?: string;
-  created_at: string;
-  updated_at: string;
+  description: string;
 }
 
 export interface Machine {
@@ -83,9 +79,9 @@ export interface MQTTEvent {
 
 export interface MachineData {
   machine_id: number;
-  events: MachineEvent[];
+  events: FeedEvent[];
   event_count: number;
-  last_event?: MachineEvent; // This will now use the correct type
+  last_event?: FeedEvent;
   last_updated: string;
   is_online: boolean;
   location: {
