@@ -264,7 +264,7 @@ def parse_header(data):
     mst = chr(mid[0])
     creator = int(mid[1])
     sender = int(mid[2])
-    if mid[3] == 42 or mid:
+    if mid[3] == 42 or mid == b"*":
         receiver = -1
     else:
         receiver=int(mid[3])
