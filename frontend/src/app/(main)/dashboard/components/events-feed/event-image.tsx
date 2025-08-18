@@ -54,7 +54,10 @@ export default function EventImage({
           alt={'Event Image'}
           width={1920}
           height={1080}
-          className={cn('h-full w-auto rounded-md object-contain', className)}
+          className={cn(
+            'h-full w-auto cursor-pointer rounded-md object-contain',
+            className,
+          )}
           onClick={() => setEnlargeImage(true)}
         />
       ) : (
