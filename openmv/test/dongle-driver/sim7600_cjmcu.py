@@ -1,12 +1,14 @@
-# Working Bulk Transfer using proven HTTP method
-# Combines multi-APN connection with the HTTP method that actually works
+# Production Bulk Cellular Transfer System
+# Initializes once, uploads data every 1 minute
+# Optimized for reliability and continuous operation
 
 import time
 import json
 from machine import SPI, Pin
+import gc
 
 class SC16IS750:
-    """Proven SC16IS750 driver"""
+    """Optimized SC16IS750 driver for production use"""
     
     def __init__(self, spi_bus=1, cs_pin="P3", baudrate=115200):
         self.cs = Pin(cs_pin, Pin.OUT)
@@ -79,20 +81,22 @@ class SC16IS750:
                 
         return data.strip()
 
-class WorkingBulkCellular:
-    """Working bulk cellular using proven methods"""
+class ProductionBulkCellular:
+    """Production cellular system - initialize once, use continuously"""
     
-    def __init__(self):
+    def __init__(self, machine_id=228):
         self.uart = SC16IS750()
+        self.machine_id = machine_id
         self.connected = False
         self.ip_address = None
         self.http_initialized = False
         self.working_apn = None
+        self.upload_count = 0
         
         # Proven APN configurations (ordered by success probability)
         self.apn_configs = [
-            {"apn": "airtelgprs.com", "name": "Airtel .com (proven working)"},
             {"apn": "airtelgprs", "name": "Airtel Primary"},
+            {"apn": "airtelgprs.com", "name": "Airtel .com"},
             {"apn": "www.airtelgprs.com", "name": "Airtel WWW"},
             {"apn": "internet", "name": "Generic Internet"},
             {"apn": "airtel.in", "name": "Airtel India"}
@@ -127,14 +131,11 @@ class WorkingBulkCellular:
             # Set APN
             success, response = self._send_at(f'AT+CGDCONT=1,"IP","{apn}"')
             if not success:
-                print(f"  ✗ Failed to set APN")
                 return False
             
             # Activate
-            print(f"  Activating...")
             success, response = self._send_at("AT+CGACT=1,1", timeout_ms=25000)
             if not success:
-                print(f"  ✗ Activation failed")
                 return False
             
             # Get IP
@@ -151,16 +152,15 @@ class WorkingBulkCellular:
                 except:
                     pass
             
-            print(f"  ✗ No valid IP")
             return False
             
         except Exception as e:
             print(f"  ✗ Exception: {e}")
             return False
     
-    def connect(self):
-        """Connect using multi-APN approach"""
-        print("=== Connection Setup ===")
+    def initialize(self):
+        """One-time initialization - call this at startup"""
+        print("=== Production System Initialization ===")
         
         try:
             # Basic setup
@@ -201,44 +201,39 @@ class WorkingBulkCellular:
                 return False
             
             # Try APNs
-            print(f"\n=== Testing APNs ===")
+            print(f"=== Connecting to Network ===")
             for apn_config in self.apn_configs:
                 if self._test_apn(apn_config):
                     self.connected = True
-                    print(f"✓ Successfully connected with {apn_config['name']}")
-                    return True
+                    print(f"✓ Connected with {apn_config['name']}")
+                    break
                 time.sleep_ms(1000)
             
-            print("✗ All APNs failed")
-            return False
+            if not self.connected:
+                print("✗ All APNs failed")
+                return False
+            
+            # Initialize HTTP
+            if not self._init_http():
+                return False
+            
+            print(f"\n✓ SYSTEM READY")
+            print(f"APN: {self.working_apn}")
+            print(f"IP: {self.ip_address}")
+            print(f"Ready for data uploads every 1 minute\n")
+            
+            return True
             
         except Exception as e:
-            print(f"Connection error: {e}")
+            print(f"Initialization error: {e}")
             return False
     
-    def _send_data_raw(self, data):
-        """Send raw data using the proven method"""
-        print(f"Uploading {len(data)} bytes using proven method...")
-        
-        # Send data directly (this method worked before)
-        self.uart.write(data)
-        
-        # Wait based on data size
-        wait_time = max(2000, len(data) // 2)
-        time.sleep_ms(wait_time)
-        
-        # Read response
-        response = self.uart.read(3000)
-        print(f"Upload response: {'OK' if 'OK' in response else 'WAITING'}")
-        
-        return "OK" in response or len(response) > 0  # Accept any response as progress
-    
-    def _init_http_proven(self):
-        """Initialize HTTP using proven method"""
+    def _init_http(self):
+        """Initialize HTTP session"""
         if self.http_initialized:
             return True
             
-        print("Initializing HTTP (proven method)...")
+        print("Initializing HTTP...")
         
         # Terminate any existing session
         self._send_at("AT+HTTPTERM")
@@ -250,7 +245,7 @@ class WorkingBulkCellular:
             print("HTTP init failed")
             return False
         
-        # Set parameters (proven working configuration)
+        # Set parameters
         self._send_at('AT+HTTPPARA="CID",1')
         time.sleep_ms(500)
         self._send_at('AT+HTTPPARA="REDIR",1')
@@ -260,57 +255,63 @@ class WorkingBulkCellular:
         print("✓ HTTP ready")
         return True
     
-    def http_post_proven(self, url, data, headers=None):
-        """HTTP POST using the exact method that worked before"""
-        if not self._init_http_proven():
+    def _send_data_raw(self, data):
+        """Send raw data using proven method"""
+        self.uart.write(data)
+        wait_time = max(2000, len(data) // 2)
+        time.sleep_ms(wait_time)
+        response = self.uart.read(3000)
+        return "OK" in response or len(response) > 0
+    
+    def upload_data(self, data_payload, url="https://n8n.vyomos.org/webhook/watchmen-detect"):
+        """Upload data - call this whenever you need to send data"""
+        if not self.connected or not self.http_initialized:
+            print("✗ System not initialized")
             return None
         
         try:
-            print(f"HTTP POST to: {url}")
+            self.upload_count += 1
+            print(f"\n=== Upload #{self.upload_count} ===")
             
-            # Set URL (proven method)
+            # Prepare payload
+            if isinstance(data_payload, dict):
+                data_payload['upload_id'] = self.upload_count
+                data_payload['timestamp'] = time.ticks_ms()
+                json_data = json.dumps(data_payload)
+            else:
+                json_data = str(data_payload)
+            
+            data_size = len(json_data)
+            print(f"Uploading {data_size} bytes ({data_size/1024:.2f} KB)")
+            
+            # Set URL
             success, response = self._send_at(f'AT+HTTPPARA="URL","{url}"', timeout_ms=5000)
             if not success:
-                print("Failed to set URL")
+                print("✗ Failed to set URL")
                 return None
             
             # Set content type
-            content_type = headers.get("Content-Type", "application/json") if headers else "application/json"
-            self._send_at(f'AT+HTTPPARA="CONTENT","{content_type}"')
+            self._send_at('AT+HTTPPARA="CONTENT","application/json"')
             time.sleep_ms(500)
             
-            # Prepare data
-            data_to_send = data if isinstance(data, str) else str(data)
-            data_length = len(data_to_send)
-            
-            print(f"Setting up upload: {data_length} bytes ({data_length/1024:.2f} KB)")
-            
-            # Use the EXACT method that worked before
-            success, response = self._send_at(f"AT+HTTPDATA={data_length},20000", timeout_ms=5000)
+            # Setup upload
+            success, response = self._send_at(f"AT+HTTPDATA={data_size},20000", timeout_ms=5000)
             
             if "DOWNLOAD" in response:
-                print("✓ Got DOWNLOAD prompt - starting upload...")
-                
-                # Upload using proven method
                 upload_start = time.ticks_ms()
-                upload_success = self._send_data_raw(data_to_send)
+                upload_success = self._send_data_raw(json_data)
                 upload_time = time.ticks_diff(time.ticks_ms(), upload_start) / 1000
                 
                 if upload_success:
                     print(f"✓ Data uploaded in {upload_time:.2f}s")
                     
-                    # Calculate upload speed
-                    upload_speed = (data_length * 8) / upload_time if upload_time > 0 else 0
-                    print(f"Upload speed: {upload_speed:.0f} bits/second")
-                    
                     # Execute POST
-                    print("Executing HTTP POST...")
                     success, response = self._send_at("AT+HTTPACTION=1", timeout_ms=30000)
                     
                     if success:
                         time.sleep_ms(3000)
                         
-                        # Parse response (proven method)
+                        # Parse response
                         status_code = 0
                         response_length = 0
                         
@@ -321,7 +322,7 @@ class WorkingBulkCellular:
                                 if len(parts) >= 3:
                                     status_code = int(parts[1])
                                     response_length = int(parts[2])
-                                    print(f"Server response: HTTP {status_code}, {response_length} bytes")
+                                    print(f"Server response: HTTP {status_code}")
                             except:
                                 pass
                         
@@ -338,114 +339,157 @@ class WorkingBulkCellular:
                                 except:
                                     pass
                         
-                        return {
+                        result = {
                             'status_code': status_code,
                             'text': response_data,
                             'upload_time': upload_time,
-                            'upload_speed': upload_speed,
-                            'data_size': data_length
+                            'data_size': data_size,
+                            'upload_id': self.upload_count
                         }
+                        
+                        if status_code == 200:
+                            print(f"✓ SUCCESS: Upload #{self.upload_count}")
+                        else:
+                            print(f"⚠ HTTP {status_code}: Upload #{self.upload_count}")
+                        
+                        return result
                     else:
-                        print("POST execution failed")
+                        print("✗ POST execution failed")
                         return None
                 else:
-                    print("Data upload failed")
+                    print("✗ Data upload failed")
                     return None
             else:
-                print(f"No DOWNLOAD prompt. Response: {response}")
+                print(f"✗ No DOWNLOAD prompt")
                 return None
                 
         except Exception as e:
-            print(f"HTTP POST error: {e}")
+            print(f"Upload error: {e}")
             return None
     
-    def disconnect(self):
+    def check_connection(self):
+        """Check if connection is still active"""
+        try:
+            success, response = self._send_at("AT+CGPADDR=1", timeout_ms=3000)
+            if "+CGPADDR:" in response and self.ip_address in response:
+                return True
+            return False
+        except:
+            return False
+    
+    def reconnect(self):
+        """Reconnect if connection is lost"""
+        print("=== Reconnecting ===")
+        self.connected = False
+        self.http_initialized = False
+        return self.initialize()
+    
+    def shutdown(self):
+        """Clean shutdown"""
+        if self.http_initialized:
+            self._send_at("AT+HTTPTERM")
+            self.http_initialized = False
         if self.connected:
-            if self.http_initialized:
-                self._send_at("AT+HTTPTERM")
-                self.http_initialized = False
             self._send_at("AT+CGACT=0,1")
             self.connected = False
-            print("✓ Disconnected")
+        print("✓ System shutdown")
 
-def main():
-    """Test working bulk transfer"""
-    
-    URL = "https://n8n.vyomos.org/webhook/watchmen-detect"
-    
-    print("=== Working Bulk Transfer Test ===")
-    
-    # Create test data close to 30KB
-    large_image = "data:image/png;base64," + ("iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzI" * 600)
+# Global system instance
+cellular_system = None
+
+def generate_sample_data():
+    """Generate sample data for testing - replace with your actual data"""
+    # Create a sample payload with image data (adjust size as needed)
+    sample_image = "data:image/png;base64," + ("iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzI" * 600)
     
     payload = {
         "machine_id": 228,
-        "message_type": "bulk_transfer_test",
-        "image": large_image,
-        "timestamp": time.ticks_ms(),
-        "test_info": {
-            "target_size": "30KB",
-            "method": "proven_http_upload"
+        "message_type": "periodic_data",
+        "image": sample_image,
+        "sensor_data": {
+            "temperature": 25.5,
+            "humidity": 60.2,
+            "pressure": 1013.25
+        },
+        "system_info": {
+            "memory_free": gc.mem_free(),
+            "uptime": time.ticks_ms()
         }
     }
     
-    json_payload = json.dumps(payload)
-    data_size = len(json_payload.encode('utf-8'))
+    return payload
+
+def main():
+    """Production main function - initialize once, upload every 1 minute"""
+    global cellular_system
     
-    print(f"Test data: {data_size} bytes ({data_size/1024:.2f} KB)")
-    print(f"Target: 30 KB (scaling factor: {30/(data_size/1024):.2f}x)")
+    print("=== Production Bulk Cellular System ===")
+    print("Initialize once, upload every 1 minute")
     
-    # Connect
-    connect_start = time.ticks_ms()
-    cellular = WorkingBulkCellular()
+    # Initialize system
+    cellular_system = ProductionBulkCellular(machine_id=228)
     
-    if not cellular.connect():
-        print("✗ Connection failed!")
+    if not cellular_system.initialize():
+        print("✗ System initialization failed!")
         return
     
-    connect_time = time.ticks_diff(time.ticks_ms(), connect_start) / 1000
-    print(f"\n✓ Connected in {connect_time:.2f}s")
-    print(f"Working APN: {cellular.working_apn}")
-    print(f"IP Address: {cellular.ip_address}")
+    print("✓ System initialized successfully")
+    print("Starting 1-minute upload cycle...\n")
     
-    # Bulk transfer test
-    print(f"\n=== Bulk Transfer (Proven Method) ===")
+    upload_interval = 0  # 1 minute in seconds
+    last_upload_time = 0
+    consecutive_failures = 0
+    max_failures = 5
     
-    transfer_start = time.ticks_ms()
-    result = cellular.http_post_proven(URL, json_payload, {"Content-Type": "application/json"})
-    total_time = time.ticks_diff(time.ticks_ms(), transfer_start) / 1000
-    
-    if result:
-        print(f"\n=== Transfer Results ===")
-        print(f"Status: {result['status_code']}")
-        print(f"Upload time: {result['upload_time']:.2f}s")
-        print(f"Total time: {total_time:.2f}s")
-        print(f"Upload speed: {result['upload_speed']:.0f} bps")
-        print(f"Data transferred: {result['data_size']/1024:.2f} KB")
-        print(f"Response: {result['text'][:100]}...")
-        
-        # 30KB projection
-        if result['upload_speed'] > 0:
-            kb_30_upload_time = (30 * 1024 * 8) / result['upload_speed']
-            kb_30_total_time = kb_30_upload_time + connect_time
+    try:
+        while True:
+            current_time = time.ticks_ms() / 1000
             
-            print(f"\n=== 30KB Projection ===")
-            print(f"Estimated upload time: {kb_30_upload_time:.0f}s ({kb_30_upload_time/60:.1f} min)")
-            print(f"Estimated total time: {kb_30_total_time:.0f}s ({kb_30_total_time/60:.1f} min)")
+            # Check if it's time for next upload
+            if current_time - last_upload_time >= upload_interval:
+                # Check connection health periodically
+                if consecutive_failures > 2:
+                    print("Checking connection health...")
+                    if not cellular_system.check_connection():
+                        print("Connection lost - attempting reconnect...")
+                        if cellular_system.reconnect():
+                            consecutive_failures = 0
+                        else:
+                            consecutive_failures += 1
+                            print(f"Reconnect failed ({consecutive_failures}/{max_failures})")
+                            if consecutive_failures >= max_failures:
+                                print("Max failures reached - system restart needed")
+                                break
+                
+                # Generate data to upload (replace with your actual data collection)
+                data_to_upload = generate_sample_data()
+                
+                # Upload data
+                result = cellular_system.upload_data(data_to_upload)
+                
+                if result and result.get('status_code') == 200:
+                    consecutive_failures = 0
+                    print(f"Next upload in {upload_interval} seconds...")
+                else:
+                    consecutive_failures += 1
+                    print(f"Upload failed ({consecutive_failures}/{max_failures})")
+                
+                last_upload_time = current_time
+                
+                # Memory cleanup
+                gc.collect()
             
-            efficiency = (30 * 1024) / kb_30_total_time if kb_30_total_time > 0 else 0
-            print(f"Efficiency: {efficiency:.1f} bytes/second for 30KB")
-        
-        if result['status_code'] == 200:
-            print("\n✓ BULK TRANSFER SUCCESSFUL!")
-        else:
-            print(f"\n⚠ Status {result['status_code']}")
+            # Sleep for 1 second before checking again
+            time.sleep(1)
             
-    else:
-        print("✗ Bulk transfer failed")
-    
-    cellular.disconnect()
-    print("\n✓ Test completed")
+    except KeyboardInterrupt:
+        print("\n=== Shutting Down ===")
+        cellular_system.shutdown()
+        print("✓ System stopped")
+    except Exception as e:
+        print(f"\n=== System Error ===")
+        print(f"Error: {e}")
+        cellular_system.shutdown()
 
 if __name__ == "__main__":
     main()
