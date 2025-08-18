@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
 import useToken from '@/hooks/use-token';
-import { Filter, Tag as TagIcon, X } from 'lucide-react';
+import {  Tag as TagIcon, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,10 @@ import {
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-
+import { getAllTags } from '../../devices/components/tag-api-utils';
 import { MachineTag } from '@/lib/types/machine';
 
-import { getAllTags } from '../../devices/components/tag-api-utils';
+// Types
 
 interface TagFilterProps {
   selectedTags: MachineTag[];
@@ -52,6 +52,8 @@ const TagFilter: React.FC<TagFilterProps> = ({
     loadTags();
   }, [organizationUid, token]);
 
+  console.log('availableTags', availableTags);
+
   const handleTagToggle = (tag: MachineTag) => {
     const isSelected = selectedTags.some((t) => t.id === tag.id);
 
@@ -75,7 +77,7 @@ const TagFilter: React.FC<TagFilterProps> = ({
       {/* Selected Tags Display */}
       {selectedTags.length > 0 && (
         <div className="mr-2 flex items-center gap-1">
-          {selectedTags.map((tag) => (
+          {selectedTags.slice(0, 2).map((tag) => (
             <Badge
               key={tag.id}
               variant="secondary"
@@ -93,14 +95,11 @@ const TagFilter: React.FC<TagFilterProps> = ({
               </Button>
             </Badge>
           ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearAll}
-            className="h-6 px-2 text-xs"
-          >
-            Clear All
-          </Button>
+          {selectedTags.length > 2 && (
+            <Badge variant="secondary" className="text-xs">
+              +{selectedTags.length - 2} more
+            </Badge>
+          )}
         </div>
       )}
 
@@ -110,10 +109,12 @@ const TagFilter: React.FC<TagFilterProps> = ({
           <Button
             variant="outline"
             size="sm"
-            className={`flex items-center gap-2 ${selectedTags.length > 0 ? 'bg-primary/10 border-primary/30' : ''}`}
+            className={`flex items-center gap-2 ${
+              selectedTags.length > 0 ? 'bg-primary/10 border-primary/30' : ''
+            }`}
           >
-            <Filter className="h-4 w-4" />
-            Filter by Tags
+            <TagIcon className="h-4 w-4" />
+            Tags
             {selectedTags.length > 0 && (
               <Badge variant="secondary" className="ml-1 text-xs">
                 {selectedTags.length}
@@ -141,15 +142,11 @@ const TagFilter: React.FC<TagFilterProps> = ({
 
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground text-sm">
-                  Loading tags...
-                </div>
+                <div className="text-muted-foreground text-sm">Loading tags...</div>
               </div>
             ) : availableTags.length === 0 ? (
               <div className="py-8 text-center">
-                <div className="text-muted-foreground text-sm">
-                  No tags found
-                </div>
+                <div className="text-muted-foreground text-sm">No tags found</div>
               </div>
             ) : (
               <ScrollArea className="h-64">
@@ -169,9 +166,7 @@ const TagFilter: React.FC<TagFilterProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <TagIcon className="h-3 w-3" />
-                            <span className="text-sm font-medium">
-                              {tag.name}
-                            </span>
+                            <span className="text-sm font-medium">{tag.name}</span>
                           </div>
                           {tag.description && (
                             <p className="text-muted-foreground mt-1 text-xs">
