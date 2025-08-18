@@ -23,7 +23,7 @@ print_lock = asyncio.Lock()
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.2
-HB_WAIT_SEC = 60
+HB_WAIT_SEC = 30
 SPATH_WAIT = 20
 SCAN_WAIT = 10
 PHOTO_TAKING_DELAY = 10
@@ -410,8 +410,10 @@ async def send_msg(msgtype, creator, msgbytes, dest):
     return retval
 
 def ack_time(smid):
+    print(f"Finding {smid} in {msgs_recd}")
     for (rmid, msgbytes, t) in msgs_recd:
         if rmid[0] == b"A":
+            print(f"Found an ack {rmid} : {msgbytes}")
             msg = msgbytes.decode()
             if smid == msg[:MIDLEN]:
                 missingids = []
