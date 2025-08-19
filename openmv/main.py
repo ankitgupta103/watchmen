@@ -19,6 +19,8 @@ from sim7600x import SIM7600X
 import sx1262
 import gps_driver
 
+from cellular_driver import Cellular
+
 print_lock = asyncio.Lock()
 
 MIN_SLEEP = 0.1
@@ -42,6 +44,8 @@ FRAME_SIZE = 195
 AIR_SPEED = 62500
 
 ENCRYPTION_ENABLED = True
+
+cellular_system = None
 
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
@@ -98,20 +102,68 @@ URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 
 sim = None
 
+# async def init_sim():
+#     global sim
+#     print("Initializing 4G connection...")
+#     sim = SIM7600X(uart_id=1, baudrate=115200)
+#     if not sim.init_module(apn="airtelgprs.com"):  # Use your carrier's APN
+#         print("4G connection failed!")
+#         return False
+#     print(" ================ >>> 4G Connected successfully!")
+
+# async def sim_send_image(creator, fname):
+#     global sim
+#     if sim is None:
+#         print("Skipping uploading since i dont have a sim card")
+#         return False
+#     img = image.Image(fname)
+#     imb = img.bytearray()
+#     encimb = encrypt_if_needed("P", imb)
+#     imgbytes = ubinascii.b2a_base64(encimb)
+#     print(f" ================ >>> Sending file of size {len(imgbytes)}")
+#     payload = {
+#         "machine_id": creator,
+#         "message_type": "event",
+#         "image": imgbytes,
+#     }
+#     json_payload = json.dumps(payload)
+#     print(json_payload)
+#     success, response = sim.http_post(URL, json_payload)
+#     if success:
+#         print(f"HB Data uploaded to server successfully : {response}")
+#         return True
+#     else:
+#         print(f"Failure uploading HB {response}")
+#         return False
+
 async def init_sim():
-    global sim
-    print("Initializing 4G connection...")
-    sim = SIM7600X(uart_id=1, baudrate=115200)
-    if not sim.init_module(apn="airtelgprs.com"):  # Use your carrier's APN
-        print("4G connection failed!")
+     """Initialize the cellular connection"""
+    global cellular_system
+
+    print("\n=== Initializing Cellular System ===")
+    cellular_system = Cellular()
+
+    if not cellular_system.initialize():
+        print("Cellular initialization failed!")
         return False
-    print(" ================ >>> 4G Connected successfully!")
+
+    print("Cellular system ready")
+
 
 async def sim_send_image(creator, fname):
-    global sim
-    if sim is None:
-        print("Skipping uploading since i dont have a sim card")
+    global sim, cellular_system
+
+    if not cellular_system:
+        print("Cellular system not initialized")
         return False
+
+    # Check connection health
+    if not cellular_system.check_connection():
+        print("Connection lost - attempting reconnect...")
+        if not cellular_system.reconnect():
+            print("  Reconnection failed")
+            return False
+
     img = image.Image(fname)
     imb = img.bytearray()
     encimb = encrypt_if_needed("P", imb)
@@ -122,15 +174,21 @@ async def sim_send_image(creator, fname):
         "message_type": "event",
         "image": imgbytes,
     }
-    json_payload = json.dumps(payload)
-    print(json_payload)
-    success, response = sim.http_post(URL, json_payload)
-    if success:
-        print(f"HB Data uploaded to server successfully : {response}")
+
+    result = cellular_system.upload_data(payload, URL)
+
+
+     if result and result.get('status_code') == 200:
+        print(f"Image #{image_count} uploaded successfully")
+        print(f"Upload time: {result.get('upload_time', 0):.2f}s")
+        print(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
         return True
     else:
-        print(f"Failure uploading HB {response}")
+        print(f"Failed to upload image #{image_count}")
+        if result:
+            print(f"HTTP Status: {result.get('status_code', 'Unknown')}")
         return False
+    
 
 # TODO add heartbeat also to sim
 
