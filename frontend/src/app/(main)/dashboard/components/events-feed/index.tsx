@@ -26,12 +26,12 @@ import { getSeverityLabel } from '@/lib/utils/severity';
 
 import Event from './event';
 
-  const severityLevels = [
-    { id: 0, label: 'LOW', description: 'No person detected' },
-    { id: 1, label: 'MEDIUM', description: 'Person detected' },
-    { id: 2, label: 'HIGH', description: 'Person with suspicious item' },
-    { id: 3, label: 'CRITICAL', description: 'Weapon detected' },
-  ];
+const severityLevels = [
+  { id: 0, label: 'LOW', description: 'No person detected' },
+  { id: 1, label: 'MEDIUM', description: 'Person detected' },
+  { id: 2, label: 'HIGH', description: 'Person with suspicious item' },
+  { id: 3, label: 'CRITICAL', description: 'Weapon detected' },
+];
 
 export default function EventsFeed({
   machines,
@@ -104,7 +104,14 @@ export default function EventsFeed({
         setIsLoading(false);
       }
     },
-    [token, organizationId, machines, dateRange, selectedTags, selectedSeverities],
+    [
+      token,
+      organizationId,
+      machines,
+      dateRange,
+      selectedTags,
+      selectedSeverities,
+    ],
   );
 
   useEffect(() => {
@@ -256,7 +263,10 @@ export default function EventsFeed({
         const severity = severityLevels.find((s) => s.id === severityId);
         return severity ? { id: severityId, label: severity.label } : null;
       })
-      .filter((severity): severity is { id: number; label: string } => severity !== null);
+      .filter(
+        (severity): severity is { id: number; label: string } =>
+          severity !== null,
+      );
   }, [selectedSeverities]);
 
   return (
@@ -332,7 +342,9 @@ export default function EventsFeed({
               >
                 <div>
                   <div className="font-medium">{severity.label}</div>
-                  <div className="text-xs text-muted-foreground">{severity.description}</div>
+                  <div className="text-muted-foreground text-xs">
+                    {severity.description}
+                  </div>
                 </div>
               </DropdownMenuCheckboxItem>
             ))}
@@ -359,10 +371,8 @@ export default function EventsFeed({
 
       {(selectedTags.length > 0 || selectedSeverities.length > 0) && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-sm">
-            Active filters:
-          </span>
-          
+          <span className="text-muted-foreground text-sm">Active filters:</span>
+
           {/* Tag filters */}
           {getSelectedTagsWithNames.map((tag) => (
             <span
