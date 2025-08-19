@@ -45,7 +45,8 @@ ENCRYPTION_ENABLED = True
 
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
-image_count = 0                 # Counter to keep tranck of saved images
+person_image_count = 0                 # Counter to keep tranck of saved images
+total_image_count = 0
 gps_str = ""
 
 consecutive_hb_failures = 0
@@ -178,20 +179,21 @@ images_to_send = []
 # Else we are blocking photos until radio.
 # Else we are also not retrying if transmission of a photo fails.
 async def person_detection_loop():
-    global image_count
+    global person_image_count, total_image_count
     while True:
         img = sensor.snapshot()
-        image_count += 1
-        print(f"Image count: {image_count}")
+        total_image_count += 1
         person_detected, confidence = detect_person(img)
         print(f"Person detected = {person_detected}, confidence = {confidence}")
         if person_detected:
+            person_image_count += 1
             r = get_rand()
             raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             print(f"Saving image to {raw_path}")
             img.save(raw_path)
             images_to_send.append(raw_path)
         await asyncio.sleep(PHOTO_TAKING_DELAY)
+        print(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
 
 async def image_sending_loop():
     global images_to_send
@@ -221,7 +223,7 @@ async def image_sending_loop():
             # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
             # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
             # TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
-            # processed_path = f"{IMG_DIR}/processed_{image_count}.jpg"
+            # processed_path = f"{IMG_DIR}/processed_{person_image_count}.jpg"
             # img.save(processed_path)  # Save image with annotations
 
 def get_human_ts():
