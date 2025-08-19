@@ -112,47 +112,151 @@ async def init_sim():
     print("Cellular system ready")
 
 
+# async def sim_send_image(creator, fname):
+#     global cellular_system
+
+#     if not cellular_system:
+#         print("Cellular system not initialized")
+#         return False
+
+#     # Check connection health
+#     if not cellular_system.check_connection():
+#         print("Connection lost - attempting reconnect...")
+#         if not cellular_system.reconnect():
+#             print("  Reconnection failed")
+#             return False
+
+#     img = image.Image(fname)
+#     imb = img.bytearray()
+#     encimb = encrypt_if_needed("P", imb)
+#     imgbytes = ubinascii.b2a_base64(encimb)
+#     print(f" ================ >>> Sending file of size {len(imgbytes)}")
+#     payload = {
+#         "machine_id": creator,
+#         "message_type": "event",
+#         "image": imgbytes,
+#     }
+
+#     result = cellular_system.upload_data(payload, URL)
+
+
+#      if result and result.get('status_code') == 200:
+#         print(f"Image #{image_count} uploaded successfully")
+#         print(f"Upload time: {result.get('upload_time', 0):.2f}s")
+#         print(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
+#         return True
+#     else:
+#         print(f"Failed to upload image #{image_count}")
+#         if result:
+#             print(f"HTTP Status: {result.get('status_code', 'Unknown')}")
+#         return False
+    
+
 async def sim_send_image(creator, fname):
+    """Send image via cellular with better error handling and retry logic"""
     global cellular_system
 
     if not cellular_system:
         print("Cellular system not initialized")
         return False
 
-    # Check connection health
-    if not cellular_system.check_connection():
-        print("Connection lost - attempting reconnect...")
-        if not cellular_system.reconnect():
-            print("  Reconnection failed")
+    # Check connection health with retry
+    max_connection_retries = 3
+    for retry in range(max_connection_retries):
+        if cellular_system.check_connection():
+            break
+        
+        print(f"Connection check failed, attempt {retry + 1}/{max_connection_retries}")
+        if retry < max_connection_retries - 1:
+            print("Attempting reconnect...")
+            if not cellular_system.reconnect():
+                print(f"  Reconnection attempt {retry + 1} failed")
+                await asyncio.sleep(5)  # Wait before next retry
+                continue
+        else:
+            print("All connection attempts failed")
             return False
 
-    img = image.Image(fname)
-    imb = img.bytearray()
-    encimb = encrypt_if_needed("P", imb)
-    imgbytes = ubinascii.b2a_base64(encimb)
-    print(f" ================ >>> Sending file of size {len(imgbytes)}")
-    payload = {
-        "machine_id": creator,
-        "message_type": "event",
-        "image": imgbytes,
-    }
+    try:
+        # Load and process image
+        img = image.Image(fname)
+        img_bytes = img.bytearray()
+        
+        # Encrypt if needed
+        encimb = encrypt_if_needed("P", img_bytes)
+        imgbytes = ubinascii.b2a_base64(encimb)
+        
+        print(f"Sending image file {fname} of size {len(imgbytes)} bytes")
+        
+        # Prepare payload with additional metadata
+        payload = {
+            "machine_id": creator,
+            "message_type": "event", 
+            "image": imgbytes,
+        }
 
-    result = cellular_system.upload_data(payload, URL)
-
-
-     if result and result.get('status_code') == 200:
-        print(f"Image #{image_count} uploaded successfully")
-        print(f"Upload time: {result.get('upload_time', 0):.2f}s")
-        print(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
-        return True
-    else:
-        print(f"Failed to upload image #{image_count}")
-        if result:
-            print(f"HTTP Status: {result.get('status_code', 'Unknown')}")
+        # Upload with retry logic
+        max_upload_retries = 3
+        for upload_retry in range(max_upload_retries):
+            result = cellular_system.upload_data(payload, URL)
+            
+            if result and result.get('status_code') == 200:
+                print(f"Image {fname} uploaded successfully on attempt {upload_retry + 1}")
+                print(f"Upload time: {result.get('upload_time', 0):.2f}s")
+                print(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
+                
+                # Clean up the image file after successful upload
+                try:
+                    os.remove(fname)
+                    print(f"Deleted uploaded image file: {fname}")
+                except:
+                    print(f"Could not delete image file: {fname}")
+                
+                return True
+            else:
+                print(f"Upload attempt {upload_retry + 1} failed")
+                if result:
+                    print(f"HTTP Status: {result.get('status_code', 'Unknown')}")
+                
+                if upload_retry < max_upload_retries - 1:
+                    await asyncio.sleep(2 ** upload_retry)  # Exponential backoff
+        
+        print(f"Failed to upload image {fname} after {max_upload_retries} attempts")
         return False
-    
+        
+    except Exception as e:
+        print(f"Error in sim_send_image: {e}")
+        return False
+
 
 # TODO add heartbeat also to sim
+
+async def sim_send_heartbeat(heartbeat_data):
+    """Send heartbeat data via cellular (for command center)"""
+    global cellular_system
+    
+    if not cellular_system or not running_as_cc():
+        return False
+        
+    try:
+        payload = {
+            "machine_id": my_addr,
+            "message_type": "heartbeat",
+            "heartbeat_data": heartbeat_data,
+        }
+        
+        result = cellular_system.upload_data(payload, URL.replace('detect', 'heartbeat'))
+        
+        if result and result.get('status_code') == 200:
+            print("Heartbeat sent via cellular")
+            return True
+        else:
+            print("Failed to send heartbeat via cellular")
+            return False
+            
+    except Exception as e:
+        print(f"Error sending cellular heartbeat: {e}")
+        return False
 
 loranode = None
 
@@ -836,9 +940,15 @@ async def main():
         #asyncio.create_task(image_sending_loop())
     else:
         print(f"Starting command center")
-        #await init_sim()
+
+        cellular_init_success = await init_sim()
+        if not cellular_init_success:
+            print("WARNING: Cellular initialization failed for command center")
+            print("Images will be saved locally but not uploaded to internet")
+
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
+        
     for i in range(24*7):
         await asyncio.sleep(3600)
         print(f"Finished HOUR {i}")
