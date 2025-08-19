@@ -24,17 +24,19 @@ print_lock = asyncio.Lock()
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.2
-HB_WAIT_SEC = 30
-SPATH_WAIT = 20
-SCAN_WAIT = 10
-VALIDATE_WAIT_SEC = 60
-PHOTO_TAKING_DELAY = 10
-PHOTO_SENDING_DELAY = 60
+HB_WAIT = 60
+HB_WAIT_2 = 1200
+SPATH_WAIT = 30
+SPATH_WAIT_2 = 1200
+SCAN_WAIT = 30
+SCAN_WAIT_2 = 1200
+VALIDATE_WAIT_SEC = 1200
+PHOTO_TAKING_DELAY = 120 # TODO change to 1.
+PHOTO_SENDING_DELAY = 120
 GPS_WAIT_SEC = 30
 
 MIDLEN = 7
-# TODO Remove
-FLAKINESS = 10
+FLAKINESS = 0
 FRAME_SIZE = 195
 
 AIR_SPEED = 62500
@@ -697,6 +699,7 @@ async def validate_and_remove_neighbours():
 
 async def send_heartbeat():
     global consecutive_hb_failures
+    i = 1
     while True:
         # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
@@ -722,26 +725,39 @@ async def send_heartbeat():
                         print(f"Error reinitializing LoRa: {e}")
         else:
             print("Not sending heartbeat right now because i dont know my shortest path")
-        await asyncio.sleep(HB_WAIT_SEC)
+        i += 1
+        if i < 10:
+            await asyncio.sleep(HB_WAIT)
+        else:
+            await asyncio.sleep(HB_WAIT_2 + random.randint(1, 120))
+
 
 async def send_scan():
     global seen_neighbours
     i = 1
     while True:
         scanmsg = my_addr.to_bytes()
-        # 0 is for Broadcast
+        # 65535 is for Broadcast
         await send_msg("N", my_addr, scanmsg, 65535)
-        await asyncio.sleep(SCAN_WAIT) # reduce after setup
+        if i < 10:
+            await asyncio.sleep(SCAN_WAIT)
+        else:
+            await asyncio.sleep(SCAN_WAIT_2 + random.randint(1,120))
         print(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
 async def send_spath():
+    i = 1
     while True:
         sp = f"{my_addr}"
         for n in seen_neighbours:
             print(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp.encode(), n)
-        await asyncio.sleep(SPATH_WAIT)
+        i += 1
+        if i < 10:
+            await asyncio.sleep(SPATH_WAIT)
+        else:
+            await asyncio.sleep(SPATH_WAIT_2 + random.randint(1,120))
 
 async def print_summary():
     while True:
