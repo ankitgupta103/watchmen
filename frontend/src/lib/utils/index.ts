@@ -206,3 +206,34 @@ export const countMachinesByStatus = (machines: Machine[]) => {
   const offline = machines.length - online;
   return { online, offline };
 };
+
+/**
+ * Converts a Unix timestamp to a JavaScript Date object
+ * Handles both seconds and milliseconds automatically
+ * @param timestamp - Unix timestamp (seconds or milliseconds)
+ * @returns JavaScript Date object
+ */
+export function unixTimestampToDate(timestamp: number): Date {
+  // If timestamp is less than 10^10, it's likely in seconds (before year 2286)
+  // If it's larger, it's likely in milliseconds
+  return new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp);
+}
+
+/**
+ * Formats a Unix timestamp to a readable string
+ * @param timestamp - Unix timestamp (seconds or milliseconds)
+ * @param options - Intl.DateTimeFormatOptions for formatting
+ * @returns Formatted date string
+ */
+export function formatUnixTimestamp(
+  timestamp: number,
+  options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }
+): string {
+  return unixTimestampToDate(timestamp).toLocaleString('en-US', options);
+}

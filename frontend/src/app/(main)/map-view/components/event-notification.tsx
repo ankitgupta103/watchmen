@@ -4,6 +4,7 @@ import { Eye, X } from 'lucide-react';
 
 import { getSeverityLabel } from '@/lib/utils/severity';
 import { FeedEvent } from '@/lib/types/activity';
+import { formatUnixTimestamp } from '@/lib/utils';
 
 interface EventNotificationProps {
   event: FeedEvent;
@@ -74,7 +75,7 @@ export default function EventNotification({
           </p>
 
           <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{new Date(event.timestamp).toLocaleTimeString()}</span>
+            <span>{formatUnixTimestamp(event.timestamp, { hour: '2-digit', minute: '2-digit' })}</span>
             <div className="flex items-center gap-1">
               <Eye className="h-3 w-3" />
               <span>Click machine for details</span>
