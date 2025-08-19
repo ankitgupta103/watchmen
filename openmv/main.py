@@ -15,10 +15,8 @@ import json
 import ubinascii
 
 import enc
-from sim7600x import SIM7600X
 import sx1262
 import gps_driver
-
 from cellular_driver import Cellular
 
 print_lock = asyncio.Lock()
@@ -100,42 +98,6 @@ recv_msg_count = {}
 
 URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 
-sim = None
-
-# async def init_sim():
-#     global sim
-#     print("Initializing 4G connection...")
-#     sim = SIM7600X(uart_id=1, baudrate=115200)
-#     if not sim.init_module(apn="airtelgprs.com"):  # Use your carrier's APN
-#         print("4G connection failed!")
-#         return False
-#     print(" ================ >>> 4G Connected successfully!")
-
-# async def sim_send_image(creator, fname):
-#     global sim
-#     if sim is None:
-#         print("Skipping uploading since i dont have a sim card")
-#         return False
-#     img = image.Image(fname)
-#     imb = img.bytearray()
-#     encimb = encrypt_if_needed("P", imb)
-#     imgbytes = ubinascii.b2a_base64(encimb)
-#     print(f" ================ >>> Sending file of size {len(imgbytes)}")
-#     payload = {
-#         "machine_id": creator,
-#         "message_type": "event",
-#         "image": imgbytes,
-#     }
-#     json_payload = json.dumps(payload)
-#     print(json_payload)
-#     success, response = sim.http_post(URL, json_payload)
-#     if success:
-#         print(f"HB Data uploaded to server successfully : {response}")
-#         return True
-#     else:
-#         print(f"Failure uploading HB {response}")
-#         return False
-
 async def init_sim():
      """Initialize the cellular connection"""
     global cellular_system
@@ -151,7 +113,7 @@ async def init_sim():
 
 
 async def sim_send_image(creator, fname):
-    global sim, cellular_system
+    global cellular_system
 
     if not cellular_system:
         print("Cellular system not initialized")
