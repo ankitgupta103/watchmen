@@ -90,7 +90,7 @@ IMG_DIR = "/sdcard/images/"
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.QVGA)
+sensor.set_framesize(sensor.HD)
 sensor.skip_frames(time=2000)
 
 sent_count = 0
@@ -99,63 +99,18 @@ recv_msg_count = {}
 URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 
 async def init_sim():
-     """Initialize the cellular connection"""
+    """Initialize the cellular connection"""
     global cellular_system
-
     print("\n=== Initializing Cellular System ===")
     cellular_system = Cellular()
-
     if not cellular_system.initialize():
         print("Cellular initialization failed!")
         return False
-
     print("Cellular system ready")
-
-
-# async def sim_send_image(creator, fname):
-#     global cellular_system
-
-#     if not cellular_system:
-#         print("Cellular system not initialized")
-#         return False
-
-#     # Check connection health
-#     if not cellular_system.check_connection():
-#         print("Connection lost - attempting reconnect...")
-#         if not cellular_system.reconnect():
-#             print("  Reconnection failed")
-#             return False
-
-#     img = image.Image(fname)
-#     imb = img.bytearray()
-#     encimb = encrypt_if_needed("P", imb)
-#     imgbytes = ubinascii.b2a_base64(encimb)
-#     print(f" ================ >>> Sending file of size {len(imgbytes)}")
-#     payload = {
-#         "machine_id": creator,
-#         "message_type": "event",
-#         "image": imgbytes,
-#     }
-
-#     result = cellular_system.upload_data(payload, URL)
-
-
-#      if result and result.get('status_code') == 200:
-#         print(f"Image #{image_count} uploaded successfully")
-#         print(f"Upload time: {result.get('upload_time', 0):.2f}s")
-#         print(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
-#         return True
-#     else:
-#         print(f"Failed to upload image #{image_count}")
-#         if result:
-#             print(f"HTTP Status: {result.get('status_code', 'Unknown')}")
-#         return False
-    
 
 async def sim_send_image(creator, fname):
     """Send image via cellular with better error handling and retry logic"""
     global cellular_system
-
     if not cellular_system:
         print("Cellular system not initialized")
         return False
@@ -227,9 +182,6 @@ async def sim_send_image(creator, fname):
     except Exception as e:
         print(f"Error in sim_send_image: {e}")
         return False
-
-
-# TODO add heartbeat also to sim
 
 async def sim_send_heartbeat(heartbeat_data):
     """Send heartbeat data via cellular (for command center)"""
@@ -309,7 +261,7 @@ async def person_detection_loop():
         total_image_count += 1
         person_detected, confidence = detect_person(img)
         print(f"Person detected = {person_detected}, confidence = {confidence}")
-        if person_detected:
+        if True: #person_detected:
             person_image_count += 1
             r = get_rand()
             raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
@@ -831,7 +783,8 @@ async def send_heartbeat():
         print(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
             # my_addr : uptime : photos taken : events seen : gps : gps_staleness : neighbours : shortest_path
-            hbmsgstr = f"{my_addr}:{get_human_ts()}"
+            hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:todo_gps_time:{seen_neighbours}:{shortest_path_to_cc}"
+            print(f"HBSTR = {hbmsgstr}")
             hbmsg = hbmsgstr.encode()
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg)
@@ -936,8 +889,8 @@ async def main():
         asyncio.create_task(send_heartbeat())
         asyncio.create_task(send_scan())
         asyncio.create_task(keep_updating_gps())
-        #asyncio.create_task(person_detection_loop())
-        #asyncio.create_task(image_sending_loop())
+        asyncio.create_task(person_detection_loop())
+        asyncio.create_task(image_sending_loop())
     else:
         print(f"Starting command center")
 
