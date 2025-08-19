@@ -86,7 +86,7 @@ def log(msg):
     log_entry = f"{my_addr}@{t} : {msg}"
     with open("log.txt", "a") as log_file:
         log_file.write(log_entry)
-    log_file.flush()
+        log_file.flush()
     print(log_entry)
 
 log("Running on device : " + uid.decode())
@@ -201,28 +201,23 @@ async def sim_send_heartbeat(heartbeat_data):
         return False
 
     try:
-        # Send heartbeat data as-is (encrypted or not)
-        payload = {
-            "machine_id": heartbeat_data["node_id"],
-            "message_type": "heartbeat",
-            "heartbeat_data": heartbeat_data["heartbeat_data"],  # Raw data
-            "received_at_cc": heartbeat_data["received_at"],
-            "cc_id": my_addr
-        }
-
-        result = cellular_system.upload_data(payload, URL.replace('detect', 'heartbeat'))
+        # heartbeat_data is already a properly formatted payload
+        result = cellular_system.upload_data(heartbeat_data, URL)
 
         if result and result.get('status_code') == 200:
-            node_id = payload["machine_id"]
-            print(f"Heartbeat from node {node_id} sent to cloud successfully")
+            node_id = heartbeat_data["machine_id"]
+            log(f"Heartbeat from node {node_id} sent to cloud successfully")
             return True
         else:
-            print("Failed to send heartbeat to cloud via cellular")
+            log("Failed to send heartbeat to cloud via cellular")
+            if result:
+                log(f"HTTP Status: {result.get('status_code', 'Unknown')}")
             return False
 
     except Exception as e:
-        print(f"Error sending cellular heartbeat: {e}")
+        log(f"Error sending cellular heartbeat: {e}")
         return False
+
 
 loranode = None
 
@@ -634,11 +629,21 @@ def hb_process(mid, msgbytes):
         log(f"HB Counts = {hb_map}")
         log(f"Images saved at cc so far = {len(images_saved_at_cc)}")
 
-        asyncio.create_task(sim_send_heartbeat({
-            "node_id": creator,
-            "heartbeat_data": msgbytes,  # Send raw encrypted data
-            "received_at": time_sec()
-        }))
+        # Send raw heartbeat data (encrypted or not) to cloud
+        # Convert bytes to base64 for JSON transmission, same as image data
+        if isinstance(msgbytes, bytes):
+            hb_data = ubinascii.b2a_base64(msgbytes)
+        else:
+            hb_data = msgbytes
+
+        heartbeat_payload =  {
+            "machine_id": creator,
+            "message_type": "heartbeat",
+            "heartbeat_data": hb_data,
+        }
+
+        log(f"Sending raw heartbeat data of length {len(msgbytes)} bytes")
+        asyncio.create_task(sim_send_heartbeat(heartbeat_payload))
 
         for i in images_saved_at_cc:
             log(i)
@@ -796,9 +801,24 @@ async def send_heartbeat():
                 gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
             else:
                 gps_staleness = -1
-            hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
-            log(f"HBSTR = {hbmsgstr}")
-            hbmsg = hbmsgstr.encode()
+            # hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
+            # log(f"HBSTR = {hbmsgstr}")
+
+
+            hb_data = {
+                "addr": my_addr,
+                "uptime": time_sec(),
+                "photos_taken": total_image_count,
+                "events_seen": person_image_count,
+                "gps": gps_str,
+                "gps_staleness": gps_staleness,
+                "neighbours": seen_neighbours,
+                "shortest_path": shortest_path_to_cc
+            }
+
+            hb_json_str = json.dumps(hb_data)
+
+            hbmsg = hb_json_str.encode()
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg)
             success = await send_msg("H", my_addr, msgbytes, peer_addr)
