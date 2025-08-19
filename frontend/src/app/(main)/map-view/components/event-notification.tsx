@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Eye, X } from 'lucide-react';
 
-import { MachineEvent } from '@/lib/types/activity';
+
 import { getSeverityLabel } from '@/lib/utils/severity';
+import { FeedEvent } from '@/lib/types/activity';
 
 interface EventNotificationProps {
-  event: MachineEvent;
+  event: FeedEvent;
   machineName: string;
   onClose: () => void;
 }
@@ -69,11 +70,11 @@ export default function EventNotification({
         {/* Event Details */}
         <div className="space-y-2">
           <p className="text-sm text-gray-700">
-            {event.eventstr || 'Event detected'}
+             Event detected
           </p>
 
           <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{event.timestamp.toLocaleTimeString()}</span>
+            <span>{new Date(event.timestamp).toLocaleTimeString()}</span>
             <div className="flex items-center gap-1">
               <Eye className="h-3 w-3" />
               <span>Click machine for details</span>
