@@ -50,6 +50,7 @@ cellular_system = None
 person_image_count = 0                 # Counter to keep tranck of saved images
 total_image_count = 0
 gps_str = ""
+gps_last_time = -1
 
 consecutive_hb_failures = 0
 lora_reinit_count = 0
@@ -64,18 +65,12 @@ uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for 
 print("Running on device : " + uid.decode())
 if uid == b'e076465dd7194025':
     my_addr = 222
-    # TODO Remove
-    #shortest_path_to_cc = [1, 9]
 elif uid == b'e076465dd7091027':
     my_addr = 221
-    # TODO Remove
-    #shortest_path_to_cc = [9]
 elif uid == b'e076465dd7194211':
     my_addr = 9
 elif uid == b'e076465dd7193a09':
     my_addr = 223
-    # TODO Remove
-    # shortest_path_to_cc = [9]
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -235,7 +230,6 @@ def running_as_cc():
     return my_addr == COMMAN_CENTER_ADDR
 
 # ------- Person Detection + snapshot ---------
-# TODO(anand): Test with IR lense for person detection in Night
 def detect_person(img):
     prediction = model.predict([img])
     scores = zip(model.labels, prediction[0].flatten().tolist())
@@ -322,7 +316,7 @@ def time_msec():
     return delta
 
 def time_sec():
-    return utime.ticks_diff(utime.ticks_ms(), clock_start) # compute time difference
+    return int(utime.ticks_diff(utime.ticks_ms(), clock_start) / 1000) # compute time difference
 
 def get_rand():
     rstr = ""
@@ -637,6 +631,7 @@ def hb_process(mid, msgbytes):
             print(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv())}")
         else:
             print(f"Only for debugging : HB msg = {msgbytes.decode()}")
+        asyncio.create_task(sim_send_heartbeat(msgbytes))
         return
     if len(shortest_path_to_cc) > 0:
         peer_addr = shortest_path_to_cc[0]
@@ -779,11 +774,14 @@ async def send_heartbeat():
     global consecutive_hb_failures
     i = 1
     while True:
-        # TODO add last known GPS here also.
         print(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
             # my_addr : uptime : photos taken : events seen : gps : gps_staleness : neighbours : shortest_path
-            hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:todo_gps_time:{seen_neighbours}:{shortest_path_to_cc}"
+            if gps_last_time > 0:
+                gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
+            else:
+                gps_staleness = -1
+            hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
             print(f"HBSTR = {hbmsgstr}")
             hbmsg = hbmsgstr.encode()
             peer_addr = shortest_path_to_cc[0]
@@ -858,9 +856,9 @@ async def keep_updating_gps():
         if gps.has_fix():
             lat, lon = gps.get_coordinates()
             if lat is not None and lon is not None:
-                gps_str = f"LAT: {lat:.6f}, LON: {lon:.6f}"
+                gps_str = f"{lat:.6f},{lon:.6f}"
                 print(gps_str)
-                # TODO add time also here.
+                gps_last_time = time_msec()
             else:
                 print(f"Empty latlong")
         else:
