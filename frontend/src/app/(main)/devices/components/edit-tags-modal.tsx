@@ -46,9 +46,7 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
         id: 0,
         key: newTag.trim().toLowerCase().replace(/\s+/g, '_'),
         name: newTag.trim(),
-        description: newTagDescription.trim() || undefined,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        description: newTagDescription.trim() as string,
       };
       setTags([...tags, newTagObj]);
       setNewTag('');
