@@ -184,7 +184,7 @@ export default function EventsFeed({
     // Reset chunk when tags change to start from beginning
     setChunk(1);
     // Clear existing events to prevent showing stale data
-    setS3FeedEvents(undefined);
+    setS3FeedEvents(() => undefined);
   }, []);
 
   const clearTagFilters = useCallback(() => {
