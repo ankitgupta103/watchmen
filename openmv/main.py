@@ -19,8 +19,6 @@ import sx1262
 import gps_driver
 from cellular_driver import Cellular
 
-print_lock = asyncio.Lock()
-
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.2
@@ -65,7 +63,6 @@ seen_neighbours = []
 
 rtc = RTC()
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
-print("Running on device : " + uid.decode())
 if uid == b'e076465dd7194025':
     my_addr = 222
 elif uid == b'e076465dd7091027':
@@ -79,10 +76,23 @@ else:
     sys.exit()
 clock_start = utime.ticks_ms() # get millisecond counter
 
+def get_human_ts():
+    _,_,_,_,h,m,s,_ = rtc.datetime()
+    t=f"{m}:{s}"
+    return t
+
+def log(msg):
+    t = get_human_ts()
+    log_entry = f"{my_addr}@{t} : {msg}")
+    log_file.write(log_entry)
+    log_file.flush()
+    print(log_entry)
+
+log("Running on device : " + uid.decode())
 # ------ Configuration for tensorflow model ------
 MODEL_PATH = "/rom/person_detect.tflite"
 model = ml.Model(MODEL_PATH)
-print(" Model loaded:", model)
+log(" Model loaded:", model)
 CONFIDENCE_THRESHOLD = 0.75
 IMG_DIR = "/sdcard/images/"
 
@@ -99,18 +109,18 @@ URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 async def init_sim():
     """Initialize the cellular connection"""
     global cellular_system
-    print("\n=== Initializing Cellular System ===")
+    log("\n=== Initializing Cellular System ===")
     cellular_system = Cellular()
     if not cellular_system.initialize():
-        print("Cellular initialization failed!")
+        log("Cellular initialization failed!")
         return False
-    print("Cellular system ready")
+    log("Cellular system ready")
 
 async def sim_send_image(creator, fname):
     """Send image via cellular with better error handling and retry logic"""
     global cellular_system
     if not cellular_system:
-        print("Cellular system not initialized")
+        log("Cellular system not initialized")
         return False
 
     # Check connection health with retry
@@ -119,15 +129,15 @@ async def sim_send_image(creator, fname):
         if cellular_system.check_connection():
             break
         
-        print(f"Connection check failed, attempt {retry + 1}/{max_connection_retries}")
+        log(f"Connection check failed, attempt {retry + 1}/{max_connection_retries}")
         if retry < max_connection_retries - 1:
-            print("Attempting reconnect...")
+            log("Attempting reconnect...")
             if not cellular_system.reconnect():
-                print(f"  Reconnection attempt {retry + 1} failed")
+                log(f"  Reconnection attempt {retry + 1} failed")
                 await asyncio.sleep(5)  # Wait before next retry
                 continue
         else:
-            print("All connection attempts failed")
+            log("All connection attempts failed")
             return False
 
     try:
@@ -139,7 +149,7 @@ async def sim_send_image(creator, fname):
         encimb = encrypt_if_needed("P", img_bytes)
         imgbytes = ubinascii.b2a_base64(encimb)
         
-        print(f"Sending image file {fname} of size {len(imgbytes)} bytes")
+        log(f"Sending image file {fname} of size {len(imgbytes)} bytes")
         
         # Prepare payload with additional metadata
         payload = {
@@ -154,31 +164,31 @@ async def sim_send_image(creator, fname):
             result = cellular_system.upload_data(payload, URL)
             
             if result and result.get('status_code') == 200:
-                print(f"Image {fname} uploaded successfully on attempt {upload_retry + 1}")
-                print(f"Upload time: {result.get('upload_time', 0):.2f}s")
-                print(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
+                log(f"Image {fname} uploaded successfully on attempt {upload_retry + 1}")
+                log(f"Upload time: {result.get('upload_time', 0):.2f}s")
+                log(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
                 
                 # Clean up the image file after successful upload
                 try:
                     os.remove(fname)
-                    print(f"Deleted uploaded image file: {fname}")
+                    log(f"Deleted uploaded image file: {fname}")
                 except:
-                    print(f"Could not delete image file: {fname}")
+                    log(f"Could not delete image file: {fname}")
                 
                 return True
             else:
-                print(f"Upload attempt {upload_retry + 1} failed")
+                log(f"Upload attempt {upload_retry + 1} failed")
                 if result:
-                    print(f"HTTP Status: {result.get('status_code', 'Unknown')}")
+                    log(f"HTTP Status: {result.get('status_code', 'Unknown')}")
                 
                 if upload_retry < max_upload_retries - 1:
                     await asyncio.sleep(2 ** upload_retry)  # Exponential backoff
         
-        print(f"Failed to upload image {fname} after {max_upload_retries} attempts")
+        log(f"Failed to upload image {fname} after {max_upload_retries} attempts")
         return False
         
     except Exception as e:
-        print(f"Error in sim_send_image: {e}")
+        log(f"Error in sim_send_image: {e}")
         return False
 
 async def sim_send_heartbeat(heartbeat_data):
@@ -198,14 +208,14 @@ async def sim_send_heartbeat(heartbeat_data):
         result = cellular_system.upload_data(payload, URL.replace('detect', 'heartbeat'))
         
         if result and result.get('status_code') == 200:
-            print("Heartbeat sent via cellular")
+            log("Heartbeat sent via cellular")
             return True
         else:
-            print("Failed to send heartbeat via cellular")
+            log("Failed to send heartbeat via cellular")
             return False
             
     except Exception as e:
-        print(f"Error sending cellular heartbeat: {e}")
+        log(f"Error sending cellular heartbeat: {e}")
         return False
 
 loranode = None
@@ -213,7 +223,7 @@ loranode = None
 async def init_lora():
     global loranode, lora_reinit_count
     lora_reinit_count += 1
-    print(f"Initializing LoRa SX126X module... my lora addr = {my_addr}")
+    log(f"Initializing LoRa SX126X module... my lora addr = {my_addr}")
     loranode = sx1262.sx126x(
         uart_num=1,        # UART port number - adjust as needed
         freq=868,          # Frequency in MHz
@@ -225,9 +235,9 @@ async def init_lora():
         m1_pin='P7'        # M1 control pin - adjust to your wiring
     )
 
-    print(f"LoRa module initialized successfully! (Total reinitializations: {lora_reinit_count})")
-    print(f"Node address: {loranode.addr}")
-    print(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
+    log(f"LoRa module initialized successfully! (Total reinitializations: {lora_reinit_count})")
+    log(f"Node address: {loranode.addr}")
+    log(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
 def running_as_cc():
     return my_addr == COMMAN_CENTER_ADDR
@@ -257,30 +267,30 @@ async def person_detection_loop():
         img = sensor.snapshot()
         total_image_count += 1
         person_detected, confidence = detect_person(img)
-        print(f"Person detected = {person_detected}, confidence = {confidence}")
+        log(f"Person detected = {person_detected}, confidence = {confidence}")
         if True: #person_detected:
             person_image_count += 1
             r = get_rand()
             raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
-            print(f"Saving image to {raw_path}")
+            log(f"Saving image to {raw_path}")
             img.save(raw_path)
             images_to_send.append(raw_path)
         await asyncio.sleep(PHOTO_TAKING_DELAY)
-        print(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
+        log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
 
 async def image_sending_loop():
     global images_to_send
     while True:
         await asyncio.sleep(5)
         if len(shortest_path_to_cc) == 0:
-            print("No shortest path yet so cant send")
+            log("No shortest path yet so cant send")
             continue
         if len(images_to_send) > 0:
-            print(f"Images to send = {len(images_to_send)}")
+            log(f"Images to send = {len(images_to_send)}")
             imagefile = images_to_send.pop(0)
             img = image.Image(imagefile)
             imgbytes = img.bytearray()
-            print(f"Sending {len(imgbytes)} bytes to the network")
+            log(f"Sending {len(imgbytes)} bytes to the network")
             msgbytes = encrypt_if_needed("P", imgbytes)
 
             peer_addr = shortest_path_to_cc[0]
@@ -290,7 +300,7 @@ async def image_sending_loop():
             transmission_end = time_msec()
 
             transmission_time = transmission_end - transmission_start
-            print(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
+            log(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
             await asyncio.sleep(PHOTO_SENDING_DELAY)
             # Draw visual annotations on the image
             # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
@@ -298,18 +308,6 @@ async def image_sending_loop():
             # TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
             # processed_path = f"{IMG_DIR}/processed_{person_image_count}.jpg"
             # img.save(processed_path)  # Save image with annotations
-
-def get_human_ts():
-    _,_,_,_,h,m,s,_ = rtc.datetime()
-    t=f"{m}:{s}"
-    return t
-
-def log(msg):
-    t = get_human_ts()
-    log_entry = f"{my_addr}@{t} : {msg}")
-    log_file.write(log_entry)
-    log_file.flush()
-    print(log_entry)
 
 msgs_sent = []
 msgs_unacked = []
@@ -342,14 +340,14 @@ def get_msg_id(msgtype, creator, dest):
 def parse_header(data):
     mid = b""
     if data == None:
-        print(f"Weird that data is none")
+        log(f"Weird that data is none")
         return None
     if len(data) < 9:
         return None
     try:
         mid = data[:MIDLEN]
     except Exception as e:
-        print(f"ERROR PARSING {data[:MIDLEN]}  :  Error : {e}")
+        log(f"ERROR PARSING {data[:MIDLEN]}  :  Error : {e}")
         return
     mst = chr(mid[0])
     creator = int(mid[1])
@@ -389,7 +387,7 @@ def radio_send(dest, data):
     sent_count = sent_count + 1
     lendata = len(data)
     if len(data) > 254:
-        print(f"Error msg too large : {len(data)}")
+        log(f"Error msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
     loranode.send(dest, data)
@@ -447,23 +445,23 @@ def encrypt_if_needed(mst, msg):
     if mst in ["H"]:
         # Must be less than 117 bytes
         if len(msg) > 117:
-            print(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
+            log(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
             return msg
         msgbytes = enc.encrypt_rsa(msg, enc.load_rsa_pub())
-        print(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        log(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
     if mst == "P":
         msgbytes = enc.encrypt_hybrid(msg, enc.load_rsa_pub())
-        print(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        log(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
     return msg
 
 # === Send Function ===
 def send_msg_internal(msgtype, creator, msgbytes, dest):
     if msgtype == "P":
-        print(f"Sending photo of length {len(msgbytes)}")
+        log(f"Sending photo of length {len(msgbytes)}")
     else:
-        print(f"Sending message {msgbytes}")
+        log(f"Sending message {msgbytes}")
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
@@ -476,7 +474,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
         return False
     for i in range(len(chunks)):
         if i % 10 == 0:
-            print(f"Sending chunk {i}")
+            log(f"Sending chunk {i}")
         await asyncio.sleep(CHUNK_SLEEP)
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
         _ = await send_single_msg("I", creator, chunkbytes, dest)
@@ -505,7 +503,7 @@ def ack_time(smid):
             if smid == msgbytes[:MIDLEN]:
                 missingids = []
                 if chr(msgbytes[0]) == 'E' and len(msgbytes) > (MIDLEN+1):
-                    print(f"Checking for missing IDs in {msgbytes[MIDLEN+1:]}")
+                    log(f"Checking for missing IDs in {msgbytes[MIDLEN+1:]}")
                     missingstr = msgbytes[MIDLEN+1:].decode()
                     missingids = [int(i) for i in missingstr.split(',')]
                 return (t, missingids)
@@ -513,9 +511,8 @@ def ack_time(smid):
 
 async def log_status():
     await asyncio.sleep(1)
-    async with print_lock:
-        log("$$$$ %%%%% ###### Printing status ###### $$$$$$ %%%%%%%%")
-        log(f"So far sent {len(msgs_sent)} messages and received {len(msgs_recd)} messages")
+    log("$$$$ %%%%% ###### Printing status ###### $$$$$$ %%%%%%%%")
+    log(f"So far sent {len(msgs_sent)} messages and received {len(msgs_recd)} messages")
     ackts = []
     msgs_not_acked = []
     for mid, msg, t in msgs_sent:
@@ -532,10 +529,9 @@ async def log_status():
         ackts.sort()
         mid = ackts[len(ackts)//2]
         p90 = ackts[int(len(ackts) * 0.9)]
-        async with print_lock:
-            log(f"[ACK Times] 50% = {mid:.2f}s, 90% = {p90:.2f}s")
-            log(f"So far {len(msgs_not_acked)} messsages havent been acked")
-            log(msgs_not_acked)
+        log(f"[ACK Times] 50% = {mid:.2f}s, 90% = {p90:.2f}s")
+        log(f"So far {len(msgs_not_acked)} messsages havent been acked")
+        log(msgs_not_acked)
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
@@ -566,7 +562,7 @@ def add_chunk(msgbytes):
         return
     cid = msgbytes[0:3].decode()
     citer = int.from_bytes(msgbytes[3:5])
-    print(f"Got chunk id {citer}")
+    log(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
     if cid not in chunk_map:
         log(f"ERROR : no entry yet for {cid}")
@@ -574,7 +570,7 @@ def add_chunk(msgbytes):
     _, expected_chunks, _ = chunk_map[cid]
     missing = get_missing_chunks(cid)
     received = expected_chunks - len(missing)
-    print(f" ===== Got {received} / {expected_chunks} chunks ====")
+    log(f" ===== Got {received} / {expected_chunks} chunks ====")
 
 def get_data_for_iter(list_chunks, chunkiter):
     for citer, chunk_data in list_chunks:
@@ -599,7 +595,7 @@ def clear_chunkid(cid):
     if cid in chunk_map:
         chunk_map.pop(cid)
     else:
-        print(f"Couldnt find {cid} in {chunk_map}")
+        log(f"Couldnt find {cid} in {chunk_map}")
 
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
@@ -616,7 +612,7 @@ def end_chunk(mid, msg):
         return (False, missing_str, None, None, None)
     else:
         if cid not in chunk_map:
-            print(f"Ignoring this because we dont have an entry for this chunkid, likely because we have already processed this.")
+            log(f"Ignoring this because we dont have an entry for this chunkid, likely because we have already processed this.")
             return (True, None, None, None, None)
         recompiled = recompile_msg(cid)
         return (True, None, cid, recompiled, creator)
@@ -629,22 +625,22 @@ def hb_process(mid, msgbytes):
         if creator not in hb_map:
             hb_map[creator] = 0
         hb_map[creator] += 1
-        print(f"HB Counts = {hb_map}")
-        print(f"Images saved at cc so far = {len(images_saved_at_cc)}")
+        log(f"HB Counts = {hb_map}")
+        log(f"Images saved at cc so far = {len(images_saved_at_cc)}")
         for i in images_saved_at_cc:
-            print(i)
+            log(i)
         if ENCRYPTION_ENABLED:
-            print(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv())}")
+            log(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv())}")
         else:
-            print(f"Only for debugging : HB msg = {msgbytes.decode()}")
+            log(f"Only for debugging : HB msg = {msgbytes.decode()}")
         asyncio.create_task(sim_send_heartbeat(msgbytes))
         return
     if len(shortest_path_to_cc) > 0:
         peer_addr = shortest_path_to_cc[0]
-        print(f"Propogating H to {peer_addr}")
+        log(f"Propogating H to {peer_addr}")
         asyncio.create_task(send_msg("H", creator, msgbytes, peer_addr))
     else:
-        print(f"Can't forward HB because I dont have Spath yet")
+        log(f"Can't forward HB because I dont have Spath yet")
 
 images_saved_at_cc = []
 
@@ -652,53 +648,53 @@ def img_process(cid, msg, creator):
     clear_chunkid(cid)
     # TODO save image
     if running_as_cc():
-        print(f"Received image of size {len(msg)}")
+        log(f"Received image of size {len(msg)}")
         if ENCRYPTION_ENABLED:
             img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv())
         else:
             img_bytes = msg
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
-        print(len(img_bytes))
+        log(len(img_bytes))
         fname = f"cc_{creator}_{cid}.jpg"
-        print(f"Saving to file {fname}")
+        log(f"Saving to file {fname}")
         images_saved_at_cc.append(fname)
         img.save(fname)
         asyncio.create_task(sim_send_image(creator, fname))
     else:
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
-            print(f"Propogating Image to {peer_addr}")
+            log(f"Propogating Image to {peer_addr}")
             #await send_msg("P", creator, msg, peer_addr)
             asyncio.create_task(send_msg("P", creator, msg, peer_addr))
         else:
-            print(f"Can't forward Photo because I dont have Spath yet")
+            log(f"Can't forward Photo because I dont have Spath yet")
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
     nodeaddr = int.from_bytes(msg)
     if nodeaddr not in seen_neighbours:
-        print(f"Adding nodeaddr {nodeaddr} to seen_neighbours")
+        log(f"Adding nodeaddr {nodeaddr} to seen_neighbours")
         seen_neighbours.append(nodeaddr)
 
 def spath_process(mid, msg):
     global shortest_path_to_cc
     if running_as_cc():
-        # print(f"Ignoring shortest path since I am cc")
+        # log(f"Ignoring shortest path since I am cc")
         return
     if len(msg) == 0:
-        print(f"Empty spath")
+        log(f"Empty spath")
         return
     spath = [int(x) for x in msg.split(",")]
     if my_addr in spath:
-        print(f"Cyclic, ignoring {my_addr} already in {spath}")
+        log(f"Cyclic, ignoring {my_addr} already in {spath}")
         return
     if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
-        print(f"Updating spath to {spath}")
+        log(f"Updating spath to {spath}")
         shortest_path_to_cc = spath
         for n in seen_neighbours:
             nsp = [my_addr] + spath
             nmsg = f"{nsp}"
-            print(f"Propogating spath from {spath} to {nmsg}")
+            log(f"Propogating spath from {spath} to {nmsg}")
             asyncio.create_task(send_msg("S", int(mid[1]), nmsg.encode(), n))
 
 def process_message(data):
@@ -715,11 +711,11 @@ def process_message(data):
         recv_msg_count[sender] = 0
     recv_msg_count[sender] += 1
     if receiver != -1 and my_addr != receiver:
-        print(f"Strange that {my_addr} is not as {receiver}")
+        log(f"Strange that {my_addr} is not as {receiver}")
         log(f"Skipping message as it is not for me but for {receiver} : {mid}")
         return
     if receiver == -1 :
-        print(f"processing broadcast message : {data} : {parsed}")
+        log(f"processing broadcast message : {data} : {parsed}")
     msgs_recd.append((mid, msg, time_msec()))
     ackmessage = mid
     if mst == "N":
@@ -736,7 +732,7 @@ def process_message(data):
         try:
             begin_chunk(msg.decode())
         except Exception as e:
-            print(f"Error decoding unicode {e} : {msg}")
+            log(f"Error decoding unicode {e} : {msg}")
     elif mst == "I":
         add_chunk(msg)
     elif mst == "E":
@@ -748,29 +744,29 @@ def process_message(data):
             if recompiled:
                 img_process(cid, recompiled, creator)
             else:
-                print(f"No recompiled, so not sending")
+                log(f"No recompiled, so not sending")
         else:
             ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     else:
-        print(f"Unseen messages type {mst} in {msg}")
+        log(f"Unseen messages type {mst} in {msg}")
     return True
 
 async def validate_and_remove_neighbours():
     global shortest_path_to_cc
     while True:
-        print(f"Going to validate neighbours : {seen_neighbours}")
+        log(f"Going to validate neighbours : {seen_neighbours}")
         to_be_removed = []
         for n in seen_neighbours:
             msgbytes = b"Nothing"
             success = await send_msg("V", my_addr, msgbytes, n)
             if success:
-                print(f"Glad to see that neighbour {n} is still within reach")
+                log(f"Glad to see that neighbour {n} is still within reach")
             else:
-                print(f"Ohno, will have to drop this neighbour : {n}")
+                log(f"Ohno, will have to drop this neighbour : {n}")
                 to_be_removed.append(n)
                 if n in shortest_path_to_cc:
-                    print(f"Even sadder that this was my shortest path to CC which I am now clearing")
+                    log(f"Even sadder that this was my shortest path to CC which I am now clearing")
                     shortest_path_to_cc = []
         for x in to_be_removed:
             seen_neighbours.remove(x)
@@ -780,7 +776,7 @@ async def send_heartbeat():
     global consecutive_hb_failures
     i = 1
     while True:
-        print(f"Shortest path = {shortest_path_to_cc}")
+        log(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
             # my_addr : uptime : photos taken : events seen : gps : gps_staleness : neighbours : shortest_path
             if gps_last_time > 0:
@@ -788,26 +784,26 @@ async def send_heartbeat():
             else:
                 gps_staleness = -1
             hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
-            print(f"HBSTR = {hbmsgstr}")
+            log(f"HBSTR = {hbmsgstr}")
             hbmsg = hbmsgstr.encode()
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg)
             success = await send_msg("H", my_addr, msgbytes, peer_addr)
             if success:
                 consecutive_hb_failures = 0
-                print(f"heartbeat sent successfully to {peer_addr}")
+                log(f"heartbeat sent successfully to {peer_addr}")
             else:
                 consecutive_hb_failures += 1
-                print(f"Failed to send heartbeat to {peer_addr}, consecutive failures = {consecutive_hb_failures}")
+                log(f"Failed to send heartbeat to {peer_addr}, consecutive failures = {consecutive_hb_failures}")
                 if consecutive_hb_failures > 1:
-                    print(f"Too many consecutive failures, reinitializing LoRa")
+                    log(f"Too many consecutive failures, reinitializing LoRa")
                     try:
                         await init_lora()
                         consecutive_hb_failures = 0
                     except Exception as e:
-                        print(f"Error reinitializing LoRa: {e}")
+                        log(f"Error reinitializing LoRa: {e}")
         else:
-            print("Not sending heartbeat right now because i dont know my shortest path")
+            log("Not sending heartbeat right now because i dont know my shortest path")
         i += 1
         if i < 10:
             await asyncio.sleep(HB_WAIT)
@@ -826,7 +822,7 @@ async def send_scan():
             await asyncio.sleep(SCAN_WAIT)
         else:
             await asyncio.sleep(SCAN_WAIT_2 + random.randint(1,120))
-        print(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
+        log(f"{my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
 async def send_spath():
@@ -834,7 +830,7 @@ async def send_spath():
     while True:
         sp = f"{my_addr}"
         for n in seen_neighbours:
-            print(f"Sending shortest path to {n}")
+            log(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp.encode(), n)
         i += 1
         if i < 10:
@@ -845,38 +841,38 @@ async def send_spath():
 async def print_summary():
     while True:
         await asyncio.sleep(30)
-        print(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa reinits: {lora_reinit_count}")
-        #print(msgs_sent)
-        #print(msgs_recd)
-        #print(msgs_unacked)
+        log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa reinits: {lora_reinit_count}")
+        #log(msgs_sent)
+        #log(msgs_recd)
+        #log(msgs_unacked)
 
 async def keep_updating_gps():
     global gps_str
-    print("Initializing GPS...")
+    log("Initializing GPS...")
     uart = gps_driver.SC16IS750(spi_bus=1, cs_pin="P3")
     uart.init_gps()
     gps = gps_driver.GPS(uart)
     while True:
         gps.update()
-        print(f"Trying to update gps")
+        log(f"Trying to update gps")
         if gps.has_fix():
             lat, lon = gps.get_coordinates()
             if lat is not None and lon is not None:
                 gps_str = f"{lat:.6f},{lon:.6f}"
-                print(gps_str)
+                log(gps_str)
                 gps_last_time = time_msec()
             else:
-                print(f"Empty latlong")
+                log(f"Empty latlong")
         else:
-            print(f"GPS has no fix")
+            log(f"GPS has no fix")
         await asyncio.sleep(GPS_WAIT_SEC)
 
 def image_test():
     r = get_rand()
-    print(r)
+    log(r)
     img = sensor.snapshot()
-    print(img.size())
-    print(img.to_jpeg().size())
+    log(img.size())
+    log(img.to_jpeg().size())
     im2 = image.Image(320, 240, image.RGB565, data=img.bytearray())
     im3 = image.Image(320, 240, image.JPEG, buffer=img.to_jpeg().bytearray())
     img.save(f"{r}.jpg")
@@ -896,19 +892,19 @@ async def main():
         asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     else:
-        print(f"Starting command center")
+        log(f"Starting command center")
 
         cellular_init_success = await init_sim()
         if not cellular_init_success:
-            print("WARNING: Cellular initialization failed for command center")
-            print("Images will be saved locally but not uploaded to internet")
+            log("WARNING: Cellular initialization failed for command center")
+            log("Images will be saved locally but not uploaded to internet")
 
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
         
     for i in range(24*7):
         await asyncio.sleep(3600)
-        print(f"Finished HOUR {i}")
+        log(f"Finished HOUR {i}")
 
 try:
     asyncio.run(main())
