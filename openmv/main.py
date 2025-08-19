@@ -642,10 +642,7 @@ def hb_process(mid, msgbytes):
             "heartbeat_data": hb_data,
         }
 
-<<<<<<< HEAD
         log(f"Sending raw heartbeat data of length {len(msgbytes)} bytes")
-=======
->>>>>>> c5e246d (openmv/main.py: hb inactive for upload)
         # asyncio.create_task(sim_send_heartbeat(heartbeat_payload))
 
         for i in images_saved_at_cc:
