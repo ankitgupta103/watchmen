@@ -201,7 +201,7 @@ async def sim_send_heartbeat(heartbeat_data):
         return False
 
     try:
-        # heartbeat_data is already a properly formatted payload
+        heartbeat_data is already a properly formatted payload
         result = cellular_system.upload_data(heartbeat_data, URL)
 
         if result and result.get('status_code') == 200:
@@ -643,7 +643,7 @@ def hb_process(mid, msgbytes):
         }
 
         log(f"Sending raw heartbeat data of length {len(msgbytes)} bytes")
-        asyncio.create_task(sim_send_heartbeat(heartbeat_payload))
+        # asyncio.create_task(sim_send_heartbeat(heartbeat_payload))
 
         for i in images_saved_at_cc:
             log(i)
@@ -801,24 +801,10 @@ async def send_heartbeat():
                 gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
             else:
                 gps_staleness = -1
-            # hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
-            # log(f"HBSTR = {hbmsgstr}")
+            hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
+            log(f"HBSTR = {hbmsgstr}")
 
-
-            hb_data = {
-                "addr": my_addr,
-                "uptime": time_sec(),
-                "photos_taken": total_image_count,
-                "events_seen": person_image_count,
-                "gps": gps_str,
-                "gps_staleness": gps_staleness,
-                "neighbours": seen_neighbours,
-                "shortest_path": shortest_path_to_cc
-            }
-
-            hb_json_str = json.dumps(hb_data)
-
-            hbmsg = hb_json_str.encode()
+            hbmsg = hbmsgstr.encode()
             peer_addr = shortest_path_to_cc[0]
             msgbytes = encrypt_if_needed("H", hbmsg)
             success = await send_msg("H", my_addr, msgbytes, peer_addr)
