@@ -45,6 +45,9 @@ ENCRYPTION_ENABLED = True
 
 cellular_system = None
 
+LOG_FILE_PATH = "mainlog.txt"
+log_file = open(LOG_FILE_PATH, "a")
+
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 person_image_count = 0                 # Counter to keep tranck of saved images
@@ -303,7 +306,10 @@ def get_human_ts():
 
 def log(msg):
     t = get_human_ts()
-    print(f"{t} : {msg}")
+    log_entry = f"{my_addr}@{t} : {msg}")
+    log_file.write(log_entry)
+    log_file.flush()
+    print(log_entry)
 
 msgs_sent = []
 msgs_unacked = []
