@@ -12,7 +12,6 @@ import 'leaflet/dist/leaflet.css';
 import './map-styles.css';
 
 import { MAPS_API_KEY } from '@/lib/constants';
-import { MachineEvent } from '@/lib/types/activity';
 import { Machine, MachineData } from '@/lib/types/machine';
 import {
   calculateMapCenter,
@@ -21,10 +20,11 @@ import {
 } from '@/lib/utils';
 
 import MachineMarker from './machine-marker';
+import { FeedEvent } from '@/lib/types/activity';
 
 interface MapProps {
   machines: Machine[];
-  machineEvents: Record<number, MachineEvent[]>;
+  machineEvents: Record<number, FeedEvent[]>;
   pulsatingMachines: Record<number, boolean>;
 }
 
@@ -79,11 +79,21 @@ export default function ReactLeafletMap({
 
         const machineData: MachineData = {
           machine_id: machine.id,
-          events: events,
+          events: [],
           event_count: events.length,
-          last_event: lastEvent,
-          last_updated:
-            lastEvent?.timestamp.toISOString() || new Date().toISOString(),
+          last_event: {
+            id: '0',
+            machineId: machine.id,
+            machineName: machine.name,
+            machineType: machine.type,
+            timestamp: new Date(lastEvent?.timestamp),
+            imagesLoaded: false,
+            severity: 0,
+            original_image_path: '',
+            cropped_images: [],
+            
+          },
+          last_updated: new Date(lastEvent?.timestamp).toISOString(),
           is_online: isMachineOnline(machine),
           is_pulsating: isPulsating,
           is_critical: lastEvent ? lastEvent.severity >= 3 : false,

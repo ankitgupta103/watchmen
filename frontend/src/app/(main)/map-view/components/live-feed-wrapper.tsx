@@ -11,15 +11,13 @@ import dynamic from 'next/dynamic';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
-import { MachineEvent } from '@/lib/types/activity';
 import { CroppedImage, Machine } from '@/lib/types/machine';
 import {
   cn,
   countMachinesByStatus,
-  generateEventId,
-  MAX_EVENTS_PER_MACHINE,
 } from '@/lib/utils';
 import { calculateSeverity } from '@/lib/utils/severity';
+import { FeedEvent } from '@/lib/types/activity';
 
 // import EventNotification from './event-notification';
 
@@ -39,7 +37,7 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
   const { organizationId } = useOrganization();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [machineEvents, setMachineEvents] = useState<
-    Record<number, MachineEvent[]>
+    Record<number, FeedEvent[]>
   >({});
   const [pulsatingMachines, setPulsatingMachines] = useState<
     Record<number, boolean>
@@ -127,22 +125,22 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
         machineId,
       });
 
-      const newEvent: MachineEvent = {
-        id: generateEventId(),
-        timestamp: new Date(),
-        eventstr: data.eventstr || classNames,
-        original_image_path: data.original_image_path,
-        cropped_images: data.cropped_images || [],
-        severity: severity,
-      };
+      // const newEvent: FeedEvent = {
+      //   id: generateEventId(),
+      //   timestamp: new Date(),
+      //   eventstr: data.eventstr || classNames,
+      //   original_image_path: data.original_image_path,
+      //   cropped_images: data.cropped_images || [],
+      //   severity: severity,
+      // };
 
-      setMachineEvents((prev) => ({
-        ...prev,
-        [machineId]: [newEvent, ...(prev[machineId] || [])].slice(
-          0,
-          MAX_EVENTS_PER_MACHINE,
-        ),
-      }));
+      // setMachineEvents((prev) => ({
+      //   ...prev,
+      //   [machineId]: [newEvent, ...(prev[machineId] || [])].slice(
+      //     0,
+      //     MAX_EVENTS_PER_MACHINE,
+      //   ),
+      // }));
 
       console.log(
         '🚀 [MapView] Starting pulsating animation for machine:',
