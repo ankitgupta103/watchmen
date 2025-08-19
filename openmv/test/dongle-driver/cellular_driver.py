@@ -80,9 +80,8 @@ class SC16IS750:
 class Cellular:
     """cellular system - initialize once, use continuously"""
     
-    def __init__(self, machine_id=228):
+    def __init__(self):
         self.uart = SC16IS750()
-        self.machine_id = machine_id
         self.connected = False
         self.ip_address = None
         self.http_initialized = False
