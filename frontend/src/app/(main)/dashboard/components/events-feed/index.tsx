@@ -41,10 +41,19 @@ export default function EventsFeed({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [selectedSeverities, setSelectedSeverities] = useState<number[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date(),
   });
+
+  // Define available severity levels
+  const severityLevels = [
+    { id: 0, label: 'LOW', description: 'No person detected' },
+    { id: 1, label: 'MEDIUM', description: 'Person detected' },
+    { id: 2, label: 'HIGH', description: 'Person with suspicious item' },
+    { id: 3, label: 'CRITICAL', description: 'Weapon detected' },
+  ];
 
   const fetchEvents = useCallback(
     async (currentChunk: number) => {
@@ -65,6 +74,7 @@ export default function EventsFeed({
         start_date: dateRange.from.toISOString().split('T')[0],
         machine_ids: machines.map((machine) => machine.id),
         tag_ids: selectedTags,
+        severity_levels: selectedSeverities,
         chunk: currentChunk,
       };
 
@@ -95,12 +105,12 @@ export default function EventsFeed({
         setIsLoading(false);
       }
     },
-    [token, organizationId, machines, dateRange, selectedTags],
+    [token, organizationId, machines, dateRange, selectedTags, selectedSeverities],
   );
 
   useEffect(() => {
     fetchEvents(1);
-  }, [dateRange, selectedTags, fetchEvents]);
+  }, [dateRange, selectedTags, selectedSeverities, fetchEvents]);
 
   useEffect(() => {
     // Create a sentinel element to observe
@@ -187,10 +197,44 @@ export default function EventsFeed({
     setS3FeedEvents(() => undefined);
   }, []);
 
+  const handleSeverityToggle = useCallback((severityId: number) => {
+    console.log('Toggling severity:', severityId);
+    setSelectedSeverities((prev) => {
+      const newSeverities = prev.includes(severityId)
+        ? prev.filter((id) => id !== severityId)
+        : [...prev, severityId];
+      console.log('New selected severities:', newSeverities);
+      return newSeverities;
+    });
+    // Reset chunk when severities change to start from beginning
+    setChunk(1);
+    // Clear existing events to prevent showing stale data
+    setS3FeedEvents(() => undefined);
+  }, []);
+
   const clearTagFilters = useCallback(() => {
     console.log('Clearing all tag filters');
     setSelectedTags([]);
     // Reset chunk when clearing tags to start from beginning
+    setChunk(1);
+    // Clear existing events to prevent showing stale data
+    setS3FeedEvents(undefined);
+  }, []);
+
+  const clearSeverityFilters = useCallback(() => {
+    console.log('Clearing all severity filters');
+    setSelectedSeverities([]);
+    // Reset chunk when clearing severities to start from beginning
+    setChunk(1);
+    // Clear existing events to prevent showing stale data
+    setS3FeedEvents(undefined);
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    console.log('Clearing all filters');
+    setSelectedTags([]);
+    setSelectedSeverities([]);
+    // Reset chunk when clearing all filters to start from beginning
     setChunk(1);
     // Clear existing events to prevent showing stale data
     setS3FeedEvents(undefined);
@@ -205,6 +249,16 @@ export default function EventsFeed({
       })
       .filter((tag): tag is { id: number; name: string } => tag !== null);
   }, [selectedTags, allTags]);
+
+  // Create a mapping for selected severities with labels
+  const getSelectedSeveritiesWithLabels = useMemo(() => {
+    return selectedSeverities
+      .map((severityId) => {
+        const severity = severityLevels.find((s) => s.id === severityId);
+        return severity ? { id: severityId, label: severity.label } : null;
+      })
+      .filter((severity): severity is { id: number; label: string } => severity !== null);
+  }, [selectedSeverities]);
 
   return (
     <div className="space-y-4 p-4">
@@ -256,24 +310,67 @@ export default function EventsFeed({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="h-10 px-3">
+              <Filter className="mr-2 h-4 w-4" />
+              Severity
+              {selectedSeverities.length > 0 && (
+                <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-800">
+                  {selectedSeverities.length}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="end">
+            <DropdownMenuLabel>Filter by Severity</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {severityLevels.map((severity) => (
+              <DropdownMenuCheckboxItem
+                key={severity.id}
+                checked={selectedSeverities.includes(severity.id)}
+                onCheckedChange={() => handleSeverityToggle(severity.id)}
+              >
+                <div>
+                  <div className="font-medium">{severity.label}</div>
+                  <div className="text-xs text-muted-foreground">{severity.description}</div>
+                </div>
+              </DropdownMenuCheckboxItem>
+            ))}
+            {selectedSeverities.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  onCheckedChange={clearSeverityFilters}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Clear All
+                </DropdownMenuCheckboxItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DateRangePicker
           setSelectStartDate={handleStartDateChange}
           setSelectEndDate={handleEndDateChange}
         />
       </div>
 
-      {selectedTags.length > 0 && (
+      {(selectedTags.length > 0 || selectedSeverities.length > 0) && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground text-sm">
-            Active tag filters:
+            Active filters:
           </span>
-          {/* Fixed: Use the correct tag ID for removal */}
+          
+          {/* Tag filters */}
           {getSelectedTagsWithNames.map((tag) => (
             <span
-              key={tag.id}
+              key={`tag-${tag.id}`}
               className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800"
             >
-              {tag.name}
+              Tag: {tag.name}
               <button
                 onClick={() => handleTagToggle(tag.id)}
                 className="ml-1 rounded-full p-0.5 hover:bg-blue-200"
@@ -283,10 +380,28 @@ export default function EventsFeed({
               </button>
             </span>
           ))}
+
+          {/* Severity filters */}
+          {getSelectedSeveritiesWithLabels.map((severity) => (
+            <span
+              key={`severity-${severity.id}`}
+              className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-800"
+            >
+              Severity: {severity.label}
+              <button
+                onClick={() => handleSeverityToggle(severity.id)}
+                className="ml-1 rounded-full p-0.5 hover:bg-orange-200"
+                aria-label={`Remove ${severity.label} severity filter`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+
           <Button
             variant="ghost"
             size="sm"
-            onClick={clearTagFilters}
+            onClick={clearAllFilters}
             className="h-6 px-2 text-xs"
           >
             Clear All
