@@ -779,7 +779,7 @@ async def send_heartbeat():
     while True:
         log(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
-            # my_addr : uptime : photos taken : events seen : gps : gps_staleness : neighbours : shortest_path
+            # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
             if gps_last_time > 0:
                 gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
             else:
