@@ -26,6 +26,13 @@ import { getSeverityLabel } from '@/lib/utils/severity';
 
 import Event from './event';
 
+  const severityLevels = [
+    { id: 0, label: 'LOW', description: 'No person detected' },
+    { id: 1, label: 'MEDIUM', description: 'Person detected' },
+    { id: 2, label: 'HIGH', description: 'Person with suspicious item' },
+    { id: 3, label: 'CRITICAL', description: 'Weapon detected' },
+  ];
+
 export default function EventsFeed({
   machines,
   allTags,
@@ -46,14 +53,6 @@ export default function EventsFeed({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date(),
   });
-
-  // Define available severity levels
-  const severityLevels = [
-    { id: 0, label: 'LOW', description: 'No person detected' },
-    { id: 1, label: 'MEDIUM', description: 'Person detected' },
-    { id: 2, label: 'HIGH', description: 'Person with suspicious item' },
-    { id: 3, label: 'CRITICAL', description: 'Weapon detected' },
-  ];
 
   const fetchEvents = useCallback(
     async (currentChunk: number) => {
