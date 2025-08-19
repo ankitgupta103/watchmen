@@ -115,6 +115,7 @@ async def init_sim():
         log("Cellular initialization failed!")
         return False
     log("Cellular system ready")
+    return True
 
 async def sim_send_image(creator, fname):
     """Send image via cellular with better error handling and retry logic"""
@@ -893,12 +894,7 @@ async def main():
         asyncio.create_task(image_sending_loop())
     else:
         log(f"Starting command center")
-
-        cellular_init_success = await init_sim()
-        if not cellular_init_success:
-            log("WARNING: Cellular initialization failed for command center")
-            log("Images will be saved locally but not uploaded to internet")
-
+        await init_sim()
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
         
