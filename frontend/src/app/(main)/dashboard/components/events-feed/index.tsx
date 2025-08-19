@@ -14,7 +14,7 @@ import { Machine, MachineTag } from '@/lib/types/machine';
 import { getSeverityLabel } from '@/lib/utils/severity';
 
 import Event from './event';
-import FilterEvents from '../filter-events';
+import FilterEvents from './filter-events';
 
 
 export default function EventsFeed({
@@ -42,6 +42,9 @@ export default function EventsFeed({
   const selectedTagsRef = useRef(selectedTags);
   const selectedSeveritiesRef = useRef(selectedSeverities);
   const dateRangeRef = useRef(dateRange);
+  // Ref to hold the AbortController for the current fetch request
+  const abortControllerRef = useRef<AbortController | null>(null);
+
 
   // Update refs whenever the values change
   useEffect(() => {
@@ -58,6 +61,15 @@ export default function EventsFeed({
 
   const fetchEvents = useCallback(
     async (currentChunk: number) => {
+      // Cancel any ongoing fetch request before starting a new one
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create a new AbortController for the current request
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       if (
         !token ||
         !organizationId ||
@@ -69,7 +81,6 @@ export default function EventsFeed({
       }
       setIsLoading(true);
 
-      // Use refs to get the latest filter values and avoid stale closures
       const payload = {
         org_id: organizationId.toString(),
         end_date: dateRangeRef.current.to.toISOString().split('T')[0],
@@ -87,6 +98,7 @@ export default function EventsFeed({
           {
             method: 'PUT',
             body: payload,
+            signal: controller.signal, // Pass the signal to the fetch request
           },
         );
 
@@ -101,20 +113,36 @@ export default function EventsFeed({
           }
           setChunk(currentChunk);
         }
-      } catch (error) {
-        console.error('Failed to fetch events:', error);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.log('Fetch request aborted.');
+        } else {
+          console.error('Failed to fetch events:', error);
+        }
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     },
     [token, organizationId, machines],
   );
 
   useEffect(() => {
+    // When filters change, reset the feed and fetch the first chunk
     setS3FeedEvents(undefined);
     setChunk(1);
     fetchEvents(1);
+
+    // Cleanup function to abort the fetch request if the component unmounts
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [dateRange, selectedTags, selectedSeverities, fetchEvents]);
+
 
   useEffect(() => {
     // Create a sentinel element to observe
