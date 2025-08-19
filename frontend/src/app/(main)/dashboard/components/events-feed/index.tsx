@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
 import useToken from '@/hooks/use-token';
 import { DateRange } from 'react-day-picker';
@@ -38,26 +38,45 @@ export default function EventsFeed({
     to: new Date(),
   });
 
+  // Use refs to store the latest filter values to avoid stale closures
+  const selectedTagsRef = useRef(selectedTags);
+  const selectedSeveritiesRef = useRef(selectedSeverities);
+  const dateRangeRef = useRef(dateRange);
+
+  // Update refs whenever the values change
+  useEffect(() => {
+    selectedTagsRef.current = selectedTags;
+  }, [selectedTags]);
+
+  useEffect(() => {
+    selectedSeveritiesRef.current = selectedSeverities;
+  }, [selectedSeverities]);
+
+  useEffect(() => {
+    dateRangeRef.current = dateRange;
+  }, [dateRange]);
+
   const fetchEvents = useCallback(
     async (currentChunk: number) => {
       if (
         !token ||
         !organizationId ||
         !machines ||
-        !dateRange.from ||
-        !dateRange.to
+        !dateRangeRef.current.from ||
+        !dateRangeRef.current.to
       ) {
         return;
       }
       setIsLoading(true);
 
+      // Use refs to get the latest filter values and avoid stale closures
       const payload = {
         org_id: organizationId.toString(),
-        end_date: dateRange.to.toISOString().split('T')[0],
-        start_date: dateRange.from.toISOString().split('T')[0],
+        end_date: dateRangeRef.current.to.toISOString().split('T')[0],
+        start_date: dateRangeRef.current.from.toISOString().split('T')[0],
         machine_ids: machines.map((machine) => machine.id),
-        tag_ids: selectedTags,
-        severity_levels: selectedSeverities,
+        tag_ids: selectedTagsRef.current,
+        severity_levels: selectedSeveritiesRef.current,
         chunk: currentChunk,
       };
 
@@ -88,14 +107,7 @@ export default function EventsFeed({
         setIsLoading(false);
       }
     },
-    [
-      token,
-      organizationId,
-      machines,
-      dateRange,
-      selectedTags,
-      selectedSeverities,
-    ],
+    [token, organizationId, machines],
   );
 
   useEffect(() => {
