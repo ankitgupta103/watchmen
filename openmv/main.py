@@ -83,7 +83,7 @@ def get_human_ts():
 
 def log(msg):
     t = get_human_ts()
-    log_entry = f"{my_addr}@{t} : {msg}")
+    log_entry = f"{my_addr}@{t} : {msg}"
     log_file.write(log_entry)
     log_file.flush()
     print(log_entry)
@@ -92,7 +92,7 @@ log("Running on device : " + uid.decode())
 # ------ Configuration for tensorflow model ------
 MODEL_PATH = "/rom/person_detect.tflite"
 model = ml.Model(MODEL_PATH)
-log(" Model loaded:", model)
+log(model)
 CONFIDENCE_THRESHOLD = 0.75
 IMG_DIR = "/sdcard/images/"
 
@@ -129,7 +129,7 @@ async def sim_send_image(creator, fname):
     for retry in range(max_connection_retries):
         if cellular_system.check_connection():
             break
-        
+
         log(f"Connection check failed, attempt {retry + 1}/{max_connection_retries}")
         if retry < max_connection_retries - 1:
             log("Attempting reconnect...")
@@ -145,17 +145,17 @@ async def sim_send_image(creator, fname):
         # Load and process image
         img = image.Image(fname)
         img_bytes = img.bytearray()
-        
+
         # Encrypt if needed
         encimb = encrypt_if_needed("P", img_bytes)
         imgbytes = ubinascii.b2a_base64(encimb)
-        
+
         log(f"Sending image file {fname} of size {len(imgbytes)} bytes")
-        
+
         # Prepare payload with additional metadata
         payload = {
             "machine_id": creator,
-            "message_type": "event", 
+            "message_type": "event",
             "image": imgbytes,
         }
 
@@ -163,31 +163,31 @@ async def sim_send_image(creator, fname):
         max_upload_retries = 3
         for upload_retry in range(max_upload_retries):
             result = cellular_system.upload_data(payload, URL)
-            
+
             if result and result.get('status_code') == 200:
                 log(f"Image {fname} uploaded successfully on attempt {upload_retry + 1}")
                 log(f"Upload time: {result.get('upload_time', 0):.2f}s")
                 log(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
-                
+
                 # Clean up the image file after successful upload
                 try:
                     os.remove(fname)
                     log(f"Deleted uploaded image file: {fname}")
                 except:
                     log(f"Could not delete image file: {fname}")
-                
+
                 return True
             else:
                 log(f"Upload attempt {upload_retry + 1} failed")
                 if result:
                     log(f"HTTP Status: {result.get('status_code', 'Unknown')}")
-                
+
                 if upload_retry < max_upload_retries - 1:
                     await asyncio.sleep(2 ** upload_retry)  # Exponential backoff
-        
+
         log(f"Failed to upload image {fname} after {max_upload_retries} attempts")
         return False
-        
+
     except Exception as e:
         log(f"Error in sim_send_image: {e}")
         return False
@@ -195,28 +195,32 @@ async def sim_send_image(creator, fname):
 async def sim_send_heartbeat(heartbeat_data):
     """Send heartbeat data via cellular (for command center)"""
     global cellular_system
-    
+
     if not cellular_system or not running_as_cc():
         return False
-        
+
     try:
+        # Send heartbeat data as-is (encrypted or not)
         payload = {
-            "machine_id": my_addr,
+            "machine_id": heartbeat_data["node_id"],
             "message_type": "heartbeat",
-            "heartbeat_data": heartbeat_data,
+            "heartbeat_data": heartbeat_data["heartbeat_data"],  # Raw data
+            "received_at_cc": heartbeat_data["received_at"],
+            "cc_id": my_addr
         }
-        
+
         result = cellular_system.upload_data(payload, URL.replace('detect', 'heartbeat'))
-        
+
         if result and result.get('status_code') == 200:
-            log("Heartbeat sent via cellular")
+            node_id = payload["machine_id"]
+            print(f"Heartbeat from node {node_id} sent to cloud successfully")
             return True
         else:
-            log("Failed to send heartbeat via cellular")
+            print("Failed to send heartbeat to cloud via cellular")
             return False
-            
+
     except Exception as e:
-        log(f"Error sending cellular heartbeat: {e}")
+        print(f"Error sending cellular heartbeat: {e}")
         return False
 
 loranode = None
@@ -628,6 +632,13 @@ def hb_process(mid, msgbytes):
         hb_map[creator] += 1
         log(f"HB Counts = {hb_map}")
         log(f"Images saved at cc so far = {len(images_saved_at_cc)}")
+
+        asyncio.create_task(sim_send_heartbeat({
+            "node_id": creator,
+            "heartbeat_data": msgbytes,  # Send raw encrypted data
+            "received_at": time_sec()
+        }))
+
         for i in images_saved_at_cc:
             log(i)
         if ENCRYPTION_ENABLED:
@@ -897,7 +908,7 @@ async def main():
         await init_sim()
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
-        
+
     for i in range(24*7):
         await asyncio.sleep(3600)
         log(f"Finished HOUR {i}")
