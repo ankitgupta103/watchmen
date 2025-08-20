@@ -29,7 +29,7 @@ SPATH_WAIT_2 = 1200
 SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
-PHOTO_TAKING_DELAY = 900 # TODO change to 1 second.
+PHOTO_TAKING_DELAY = 120 # TODO change to 1 second.
 PHOTO_SENDING_DELAY = 120
 GPS_WAIT_SEC = 30
 
@@ -37,7 +37,7 @@ MIDLEN = 7
 FLAKINESS = 0
 FRAME_SIZE = 195
 
-AIR_SPEED = 62500
+AIR_SPEED = 19200
 
 ENCRYPTION_ENABLED = True
 
@@ -201,9 +201,7 @@ async def sim_send_heartbeat(heartbeat_data):
         return False
 
     try:
-        heartbeat_data is already a properly formatted payload
         result = cellular_system.upload_data(heartbeat_data, URL)
-
         if result and result.get('status_code') == 200:
             node_id = heartbeat_data["machine_id"]
             log(f"Heartbeat from node {node_id} sent to cloud successfully")
