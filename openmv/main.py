@@ -19,9 +19,9 @@ import sx1262
 import gps_driver
 from cellular_driver import Cellular
 
-MIN_SLEEP = 0.2
+MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.1
+CHUNK_SLEEP = 0.2
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 30
@@ -418,7 +418,8 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
         return (True, [])
     for retry_i in range(3):
         radio_send(dest, databytes)
-        for i in range(5):
+        await asyncio.sleep(ACK_SLEEP)
+        for i in range(8):
             at, missing_chunks = ack_time(mid)
             if at > 0:
                 log(f"Msg {mid} : was acked in {at - timesent} msecs")
