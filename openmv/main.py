@@ -58,6 +58,8 @@ gps_last_time = -1
 consecutive_hb_failures = 0
 lora_reinit_count = 0
 
+image_in_progress = False
+
 COMMAN_CENTER_ADDR = 9
 my_addr = None
 shortest_path_to_cc = []
@@ -296,7 +298,9 @@ async def image_sending_loop():
 
             peer_addr = shortest_path_to_cc[0]
             transmission_start = time_msec()
+            image_in_progress = True
             await send_msg("P", my_addr, msgbytes, peer_addr)
+            image_in_progress = False
             # If failure, retry and put it back in queue
             transmission_end = time_msec()
 
@@ -475,6 +479,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
     for i in range(len(chunks)):
         if i % 10 == 0:
             log(f"Sending chunk {i}")
+        image_in_progress = True
         await asyncio.sleep(CHUNK_SLEEP)
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
         _ = await send_single_msg("I", creator, chunkbytes, dest)
@@ -488,6 +493,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
             return True
         log(f"Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}")
         for mc in missing_chunks:
+            image_in_progress = True
             await asyncio.sleep(CHUNK_SLEEP)
             chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
             _ = await send_single_msg("I", creator, chunkbytes, dest)
@@ -536,6 +542,7 @@ async def log_status():
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
 def begin_chunk(msg):
+    image_in_progress = True
     parts = msg.split(":")
     if len(parts) != 3:
         log(f"ERROR : begin message unparsable {msg}")
@@ -557,6 +564,7 @@ def get_missing_chunks(cid):
     return missing_chunks
 
 def add_chunk(msgbytes):
+    image_in_progress = True
     if len(msgbytes) < 5:
         log(f"ERROR : Not enough bytes {len(msgbytes)} : {msgbytes}")
         return
@@ -600,6 +608,7 @@ def clear_chunkid(cid):
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
 def end_chunk(mid, msg):
+    image_in_progress = False
     cid = msg
     creator = int(mid[1])
     missing = get_missing_chunks(cid)
@@ -793,6 +802,10 @@ async def send_heartbeat():
     global consecutive_hb_failures
     i = 1
     while True:
+        if image_in_progress:
+            print(f"Skipping HB send because image in progress")
+            await asyncio.sleep(10)
+            continue
         log(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
             # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
@@ -833,6 +846,10 @@ async def send_scan():
     global seen_neighbours
     i = 1
     while True:
+        if image_in_progress:
+            print(f"Skipping scan send because image in progress")
+            await asyncio.sleep(10)
+            continue
         scanmsg = my_addr.to_bytes()
         # 65535 is for Broadcast
         await send_msg("N", my_addr, scanmsg, 65535)
@@ -846,6 +863,10 @@ async def send_scan():
 async def send_spath():
     i = 1
     while True:
+        if image_in_progress:
+            print(f"Skipping spath send because image in progress")
+            await asyncio.sleep(10)
+            continue
         sp = f"{my_addr}"
         for n in seen_neighbours:
             log(f"Sending shortest path to {n}")
@@ -912,7 +933,7 @@ async def main():
     else:
         asyncio.create_task(send_scan())
         await asyncio.sleep(8)
-        #asyncio.create_task(send_heartbeat())
+        asyncio.create_task(send_heartbeat())
         await asyncio.sleep(2)
         # asyncio.create_task(keep_updating_gps())
         asyncio.create_task(person_detection_loop())
