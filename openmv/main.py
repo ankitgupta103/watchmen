@@ -19,7 +19,7 @@ import sx1262
 import gps_driver
 from cellular_driver import Cellular
 
-MIN_SLEEP = 0.2
+MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.1
 
@@ -39,7 +39,7 @@ MIDLEN = 7
 FLAKINESS = 0
 FRAME_SIZE = 195
 
-AIR_SPEED = 19200
+AIR_SPEED = 62500
 
 ENCRYPTION_ENABLED = True
 
@@ -915,9 +915,9 @@ async def main():
         await asyncio.sleep(2)
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
-        asyncio.create_task(keep_updating_gps())
-        asyncio.create_task(person_detection_loop())
-        asyncio.create_task(image_sending_loop())
+        # asyncio.create_task(keep_updating_gps())
+        #asyncio.create_task(person_detection_loop())
+        #asyncio.create_task(image_sending_loop())
     for i in range(24*7):
         await asyncio.sleep(3600)
         log(f"Finished HOUR {i}")
