@@ -462,8 +462,6 @@ def encrypt_if_needed(mst, msg):
 def send_msg_internal(msgtype, creator, msgbytes, dest):
     if msgtype == "P":
         log(f"Sending photo of length {len(msgbytes)}")
-    else:
-        log(f"Sending message {msgbytes}")
     if len(msgbytes) < FRAME_SIZE:
         succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
         return succ
