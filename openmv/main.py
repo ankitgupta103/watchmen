@@ -73,7 +73,6 @@ elif uid == b'e076465dd7091027':
     my_addr = 221
 elif uid == b'e076465dd7194211':
     my_addr = 222
-    shortest_path_to_cc = [9]
 elif uid == b'e076465dd7193a09':
     my_addr = 9
 else:
@@ -88,12 +87,12 @@ def get_human_ts():
     t=f"{m}:{s}"
     return t
 
+log_entries_buffer = []
+
 def log(msg):
     t = get_human_ts()
     log_entry = f"{my_addr}@{t} : {msg}"
-    #with open("log.txt", "a") as log_file:
-    #    log_file.write(log_entry)
-    #    log_file.flush()
+    log_entries_buffer.append(log_entry)
     print(log_entry)
 
 def running_as_cc():
@@ -303,9 +302,10 @@ async def image_sending_loop():
             transmission_start = time_msec()
             global image_in_progress
             image_in_progress = True
-            await send_msg("P", my_addr, msgbytes, peer_addr)
+            sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
             image_in_progress = False
-            # If failure, retry and put it back in queue
+            if not sent_succ:
+                images_to_send.append(imagefile) # pushed to back of queue
             transmission_end = time_msec()
 
             transmission_time = transmission_end - transmission_start
@@ -889,10 +889,23 @@ async def send_spath():
         else:
             await asyncio.sleep(SPATH_WAIT_2 + random.randint(1,120))
 
-async def print_summary():
+async def print_summary_and_flush_logs():
     while True:
-        await asyncio.sleep(300)
+        global seen_neighbours
+        if image_in_progress:
+            print(f"Skipping print summary because image in progress")
+            await asyncio.sleep(200)
+            continue
+        await asyncio.sleep(30)
         log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa reinits: {lora_reinit_count}")
+        with open(LOG_FILE_PATH, "a") as log_file:
+            global log_entries_buffer
+            tmp = log_entries_buffer
+            log_entries_buffer = []
+            print(f"Writing {len(tmp)} lines to logfile")
+            for x in tmp:
+                log_file.write(x + "\n")
+            log_file.flush()
         #log(msgs_sent)
         #log(msgs_recd)
         #log(msgs_unacked)
@@ -918,23 +931,11 @@ async def keep_updating_gps():
             log(f"GPS has no fix")
         await asyncio.sleep(GPS_WAIT_SEC)
 
-def image_test():
-    r = get_rand()
-    log(r)
-    img = sensor.snapshot()
-    log(img.size())
-    log(img.to_jpeg().size())
-    im2 = image.Image(320, 240, image.RGB565, data=img.bytearray())
-    im3 = image.Image(320, 240, image.JPEG, buffer=img.to_jpeg().bytearray())
-    img.save(f"{r}.jpg")
-    im2.save(f"reconstructed_{r}.jpg")
-    im3.save(f"reconstructed_jpeg_{r}.jpg")
-
 async def main():
     log(f"[INFO] Started device {my_addr}")
     await init_lora()
     asyncio.create_task(radio_read())
-    asyncio.create_task(print_summary())
+    asyncio.create_task(print_summary_and_flush_logs())
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
