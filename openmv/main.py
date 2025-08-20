@@ -91,9 +91,9 @@ def get_human_ts():
 def log(msg):
     t = get_human_ts()
     log_entry = f"{my_addr}@{t} : {msg}"
-    with open("log.txt", "a") as log_file:
-        log_file.write(log_entry)
-        log_file.flush()
+    #with open("log.txt", "a") as log_file:
+    #    log_file.write(log_entry)
+    #    log_file.flush()
     print(log_entry)
 
 def running_as_cc():
