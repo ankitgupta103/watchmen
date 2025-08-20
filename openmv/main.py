@@ -400,7 +400,7 @@ def radio_send(dest, data):
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
     loranode.send(dest, data)
-    log(f"[SENT at {len(data)} bytes] {data} at {time_msec()}")
+    log(f"[SENT {len(data)} bytes to {dest}] {data} at {time_msec()}")
 
 def pop_and_get(mid):
     for i in range(len(msgs_unacked)):
@@ -580,7 +580,7 @@ def add_chunk(msgbytes):
         return
     cid = msgbytes[0:3].decode()
     citer = int.from_bytes(msgbytes[3:5])
-    log(f"Got chunk id {citer}")
+    #log(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
     if cid not in chunk_map:
         log(f"ERROR : no entry yet for {cid}")
@@ -588,7 +588,7 @@ def add_chunk(msgbytes):
     _, expected_chunks, _ = chunk_map[cid]
     missing = get_missing_chunks(cid)
     received = expected_chunks - len(missing)
-    log(f" ===== Got {received} / {expected_chunks} chunks ====")
+    #log(f" ===== Got {received} / {expected_chunks} chunks ====")
 
 def get_data_for_iter(list_chunks, chunkiter):
     for citer, chunk_data in list_chunks:
