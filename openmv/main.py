@@ -939,7 +939,7 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
-        # await init_sim()
+        await init_sim()
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(send_spath())
