@@ -71,6 +71,7 @@ elif uid == b'e076465dd7091027':
     my_addr = 221
 elif uid == b'e076465dd7194211':
     my_addr = 222
+    shortest_path_to_cc = [9]
 elif uid == b'e076465dd7193a09':
     my_addr = 223
 else:
@@ -742,7 +743,7 @@ def process_message(data):
     elif mst == "S":
         spath_process(mid, msg.decode())
     elif mst == "H":
-        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+        send_msg("A", my_addr, ackmessage, sender)
         hb_process(mid, msg)
     elif mst == "B":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
