@@ -116,6 +116,17 @@ recv_msg_count = {}
 
 URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 
+async def acquire_image_lock():
+    global image_in_progress
+    image_in_progress = True
+    await asyncio.sleep(120)
+    print(f"Going to release the image lock after 120 seconds, current lock state = {image_in_progress}")
+    image_in_progress = False
+
+async def release_image_lock():
+    global image_in_progress
+    image_in_progress = False
+
 async def init_sim():
     """Initialize the cellular connection"""
     global cellular_system
@@ -300,10 +311,9 @@ async def image_sending_loop():
 
             peer_addr = shortest_path_to_cc[0]
             transmission_start = time_msec()
-            global image_in_progress
-            image_in_progress = True
+            acquire_image_lock()
             sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
-            image_in_progress = False
+            release_image_lock()
             if not sent_succ:
                 images_to_send.append(imagefile) # pushed to back of queue
             transmission_end = time_msec()
@@ -483,8 +493,6 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
     for i in range(len(chunks)):
         if i % 10 == 0:
             log(f"Sending chunk {i}")
-        global image_in_progress
-        image_in_progress = True
         await asyncio.sleep(CHUNK_SLEEP)
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
         _ = await send_single_msg("I", creator, chunkbytes, dest)
@@ -499,8 +507,6 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
             return True
         log(f"Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}")
         for mc in missing_chunks:
-            global image_in_progress
-            image_in_progress = True
             await asyncio.sleep(CHUNK_SLEEP)
             chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
             _ = await send_single_msg("I", creator, chunkbytes, dest)
@@ -550,8 +556,6 @@ async def log_status():
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
 def begin_chunk(msg):
-    global image_in_progress
-    image_in_progress = True
     parts = msg.split(":")
     if len(parts) != 3:
         log(f"ERROR : begin message unparsable {msg}")
@@ -573,8 +577,6 @@ def get_missing_chunks(cid):
     return missing_chunks
 
 def add_chunk(msgbytes):
-    global image_in_progress
-    image_in_progress = True
     if len(msgbytes) < 5:
         log(f"ERROR : Not enough bytes {len(msgbytes)} : {msgbytes}")
         return
@@ -618,8 +620,6 @@ def clear_chunkid(cid):
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
 def end_chunk(mid, msg):
-    global image_in_progress
-    image_in_progress = False
     cid = msg
     creator = int(mid[1])
     missing = get_missing_chunks(cid)
@@ -765,6 +765,7 @@ def process_message(data):
         asyncio.create_task(hb_process(mid, msg))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif mst == "B":
+        acquire_image_lock()
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
         try:
             begin_chunk(msg.decode())
@@ -775,6 +776,7 @@ def process_message(data):
     elif mst == "E":
         alldone, missing_str, cid, recompiled, creator = end_chunk(mid, msg.decode())
         if alldone:
+            release_image_lock()
             # Also when it fails
             ackmessage += b":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
