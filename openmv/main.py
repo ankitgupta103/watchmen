@@ -816,7 +816,7 @@ async def send_heartbeat():
         await asyncio.sleep(5)
         if image_in_progress:
             print(f"Skipping HB send because image in progress")
-            await asyncio.sleep(10)
+            await asyncio.sleep(200)
             continue
         log(f"Shortest path = {shortest_path_to_cc}")
         if len(shortest_path_to_cc) > 0:
@@ -860,7 +860,7 @@ async def send_scan():
     while True:
         if image_in_progress:
             print(f"Skipping scan send because image in progress")
-            await asyncio.sleep(10)
+            await asyncio.sleep(200)
             continue
         scanmsg = my_addr.to_bytes()
         # 65535 is for Broadcast
@@ -877,7 +877,7 @@ async def send_spath():
     while True:
         if image_in_progress:
             print(f"Skipping spath send because image in progress")
-            await asyncio.sleep(10)
+            await asyncio.sleep(200)
             continue
         sp = f"{my_addr}"
         for n in seen_neighbours:
@@ -891,7 +891,7 @@ async def send_spath():
 
 async def print_summary():
     while True:
-        await asyncio.sleep(30)
+        await asyncio.sleep(300)
         log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa reinits: {lora_reinit_count}")
         #log(msgs_sent)
         #log(msgs_recd)
