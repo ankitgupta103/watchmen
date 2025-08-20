@@ -39,7 +39,7 @@ MIDLEN = 7
 FLAKINESS = 0
 FRAME_SIZE = 195
 
-AIR_SPEED = 62500
+AIR_SPEED = 19200
 
 ENCRYPTION_ENABLED = True
 
@@ -300,6 +300,7 @@ async def image_sending_loop():
 
             peer_addr = shortest_path_to_cc[0]
             transmission_start = time_msec()
+            global image_in_progress
             image_in_progress = True
             await send_msg("P", my_addr, msgbytes, peer_addr)
             image_in_progress = False
@@ -481,6 +482,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
     for i in range(len(chunks)):
         if i % 10 == 0:
             log(f"Sending chunk {i}")
+        global image_in_progress
         image_in_progress = True
         await asyncio.sleep(CHUNK_SLEEP)
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
@@ -496,6 +498,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
             return True
         log(f"Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}")
         for mc in missing_chunks:
+            global image_in_progress
             image_in_progress = True
             await asyncio.sleep(CHUNK_SLEEP)
             chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
@@ -546,6 +549,7 @@ async def log_status():
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
 def begin_chunk(msg):
+    global image_in_progress
     image_in_progress = True
     parts = msg.split(":")
     if len(parts) != 3:
@@ -568,6 +572,7 @@ def get_missing_chunks(cid):
     return missing_chunks
 
 def add_chunk(msgbytes):
+    global image_in_progress
     image_in_progress = True
     if len(msgbytes) < 5:
         log(f"ERROR : Not enough bytes {len(msgbytes)} : {msgbytes}")
@@ -612,6 +617,7 @@ def clear_chunkid(cid):
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
 def end_chunk(mid, msg):
+    global image_in_progress
     image_in_progress = False
     cid = msg
     creator = int(mid[1])
