@@ -19,9 +19,11 @@ import sx1262
 import gps_driver
 from cellular_driver import Cellular
 
-MIN_SLEEP = 0.1
-ACK_SLEEP = 0.2
+MIN_SLEEP = 0.2
+ACK_SLEEP = 0.3
 CHUNK_SLEEP = 0.2
+
+DISCOVERY_COUNT = 100
 HB_WAIT = 60
 HB_WAIT_2 = 1200
 SPATH_WAIT = 30
@@ -271,7 +273,7 @@ async def person_detection_loop():
             person_image_count += 1
             r = get_rand()
             raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
-            log(f"Saving image to {raw_path}")
+            log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
             img.save(raw_path)
             images_to_send.append(raw_path)
         await asyncio.sleep(PHOTO_TAKING_DELAY)
@@ -822,7 +824,7 @@ async def send_heartbeat():
         else:
             log("Not sending heartbeat right now because i dont know my shortest path")
         i += 1
-        if i < 10:
+        if i < DISCOVERY_COUNT:
             await asyncio.sleep(HB_WAIT)
         else:
             await asyncio.sleep(HB_WAIT_2 + random.randint(1, 120))
@@ -835,7 +837,7 @@ async def send_scan():
         scanmsg = my_addr.to_bytes()
         # 65535 is for Broadcast
         await send_msg("N", my_addr, scanmsg, 65535)
-        if i < 10:
+        if i < DISCOVERY_COUNT:
             await asyncio.sleep(SCAN_WAIT)
         else:
             await asyncio.sleep(SCAN_WAIT_2 + random.randint(1,120))
@@ -850,7 +852,7 @@ async def send_spath():
             log(f"Sending shortest path to {n}")
             await send_msg("S", my_addr, sp.encode(), n)
         i += 1
-        if i < 10:
+        if i < DISCOVERY_COUNT:
             await asyncio.sleep(SPATH_WAIT)
         else:
             await asyncio.sleep(SPATH_WAIT_2 + random.randint(1,120))
