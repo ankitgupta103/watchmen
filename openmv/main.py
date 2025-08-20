@@ -71,7 +71,6 @@ elif uid == b'e076465dd7091027':
     my_addr = 221
 elif uid == b'e076465dd7194211':
     my_addr = 222
-    shortest_path_to_cc = [9]
 elif uid == b'e076465dd7193a09':
     my_addr = 223
 else:
@@ -902,22 +901,22 @@ async def main():
     log(f"[INFO] Started device {my_addr}")
     await init_lora()
     asyncio.create_task(radio_read())
-    #asyncio.create_task(print_summary())
-    #asyncio.create_task(validate_and_remove_neighbours())
+    asyncio.create_task(print_summary())
+    asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
         # await init_sim()
-        #asyncio.create_task(send_scan())
-        #await asyncio.sleep(2)
+        asyncio.create_task(send_scan())
+        await asyncio.sleep(2)
         asyncio.create_task(send_spath())
     else:
-        #asyncio.create_task(send_scan())
-        #await asyncio.sleep(8)
+        asyncio.create_task(send_scan())
+        await asyncio.sleep(8)
         asyncio.create_task(send_heartbeat())
-        #await asyncio.sleep(2)
+        await asyncio.sleep(2)
         # asyncio.create_task(keep_updating_gps())
-        #asyncio.create_task(person_detection_loop())
-        #asyncio.create_task(image_sending_loop())
+        asyncio.create_task(person_detection_loop())
+        asyncio.create_task(image_sending_loop())
     for i in range(24*7):
         await asyncio.sleep(3600)
         log(f"Finished HOUR {i}")
