@@ -20,8 +20,8 @@ import gps_driver
 from cellular_driver import Cellular
 
 MIN_SLEEP = 0.1
-ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.2
+ACK_SLEEP = 0.1
+CHUNK_SLEEP = 0.1
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 30
@@ -620,7 +620,7 @@ def end_chunk(mid, msg):
 
 hb_map = {}
 
-def hb_process(mid, msgbytes):
+async def hb_process(mid, msgbytes):
     creator = int(mid[1])
     if running_as_cc():
         if creator not in hb_map:
@@ -743,8 +743,8 @@ def process_message(data):
     elif mst == "S":
         spath_process(mid, msg.decode())
     elif mst == "H":
-        send_msg("A", my_addr, ackmessage, sender)
-        hb_process(mid, msg)
+        asyncio.create_task(hb_process(mid, msg))
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif mst == "B":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
         try:
