@@ -21,7 +21,7 @@ from cellular_driver import Cellular
 
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.2
+CHUNK_SLEEP = 0.3
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 30
@@ -39,7 +39,7 @@ MIDLEN = 7
 FLAKINESS = 0
 FRAME_SIZE = 195
 
-AIR_SPEED = 19200
+AIR_SPEED = 62500
 
 ENCRYPTION_ENABLED = True
 
@@ -80,6 +80,8 @@ else:
     sys.exit()
 clock_start = utime.ticks_ms() # get millisecond counter
 
+outbox = []
+
 def get_human_ts():
     _,_,_,_,h,m,s,_ = rtc.datetime()
     t=f"{m}:{s}"
@@ -106,7 +108,7 @@ IMG_DIR = "/sdcard/images/"
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.HD)
+sensor.set_framesize(sensor.VGA)
 sensor.skip_frames(time=2000)
 
 sent_count = 0
@@ -484,6 +486,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
         _ = await send_single_msg("I", creator, chunkbytes, dest)
     for retry_i in range(50):
+        await asyncio.sleep(CHUNK_SLEEP)
         succ, missing_chunks = await send_single_msg("E", creator, imid, dest)
         if not succ:
             log(f"Failed sending chunk end")
@@ -500,6 +503,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
     return False
 
 async def send_msg(msgtype, creator, msgbytes, dest):
+    #outbox.append((msgtype, creator, msgbytes, dest))
     retval = await send_msg_internal(msgtype, creator, msgbytes, dest)
     return retval
 
