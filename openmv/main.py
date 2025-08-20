@@ -837,7 +837,7 @@ async def send_heartbeat():
             log("Not sending heartbeat right now because i dont know my shortest path")
         i += 1
         if i < DISCOVERY_COUNT:
-            await asyncio.sleep(HB_WAIT)
+            await asyncio.sleep(HB_WAIT + random.randint(3,10))
         else:
             await asyncio.sleep(HB_WAIT_2 + random.randint(1, 120))
 
