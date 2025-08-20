@@ -19,7 +19,7 @@ import sx1262
 import gps_driver
 from cellular_driver import Cellular
 
-MIN_SLEEP = 0.1
+MIN_SLEEP = 0.2
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.1
 
@@ -90,6 +90,9 @@ def log(msg):
         log_file.write(log_entry)
         log_file.flush()
     print(log_entry)
+
+def running_as_cc():
+    return my_addr == COMMAN_CENTER_ADDR
 
 log("Running on device : " + uid.decode())
 # ------ Configuration for tensorflow model ------
@@ -239,9 +242,6 @@ async def init_lora():
     log(f"LoRa module initialized successfully! (Total reinitializations: {lora_reinit_count})")
     log(f"Node address: {loranode.addr}")
     log(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
-
-def running_as_cc():
-    return my_addr == COMMAN_CENTER_ADDR
 
 # ------- Person Detection + snapshot ---------
 def detect_person(img):
@@ -719,7 +719,7 @@ def process_message(data):
     log(f"[RECV {len(data)}] {data} at {time_msec()}")
     parsed = parse_header(data)
     if not parsed:
-        log(f"Failure parsing incoming data : {data}")
+        log(f" ######## ***** @@@@@@@@ Failure parsing incoming data : {data}")
         return False
     if random.randint(1,100) <= FLAKINESS:
         log(f"Flakiness dropping {data}")
@@ -916,8 +916,8 @@ async def main():
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(keep_updating_gps())
-        #asyncio.create_task(person_detection_loop())
-        #asyncio.create_task(image_sending_loop())
+        asyncio.create_task(person_detection_loop())
+        asyncio.create_task(image_sending_loop())
     for i in range(24*7):
         await asyncio.sleep(3600)
         log(f"Finished HOUR {i}")
