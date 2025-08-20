@@ -68,13 +68,13 @@ seen_neighbours = []
 rtc = RTC()
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 if uid == b'e076465dd7194025':
-    my_addr = 9
+    my_addr = 223
 elif uid == b'e076465dd7091027':
     my_addr = 221
 elif uid == b'e076465dd7194211':
     my_addr = 222
 elif uid == b'e076465dd7193a09':
-    my_addr = 223
+    my_addr = 9
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
