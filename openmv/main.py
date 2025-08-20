@@ -20,7 +20,7 @@ import gps_driver
 from cellular_driver import Cellular
 
 MIN_SLEEP = 0.2
-ACK_SLEEP = 0.3
+ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.2
 
 DISCOVERY_COUNT = 100
@@ -414,10 +414,10 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
         msgs_sent.append((mid, msgbytes, timesent))
     if not ackneeded:
         radio_send(dest, databytes)
+        await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     for retry_i in range(3):
         radio_send(dest, databytes)
-        await asyncio.sleep(ACK_SLEEP if ackneeded else MIN_SLEEP)
         for i in range(5):
             at, missing_chunks = ack_time(mid)
             if at > 0:
