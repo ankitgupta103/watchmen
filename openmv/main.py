@@ -19,7 +19,7 @@ import sx1262
 import gps_driver
 from cellular_driver import Cellular
 
-MIN_SLEEP = 0.1
+MIN_SLEEP = 0.2
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.1
 
@@ -907,13 +907,13 @@ async def main():
     if running_as_cc():
         log(f"Starting command center")
         # await init_sim()
+        asyncio.create_task(send_scan())
+        await asyncio.sleep(2)
         asyncio.create_task(send_spath())
-        await asyncio.sleep(2)
-        asyncio.create_task(send_scan())
     else:
-        asyncio.create_task(send_heartbeat())
-        await asyncio.sleep(2)
         asyncio.create_task(send_scan())
+        await asyncio.sleep(8)
+        asyncio.create_task(send_heartbeat())
         await asyncio.sleep(2)
         # asyncio.create_task(keep_updating_gps())
         #asyncio.create_task(person_detection_loop())
