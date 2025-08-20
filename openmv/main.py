@@ -120,7 +120,7 @@ async def acquire_image_lock():
     global image_in_progress
     image_in_progress = True
     await asyncio.sleep(120)
-    print(f"Going to release the image lock after 120 seconds, current lock state = {image_in_progress}")
+    log(f"Going to release the image lock after 120 seconds, current lock state = {image_in_progress}")
     image_in_progress = False
 
 async def release_image_lock():
@@ -817,7 +817,7 @@ async def send_heartbeat():
     while True:
         await asyncio.sleep(5)
         if image_in_progress:
-            print(f"Skipping HB send because image in progress")
+            log(f"Skipping HB send because image in progress")
             await asyncio.sleep(200)
             continue
         log(f"Shortest path = {shortest_path_to_cc}")
@@ -861,7 +861,7 @@ async def send_scan():
     i = 1
     while True:
         if image_in_progress:
-            print(f"Skipping scan send because image in progress")
+            log(f"Skipping scan send because image in progress")
             await asyncio.sleep(200)
             continue
         scanmsg = my_addr.to_bytes()
@@ -878,7 +878,7 @@ async def send_spath():
     i = 1
     while True:
         if image_in_progress:
-            print(f"Skipping spath send because image in progress")
+            log(f"Skipping spath send because image in progress")
             await asyncio.sleep(200)
             continue
         sp = f"{my_addr}"
@@ -895,7 +895,7 @@ async def print_summary_and_flush_logs():
     while True:
         global seen_neighbours
         if image_in_progress:
-            print(f"Skipping print summary because image in progress")
+            log(f"Skipping print summary because image in progress")
             await asyncio.sleep(200)
             continue
         await asyncio.sleep(30)
@@ -904,7 +904,7 @@ async def print_summary_and_flush_logs():
             global log_entries_buffer
             tmp = log_entries_buffer
             log_entries_buffer = []
-            print(f"Writing {len(tmp)} lines to logfile")
+            log(f"Writing {len(tmp)} lines to logfile")
             for x in tmp:
                 log_file.write(x + "\n")
             log_file.flush()
