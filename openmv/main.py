@@ -802,6 +802,7 @@ async def send_heartbeat():
     global consecutive_hb_failures
     i = 1
     while True:
+        await asyncio.sleep(5)
         if image_in_progress:
             print(f"Skipping HB send because image in progress")
             await asyncio.sleep(10)
