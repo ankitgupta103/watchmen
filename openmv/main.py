@@ -20,8 +20,8 @@ import gps_driver
 from cellular_driver import Cellular
 
 MIN_SLEEP = 0.1
-ACK_SLEEP = 0.1
-CHUNK_SLEEP = 0.1
+ACK_SLEEP = 0.2
+CHUNK_SLEEP = 0.2
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 30
@@ -912,7 +912,7 @@ async def main():
     else:
         asyncio.create_task(send_scan())
         await asyncio.sleep(8)
-        asyncio.create_task(send_heartbeat())
+        #asyncio.create_task(send_heartbeat())
         await asyncio.sleep(2)
         # asyncio.create_task(keep_updating_gps())
         asyncio.create_task(person_detection_loop())
