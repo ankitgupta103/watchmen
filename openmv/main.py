@@ -910,7 +910,7 @@ async def main():
         asyncio.create_task(image_sending_loop())
     else:
         log(f"Starting command center")
-        await init_sim()
+        # await init_sim()
         asyncio.create_task(send_spath())
         asyncio.create_task(send_scan())
 
