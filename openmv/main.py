@@ -118,12 +118,14 @@ URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 
 async def acquire_image_lock():
     global image_in_progress
+    log(f"Acquiring Image Lock")
     image_in_progress = True
     await asyncio.sleep(120)
     log(f"Going to release the image lock after 120 seconds, current lock state = {image_in_progress}")
     image_in_progress = False
 
 async def release_image_lock():
+    log(f"Releasing Image Lock")
     global image_in_progress
     image_in_progress = False
 
@@ -311,7 +313,7 @@ async def image_sending_loop():
 
             peer_addr = shortest_path_to_cc[0]
             transmission_start = time_msec()
-            acquire_image_lock()
+            asyncio.create_task(acquire_image_lock())
             sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
             release_image_lock()
             if not sent_succ:
@@ -765,7 +767,7 @@ def process_message(data):
         asyncio.create_task(hb_process(mid, msg))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif mst == "B":
-        acquire_image_lock()
+        asyncio.create_task(acquire_image_lock())
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
         try:
             begin_chunk(msg.decode())
