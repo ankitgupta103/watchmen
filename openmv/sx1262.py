@@ -377,11 +377,11 @@ class sx126x:
                message + b'\n'
         #print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
         self.ser.write(data)
-        time.sleep_ms(100)
+        time.sleep_ms(150)
 
     def receive(self):
         if self.ser.any():
-            time.sleep_ms(100)
+            time.sleep_ms(150)
             r_buff = self.ser.readline()
             if r_buff and len(r_buff) >= 6:
                 # sender_addr = (r_buff[0] << 8) + r_buff[1]
