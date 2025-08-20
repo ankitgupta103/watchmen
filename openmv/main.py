@@ -73,6 +73,7 @@ elif uid == b'e076465dd7091027':
     my_addr = 221
 elif uid == b'e076465dd7194211':
     my_addr = 222
+    shortest_path_to_cc = [9]
 elif uid == b'e076465dd7193a09':
     my_addr = 9
 else:
@@ -938,14 +939,14 @@ async def main():
     if running_as_cc():
         log(f"Starting command center")
         # await init_sim()
-        asyncio.create_task(send_scan())
-        await asyncio.sleep(2)
-        asyncio.create_task(send_spath())
+        #asyncio.create_task(send_scan())
+        #await asyncio.sleep(2)
+        #asyncio.create_task(send_spath())
     else:
-        asyncio.create_task(send_scan())
-        await asyncio.sleep(8)
-        asyncio.create_task(send_heartbeat())
-        await asyncio.sleep(2)
+        #asyncio.create_task(send_scan())
+        #await asyncio.sleep(8)
+        #asyncio.create_task(send_heartbeat())
+        #await asyncio.sleep(2)
         # asyncio.create_task(keep_updating_gps())
         asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
