@@ -19,12 +19,12 @@ import sx1262
 import gps_driver
 from cellular_driver import Cellular
 
-MIN_SLEEP = 0.2
+MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.2
+CHUNK_SLEEP = 0.1
 
 DISCOVERY_COUNT = 100
-HB_WAIT = 60
+HB_WAIT = 30
 HB_WAIT_2 = 1200
 SPATH_WAIT = 30
 SPATH_WAIT_2 = 1200
@@ -904,18 +904,20 @@ async def main():
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary())
     asyncio.create_task(validate_and_remove_neighbours())
-    if my_addr != COMMAN_CENTER_ADDR:
-        asyncio.create_task(send_heartbeat())
-        asyncio.create_task(send_scan())
-        asyncio.create_task(keep_updating_gps())
-        asyncio.create_task(person_detection_loop())
-        asyncio.create_task(image_sending_loop())
-    else:
+    if running_as_cc():
         log(f"Starting command center")
         # await init_sim()
         asyncio.create_task(send_spath())
+        await asyncio.sleep(2)
         asyncio.create_task(send_scan())
-
+    else:
+        asyncio.create_task(send_heartbeat())
+        await asyncio.sleep(2)
+        asyncio.create_task(send_scan())
+        await asyncio.sleep(2)
+        asyncio.create_task(keep_updating_gps())
+        #asyncio.create_task(person_detection_loop())
+        #asyncio.create_task(image_sending_loop())
     for i in range(24*7):
         await asyncio.sleep(3600)
         log(f"Finished HOUR {i}")
