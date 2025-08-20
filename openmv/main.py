@@ -818,6 +818,7 @@ async def send_heartbeat():
     i = 1
     while True:
         await asyncio.sleep(5)
+        global image_in_progress
         if image_in_progress:
             log(f"Skipping HB send because image in progress")
             await asyncio.sleep(200)
@@ -862,6 +863,7 @@ async def send_scan():
     global seen_neighbours
     i = 1
     while True:
+        global image_in_progress
         if image_in_progress:
             log(f"Skipping scan send because image in progress")
             await asyncio.sleep(200)
@@ -879,6 +881,7 @@ async def send_scan():
 async def send_spath():
     i = 1
     while True:
+        global image_in_progress
         if image_in_progress:
             log(f"Skipping spath send because image in progress")
             await asyncio.sleep(200)
@@ -895,7 +898,7 @@ async def send_spath():
 
 async def print_summary_and_flush_logs():
     while True:
-        global seen_neighbours
+        global image_in_progress
         if image_in_progress:
             log(f"Skipping print summary because image in progress")
             await asyncio.sleep(200)
