@@ -24,15 +24,15 @@ ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.3
 
 DISCOVERY_COUNT = 100
-HB_WAIT = 30
+HB_WAIT = 300
 HB_WAIT_2 = 1200
 SPATH_WAIT = 30
 SPATH_WAIT_2 = 1200
 SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
-PHOTO_TAKING_DELAY = 120 # TODO change to 1 second.
-PHOTO_SENDING_DELAY = 120
+PHOTO_TAKING_DELAY = 800 # TODO change to 1 second.
+PHOTO_SENDING_DELAY = 600
 GPS_WAIT_SEC = 30
 
 MIDLEN = 7
@@ -45,7 +45,7 @@ ENCRYPTION_ENABLED = True
 
 cellular_system = None
 
-LOG_FILE_PATH = "mainlog.txt"
+LOG_FILE_PATH = "/sdcard/mainlog.txt"
 log_file = open(LOG_FILE_PATH, "a")
 
 # -------- Start FPS clock -----------
@@ -104,6 +104,31 @@ MODEL_PATH = "/rom/person_detect.tflite"
 model = ml.Model(MODEL_PATH)
 log(model)
 CONFIDENCE_THRESHOLD = 0.75
+
+# ADD THIS after line 103 (after log("Running on device : " + uid.decode())):
+def init_sdcard():
+    try:
+        os.listdir('/sdcard')
+        log("SD card available")
+        return True
+    except OSError:
+        log("ERROR: SD card not found!")
+        return False
+
+sdcard_ok = init_sdcard()
+
+if sdcard_ok:
+    try:
+        os.mkdir("/sdcard/images")
+        log("Created /sdcard/images directory")
+    except OSError:
+        log("/sdcard/images directory already exists")
+
+if not sdcard_ok:
+    log("Using flash storage as fallback")
+    LOG_FILE_PATH = "/flash/mainlog.txt"
+    
+
 IMG_DIR = "/sdcard/images/"
 
 sensor.reset()
@@ -289,7 +314,7 @@ async def person_detection_loop():
         if True: #person_detected:
             person_image_count += 1
             r = get_rand()
-            raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+            raw_path = f"/sdcard/raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
             img.save(raw_path)
             images_to_send.append(raw_path)
@@ -664,7 +689,7 @@ async def hb_process(mid, msgbytes):
         }
 
         log(f"Sending raw heartbeat data of length {len(msgbytes)} bytes")
-        # asyncio.create_task(sim_send_heartbeat(heartbeat_payload))
+        asyncio.create_task(sim_send_heartbeat(heartbeat_payload))
 
         for i in images_saved_at_cc:
             log(i)
@@ -672,7 +697,7 @@ async def hb_process(mid, msgbytes):
             log(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv())}")
         else:
             log(f"Only for debugging : HB msg = {msgbytes.decode()}")
-        asyncio.create_task(sim_send_heartbeat(msgbytes))
+        # asyncio.create_task(sim_send_heartbeat(msgbytes))
         return
     if len(shortest_path_to_cc) > 0:
         peer_addr = shortest_path_to_cc[0]
@@ -694,7 +719,7 @@ def img_process(cid, msg, creator):
             img_bytes = msg
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         log(len(img_bytes))
-        fname = f"cc_{creator}_{cid}.jpg"
+        fname = f"/sdcard/cc_{creator}_{cid}.jpg"
         log(f"Saving to file {fname}")
         images_saved_at_cc.append(fname)
         img.save(fname)
