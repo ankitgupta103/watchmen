@@ -78,6 +78,12 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
           showDeleteButtons={true}
         />
       </TableCell>
+      <TableCell>{machine?.specifications?.uptime ? `${machine?.specifications?.uptime}s` : '-'}</TableCell>
+      <TableCell>{machine?.specifications?.photos_taken ? `${machine?.specifications?.photos_taken}` : '-'}</TableCell>
+      <TableCell>{machine?.specifications?.events_seen ? `${machine?.specifications?.events_seen}` : '-'}</TableCell>
+      <TableCell>{machine?.specifications?.gps_staleness ? `${machine?.specifications?.gps_staleness}s` : '-'}</TableCell>
+      <TableCell>{machine?.specifications?.neighbours ? `${machine?.specifications?.neighbours}` : '-'}</TableCell>
+      <TableCell>{machine?.specifications?.shortest_path ? `${machine?.specifications?.shortest_path}` : '-'}</TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
