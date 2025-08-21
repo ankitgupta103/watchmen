@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
 import useToken from '@/hooks/use-token';
+import { useRouter } from 'next/navigation';
 
 import {
   Table,
@@ -21,13 +22,10 @@ import { createOrUpdateTag, deleteTag } from './tag-api-utils';
 
 interface DevicesTableProps {
   machines: Machine[];
-  onRefreshMachines?: () => Promise<void>;
 }
 
-const DevicesTable: React.FC<DevicesTableProps> = ({
-  machines,
-  onRefreshMachines,
-}) => {
+const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
+  const router = useRouter();
   const { token } = useToken();
   const { organizationUid } = useOrganization();
   const [addTagsModalOpen, setAddTagsModalOpen] = useState<{
@@ -46,7 +44,7 @@ const DevicesTable: React.FC<DevicesTableProps> = ({
     }
 
     try {
-      const success = await deleteTag(
+      await deleteTag(
         machineId,
         {
           organization_uid: organizationUid,
@@ -56,9 +54,7 @@ const DevicesTable: React.FC<DevicesTableProps> = ({
         token,
       );
 
-      if (success && onRefreshMachines) {
-        await onRefreshMachines();
-      }
+      router.refresh();
     } catch (error) {
       console.error('Failed to delete tag:', error);
     }
@@ -111,9 +107,7 @@ const DevicesTable: React.FC<DevicesTableProps> = ({
       }
 
       // Refresh machines data
-      if (onRefreshMachines) {
-        await onRefreshMachines();
-      }
+      router.refresh();
     } catch (error) {
       console.error('Failed to update tags:', error);
     }
@@ -137,6 +131,12 @@ const DevicesTable: React.FC<DevicesTableProps> = ({
             <TableHead>Connection</TableHead>
             <TableHead>Location</TableHead>
             <TableHead>Tags</TableHead>
+            <TableHead>Uptime</TableHead>
+            <TableHead>Photos Taken</TableHead>
+            <TableHead>Events Seen</TableHead>
+            <TableHead>GPS Staleness</TableHead>
+            <TableHead>Neighbours</TableHead>
+            <TableHead>Shortest Path</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -163,9 +163,7 @@ const DevicesTable: React.FC<DevicesTableProps> = ({
           }
           onTagsAdded={() => {
             // Refresh machines data to show updated tags
-            if (onRefreshMachines) {
-              onRefreshMachines();
-            }
+            router.refresh();
           }}
         />
       )}
