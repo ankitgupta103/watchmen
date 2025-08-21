@@ -11,13 +11,10 @@ import dynamic from 'next/dynamic';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
-import { CroppedImage, Machine } from '@/lib/types/machine';
-import {
-  cn,
-  countMachinesByStatus,
-} from '@/lib/utils';
-import { calculateSeverity } from '@/lib/utils/severity';
 import { FeedEvent } from '@/lib/types/activity';
+import { CroppedImage, Machine } from '@/lib/types/machine';
+import { cn, countMachinesByStatus } from '@/lib/utils';
+import { calculateSeverity } from '@/lib/utils/severity';
 
 // import EventNotification from './event-notification';
 

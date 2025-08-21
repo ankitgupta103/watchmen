@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import useOrganization from '@/hooks/use-organization';
 import useToken from '@/hooks/use-token';
 import { DateRange } from 'react-day-picker';
@@ -15,7 +21,6 @@ import { getSeverityLabel } from '@/lib/utils/severity';
 
 import Event from './event';
 import FilterEvents from './filter-events';
-
 
 export default function EventsFeed({
   machines,
@@ -44,7 +49,6 @@ export default function EventsFeed({
   const dateRangeRef = useRef(dateRange);
   // Ref to hold the AbortController for the current fetch request
   const abortControllerRef = useRef<AbortController | null>(null);
-
 
   // Update refs whenever the values change
   useEffect(() => {
@@ -142,7 +146,6 @@ export default function EventsFeed({
       }
     };
   }, [dateRange, selectedTags, selectedSeverities, fetchEvents]);
-
 
   useEffect(() => {
     // Create a sentinel element to observe
@@ -247,7 +250,6 @@ export default function EventsFeed({
     setSelectedTags([]);
     setSelectedSeverities([]);
   }, []);
-
 
   return (
     <div className="space-y-4 p-4">

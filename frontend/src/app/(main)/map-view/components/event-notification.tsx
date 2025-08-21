@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Eye, X } from 'lucide-react';
 
-
-import { getSeverityLabel } from '@/lib/utils/severity';
 import { FeedEvent } from '@/lib/types/activity';
 import { formatUnixTimestamp } from '@/lib/utils';
+import { getSeverityLabel } from '@/lib/utils/severity';
 
 interface EventNotificationProps {
   event: FeedEvent;
@@ -70,12 +69,15 @@ export default function EventNotification({
 
         {/* Event Details */}
         <div className="space-y-2">
-          <p className="text-sm text-gray-700">
-             Event detected
-          </p>
+          <p className="text-sm text-gray-700">Event detected</p>
 
           <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{formatUnixTimestamp(event.timestamp, { hour: '2-digit', minute: '2-digit' })}</span>
+            <span>
+              {formatUnixTimestamp(event.timestamp, {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
             <div className="flex items-center gap-1">
               <Eye className="h-3 w-3" />
               <span>Click machine for details</span>
