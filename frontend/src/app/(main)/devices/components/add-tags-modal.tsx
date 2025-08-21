@@ -11,14 +11,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -116,6 +114,17 @@ const AddTagsModal: React.FC<AddTagsModalProps> = ({
         setNewTagDescription('');
         // Refresh available tags
         await loadAvailableTags();
+      }
+
+      // Close modal and reset state
+      onOpenChange(false);
+      setSelectedTags([]);
+      setNewTagName('');
+      setNewTagDescription('');
+
+      // Notify parent component that tags were added
+      if (onTagsAdded) {
+        onTagsAdded();
       }
     } catch (error) {
       console.error('Failed to create new tag:', error);
@@ -283,11 +292,16 @@ const AddTagsModal: React.FC<AddTagsModalProps> = ({
                 </div>
               </div>
             )}
+
+            <Button className="w-full" onClick={handleAddSelectedTags}>
+              <Plus className="h-4 w-4" />
+              Add Tags
+            </Button>
           </TabsContent>
 
           <TabsContent value="create" className="space-y-4">
             <div className="space-y-3">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="tag-name">Tag Name</Label>
                 <Input
                   id="tag-name"
@@ -296,7 +310,7 @@ const AddTagsModal: React.FC<AddTagsModalProps> = ({
                   onChange={(e) => setNewTagName(e.target.value)}
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="tag-description">Description (Optional)</Label>
                 <Textarea
                   id="tag-description"
@@ -318,35 +332,14 @@ const AddTagsModal: React.FC<AddTagsModalProps> = ({
                   </>
                 ) : (
                   <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Tag
+                    <Plus className="h-4 w-4" />
+                    Add Tag
                   </>
                 )}
               </Button>
             </div>
           </TabsContent>
         </Tabs>
-
-        <Separator />
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAddSelectedTags}
-            disabled={selectedTags.length === 0 || loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding Tags...
-              </>
-            ) : (
-              `Add ${selectedTags.length} Tag${selectedTags.length !== 1 ? 's' : ''}`
-            )}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

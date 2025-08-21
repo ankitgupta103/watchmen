@@ -12,6 +12,7 @@ import 'leaflet/dist/leaflet.css';
 import './map-styles.css';
 
 import { MAPS_API_KEY } from '@/lib/constants';
+import { FeedEvent } from '@/lib/types/activity';
 import { Machine, MachineData } from '@/lib/types/machine';
 import {
   calculateMapCenter,
@@ -20,7 +21,6 @@ import {
 } from '@/lib/utils';
 
 import MachineMarker from './machine-marker';
-import { FeedEvent } from '@/lib/types/activity';
 
 interface MapProps {
   machines: Machine[];
@@ -91,7 +91,6 @@ export default function ReactLeafletMap({
             severity: 0,
             original_image_path: '',
             cropped_images: [],
-            
           },
           last_updated: new Date(lastEvent?.timestamp).toISOString(),
           is_online: isMachineOnline(machine),

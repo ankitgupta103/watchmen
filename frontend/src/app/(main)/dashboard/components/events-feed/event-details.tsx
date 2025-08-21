@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/tooltip';
 
 import { FeedEvent } from '@/lib/types/activity';
-import { cn, toTitleCase, formatUnixTimestamp } from '@/lib/utils';
+import { cn, formatUnixTimestamp, toTitleCase } from '@/lib/utils';
 import { getSeverityLabel } from '@/lib/utils/severity';
 
 import EventImage from './event-image';
@@ -52,9 +52,7 @@ export default function EventDetails({ event }: { event: FeedEvent }) {
         <h4 className="text-muted-foreground text-sm font-semibold">
           Timestamp
         </h4>
-        <p>
-          {formatUnixTimestamp(event.timestamp)}
-        </p>
+        <p>{formatUnixTimestamp(event.timestamp)}</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-muted col-span-full h-full space-y-2 rounded-md p-2">

@@ -10,7 +10,14 @@ export interface Machine {
   name: string;
   type: string;
   machine_uid: string;
-  specifications: Record<string, unknown>;
+  specifications?: {
+    uptime?: number;
+    photos_taken?: number;
+    events_seen?: number;
+    gps_staleness?: number;
+    neighbours?: number[];
+    shortest_path?: number[];
+  };
   mfg_date: string;
   activation_date: string;
   end_of_service_date: string | null;

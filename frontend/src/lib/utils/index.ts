@@ -233,7 +233,7 @@ export function formatUnixTimestamp(
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }
+  },
 ): string {
   return unixTimestampToDate(timestamp).toLocaleString('en-US', options);
 }
