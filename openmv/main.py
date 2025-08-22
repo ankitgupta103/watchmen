@@ -79,6 +79,7 @@ else:
     sys.exit()
 clock_start = utime.ticks_ms() # get millisecond counter
 
+print(f"MyAddr = {my_addr}")
 encnode = enc.EncNode(my_addr)
 
 def get_human_ts():
@@ -691,7 +692,7 @@ async def hb_process(mid, msgbytes):
         for i in images_saved_at_cc:
             log(i)
         if ENCRYPTION_ENABLED:
-            log(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, encnode.get_pvt_key(creator))}")
+            log(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, encnode.get_prv_key(creator))}")
         else:
             log(f"Only for debugging : HB msg = {msgbytes.decode()}")
         # asyncio.create_task(sim_send_heartbeat(msgbytes))
@@ -711,7 +712,7 @@ def img_process(cid, msg, creator):
     if running_as_cc():
         log(f"Received image of size {len(msg)}")
         if ENCRYPTION_ENABLED:
-            img_bytes = enc.decrypt_hybrid(msg, encnode.get_pvt_key(creator))
+            img_bytes = enc.decrypt_hybrid(msg, encnode.get_prv_key(creator))
         else:
             img_bytes = msg
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
