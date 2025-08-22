@@ -146,16 +146,28 @@ export default function HeatMapCalendar({
           })
             .then((result) => {
               if (result?.success && result.events) {
-                const newEvents = result.events.map((event, index) => ({
-                  ...event,
-                  id: `${machine.id}-${dateStr}-${index}`,
-                  machineId: machine.id,
-                  machineName: machine.name,
-                  timestamp: event.timestamp
-                    ? new Date(Number(event.timestamp) * 1000)
-                    : new Date(dateStr + 'T12:00:00'),
-                  imagesLoaded: false,
-                }));
+                const newEvents = result.events.map((event, index) => {
+                  // Handle timestamp conversion more robustly
+                  let eventTimestamp: Date;
+                  if (event.timestamp) {
+                    const timestampNum = Number(event.timestamp);
+                    // If timestamp is in seconds (typical Unix timestamp), convert to milliseconds
+                    // If timestamp is already in milliseconds, use as is
+                    eventTimestamp = new Date(timestampNum < 1e12 ? timestampNum * 1000 : timestampNum);
+                  } else {
+                    // Fallback to noon of the selected date
+                    eventTimestamp = new Date(dateStr + 'T12:00:00');
+                  }
+
+                  return {
+                    ...event,
+                    id: `${machine.id}-${dateStr}-${index}`,
+                    machineId: machine.id,
+                    machineName: machine.name,
+                    timestamp: eventTimestamp,
+                    imagesLoaded: false,
+                  };
+                });
                 setEvents((prev) => ({
                   ...prev,
                   [dateStr]: [...(prev[dateStr] || []), ...newEvents],
@@ -322,9 +334,12 @@ export default function HeatMapCalendar({
   const selectedDateEvents = useMemo(
     () =>
       (events[selectedDate.toLocaleDateString('en-CA')] || []).sort(
-        (a, b) =>
-          new Date(Number(b.timestamp) * 1000).getTime() -
-          new Date(Number(a.timestamp) * 1000).getTime(),
+        (a, b) => {
+          // Since timestamp is now already a Date object, we can directly compare
+          const aTime = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+          const bTime = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+          return bTime - aTime; // Sort in descending order (newest first)
+        }
       ),
     [events, selectedDate],
   );
@@ -571,9 +586,20 @@ export default function HeatMapCalendar({
                         <div className="text-xs text-gray-600">
                           Time:{' '}
                           <span className="font-medium">
-                            {new Date(
-                              Number(event.timestamp) * 1000,
-                            ).toLocaleTimeString()}
+                            {event.timestamp instanceof Date 
+                              ? event.timestamp.toLocaleTimeString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                  hour12: true
+                                })
+                              : new Date(event.timestamp).toLocaleTimeString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                  hour12: true
+                                })
+                            }
                           </span>
                         </div>
                         {event.eventstr && (
