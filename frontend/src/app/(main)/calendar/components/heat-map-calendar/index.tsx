@@ -114,6 +114,7 @@ export default function HeatMapCalendar({
     if (!areaFilter) return machines;
     return machines.filter(
       (machine) =>
+        machine.last_location &&
         machine.last_location.lat >= areaFilter.south &&
         machine.last_location.lat <= areaFilter.north &&
         machine.last_location.long >= areaFilter.west &&
@@ -329,7 +330,7 @@ export default function HeatMapCalendar({
     return () => {
       controller.abort();
     };
-  }, [currentMonth, fetchEventsForDate, token, getCalendarDays]);
+  }, [currentMonth, fetchEventsForDate, token, getCalendarDays, areaFilter]);
 
   const selectedDateEvents = useMemo(
     () =>

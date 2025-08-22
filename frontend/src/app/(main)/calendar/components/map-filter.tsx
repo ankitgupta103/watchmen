@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { Machine } from '@/lib/types/machine';
-import { isMachineOnline } from '@/lib/utils';
+// Remove isMachineOnline import as it's deprecated
 
 interface MapBounds {
   north: number;
@@ -34,7 +34,12 @@ const getMachineStatusColor = (
 ) => {
   if (isSelected) return 'bg-blue-500';
 
-  if (isMachineOnline(machine)) return 'bg-green-500';
+  // Use timestamp-based online detection (2 hours threshold)
+  if (machine.last_location?.timestamp) {
+    const lastSeen = new Date(machine.last_location.timestamp);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    if (lastSeen > twoHoursAgo) return 'bg-green-500';
+  }
   return 'bg-gray-500';
 };
 
@@ -209,12 +214,16 @@ const MapFilter = ({
 
   const isMachineInBounds = (machine: Machine) => {
     if (!tempBounds) return false;
-    return (
-      machine?.last_location?.lat >= tempBounds.south &&
-      machine?.last_location?.lat <= tempBounds.north &&
-      machine?.last_location?.long >= tempBounds.west &&
-      machine?.last_location?.long <= tempBounds.east
+    if (!machine?.last_location) return false;
+    
+    const inBounds = (
+      machine.last_location.lat >= tempBounds.south &&
+      machine.last_location.lat <= tempBounds.north &&
+      machine.last_location.long >= tempBounds.west &&
+      machine.last_location.long <= tempBounds.east
     );
+    
+    return inBounds;
   };
 
   const selectedMachinesCount = tempBounds
