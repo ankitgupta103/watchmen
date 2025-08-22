@@ -920,12 +920,12 @@ async def send_spath():
 
 async def print_summary_and_flush_logs():
     while True:
+        await asyncio.sleep(30)
         global image_in_progress
         if image_in_progress:
             log(f"Skipping print summary because image in progress")
             await asyncio.sleep(200)
             continue
-        await asyncio.sleep(30)
         log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa reinits: {lora_reinit_count}")
         with open(LOG_FILE_PATH, "a") as log_file:
             global log_entries_buffer
