@@ -8,7 +8,7 @@ import rsa
 
 import random
 
-# Remove this import in openmv
+# ===== REMOVE BEFORE FINALIZING =====
 run_on_omv = True
 try:
     import omv
@@ -17,24 +17,35 @@ except:
 
 if True: # not run_on_omv:
     import enc_priv
+# ====================================
+
+class EncNode:
+    def __init__(self, my_addr):
+        self.my_addr = my_addr
+        e_pub = 65537
+        pub_filename = f"{my_addr}.pub"
+        pub_file = open(pub_filename, "r")
+        n_pub_from_file = int(pub_file.readline().strip())
+        self.pubkey = PublicKey(n_pub_from_file, e_pub)
+        print(f"Loading public key from file {pub_filename}")
+        self.rsa_priv = enc_priv.PrivKeyRepo() # TODO REMOVE
+
+    def get_pub_key(self):
+        return self.pubkey
+
+    def get_prv_key_self(self):
+        return self.rsa_priv.get_pvt_key(self.my_addr)
+ 
+    def get_prv_key(self, othernode):
+        return self.rsa_priv.get_pvt_key(othernode)
 
 def setup_aes():
     aes_key = os.urandom(32)
     return aes_key
 
-def load_rsa_pub(nodeaddr):
-    e_pub = 65537
-    pub_file = open(f"{nodeaddr}.pub", "r")
-    n_pub_from_file = int(pub_file.readline().strip())
-    return PublicKey(n_pub_from_file, e_pub)
-
-def load_rsa_prv(nodeaddr):
-    rsa_priv = enc_priv.PrivKeyRepo()
-    return rsa_priv.get_pvt_key(nodeaddr)
-
-def load_rsa(nodeaddr):
-    pubkey = load_rsa_pub(nodeaddr)
-    privkey = load_rsa_prv(nodeaddr)
+def load_rsa(encnode):
+    pubkey = encnode.get_pub_key()
+    privkey = encnode.get_prv_key_self()
     return pubkey, privkey
 
 def pad(data):
@@ -85,11 +96,11 @@ def get_rand(n):
     return rstr
 
 # Debugging only
-def test_encryption(nodeaddr, n2, enctype):
+def test_encryption(encnode, nodeaddr, n2, enctype):
     clock_start = utime.ticks_ms()
     t0 = utime.ticks_diff(utime.ticks_ms(), clock_start)
     if enctype == "RSA" or enctype == "HYBRID":
-        public_key, private_key = load_rsa(nodeaddr)
+        public_key, private_key = load_rsa(encnode)
     elif enctype == "AES":
         aes_key = setup_aes()
     else:
@@ -126,14 +137,22 @@ def test_encryption(nodeaddr, n2, enctype):
             print(f"Strings DONT match {teststr} != {teststr_decrypt}")
         lenstr = lenstr*2
 
-test_encryption(9, 5, "RSA")
-test_encryption(9, 5, "HYBRID")
+def main():
+    encnode = EncNode(9)
+    test_encryption(encnode, 9, 5, "RSA")
+    test_encryption(encnode, 9, 5, "HYBRID")
 
-test_encryption(221, 5, "RSA")
-test_encryption(221, 5, "HYBRID")
+    encnode = EncNode(221)
+    test_encryption(encnode, 221, 5, "RSA")
+    test_encryption(encnode, 221, 5, "HYBRID")
 
-test_encryption(222, 5, "RSA")
-test_encryption(222, 5, "HYBRID")
+    encnode = EncNode(222)
+    test_encryption(encnode, 222, 5, "RSA")
+    test_encryption(encnode, 222, 5, "HYBRID")
 
-test_encryption(223, 5, "RSA")
-test_encryption(223, 5, "HYBRID")
+    encnode = EncNode(223)
+    test_encryption(encnode, 223, 5, "RSA")
+    test_encryption(encnode, 223, 5, "HYBRID")
+
+if __name__ == "__main__":
+    main()

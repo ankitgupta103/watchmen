@@ -10,7 +10,7 @@ def setup_rsa(nodeaddr):
     f.write(str(pubkey.n))
     f.close()
 
-    print(f"        ----- PUBLIC KEY -----")
+    print(f"        #----- PUBLIC  KEY -----")
     print(f"        self.n_pub[{nodeaddr}] = {pubkey.n}")
     print(f"        self.e_pub[{nodeaddr}] = {pubkey.e}")
     print(f"        #----- PRIVATE KEY -----")
