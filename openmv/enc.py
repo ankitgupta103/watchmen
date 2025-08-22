@@ -8,54 +8,34 @@ import rsa
 
 import random
 
+# Remove this import in openmv
+run_on_omv = True
+try:
+    import omv
+except:
+    run_on_omv = False
+
+if True: # not run_on_omv:
+    import enc_priv
+
 def setup_aes():
     aes_key = os.urandom(32)
     return aes_key
 
-def load_rsa_pub():
-    # --- PUBLIC KEY ---
-    n_pub = 134757328335095073264107487580236751075497529325796582413778089501277032934474732458456051033549436336663731983176518897577428529619416759550357638328534147420836000895848725276125919429970241050547236918537990787197869670219106130399791082068749626382827068666665788771701212727840387879898818585324380393767
+def load_rsa_pub(nodeaddr):
     e_pub = 65537
-    return PublicKey(n_pub, e_pub)
+    pub_file = open(f"{nodeaddr}.pub", "r")
+    n_pub_from_file = int(pub_file.readline().strip())
+    return PublicKey(n_pub_from_file, e_pub)
 
-def load_rsa_prv():
-    # --- PRIVATE KEY ---
-    n_pvt = 134757328335095073264107487580236751075497529325796582413778089501277032934474732458456051033549436336663731983176518897577428529619416759550357638328534147420836000895848725276125919429970241050547236918537990787197869670219106130399791082068749626382827068666665788771701212727840387879898818585324380393767
-    e_pvt = 65537
-    d_pvt = 129581867215125677359416114062384913144908285367223104867728080326692991982095574096035832218964637959268022484700004896857188243841122483282169385195600397749104751582544242676968813573435276435780296838193793364689250761289975699268807322831617942170637411240074770791871778711210551609564279704871862852033
-    p_pvt = 53473502994337956307730497488750698087352716591628935084418147346112279308966922112008552876214706995044264539806129783878996654353064960856832850151888740416109183
-    q_pvt = 2520076688249951711240023758723869637205488920845314634534736836435350884630668391442225601384713321448756530503563282483747207121171065283298649
-    return PrivateKey(n_pvt, e_pvt, d_pvt, p_pvt, q_pvt)
+def load_rsa_prv(nodeaddr):
+    rsa_priv = enc_priv.PrivKeyRepo()
+    return rsa_priv.get_pvt_key(nodeaddr)
 
-def load_rsa():
-    pubkey = load_rsa_pub()
-    privkey = load_rsa_prv()
+def load_rsa(nodeaddr):
+    pubkey = load_rsa_pub(nodeaddr)
+    privkey = load_rsa_prv(nodeaddr)
     return pubkey, privkey
-
-def load_rsa_pem( pub_path='public.pem', priv_path='private.pem'):
-    pubkey = load_rsa_pub()
-    privkey = load_rsa_prv()
-    with open(pub_path, 'w') as pub_file:
-        pub_file.write(pubkey.save_pkcs1().decode())
-
-    with open(priv_path, 'w') as priv_file:
-        priv_file.write(privkey.save_pkcs1().decode())
-    
-
-def setup_rsa():
-    print("\nGeneration RSA Keys...")
-    (pubkey, privkey) = newkeys(1024)
-    # Print components for use in custom encryption
-    print(f"\t----- PUBLIC KEY -----")
-    print(f"\tn_pub = {pubkey.n}")
-    print(f"\te_pub = {pubkey.e}")
-
-    print(f"\t#----- PRIVATE KEY -----")
-    print(f"\tn_pvt = {privkey.n}")
-    print(f"\te_pvt = {privkey.e}")
-    print(f"\td_pvt = {privkey.d}")
-    print(f"\tp_pvt = {privkey.p}")
-    print(f"\tq_pvt = {privkey.q}")
 
 def pad(data):
     pad_len = 16 - (len(data) % 16)
@@ -105,12 +85,11 @@ def get_rand(n):
     return rstr
 
 # Debugging only
-def test_encryption(n2, enctype):
+def test_encryption(nodeaddr, n2, enctype):
     clock_start = utime.ticks_ms()
     t0 = utime.ticks_diff(utime.ticks_ms(), clock_start)
     if enctype == "RSA" or enctype == "HYBRID":
-        # public_key, private_key = setup_rsa()
-        public_key, private_key = load_rsa()
+        public_key, private_key = load_rsa(nodeaddr)
     elif enctype == "AES":
         aes_key = setup_aes()
     else:
@@ -142,8 +121,19 @@ def test_encryption(n2, enctype):
         else:
             return
         t5 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-        print(f"{enctype} : Encrypting {len(teststr)} to {len(teststr_enc)}, creation time = {t3-t2}, enc time = {t4-t3}, decrypt time = {t5-t4}")
+        print(f"{enctype}@{nodeaddr} : Encrypting {len(teststr)} to {len(teststr_enc)}, creation time = {t3-t2}, enc time = {t4-t3}, decrypt time = {t5-t4}")
         if teststr.encode() != teststr_decrypt:
             print(f"Strings DONT match {teststr} != {teststr_decrypt}")
         lenstr = lenstr*2
 
+test_encryption(9, 5, "RSA")
+test_encryption(9, 5, "HYBRID")
+
+test_encryption(221, 5, "RSA")
+test_encryption(221, 5, "HYBRID")
+
+test_encryption(222, 5, "RSA")
+test_encryption(222, 5, "HYBRID")
+
+test_encryption(223, 5, "RSA")
+test_encryption(223, 5, "HYBRID")
