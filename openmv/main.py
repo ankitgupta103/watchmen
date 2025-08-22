@@ -1,4 +1,3 @@
-import omv
 from machine import RTC, UART
 import uasyncio as asyncio
 import utime
@@ -45,7 +44,7 @@ ENCRYPTION_ENABLED = True
 
 cellular_system = None
 
-LOG_FILE_PATH = "/sdcard/mainlog.txt"
+LOG_FILE_PATH = "mainlog.txt"
 log_file = open(LOG_FILE_PATH, "a")
 
 # -------- Start FPS clock -----------
@@ -80,7 +79,7 @@ else:
     sys.exit()
 clock_start = utime.ticks_ms() # get millisecond counter
 
-outbox = []
+encnode = enc.EncNode(my_addr)
 
 def get_human_ts():
     _,_,_,_,h,m,s,_ = rtc.datetime()
@@ -313,7 +312,7 @@ async def person_detection_loop():
         if True: #person_detected:
             person_image_count += 1
             r = get_rand()
-            raw_path = f"/sdcard/raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+            raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
             img.save(raw_path)
             images_to_send.append(raw_path)
@@ -493,11 +492,11 @@ def encrypt_if_needed(mst, msg):
         if len(msg) > 117:
             log(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
             return msg
-        msgbytes = enc.encrypt_rsa(msg, enc.load_rsa_pub(my_addr))
+        msgbytes = enc.encrypt_rsa(msg, encnode.get_pub_key())
         log(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
     if mst == "P":
-        msgbytes = enc.encrypt_hybrid(msg, enc.load_rsa_pub(my_addr))
+        msgbytes = enc.encrypt_hybrid(msg, encnode.get_pub_key())
         log(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
     return msg
@@ -539,7 +538,6 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
     return False
 
 async def send_msg(msgtype, creator, msgbytes, dest):
-    #outbox.append((msgtype, creator, msgbytes, dest))
     retval = await send_msg_internal(msgtype, creator, msgbytes, dest)
     return retval
 
@@ -693,7 +691,7 @@ async def hb_process(mid, msgbytes):
         for i in images_saved_at_cc:
             log(i)
         if ENCRYPTION_ENABLED:
-            log(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, enc.load_rsa_prv(creator))}")
+            log(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, encnode.get_pvt_key(creator))}")
         else:
             log(f"Only for debugging : HB msg = {msgbytes.decode()}")
         # asyncio.create_task(sim_send_heartbeat(msgbytes))
@@ -713,7 +711,7 @@ def img_process(cid, msg, creator):
     if running_as_cc():
         log(f"Received image of size {len(msg)}")
         if ENCRYPTION_ENABLED:
-            img_bytes = enc.decrypt_hybrid(msg, enc.load_rsa_prv(creator))
+            img_bytes = enc.decrypt_hybrid(msg, encnode.get_pvt_key(creator))
         else:
             img_bytes = msg
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
