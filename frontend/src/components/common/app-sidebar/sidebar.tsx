@@ -9,7 +9,7 @@ import {
   HomeIcon,
   LogOut,
   Monitor,
-  NetworkIcon,
+  // NetworkIcon,
   User,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -65,11 +65,11 @@ const items = [
     url: '/calendar',
     icon: Calendar,
   },
-  {
-    title: 'Network Simulation',
-    url: '/network-simulation',
-    icon: NetworkIcon,
-  },
+  // {
+  //   title: 'Network Simulation',
+  //   url: '/network-simulation',
+  //   icon: NetworkIcon,
+  // },
 ];
 
 export default function AppSidebar() {

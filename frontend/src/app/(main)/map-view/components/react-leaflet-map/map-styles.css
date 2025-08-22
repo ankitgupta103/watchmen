@@ -117,11 +117,15 @@
 
 /* Machine status indicators */
 .machine-online {
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.3);
+  background-color: #22c55e !important;
+  border-color: #16a34a !important;
 }
 
 .machine-offline {
   box-shadow: 0 0 0 2px rgba(156, 163, 175, 0.3);
+  background-color: #374151 !important;
+  border-color: #6b7280 !important;
 }
 
 .machine-critical {
