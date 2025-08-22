@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 
 import { FeedEvent } from '@/lib/types/activity';
 import { CroppedImage, Machine } from '@/lib/types/machine';
-import { cn, countMachinesByStatus } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { calculateSeverity } from '@/lib/utils/severity';
 
 // import EventNotification from './event-notification';
@@ -21,7 +21,11 @@ import { calculateSeverity } from '@/lib/utils/severity';
 interface EventMessage {
   eventstr?: string;
   original_image_path?: string;
+  annotated_image_path?: string;
   cropped_images?: CroppedImage[];
+  timestamp?: number;
+  machine_id?: number;
+  severity?: number;
 }
 
 const ReactLeafletMap = dynamic(() => import('./react-leaflet-map'), {
@@ -112,7 +116,7 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
       processedEventKeysRef.current.add(eventKey);
       globalProcessedEvents.add(eventKey);
 
-      const severity = calculateSeverity(data.cropped_images || []);
+      const severity = data.severity || calculateSeverity(data.cropped_images || []);
       const classNames =
         data.cropped_images?.map((c) => c.class_name).join(', ') || 'Event';
 
@@ -122,22 +126,24 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
         machineId,
       });
 
-      // const newEvent: FeedEvent = {
-      //   id: generateEventId(),
-      //   timestamp: new Date(),
-      //   eventstr: data.eventstr || classNames,
-      //   original_image_path: data.original_image_path,
-      //   cropped_images: data.cropped_images || [],
-      //   severity: severity,
-      // };
+      // Create event using dashboard structure
+      const newEvent: FeedEvent = {
+        original_image_path: data.original_image_path || '',
+        annotated_image_path: data.annotated_image_path || data.original_image_path || '',
+        cropped_images: data.cropped_images || [],
+        timestamp: data.timestamp || Math.floor(Date.now() / 1000),
+        machine_id: machineId,
+        severity: severity,
+      };
 
-      // setMachineEvents((prev) => ({
-      //   ...prev,
-      //   [machineId]: [newEvent, ...(prev[machineId] || [])].slice(
-      //     0,
-      //     MAX_EVENTS_PER_MACHINE,
-      //   ),
-      // }));
+      const MAX_EVENTS_PER_MACHINE = 10;
+      setMachineEvents((prev) => ({
+        ...prev,
+        [machineId]: [newEvent, ...(prev[machineId] || [])].slice(
+          0,
+          MAX_EVENTS_PER_MACHINE,
+        ),
+      }));
 
       console.log(
         '🚀 [MapView] Starting pulsating animation for machine:',
@@ -154,7 +160,7 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
       // });
       // }
     },
-    [extractMachineIdFromTopic, startPulsatingAnimation, machines],
+    [extractMachineIdFromTopic, startPulsatingAnimation],
   );
 
   usePubSub(mqttTopics, handleMqttMessage, {
@@ -171,8 +177,24 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
     setTimeout(() => setIsRefreshing(false), 1500);
   }, []);
 
-  const { online: onlineCount, offline: offlineCount } =
-    countMachinesByStatus(machines);
+  // Calculate device status based on last_location timestamp
+  const getDeviceStatus = useCallback((machine: Machine) => {
+    if (!machine.last_location?.timestamp) return 'offline';
+    const lastSeen = new Date(machine.last_location.timestamp);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
+    return lastSeen > twoHoursAgo ? 'online' : 'offline';
+  }, []);
+
+  const deviceStatusCounts = useMemo(() => {
+    const counts = { online: 0, offline: 0 };
+    machines.forEach(machine => {
+      const status = getDeviceStatus(machine);
+      counts[status]++;
+    });
+    return counts;
+  }, [machines, getDeviceStatus]);
+
+  const { online: onlineCount, offline: offlineCount } = deviceStatusCounts;
   const totalEvents = Object.values(machineEvents).reduce(
     (sum, events) => sum + events.length,
     0,
@@ -227,25 +249,8 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
           </div>
         </div>
 
-        {/* Test and refresh buttons */}
+        {/* Refresh button */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              // Test ripple effect on first machine
-              if (machines.length > 0) {
-                console.log(
-                  '🧪 [MapView] Testing ripple effect on machine:',
-                  machines[0].id,
-                );
-                startPulsatingAnimation(machines[0].id);
-              }
-            }}
-            className="hover:bg-blue-50"
-          >
-            🧪 Test Ripple
-          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -284,6 +289,7 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
           machines={machines}
           machineEvents={machineEvents}
           pulsatingMachines={pulsatingMachines}
+          getDeviceStatus={getDeviceStatus}
         />
       </div>
 

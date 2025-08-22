@@ -17,7 +17,6 @@ import { Machine, MachineData } from '@/lib/types/machine';
 import {
   calculateMapCenter,
   calculateOptimalZoom,
-  isMachineOnline,
 } from '@/lib/utils';
 
 import MachineMarker from './machine-marker';
@@ -26,12 +25,14 @@ interface MapProps {
   machines: Machine[];
   machineEvents: Record<number, FeedEvent[]>;
   pulsatingMachines: Record<number, boolean>;
+  getDeviceStatus: (machine: Machine) => 'online' | 'offline';
 }
 
 export default function ReactLeafletMap({
   machines,
   machineEvents,
   pulsatingMachines,
+  getDeviceStatus,
 }: MapProps) {
   const center = calculateMapCenter(machines);
   const zoom = calculateOptimalZoom(machines);
@@ -77,26 +78,31 @@ export default function ReactLeafletMap({
           machineId: machine.id,
         });
 
+        // Convert FeedEvent from activity.ts to the format expected by MachineData
+        const convertedEvents = events.map(event => ({
+          id: `${event.machine_id}_${event.timestamp}`,
+          machineId: event.machine_id,
+          machineName: machine.name,
+          machineType: machine.type,
+          timestamp: new Date(event.timestamp * 1000),
+          original_image_path: event.original_image_path,
+          cropped_images: event.cropped_images,
+          fullImageUrl: event.annotated_image_path || event.original_image_path,
+          croppedImageUrls: [],
+          imagesLoaded: false,
+          severity: event.severity,
+        }));
+
         const machineData: MachineData = {
           machine_id: machine.id,
-          events: [],
+          events: convertedEvents,
           event_count: events.length,
-          last_event: {
-            id: '0',
-            machineId: machine.id,
-            machineName: machine.name,
-            machineType: machine.type,
-            timestamp: new Date(lastEvent?.timestamp),
-            imagesLoaded: false,
-            severity: 0,
-            original_image_path: '',
-            cropped_images: [],
-          },
-          last_updated: new Date(lastEvent?.timestamp).toISOString(),
-          is_online: isMachineOnline(machine),
+          last_event: lastEvent ? convertedEvents[0] : undefined,
+          last_updated: lastEvent ? new Date(lastEvent.timestamp * 1000).toISOString() : new Date().toISOString(),
+          is_online: getDeviceStatus(machine) === 'online',
           is_pulsating: isPulsating,
           is_critical: lastEvent ? lastEvent.severity >= 3 : false,
-          location: { lat: 0, long: 0, timestamp: '' },
+          location: machine.last_location,
           stats_data: {},
           buffer_size: 0,
         };

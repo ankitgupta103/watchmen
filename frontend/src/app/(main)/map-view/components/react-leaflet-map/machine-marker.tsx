@@ -4,7 +4,7 @@ import { renderToString } from 'react-dom/server';
 import { Marker, Popup } from 'react-leaflet';
 
 import { Machine, MachineData } from '@/lib/types/machine';
-import { cn, formatEventCount, isMachineOnline } from '@/lib/utils';
+import { cn, formatEventCount } from '@/lib/utils';
 
 import PopupContent from './popup-content';
 
@@ -13,7 +13,7 @@ const createStatusIcon = (
   machineData: MachineData,
   showName: boolean = false,
 ) => {
-  const isOnline = isMachineOnline(machine);
+  const isOnline = machineData.is_online;
   const isPulsating = machineData.is_pulsating;
   const severity = machineData.last_event?.severity ?? 0;
 
@@ -94,8 +94,8 @@ const createStatusIcon = (
         className={cn(
           `relative flex h-6 w-6 items-center justify-center rounded-full border-2 shadow-lg transition-all duration-300`,
           isOnline
-            ? 'machine-online border-green-400 bg-green-500 text-white'
-            : 'machine-offline border-gray-500 bg-gray-700 text-white',
+            ? 'machine-online border-green-300 bg-green-500 text-white shadow-green-500/50'
+            : 'machine-offline border-gray-500 bg-gray-700 text-white shadow-gray-500/50',
           isPulsating && severity > 0 ? 'scale-110' : 'scale-100',
           severity > 0 ? 'ring-2 ring-offset-2' : '',
           severity === 3
@@ -168,6 +168,8 @@ export default function MachineMarker({
   console.log('📍 [MapView] Machine marker:', {
     machineId: machine.id,
     machineName: machine.name,
+    isOnline: machineData.is_online,
+    lastLocationTimestamp: machine.last_location?.timestamp,
     isPulsating: machineData.is_pulsating,
     severity: machineData.last_event?.severity,
     eventCount: machineData.event_count,
@@ -219,7 +221,7 @@ export default function MachineMarker({
         <PopupContent
           machine={machine}
           machineData={machineData}
-          isOnline={isMachineOnline(machine)}
+          isOnline={machineData.is_online}
         />
       </Popup>
     </Marker>

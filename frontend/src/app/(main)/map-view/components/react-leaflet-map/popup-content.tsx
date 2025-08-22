@@ -47,8 +47,10 @@ export default function PopupContent({
       let fullUrl: string | null = null;
       let croppedUrls: Record<string, string> = {};
 
-      if (last_event.original_image_path) {
-        fullUrl = await getPresignedUrl(last_event.original_image_path, token);
+      // Prefer annotated_image_path over original_image_path, similar to dashboard
+      const imagePath = ('annotated_image_path' in last_event ? (last_event as { annotated_image_path: string }).annotated_image_path : null) || last_event.original_image_path;
+      if (imagePath) {
+        fullUrl = await getPresignedUrl(imagePath, token);
       }
 
       if (last_event.cropped_images && last_event.cropped_images.length > 0) {
@@ -131,7 +133,7 @@ export default function PopupContent({
           {/* Event Description */}
           <div className="rounded-lg bg-gray-50 p-3">
             <p className="text-sm text-gray-700">
-              {last_event.eventstr || 'Event detected'}
+              {last_event.cropped_images?.map(img => img.class_name).join(', ') || 'Event detected'}
             </p>
           </div>
 
