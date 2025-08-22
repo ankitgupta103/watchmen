@@ -45,7 +45,6 @@ ENCRYPTION_ENABLED = True
 cellular_system = None
 
 LOG_FILE_PATH = "mainlog.txt"
-log_file = open(LOG_FILE_PATH, "a")
 
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
@@ -717,7 +716,7 @@ def img_process(cid, msg, creator):
             img_bytes = msg
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         log(len(img_bytes))
-        fname = f"/sdcard/cc_{creator}_{cid}.jpg"
+        fname = f"cc_{creator}_{cid}.jpg"
         log(f"Saving to file {fname}")
         images_saved_at_cc.append(fname)
         img.save(fname)
