@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Tag, X } from 'lucide-react';
+import { Edit, Tag, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,23 +36,11 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
   onOpenChange,
 }) => {
   const [tags, setTags] = useState<MachineTag[]>(machine.tags || []);
-  const [newTag, setNewTag] = useState('');
-  const [newTagDescription, setNewTagDescription] = useState('');
   const [deletedTagIds, setDeletedTagIds] = useState<number[]>([]);
+  const [editingTag, setEditingTag] = useState<MachineTag | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [editingDescription, setEditingDescription] = useState('');
 
-  const handleAddTag = () => {
-    if (newTag.trim() && !tags.some((tag) => tag.name === newTag.trim())) {
-      const newTagObj: MachineTag = {
-        id: 0,
-        key: newTag.trim().toLowerCase().replace(/\s+/g, '_'),
-        name: newTag.trim(),
-        description: newTagDescription.trim() as string,
-      };
-      setTags([...tags, newTagObj]);
-      setNewTag('');
-      setNewTagDescription('');
-    }
-  };
 
   const handleRemoveTag = (tagToRemove: MachineTag) => {
     if (tagToRemove.id > 0) {
@@ -61,7 +49,39 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
     setTags(tags.filter((tag) => tag.name !== tagToRemove.name));
   };
 
+  const handleEditTag = (tag: MachineTag) => {
+    setEditingTag(tag);
+    setEditingName(tag.name);
+    setEditingDescription(tag.description || '');
+  };
+
+  const handleSaveEdit = () => {
+    if (editingTag && editingName.trim()) {
+      const updatedTags = tags.map((tag) =>
+        tag.id === editingTag.id
+          ? {
+              ...tag,
+              name: editingName.trim(),
+              description: editingDescription.trim(),
+            }
+          : tag
+      );
+      setTags(updatedTags);
+      setEditingTag(null);
+      setEditingName('');
+      setEditingDescription('');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTag(null);
+    setEditingName('');
+    setEditingDescription('');
+  };
+
   const handleSubmit = () => {
+    // Pass both updated tags and deleted tag IDs
+    // The parent will handle distinguishing between new tags (id === 0) and updated tags (id > 0)
     onUpdateTags(machine.id, tags, deletedTagIds);
     onOpenChange(false);
   };
@@ -69,9 +89,10 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setTags(machine.tags || []);
-      setNewTag('');
-      setNewTagDescription('');
       setDeletedTagIds([]);
+      setEditingTag(null);
+      setEditingName('');
+      setEditingDescription('');
     }
     onOpenChange(open);
   };
@@ -82,48 +103,15 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
         <DialogHeader>
           <DialogTitle>Edit Tags for {machine.name}</DialogTitle>
           <DialogDescription>
-            Add, remove, or modify tags for this machine.
+            Edit or remove existing tags for this machine.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-new-tag" className="text-right">
-              Tag Name
-            </Label>
-            <div className="col-span-3">
-              <Input
-                id="edit-new-tag"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === 'Enter' && (e.preventDefault(), handleAddTag())
-                }
-                placeholder="Enter tag name"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-new-tag-desc" className="text-right">
-              Description
-            </Label>
-            <div className="col-span-3 flex gap-2">
-              <Input
-                id="edit-new-tag-desc"
-                value={newTagDescription}
-                onChange={(e) => setNewTagDescription(e.target.value)}
-                placeholder="Enter tag description (optional)"
-                className="flex-1"
-              />
-              <Button type="button" onClick={handleAddTag} size="sm">
-                Add
-              </Button>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label className="text-right">Current Tags</Label>
-            <div className="col-span-3 flex flex-wrap gap-2">
-              {tags.length > 0 ? (
-                tags.map((tag, index) => (
+          {tags.length > 0 ? (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Current Tags</Label>
+              <div className="col-span-3 flex flex-wrap gap-2">
+                {tags.map((tag, index) => (
                   <Badge
                     key={index}
                     variant="secondary"
@@ -140,6 +128,15 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
                     </div>
                     <button
                       type="button"
+                      onClick={() => handleEditTag(tag)}
+                      className="hover:text-primary ml-1"
+                      aria-label={`Edit tag ${tag.name}`}
+                      title={`Edit tag ${tag.name}`}
+                    >
+                      <Edit className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleRemoveTag(tag)}
                       className="hover:text-destructive ml-1"
                       aria-label={`Remove tag ${tag.name}`}
@@ -148,12 +145,72 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>
-                ))
-              ) : (
-                <span className="text-muted-foreground text-sm">No tags</span>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="text-center py-8">
+              <Tag className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground text-sm">
+                This machine has no tags to edit.
+              </p>
+              <p className="text-muted-foreground text-xs mt-1">
+                Use &quot;Add Tags&quot; to create new tags for this machine.
+              </p>
+            </div>
+          )}
+          
+          {/* Edit Tag Form */}
+          {editingTag && (
+            <div className="grid gap-4 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <Label>Editing Tag: {editingTag.name}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-tag-name" className="text-right">
+                  Name
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="edit-tag-name"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    placeholder="Enter tag name"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-tag-desc" className="text-right">
+                  Description
+                </Label>
+                <div className="col-span-3 flex gap-2">
+                  <Input
+                    id="edit-tag-desc"
+                    value={editingDescription}
+                    onChange={(e) => setEditingDescription(e.target.value)}
+                    placeholder="Enter tag description (optional)"
+                    className="flex-1"
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={handleSaveEdit} 
+                    size="sm"
+                    disabled={!editingName.trim()}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button

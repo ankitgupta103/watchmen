@@ -84,25 +84,24 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
         );
       }
 
-      // Create new tags (those with id: 0)
-      const newTags = updatedTags.filter((tag) => tag.id === 0);
-      const finalTags: MachineTag[] = [
-        ...updatedTags.filter((tag) => tag.id > 0),
-      ];
-
-      for (const tag of newTags) {
-        const result = await createOrUpdateTag(
-          machineId,
-          {
-            organization_uid: organizationUid,
-            name: tag.name,
-            description: tag.description,
-          },
-          token,
-        );
-
-        if (result) {
-          finalTags.push(result);
+      // Get original tags for comparison
+      const originalTags = (machines.find(m => m.id === machineId)?.tags || []);
+      
+      // Update existing tags that have changed
+      for (const tag of updatedTags) {
+        const originalTag = originalTags.find(ot => ot.id === tag.id);
+        if (originalTag && (originalTag.name !== tag.name || originalTag.description !== tag.description)) {
+          // Tag has been modified, update it
+          await createOrUpdateTag(
+            machineId,
+            {
+              organization_uid: organizationUid,
+              name: tag.name,
+              description: tag.description,
+              tag_id: tag.id, // Include tag_id to indicate this is an update
+            },
+            token,
+          );
         }
       }
 

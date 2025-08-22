@@ -97,7 +97,10 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
               <Plus className="mr-2 h-4 w-4" />
               Add Tags
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEditTags(machine)}>
+            <DropdownMenuItem 
+              onClick={() => onEditTags(machine)}
+              disabled={!machine.tags || machine.tags.length === 0}
+            >
               <Tag className="mr-2 h-4 w-4" />
               Edit Tags
             </DropdownMenuItem>
