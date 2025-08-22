@@ -163,7 +163,7 @@ async def init_sim():
     log("Cellular system ready")
     return True
 
-async def sim_send_image(creator, fname):
+async def sim_send_image(creator, encimb):
     """Send image via cellular with better error handling and retry logic"""
     global cellular_system
     if not cellular_system:
@@ -189,15 +189,8 @@ async def sim_send_image(creator, fname):
 
     try:
         # Load and process image
-        img = image.Image(fname)
-        img_bytes = img.bytearray()
-
-        # Encrypt if needed
-        encimb = encrypt_if_needed("P", img_bytes)
         imgbytes = ubinascii.b2a_base64(encimb)
-
-        log(f"Sending image file {fname} of size {len(imgbytes)} bytes")
-
+        log(f"Sending image of size {len(imgbytes)} bytes")
         # Prepare payload with additional metadata
         payload = {
             "machine_id": creator,
@@ -211,17 +204,9 @@ async def sim_send_image(creator, fname):
             result = cellular_system.upload_data(payload, URL)
 
             if result and result.get('status_code') == 200:
-                log(f"Image {fname} uploaded successfully on attempt {upload_retry + 1}")
+                log(f"Image uploaded successfully on attempt {upload_retry + 1}")
                 log(f"Upload time: {result.get('upload_time', 0):.2f}s")
                 log(f"Data size: {result.get('data_size', 0)/1024:.2f} KB")
-
-                # Clean up the image file after successful upload
-                try:
-                    os.remove(fname)
-                    log(f"Deleted uploaded image file: {fname}")
-                except:
-                    log(f"Could not delete image file: {fname}")
-
                 return True
             else:
                 log(f"Upload attempt {upload_retry + 1} failed")
@@ -231,7 +216,7 @@ async def sim_send_image(creator, fname):
                 if upload_retry < max_upload_retries - 1:
                     await asyncio.sleep(2 ** upload_retry)  # Exponential backoff
 
-        log(f"Failed to upload image {fname} after {max_upload_retries} attempts")
+        log(f"Failed to upload image after {max_upload_retries} attempts")
         return False
 
     except Exception as e:
@@ -707,9 +692,9 @@ images_saved_at_cc = []
 
 def img_process(cid, msg, creator):
     clear_chunkid(cid)
-    # TODO save image
     if running_as_cc():
         log(f"Received image of size {len(msg)}")
+        # ----- TODO REMOVE THIS IS FOR DEBUGGING ONLY -------
         if ENCRYPTION_ENABLED:
             img_bytes = enc.decrypt_hybrid(msg, encnode.get_prv_key(creator))
         else:
@@ -720,7 +705,8 @@ def img_process(cid, msg, creator):
         log(f"Saving to file {fname}")
         images_saved_at_cc.append(fname)
         img.save(fname)
-        asyncio.create_task(sim_send_image(creator, fname))
+        # ------------------------------------------------------
+        asyncio.create_task(sim_send_image(creator, msg))
     else:
         if len(shortest_path_to_cc) > 0:
             peer_addr = shortest_path_to_cc[0]
