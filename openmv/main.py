@@ -44,8 +44,6 @@ ENCRYPTION_ENABLED = True
 
 cellular_system = None
 
-LOG_FILE_PATH = "mainlog.txt"
-
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 person_image_count = 0                 # Counter to keep tranck of saved images
@@ -78,8 +76,38 @@ else:
     sys.exit()
 clock_start = utime.ticks_ms() # get millisecond counter
 
+def running_as_cc():
+    return my_addr == COMMAN_CENTER_ADDR
+
+def get_fs_root_for_storage():
+    has_sdcard = True
+    try:
+        os.listdir('/sdcard')
+        print("SD card available")
+    except OSError:
+        print("ERROR: SD card not found!")
+        has_sdcard = False
+
+    if has_sdcard:
+        return "/sdcard"
+    else:
+        return "/flash"
+
+FS_ROOT = get_fs_root_for_storage()
+if running_as_cc():
+    IMAGE_DIR = f"{FS_ROOT}/ccimages"
+else:
+    IMAGE_DIR = f"{FS_ROOT}/images"
+try:
+    os.mkdir(IMAGE_DIR)
+    print(f"Created {IMAGE_DIR} directory")
+except OSError:
+    print(f"{IMAGE_DIR} directory already exists")
+LOG_FILE_PATH = f"{FS_ROOT}/mainlog.txt"
+
 print(f"MyAddr = {my_addr}")
 encnode = enc.EncNode(my_addr)
+print(f"Logs will be written at {LOG_FILE_PATH}")
 
 def get_human_ts():
     _,_,_,_,h,m,s,_ = rtc.datetime()
@@ -94,40 +122,12 @@ def log(msg):
     log_entries_buffer.append(log_entry)
     print(log_entry)
 
-def running_as_cc():
-    return my_addr == COMMAN_CENTER_ADDR
-
 log("Running on device : " + uid.decode())
 # ------ Configuration for tensorflow model ------
 MODEL_PATH = "/rom/person_detect.tflite"
 model = ml.Model(MODEL_PATH)
 log(model)
 CONFIDENCE_THRESHOLD = 0.75
-
-# ADD THIS after line 103 (after log("Running on device : " + uid.decode())):
-def init_sdcard():
-    try:
-        os.listdir('/sdcard')
-        log("SD card available")
-        return True
-    except OSError:
-        log("ERROR: SD card not found!")
-        return False
-
-sdcard_ok = init_sdcard()
-
-if sdcard_ok:
-    try:
-        os.mkdir("/sdcard/images")
-        log("Created /sdcard/images directory")
-    except OSError:
-        log("/sdcard/images directory already exists")
-
-if not sdcard_ok:
-    log("Using flash storage as fallback")
-    LOG_FILE_PATH = "/flash/mainlog.txt"
-
-IMG_DIR = "/sdcard/images/"
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
@@ -312,7 +312,7 @@ async def person_detection_loop():
         if True: #person_detected:
             person_image_count += 1
             r = get_rand()
-            raw_path = f"raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+            raw_path = f"{IMAGE_DIR}/raw_{r}_{person_detected}_{confidence:.2f}.jpg"
             log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
             img.save(raw_path)
             images_to_send.append(raw_path)
@@ -350,7 +350,7 @@ async def image_sending_loop():
             # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
             # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
             # TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
-            # processed_path = f"{IMG_DIR}/processed_{person_image_count}.jpg"
+            # processed_path = f"{IMAGE_DIR}/processed_{person_image_count}.jpg"
             # img.save(processed_path)  # Save image with annotations
 
 msgs_sent = []
@@ -716,7 +716,7 @@ def img_process(cid, msg, creator):
             img_bytes = msg
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         log(len(img_bytes))
-        fname = f"cc_{creator}_{cid}.jpg"
+        fname = f"{IMAGE_DIR}/cc_{creator}_{cid}.jpg"
         log(f"Saving to file {fname}")
         images_saved_at_cc.append(fname)
         img.save(fname)
