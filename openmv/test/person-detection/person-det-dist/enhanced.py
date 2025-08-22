@@ -63,9 +63,9 @@ sensor.set_auto_whitebal(False)  # Disable auto white balance
 sensor.set_auto_exposure(False)  # Disable auto exposure
 
 # Manual settings for optimal greyscale clarity
-sensor.set_brightness(0)  # Neutral brightness (-3 to +3)
-sensor.set_contrast(2)  # Higher contrast for better edge detection (0 to +3)
-sensor.set_saturation(0)  # Not relevant for greyscale
+# sensor.set_brightness(0)           # Neutral brightness (-3 to +3)
+# sensor.set_contrast(2)             # Higher contrast for better edge detection (0 to +3)
+# sensor.set_saturation(0)           # Not relevant for greyscale
 
 # You can fine-tune these manual values:
 # sensor.set_brightness(-1)        # Darker for bright environments
@@ -267,8 +267,8 @@ def print_system_status():
     print(f"   🎥 Camera: VGA (640x480) Greyscale, Manual settings")
     print(f"   🤖 Model: 128x128 input YOLOv8n")
     print(f"   🎛️  Confidence threshold: {CONFIDENCE_THRESHOLD}")
-    print("   💾 Memory: Aggressive cleanup between cycles")
-    print("   🖼️  Focus: Consistent greyscale images, Manual control")
+    print(f"   💾 Memory: Aggressive cleanup between cycles")
+    print(f"   🖼️  Focus: Consistent greyscale images, Manual control")
 
 
 print_system_status()
