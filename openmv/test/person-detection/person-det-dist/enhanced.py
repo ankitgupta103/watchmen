@@ -196,11 +196,6 @@ def run_optimized_person_detection():
             img = sensor.snapshot()
             print(f"✅ Image captured: {img.width()}x{img.height()}")
 
-            # Quick image quality check (greyscale)
-            center_pixel = img.get_pixel(img.width() // 2, img.height() // 2)
-            brightness = center_pixel  # Greyscale pixel is single value
-            print(f"📊 Image brightness: {brightness} (0-255)")
-
             # ===== STEP 3: PROCESS FOR PERSON =====
             print("🤖 Processing for person detection...")
 
