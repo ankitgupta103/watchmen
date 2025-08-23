@@ -247,22 +247,6 @@ def run_optimized_person_detection():
             break
 
 
-# ===========================
-# SYSTEM STATUS & START
-# ===========================
-def print_system_status():
-    """Display system configuration"""
-    print("\n📊 SYSTEM STATUS:")
-    print(f"   🎯 Target: Person detection only (COCO class {PERSON_CLASS_ID})")
-    print(f"   🎥 Camera: VGA (640x480) Greyscale, Manual settings")
-    print(f"   🤖 Model: 128x128 input YOLOv8n")
-    print(f"   🎛️  Confidence threshold: {CONFIDENCE_THRESHOLD}")
-    print(f"   💾 Memory: Aggressive cleanup between cycles")
-    print(f"   🖼️  Focus: Consistent greyscale images, Manual control")
-
-
-print_system_status()
-
 # Start the optimized detection system
 if __name__ == "__main__":
     try:
