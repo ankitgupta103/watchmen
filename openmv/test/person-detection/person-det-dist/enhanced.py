@@ -17,11 +17,6 @@ PERSON_CLASS_ID = 0  # COCO dataset: person = class 0
 CONFIDENCE_THRESHOLD = 0.6  # Higher threshold for reliable person detection
 
 try:
-    # Clear any existing model
-    try:
-        del model
-    except:
-        pass
     gc.collect()
 
     # Load YOLOv8n model
