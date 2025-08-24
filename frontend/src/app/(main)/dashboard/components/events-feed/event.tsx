@@ -17,7 +17,9 @@ export default function Event({
   event: FeedEvent;
   machines: Machine[];
 }) {
-  const machine = machines.find((machine) => machine.id === event.machine_id);
+  const machine = machines.find(
+    (machine) => machine.id === parseInt(event?.machine_id as string)
+  );
 
   return (
     <div

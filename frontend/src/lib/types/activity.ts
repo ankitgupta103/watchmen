@@ -15,7 +15,7 @@ export interface FeedEvent {
   annotated_image_path: string;
   cropped_images: CroppedImage[];
   timestamp: number;
-  machine_id: number;
+  machine_id: number | string;
   severity: number;
 }
 
