@@ -81,7 +81,7 @@ export default function ReactLeafletMap({
         // Convert FeedEvent from activity.ts to the format expected by MachineData
         const convertedEvents = events.map(event => ({
           id: `${event.machine_id}_${event.timestamp}`,
-          machineId: event.machine_id,
+          machineId: parseInt(event.machine_id as string),
           machineName: machine.name,
           machineType: machine.type,
           timestamp: new Date(event.timestamp * 1000),
