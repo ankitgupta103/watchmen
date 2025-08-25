@@ -96,31 +96,31 @@ class GPS:
             if sentence.startswith('$') and '*' in sentence:
                 self._parse_sentence(sentence)
 
-    def _parse_sentence(self, sentence):
-        """Parse NMEA sentence for coordinates"""
-        try:
-            # Validate checksum
-            parts = sentence.split('*')
-            if len(parts) != 2:
-                return
+    # def _parse_sentence(self, sentence):
+    #     """Parse NMEA sentence for coordinates"""
+    #     try:
+    #         # Validate checksum
+    #         parts = sentence.split('*')
+    #         if len(parts) != 2:
+    #             return
 
-            data_part = parts[0][1:]  # Remove '$'
-            checksum_str = parts[1][:2]
+    #         data_part = parts[0][1:]  # Remove '$'
+    #         checksum_str = parts[1][:2]
 
-            # Calculate checksum
-            calc_checksum = 0
-            for char in data_part:
-                calc_checksum ^= ord(char)
+    #         # Calculate checksum
+    #         calc_checksum = 0
+    #         for char in data_part:
+    #             calc_checksum ^= ord(char)
 
-            if calc_checksum != int(checksum_str, 16):
-                return  # Invalid checksum
+    #         if calc_checksum != int(checksum_str, 16):
+    #             return  # Invalid checksum
 
-            # Parse GGA sentences (best for coordinates)
-            if sentence.startswith('$GNGGA') or sentence.startswith('$GPGGA'):
-                self._parse_gga(sentence)
+    #         # Parse GGA sentences (best for coordinates)
+    #         if sentence.startswith('$GNGGA') or sentence.startswith('$GPGGA'):
+    #             self._parse_gga(sentence)
 
-        except:
-            pass  # Ignore parsing errors
+    #     except:
+    #         pass  # Ignore parsing errors
 
     def _parse_gga(self, sentence):
         """Parse GGA sentence for lat/lon"""
@@ -136,20 +136,20 @@ class GPS:
             if quality == 0:  # No fix
                 return
 
-            # # Extract coordinates
-            # lat_str = parts[2]
-            # lat_dir = parts[3]
-            # lon_str = parts[4]
-            # lon_dir = parts[5]
+            # Extract coordinates
+            lat_str = parts[2]
+            lat_dir = parts[3]
+            lon_str = parts[4]
+            lon_dir = parts[5]
 
-            # if lat_str and lon_str:
-            #     # Convert from DDMM.MMMM to decimal degrees
-            #     lat = self._nmea_to_decimal(lat_str, lat_dir)
-            #     lon = self._nmea_to_decimal(lon_str, lon_dir)
+            if lat_str and lon_str:
+                # Convert from DDMM.MMMM to decimal degrees
+                lat = self._nmea_to_decimal(lat_str, lat_dir)
+                lon = self._nmea_to_decimal(lon_str, lon_dir)
 
-            #     if lat is not None and lon is not None:
-            #         self.latitude = lat
-            #         self.longitude = lon
+                if lat is not None and lon is not None:
+                    self.latitude = lat
+                    self.longitude = lon
 
         except:
             pass
