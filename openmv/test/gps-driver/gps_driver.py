@@ -136,49 +136,49 @@ class GPS:
             if quality == 0:  # No fix
                 return
 
-            # Extract coordinates
-            lat_str = parts[2]
-            lat_dir = parts[3]
-            lon_str = parts[4]
-            lon_dir = parts[5]
+            # # Extract coordinates
+            # lat_str = parts[2]
+            # lat_dir = parts[3]
+            # lon_str = parts[4]
+            # lon_dir = parts[5]
 
-            if lat_str and lon_str:
-                # Convert from DDMM.MMMM to decimal degrees
-                lat = self._nmea_to_decimal(lat_str, lat_dir)
-                lon = self._nmea_to_decimal(lon_str, lon_dir)
+            # if lat_str and lon_str:
+            #     # Convert from DDMM.MMMM to decimal degrees
+            #     lat = self._nmea_to_decimal(lat_str, lat_dir)
+            #     lon = self._nmea_to_decimal(lon_str, lon_dir)
 
-                if lat is not None and lon is not None:
-                    self.latitude = lat
-                    self.longitude = lon
+            #     if lat is not None and lon is not None:
+            #         self.latitude = lat
+            #         self.longitude = lon
 
         except:
             pass
 
     def _nmea_to_decimal(self, coord_str, direction):
         """Convert NMEA coordinate to decimal degrees"""
-        # try:
-        #     if not coord_str or not direction:
-        #         return None
+        try:
+            if not coord_str or not direction:
+                return None
 
-        #     # Find decimal point
-        #     dot_pos = coord_str.find('.')
-        #     if dot_pos < 3:
-        #         return None
+            # Find decimal point
+            dot_pos = coord_str.find('.')
+            if dot_pos < 3:
+                return None
 
-        #     # Extract degrees and minutes
-        #     degrees = float(coord_str[:dot_pos-2])
-        #     minutes = float(coord_str[dot_pos-2:])
+            # Extract degrees and minutes
+            degrees = float(coord_str[:dot_pos-2])
+            minutes = float(coord_str[dot_pos-2:])
 
-        #     # Convert to decimal
-        #     decimal = degrees + minutes / 60.0
+            # Convert to decimal
+            decimal = degrees + minutes / 60.0
 
-        #     # Apply direction
-        #     if direction in ['S', 'W']:
-        #         decimal = -decimal
+            # Apply direction
+            if direction in ['S', 'W']:
+                decimal = -decimal
 
-        #     return decimal
+            return decimal
 
-        # except:
+        except:
             return None
 
     def has_fix(self):
