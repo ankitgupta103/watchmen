@@ -59,11 +59,11 @@ class SC16IS750:
     def read_data(self):
         """Read available GPS data"""
         data = ""
-        while self._read_register(0x09) > 0:  # bytes available
-            byte_val = self._read_register(0x00)
-            if (32 <= byte_val <= 126) or byte_val in [10, 13]:
-                data += chr(byte_val)
-        return data
+        # while self._read_register(0x09) > 0:  # bytes available
+        #     byte_val = self._read_register(0x00)
+        #     if (32 <= byte_val <= 126) or byte_val in [10, 13]:
+        #         data += chr(byte_val)
+        # return data
 
 class GPS:
     """Simple GPS coordinate extractor"""
@@ -96,31 +96,31 @@ class GPS:
             if sentence.startswith('$') and '*' in sentence:
                 self._parse_sentence(sentence)
 
-    # def _parse_sentence(self, sentence):
-    #     """Parse NMEA sentence for coordinates"""
-    #     try:
-    #         # Validate checksum
-    #         parts = sentence.split('*')
-    #         if len(parts) != 2:
-    #             return
+    def _parse_sentence(self, sentence):
+        """Parse NMEA sentence for coordinates"""
+        try:
+            # Validate checksum
+            parts = sentence.split('*')
+            if len(parts) != 2:
+                return
 
-    #         data_part = parts[0][1:]  # Remove '$'
-    #         checksum_str = parts[1][:2]
+            data_part = parts[0][1:]  # Remove '$'
+            checksum_str = parts[1][:2]
 
-    #         # Calculate checksum
-    #         calc_checksum = 0
-    #         for char in data_part:
-    #             calc_checksum ^= ord(char)
+            # Calculate checksum
+            calc_checksum = 0
+            for char in data_part:
+                calc_checksum ^= ord(char)
 
-    #         if calc_checksum != int(checksum_str, 16):
-    #             return  # Invalid checksum
+            if calc_checksum != int(checksum_str, 16):
+                return  # Invalid checksum
 
-    #         # Parse GGA sentences (best for coordinates)
-    #         if sentence.startswith('$GNGGA') or sentence.startswith('$GPGGA'):
-    #             self._parse_gga(sentence)
+            # Parse GGA sentences (best for coordinates)
+            if sentence.startswith('$GNGGA') or sentence.startswith('$GPGGA'):
+                self._parse_gga(sentence)
 
-    #     except:
-    #         pass  # Ignore parsing errors
+        except:
+            pass  # Ignore parsing errors
 
     def _parse_gga(self, sentence):
         """Parse GGA sentence for lat/lon"""
