@@ -204,33 +204,33 @@ def main():
     # Initialize GPS
     gps = GPS(uart)
 
-    # print("Ready. Searching for GPS fix...")
-    # print("(Move to outdoor location with clear sky view)")
-    # print("-" * 50)
+    print("Ready. Searching for GPS fix...")
+    print("(Move to outdoor location with clear sky view)")
+    print("-" * 50)
 
     last_fix_time = 0
 
-    # try:
-    #     while True:
-    #         # Update GPS data
-    #         gps.update()
+    try:
+        while True:
+            # Update GPS data
+            gps.update()
 
-    #         # Check for fix every second
-    #         current_time = time.ticks_ms()
-    #         if time.ticks_diff(current_time, last_fix_time) > 1000:
-    #             last_fix_time = current_time
+            # Check for fix every second
+            current_time = time.ticks_ms()
+            if time.ticks_diff(current_time, last_fix_time) > 1000:
+                last_fix_time = current_time
 
-    #             if gps.has_fix():
-    #                 lat, lon = gps.get_coordinates()
-    #                 if lat is not None and lon is not None:
-    #                     print(f"LAT: {lat:.6f}, LON: {lon:.6f}")
-    #             else:
-    #                 print("Searching for satellites...")
+                if gps.has_fix():
+                    lat, lon = gps.get_coordinates()
+                    if lat is not None and lon is not None:
+                        print(f"LAT: {lat:.6f}, LON: {lon:.6f}")
+                else:
+                    print("Searching for satellites...")
 
-    #         time.sleep_ms(100)
+            time.sleep_ms(100)
 
-    # except KeyboardInterrupt:
-    #     print("\nStopped.")
+    except KeyboardInterrupt:
+        print("\nStopped.")
 
 if __name__ == "__main__":
     main()
