@@ -7,7 +7,7 @@ class SC16IS750:
     def __init__(self, spi_bus, cs_pin):
         self.cs = Pin(cs_pin, Pin.OUT)
         self.cs.value(1)
-        self.spi = SPI(spi_bus, baudrate=100000, polarity=0, phase=0)
+        self.spi = SPI(spi_bus, baudrate=500000, polarity=0, phase=0)
 
     def _write_register(self, reg, val):
         self.cs.value(0)
