@@ -156,29 +156,29 @@ class GPS:
 
     def _nmea_to_decimal(self, coord_str, direction):
         """Convert NMEA coordinate to decimal degrees"""
-        try:
-            if not coord_str or not direction:
-                return None
+        # try:
+        #     if not coord_str or not direction:
+        #         return None
 
-            # Find decimal point
-            dot_pos = coord_str.find('.')
-            if dot_pos < 3:
-                return None
+        #     # Find decimal point
+        #     dot_pos = coord_str.find('.')
+        #     if dot_pos < 3:
+        #         return None
 
-            # Extract degrees and minutes
-            degrees = float(coord_str[:dot_pos-2])
-            minutes = float(coord_str[dot_pos-2:])
+        #     # Extract degrees and minutes
+        #     degrees = float(coord_str[:dot_pos-2])
+        #     minutes = float(coord_str[dot_pos-2:])
 
-            # Convert to decimal
-            decimal = degrees + minutes / 60.0
+        #     # Convert to decimal
+        #     decimal = degrees + minutes / 60.0
 
-            # Apply direction
-            if direction in ['S', 'W']:
-                decimal = -decimal
+        #     # Apply direction
+        #     if direction in ['S', 'W']:
+        #         decimal = -decimal
 
-            return decimal
+        #     return decimal
 
-        except:
+        # except:
             return None
 
     def has_fix(self):
