@@ -30,40 +30,40 @@ class SC16IS750:
         time.sleep_us(50)
         return result
 
-    def init_gps(self):
-        """Initialize for GPS at 9600 baud"""
-        # Reset
-        reg = self._read_register(0x0E)
-        self._write_register(0x0E, reg | 0x08)
-        time.sleep_ms(200)
+    # def init_gps(self):
+    #     """Initialize for GPS at 9600 baud"""
+    #     # Reset
+    #     reg = self._read_register(0x0E)
+    #     self._write_register(0x0E, reg | 0x08)
+    #     time.sleep_ms(200)
 
-        # Set 9600 baud
-        divisor = 96  # 14745600 / (9600 * 16)
-        self._write_register(0x03, 0x80)  # Enable divisor access
-        time.sleep_ms(10)
-        self._write_register(0x00, divisor & 0xFF)  # DLL
-        self._write_register(0x01, divisor >> 8)    # DLH
-        self._write_register(0x03, 0x03)  # 8N1
-        time.sleep_ms(10)
+    #     # Set 9600 baud
+    #     divisor = 96  # 14745600 / (9600 * 16)
+    #     self._write_register(0x03, 0x80)  # Enable divisor access
+    #     time.sleep_ms(10)
+    #     self._write_register(0x00, divisor & 0xFF)  # DLL
+    #     self._write_register(0x01, divisor >> 8)    # DLH
+    #     self._write_register(0x03, 0x03)  # 8N1
+    #     time.sleep_ms(10)
 
-        # Setup UART
-        self._write_register(0x02, 0x07)  # Reset & enable FIFO
-        self._write_register(0x01, 0x00)  # Disable interrupts
-        self._write_register(0x04, 0x00)  # Normal operation
-        time.sleep_ms(100)
+    #     # Setup UART
+    #     self._write_register(0x02, 0x07)  # Reset & enable FIFO
+    #     self._write_register(0x01, 0x00)  # Disable interrupts
+    #     self._write_register(0x04, 0x00)  # Normal operation
+    #     time.sleep_ms(100)
 
-        # Clear buffer
-        while self._read_register(0x09) > 0:
-            self._read_register(0x00)
+    #     # Clear buffer
+    #     while self._read_register(0x09) > 0:
+    #         self._read_register(0x00)
 
     def read_data(self):
         """Read available GPS data"""
         data = ""
-        # while self._read_register(0x09) > 0:  # bytes available
-        #     byte_val = self._read_register(0x00)
-        #     if (32 <= byte_val <= 126) or byte_val in [10, 13]:
-        #         data += chr(byte_val)
-        # return data
+        while self._read_register(0x09) > 0:  # bytes available
+            byte_val = self._read_register(0x00)
+            if (32 <= byte_val <= 126) or byte_val in [10, 13]:
+                data += chr(byte_val)
+        return data
 
 class GPS:
     """Simple GPS coordinate extractor"""
