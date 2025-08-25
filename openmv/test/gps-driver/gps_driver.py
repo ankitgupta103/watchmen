@@ -7,7 +7,7 @@ class SC16IS750:
     def __init__(self, spi_bus, cs_pin):
         self.cs = Pin(cs_pin, Pin.OUT)
         self.cs.value(1)
-        self.spi = SPI(spi_bus, baudrate=500000, polarity=0, phase=0)
+        self.spi = SPI(spi_bus, baudrate=100000, polarity=0, phase=0)
 
     def _write_register(self, reg, val):
         self.cs.value(0)
@@ -30,31 +30,31 @@ class SC16IS750:
         time.sleep_us(50)
         return result
 
-    # def init_gps(self):
-    #     """Initialize for GPS at 9600 baud"""
-    #     # Reset
-    #     reg = self._read_register(0x0E)
-    #     self._write_register(0x0E, reg | 0x08)
-    #     time.sleep_ms(200)
+    def init_gps(self):
+        """Initialize for GPS at 9600 baud"""
+        # Reset
+        reg = self._read_register(0x0E)
+        self._write_register(0x0E, reg | 0x08)
+        time.sleep_ms(200)
 
-    #     # Set 9600 baud
-    #     divisor = 96  # 14745600 / (9600 * 16)
-    #     self._write_register(0x03, 0x80)  # Enable divisor access
-    #     time.sleep_ms(10)
-    #     self._write_register(0x00, divisor & 0xFF)  # DLL
-    #     self._write_register(0x01, divisor >> 8)    # DLH
-    #     self._write_register(0x03, 0x03)  # 8N1
-    #     time.sleep_ms(10)
+        # Set 9600 baud
+        divisor = 96  # 14745600 / (9600 * 16)
+        self._write_register(0x03, 0x80)  # Enable divisor access
+        time.sleep_ms(10)
+        self._write_register(0x00, divisor & 0xFF)  # DLL
+        self._write_register(0x01, divisor >> 8)    # DLH
+        self._write_register(0x03, 0x03)  # 8N1
+        time.sleep_ms(10)
 
-    #     # Setup UART
-    #     self._write_register(0x02, 0x07)  # Reset & enable FIFO
-    #     self._write_register(0x01, 0x00)  # Disable interrupts
-    #     self._write_register(0x04, 0x00)  # Normal operation
-    #     time.sleep_ms(100)
+        # Setup UART
+        self._write_register(0x02, 0x07)  # Reset & enable FIFO
+        self._write_register(0x01, 0x00)  # Disable interrupts
+        self._write_register(0x04, 0x00)  # Normal operation
+        time.sleep_ms(100)
 
-    #     # Clear buffer
-    #     while self._read_register(0x09) > 0:
-    #         self._read_register(0x00)
+        # Clear buffer
+        while self._read_register(0x09) > 0:
+            self._read_register(0x00)
 
     def read_data(self):
         """Read available GPS data"""
