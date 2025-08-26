@@ -702,7 +702,7 @@ async def hb_process(mid, msgbytes, sender):
 
 images_saved_at_cc = []
 
-def img_process(cid, msg, creator, sender):
+async def img_process(cid, msg, creator, sender):
     print(f"DEBUGGING In img_process")
     clear_chunkid(cid)
     if running_as_cc():
@@ -725,7 +725,7 @@ def img_process(cid, msg, creator, sender):
         sent_succ = False
         for peer_addr in destlist:
             log(f"Propogating Image to {peer_addr}")
-            sent_succ = asyncio.create_task(send_msg("P", creator, msg, peer_addr)) # is this await ok?
+            sent_succ = await asyncio.create_task(send_msg("P", creator, msg, peer_addr))
             if sent_succ:
                 break
         if not sent_succ:
@@ -808,7 +808,7 @@ def process_message(data):
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             if recompiled:
                 print("DEBUGGING Recompiled message available, processing image")
-                img_process(cid, recompiled, creator, sender)
+                asyncio.create_task(img_process(cid, recompiled, creator, sender))
             else:
                 log(f"No recompiled, so not sending")
         else:
