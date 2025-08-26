@@ -93,6 +93,7 @@ def get_fs_root_for_storage():
         return "/flash"
 
 FS_ROOT = get_fs_root_for_storage()
+print(f"Using FS_ROOT : {FS_ROOT}")
 if running_as_cc():
     IMAGE_DIR = f"{FS_ROOT}/ccimages"
 else:
@@ -702,6 +703,7 @@ async def hb_process(mid, msgbytes, sender):
 images_saved_at_cc = []
 
 def img_process(cid, msg, creator, sender):
+    print(f"DEBUGGING In img_process")
     clear_chunkid(cid)
     if running_as_cc():
         log(f"Received image of size {len(msg)}")
@@ -723,7 +725,7 @@ def img_process(cid, msg, creator, sender):
         sent_succ = False
         for peer_addr in destlist:
             log(f"Propogating Image to {peer_addr}")
-            sent_succ = await asyncio.create_task(send_msg("P", creator, msg, peer_addr)) # is this await ok?
+            sent_succ = asyncio.create_task(send_msg("P", creator, msg, peer_addr)) # is this await ok?
             if sent_succ:
                 break
         if not sent_succ:
@@ -799,11 +801,13 @@ def process_message(data):
     elif mst == "E":
         alldone, missing_str, cid, recompiled, creator = end_chunk(mid, msg.decode())
         if alldone:
+            print(f"DEBUGGING Alldone!!!!")
             release_image_lock()
             # Also when it fails
             ackmessage += b":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             if recompiled:
+                print("DEBUGGING Recompiled message available, processing image")
                 img_process(cid, recompiled, creator, sender)
             else:
                 log(f"No recompiled, so not sending")
