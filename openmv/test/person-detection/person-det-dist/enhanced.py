@@ -1,259 +1,519 @@
-import sensor
+# Fixed Unified Evaluation Script for OpenMV RT1062
+# This script evaluates a TFLite model on images from SD card folders
+# Generates comprehensive metrics and CSV logs
+
+import os
 import ml
+import image
 import time
 import gc
 
-print("🚀 Initializing Optimized Person Detection System...")
+# --- SCRIPT MODE ---
+# Step 1: Set RUN_MODE to 1 and run the script. This will create file lists.
+# Step 2: After Step 1 is done, set RUN_MODE to 2 and run the script again.
+RUN_MODE = 2  # 1 = List Files, 2 = Evaluate Model
 
-# ===========================
-# MEMORY & MODEL SETUP
-# ===========================
-print("📝 Step 1: Clearing memory and loading model...")
-gc.collect()
+# --- CONFIGURATION ---
+MODEL_PATH = "/sdcard/best_full_integer_quant.tflite"  # Update with your model path
+TARGET_LABEL = "person"
+ALL_IMAGES_DIR = (
+    "/sdcard/netrajaal/totalfiles"  # Folder with all images (positive + negative)
+)
+PERSON_ONLY_DIR = (
+    "/sdcard/netrajaal/totalpeople"  # Folder with only person images (ground truth)
+)
+OUTPUT_DIR = "/sdcard/results"
 
-# Model configuration
-MODEL_PATH = "/sdcard/yolov8n_full_integer_quant.tflite"  # UPDATE THIS PATH
-PERSON_CLASS_ID = 0  # COCO dataset: person = class 0
-CONFIDENCE_THRESHOLD = 0.6  # Higher threshold for reliable person detection
+# Model input size - check your model requirements
+MODEL_INPUT_SIZE = 96  # Change to 128 if your model needs 128x128
 
-try:
-    gc.collect()
-
-    # Load YOLOv8n model
-    model = ml.Model(MODEL_PATH, load_to_fb=True)
-    print(f"✅ Model loaded: {model.input_shape} -> {model.output_shape}")
-
-    # Verify 128x128 input
-    if model.input_shape[0][1] != 128:
-        print(
-            f"⚠️  Warning: Expected 128x128, got {model.input_shape[0][1]}x{model.input_shape[0][1]}"
-        )
-
-    # Check if model expects RGB (3 channels) with greyscale input (1 channel)
-    if len(model.input_shape[0]) >= 4 and model.input_shape[0][3] == 3:
-        print("ℹ️  Model expects RGB input - OpenMV will auto-convert greyscale")
-
-except Exception as e:
-    print(f"❌ Model loading failed: {e}")
-    exit()
-
-# ===========================
-# CAMERA OPTIMIZATION
-# ===========================
-print("📷 Step 2: Optimizing camera for clear greyscale images...")
-
-sensor.reset()
-sensor.set_pixformat(sensor.GRAYSCALE)  # Greyscale for consistency and efficiency
-
-# Use VGA for better field of view - model will resize to 128x128 internally
-sensor.set_framesize(sensor.VGA)  # 640x480 for good field of view
-print("📐 Camera: VGA (640x480) Greyscale -> Model resizes to 128x128")
-
-# Camera stability settings
-sensor.skip_frames(time=3000)  # Longer stabilization time
-
-# Manual settings for consistent greyscale images
-sensor.set_auto_gain(False)  # Disable auto gain for consistency
-sensor.set_auto_whitebal(False)  # Disable auto white balance
-sensor.set_auto_exposure(False)  # Disable auto exposure
-
-# Manual settings for optimal greyscale clarity
-# sensor.set_brightness(0)           # Neutral brightness (-3 to +3)
-# sensor.set_contrast(2)             # Higher contrast for better edge detection (0 to +3)
-# sensor.set_saturation(0)           # Not relevant for greyscale
-
-# You can fine-tune these manual values:
-# sensor.set_brightness(-1)        # Darker for bright environments
-# sensor.set_contrast(3)           # Maximum contrast for better edges
-# sensor.set_saturation(0)         # Always 0 for greyscale
-
-print("✅ Camera optimized: Manual settings, Greyscale, VGA resolution")
-print("💡 Tip: Adjust brightness/contrast manually for your lighting conditions")
+# File paths for the generated lists
+ALL_IMAGES_LIST = "/sdcard/all_images.txt"
+PERSON_IMAGES_LIST = "/sdcard/person_images.txt"
 
 
-# ===========================
-# OPTIMIZED PERSON DETECTION
-# ===========================
-def detect_person_only(img):
-    """Streamlined person-only detection"""
-
-    # Step 1: Run inference
-    start_time = time.ticks_ms()
-    prediction = model.predict([img])
-    inference_time = time.ticks_diff(time.ticks_ms(), start_time)
-
-    # Step 2: Parse output for person class only
-    output = prediction[0]
-
-    max_person_confidence = 0.0
-    person_detections = []
-    boxes_processed = 0
-
+# --- HELPER FUNCTIONS ---
+def read_file_lines(filepath):
+    """Read all lines from a file - compatible with MicroPython"""
+    lines = []
     try:
-        # Handle different output formats efficiently
-        if len(output.shape) == 3:
-            if output.shape[1] > output.shape[2]:
-                # Format: (1, detections, features)
-                num_detections = output.shape[1]
-                for i in range(min(num_detections, 300)):  # Process up to 300 boxes
-                    detection = output[0, i, :]
-                    person_conf = extract_person_confidence(detection)
-                    boxes_processed += 1
+        with open(filepath, "r") as f:
+            # Read entire file at once if small enough
+            content = f.read()
+            lines = [line.strip() for line in content.split("\n") if line.strip()]
+    except MemoryError:
+        # If file too large, read line by line
+        try:
+            with open(filepath, "r") as f:
+                while True:
+                    line = f.readline()
+                    if not line:
+                        break
+                    line = line.strip()
+                    if line:
+                        lines.append(line)
+        except Exception as e:
+            print(f"Error reading file line by line: {e}")
+    except Exception as e:
+        print(f"Error reading file: {e}")
 
-                    if person_conf > max_person_confidence:
-                        max_person_confidence = person_conf
+    return lines
 
-                    if person_conf > CONFIDENCE_THRESHOLD:
-                        person_detections.append(person_conf)
+
+def check_sd_card():
+    """Check if SD card is properly mounted"""
+    print("🔍 Checking SD card status...")
+    try:
+        sdcard_contents = os.listdir("/sdcard")
+        print(f"  ✅ SD card accessible. Found {len(sdcard_contents)} items")
+        return True
+    except OSError as e:
+        print(f"  ❌ SD card not accessible: {e}")
+        return False
+
+
+def verify_file_contents(filepath, max_lines=5):
+    """Verify a file exists and show its first few lines"""
+    print(f"\n📄 Verifying file: {filepath}")
+    try:
+        os.stat(filepath)
+        print(f"  ✅ File exists")
+
+        line_count = 0
+        with open(filepath, "r") as f:
+            print(f"  First {max_lines} lines:")
+            while line_count < max_lines:
+                line = f.readline()
+                if not line:
+                    break
+                print(
+                    f"    Line {line_count+1}: {line.strip()[:50]}..."
+                )  # Show first 50 chars
+                line_count += 1
+
+        # Count total lines
+        total = 0
+        with open(filepath, "r") as f:
+            while True:
+                line = f.readline()
+                if not line:
+                    break
+                if line.strip():
+                    total += 1
+
+        print(f"  Total lines in file: {total}")
+        return True
+
+    except OSError as e:
+        print(f"  ❌ File error: {e}")
+        return False
+
+
+# --- MODE 1: FILE LISTING ---
+def create_file_lists():
+    """Create lists of image files from directories"""
+    print("=" * 60)
+    print("MODE 1: CREATING FILE LISTS")
+    print("=" * 60)
+
+    if not check_sd_card():
+        print("❌ SD card not accessible. Please check SD card mounting.")
+        return
+
+    def list_images(directory_path, output_file):
+        """List all image files in a directory"""
+        print(f"\n📂 Scanning: {directory_path}")
+
+        valid_extensions = (".jpg", ".jpeg", ".bmp", ".png")
+        count = 0
+
+        try:
+            # Check directory exists
+            try:
+                os.stat(directory_path)
+            except OSError:
+                print(f"  ❌ Directory not found: {directory_path}")
+                return 0
+
+            # Open output file
+            with open(output_file, "w") as f:
+                # List files
+                clean_path = directory_path.rstrip("/")
+
+                try:
+                    files = os.listdir(clean_path)
+                    print(f"  Found {len(files)} entries")
+
+                    for filename in files:
+                        if filename.lower().endswith(valid_extensions):
+                            full_path = clean_path + "/" + filename
+                            f.write(full_path + "\n")
+                            count += 1
+
+                            if count % 50 == 0:
+                                print(f"    Processed {count} images...")
+                                gc.collect()
+
+                except OSError as e:
+                    print(f"  ❌ Error listing directory: {e}")
+                    return 0
+
+            print(f"  ✅ Found {count} images -> {output_file}")
+            return count
+
+        except OSError as e:
+            print(f"  ❌ Failed to create output file: {e}")
+            return 0
+
+    # Create lists
+    all_count = list_images(ALL_IMAGES_DIR, ALL_IMAGES_LIST)
+    gc.collect()
+    person_count = list_images(PERSON_ONLY_DIR, PERSON_IMAGES_LIST)
+
+    print("\n" + "=" * 60)
+    print(f"✅ File listing complete!")
+    print(f"    Total images: {all_count}")
+    print(f"    Person images: {person_count}")
+    print(f"    Non-person images: {all_count - person_count}")
+    print("\n⚠️  Now set RUN_MODE = 2 and run again for evaluation")
+    print("=" * 60)
+
+
+def evaluate_model():
+    """Evaluate model on all images and calculate metrics"""
+    print("=" * 60)
+    print("MODE 2: MODEL EVALUATION")
+    print("=" * 60)
+
+    # Create output directory
+    try:
+        os.mkdir(OUTPUT_DIR)
+    except OSError:
+        pass  # Directory already exists
+
+    # Load model
+    print("\n🧠 Loading model...")
+    try:
+        model = ml.Model(MODEL_PATH)
+        print(f"  ✅ Model loaded successfully")
+        print(f"  Input size: {MODEL_INPUT_SIZE}x{MODEL_INPUT_SIZE}")
+    except Exception as e:
+        print(f"  ❌ Failed to load model: {e}")
+        return
+
+    # Load ground truth (person images)
+    print("\n📋 Loading ground truth...")
+    person_images = set()
+
+    # Read person image paths
+    person_paths = read_file_lines(PERSON_IMAGES_LIST)
+    if not person_paths:
+        print(f"  ❌ Could not load person images from {PERSON_IMAGES_LIST}")
+        print(f"  Please run with RUN_MODE=1 first!")
+        return
+
+    # --- CHANGE 1 of 2: Store only the FILENAME for ground truth ---
+    # Instead of the full path, we store just the filename (e.g., "person1.jpg").
+    for path in person_paths:
+        img_filename = path.split("/")[-1]
+        person_images.add(img_filename)
+    # ----------------------------------------------------------------
+
+    print(f"  ✅ Loaded {len(person_images)} person image names")
+    if len(person_images) > 0:
+        sample = list(person_images)[:3]
+        print(f"  Sample names: {sample}")
+
+    # Initialize metrics
+    metrics = {
+        "tp": 0,  # True Positives
+        "fp": 0,  # False Positives
+        "tn": 0,  # True Negatives
+        "fn": 0,  # False Negatives
+        "total": 0,
+        "errors": 0,
+    }
+
+    # Process threshold
+    confidence_threshold = 0.5
+
+    # Load all image paths
+    print("\n📂 Loading all image paths...")
+    all_image_paths = read_file_lines(ALL_IMAGES_LIST)
+    if not all_image_paths:
+        print(f"  ❌ Could not load image paths from {ALL_IMAGES_LIST}")
+        print(f"  Please run with RUN_MODE=1 first!")
+        return
+
+    print(f"  ✅ Found {len(all_image_paths)} images to process")
+
+    csv_path = f"{OUTPUT_DIR}/evaluation_results.csv"
+    try:
+        with open(csv_path, "w") as f:
+            f.write("filename,ground_truth,confidence_score,predicted,result\n")
+    except OSError as e:
+        print(f"  ❌ Could not create CSV file: {e}")
+        return
+
+    # Process each image
+    print(f"\n🔄 Processing images (threshold={confidence_threshold})...")
+    print("-" * 50)
+
+    start_time = time.ticks_ms()
+    processed = 0
+    total_images = len(all_image_paths)
+
+    for img_path in all_image_paths:
+        if not img_path:
+            continue
+
+        # --- CHANGE 2 of 2: Check using the FILENAME ---
+        # We extract the filename from the current path and check against our set.
+        img_filename = img_path.split("/")[-1]
+        is_person_image = img_filename in person_images
+        # ------------------------------------------------
+
+        processed += 1
+
+        # Debug first few images
+        if processed <= 3:
+            print(f"  Processing: {img_filename} (Person: {is_person_image})")
+
+        # Process image
+        score = process_single_image(model, img_path, MODEL_INPUT_SIZE)
+
+        current_result = {}
+        if score is None:
+            metrics["errors"] += 1
+            current_result = {
+                "filename": img_filename,
+                "ground_truth": is_person_image,
+                "score": 0.0,
+                "predicted": False,
+                "status": "ERROR",
+            }
+        else:
+            predicted_person = score >= confidence_threshold
+            metrics["total"] += 1
+            status = "UNKNOWN"
+            if is_person_image and predicted_person:
+                metrics["tp"] += 1
+                status = "TP"
+            elif not is_person_image and predicted_person:
+                metrics["fp"] += 1
+                status = "FP"
+            elif is_person_image and not predicted_person:
+                metrics["fn"] += 1
+                status = "FN"
             else:
-                # Format: (1, features, detections)
-                num_detections = output.shape[2]
-                for i in range(min(num_detections, 300)):
-                    detection = output[0, :, i]
-                    person_conf = extract_person_confidence(detection)
-                    boxes_processed += 1
+                metrics["tn"] += 1
+                status = "TN"
 
-                    if person_conf > max_person_confidence:
-                        max_person_confidence = person_conf
+            current_result = {
+                "filename": img_filename,
+                "ground_truth": is_person_image,
+                "score": score,
+                "predicted": predicted_person,
+                "status": status,
+            }
 
-                    if person_conf > CONFIDENCE_THRESHOLD:
-                        person_detections.append(person_conf)
+        # Append the new data to the CSV file
+        try:
+            with open(csv_path, "a") as f:
+                r = current_result
+                gt = "person" if r["ground_truth"] else "no_person"
+                pred = "person" if r["predicted"] else "no_person"
+                # Log the clean filename instead of the full path
+                f.write(f"{r['filename']},{gt},{r['score']:.4f},{pred},{r['status']}\n")
+        except OSError as e:
+            print(f"  ❌ Error writing to CSV: {e}")
 
-        elif len(output.shape) == 2:
-            # Format: (detections, features)
-            num_detections = output.shape[0]
-            for i in range(min(num_detections, 300)):
-                detection = output[i, :]
-                person_conf = extract_person_confidence(detection)
-                boxes_processed += 1
+        # Progress update
+        if processed % 20 == 0 or processed == total_images:
+            elapsed = time.ticks_diff(time.ticks_ms(), start_time) / 1000
+            print(
+                f"  Processed: {processed}/{total_images} | Time: {elapsed:.1f}s | "
+                f"TP:{metrics['tp']} FP:{metrics['fp']} "
+                f"TN:{metrics['tn']} FN:{metrics['fn']}"
+            )
+            gc.collect()
 
-                if person_conf > max_person_confidence:
-                    max_person_confidence = person_conf
+    # Calculate final metrics
+    total_time = time.ticks_diff(time.ticks_ms(), start_time) / 1000
 
-                if person_conf > CONFIDENCE_THRESHOLD:
-                    person_detections.append(person_conf)
+    print("\n" + "=" * 60)
+    print("📊 EVALUATION RESULTS")
+    print("=" * 60)
+
+    # Basic counts
+    print("\n📈 Detection Summary:")
+    print(f"  Total images processed: {processed}")
+    print(f"  Successful evaluations: {metrics['total']}")
+    print(f"  Processing errors: {metrics['errors']}")
+    print(f"  Total time: {total_time:.1f}s")
+    print(f"  Average time per image: {total_time/max(processed,1):.3f}s")
+
+    # Confusion Matrix
+    print(f"\n📋 Confusion Matrix:")
+    print(f"  {'':12} {'Predicted':^20}")
+    print(f"  {'Actual':12} {'Person':>10} {'No Person':>10}")
+    print(f"  {'Person':12} {metrics['tp']:>10} {metrics['fn']:>10}")
+    print(f"  {'No Person':12} {metrics['fp']:>10} {metrics['tn']:>10}")
+
+    # Calculate performance metrics
+    if metrics["total"] > 0:
+        accuracy = (metrics["tp"] + metrics["tn"]) / metrics["total"]
+
+        if metrics["tp"] + metrics["fp"] > 0:
+            precision = metrics["tp"] / (metrics["tp"] + metrics["fp"])
+        else:
+            precision = 0.0
+
+        if metrics["tp"] + metrics["fn"] > 0:
+            recall = metrics["tp"] / (metrics["tp"] + metrics["fn"])
+        else:
+            recall = 0.0
+
+        if precision + recall > 0:
+            f1_score = 2 * (precision * recall) / (precision + recall)
+        else:
+            f1_score = 0.0
+
+        if metrics["tn"] + metrics["fp"] > 0:
+            specificity = metrics["tn"] / (metrics["tn"] + metrics["fp"])
+        else:
+            specificity = 0.0
+
+        print(f"\n🎯 Performance Metrics:")
+        print(
+            f"  Accuracy:    {accuracy:.3f} ({metrics['tp']+metrics['tn']}/{metrics['total']})"
+        )
+        print(f"  Precision:   {precision:.3f} (TP/(TP+FP))")
+        print(f"  Recall:      {recall:.3f} (TP/(TP+FN))")
+        print(f"  Specificity: {specificity:.3f} (TN/(TN+FP))")
+        print(f"  F1-Score:    {f1_score:.3f}")
+    save_results_csv(metrics, total_time, processed)
+
+    print("\n" + "=" * 60)
+    print("✅ EVALUATION COMPLETE!")
+    print(f"📁 Results saved to: {OUTPUT_DIR}")
+    print("=" * 60)
+
+
+def process_single_image(model, img_path, target_size):
+    """
+    Process a single image and return confidence score.
+    Returns None if processing fails.
+    """
+    try:
+        # --- FIX: RESIZING LOGIC ---
+        # Reverted to using the correct 'scale' and 'crop' methods to fix the error.
+        img = image.Image(img_path, copy_to_fb=False)
+
+        # Get original dimensions
+        w = img.width()
+        h = img.height()
+
+        # Determine scale factor to fit the image inside the target square, maintaining aspect ratio
+        if w > h:
+            scale_factor = target_size / h
+        else:
+            scale_factor = target_size / w
+
+        # The scale() method returns a new, scaled image object.
+        img = img.scale(x_scale=scale_factor, y_scale=scale_factor, hint=image.BICUBIC)
+
+        # Perform a center crop to get the final square image
+        x_offset = (img.width() - target_size) // 2
+        y_offset = (img.height() - target_size) // 2
+        img = img.crop(roi=(x_offset, y_offset, target_size, target_size))
+
+        # --- CORRECT INFERENCE LOGIC (from previous fix) ---
+        # Run inference to get the raw prediction tensor
+        prediction_tensor = model.predict([img])
+        del img
+        gc.collect()
+
+        # Parse the raw tensor to find the confidence score for "person"
+        scores = zip(model.labels, prediction_tensor[0].flatten().tolist())
+        person_confidence = 0.0
+        for label, confidence in scores:
+            if label == TARGET_LABEL:
+                person_confidence = confidence
+                break  # Exit loop once the "person" score is found
+
+        return person_confidence
 
     except Exception as e:
-        print(f"⚠️  Detection parsing error: {e}")
-        return False, 0.0, inference_time, 0
-
-    person_detected = len(person_detections) > 0
-    return person_detected, max_person_confidence, inference_time, boxes_processed
-
-
-def extract_person_confidence(detection):
-    """Extract person class confidence from detection"""
-    try:
-        if len(detection) >= 84:
-            # Full YOLO format: [x, y, w, h] + 80 class scores
-            person_score = detection[4 + PERSON_CLASS_ID]  # Person is class 0
-        elif len(detection) >= 5:
-            # Simplified format: [x, y, w, h, person_score]
-            person_score = detection[4]
-        else:
-            return 0.0
-
-        # Apply sigmoid activation
-        person_conf = 1.0 / (1.0 + 2.718281828 ** (-person_score))
-        return person_conf
-
-    except:
-        return 0.0
-
-
-# ===========================
-# OPTIMIZED DETECTION LOOP
-# ===========================
-def run_optimized_person_detection():
-    """Clean, optimized detection workflow"""
-
-    print("\n🎯 Starting Optimized Person Detection")
-    print("📋 Workflow: Clear Memory -> Capture -> Process -> Results -> Repeat")
-    print("🎛️  Settings: VGA Greyscale, Manual camera, 128x128 processing")
-    print("=" * 70)
-
-    capture_count = 0
-
-    while True:
-        try:
-            capture_count += 1
-
-            # ===== STEP 1: CLEAR MEMORY =====
-            print(f"\n🔄 CYCLE #{capture_count}")
-            print("🧹 Clearing memory...")
-            gc.collect()
-
-            # ===== STEP 2: CAPTURE CLEAR IMAGE =====
-            print("📸 Capturing clear image...")
-
-            # Take multiple frames to ensure freshness and focus
-            for _ in range(4):  # More frames for better quality
-                temp_img = sensor.snapshot()
-                del temp_img
-                time.sleep_ms(100)  # Allow sensor to adjust
-
-            # Final capture for processing
-            img = sensor.snapshot()
-            print(f"✅ Image captured: {img.width()}x{img.height()}")
-
-            # ===== STEP 3: PROCESS FOR PERSON =====
-            print("🤖 Processing for person detection...")
-
-            person_detected, max_confidence, inference_time, boxes_processed = (
-                detect_person_only(img)
-            )
-
-            # ===== STEP 4: PRINT RESULTS =====
-            print("📋 DETECTION RESULTS:")
-            print(f"   ⏱️  Inference time: {inference_time}ms")
-            print(f"   📦 Boxes processed: {boxes_processed}")
-            print(f"   🎯 Max confidence: {max_confidence:.3f}")
-
-            if person_detected:
-                print(f"   🟢 PERSON DETECTED! (Confidence: {max_confidence:.3f})")
-
-                # Optional: Save greyscale image when person detected
-                # img_path = f"/sdcard/person_{capture_count}_{max_confidence:.2f}.jpg"
-                # img.save(img_path)
-                # print(f"   💾 Saved: {img_path}")
-
-            else:
-                print(f"   🔴 No person detected")
-
-            # ===== STEP 5: CLEANUP =====
-            del img
-            gc.collect()
-
-            # Wait before next cycle (can adjust this)
-            print("⏳ Waiting 4 seconds before next detection...")
-            for i in range(4, 0, -1):
-                print(f"   Next in {i}s...")
-                time.sleep(1)
-
-        except Exception as cycle_error:
-            print(f"❌ Cycle error: {cycle_error}")
-            print("🔧 Recovering...")
-
-            # Emergency cleanup
-            try:
-                del img
-            except:
-                pass
-            gc.collect()
-            time.sleep(3)
-
-        except KeyboardInterrupt:
-            print("\n🛑 Detection stopped by user")
-            break
-
-
-# Start the optimized detection system
-if __name__ == "__main__":
-    try:
-        run_optimized_person_detection()
-    except Exception as main_error:
-        print(f"❌ System error: {main_error}")
-    finally:
-        print("🧹 Final cleanup...")
+        print(f"  ❌ Failed processing {img_path}: {e}")
         gc.collect()
-        print("✅ System shutdown complete")
+        return None
+
+
+# --- MODIFICATION --- This function now only saves the summary text file.
+def save_results_csv(metrics, total_time, total_processed):
+    """Save summary metrics to a text file."""
+    # The detailed CSV is now saved incrementally, so that part is removed from this function.
+
+    # Save summary metrics
+    summary_path = f"{OUTPUT_DIR}/evaluation_summary.txt"
+    try:
+        with open(summary_path, "w") as f:
+            f.write("MODEL EVALUATION SUMMARY\n")
+            f.write("=" * 40 + "\n\n")
+            f.write(f"Model: {MODEL_PATH}\n")
+            f.write(f"Total Images: {total_processed}\n")
+            f.write(f"Processing Time: {total_time:.1f}s\n\n")
+
+            f.write("CONFUSION MATRIX:\n")
+            f.write(f"  True Positives:  {metrics['tp']}\n")
+            f.write(f"  False Positives: {metrics['fp']}\n")
+            f.write(f"  True Negatives:  {metrics['tn']}\n")
+            f.write(f"  False Negatives: {metrics['fn']}\n\n")
+
+            if metrics["total"] > 0:
+                acc = (metrics["tp"] + metrics["tn"]) / metrics["total"]
+                prec = metrics["tp"] / max(metrics["tp"] + metrics["fp"], 1)
+                rec = metrics["tp"] / max(metrics["tp"] + metrics["fn"], 1)
+                f1 = 2 * prec * rec / max(prec + rec, 0.001)
+
+                f.write("PERFORMANCE METRICS:\n")
+                f.write(f"  Accuracy:    {acc:.3f}\n")
+                f.write(f"  Precision:   {prec:.3f}\n")
+                f.write(f"  Recall:      {rec:.3f}\n")
+                f.write(f"  F1-Score:    {f1:.3f}\n")
+
+        print(f"\n💾 Saved summary to {summary_path}")
+
+    except OSError as e:
+        print(f"  ❌ Failed to save summary: {e}")
+
+
+# --- MAIN EXECUTION ---
+if __name__ == "__main__":
+    print("\n" + "🚀" * 30)
+    print("OPENMV RT1062 MODEL EVALUATION SYSTEM")
+    print("🚀" * 30 + "\n")
+
+    if RUN_MODE == 1:
+        create_file_lists()
+    elif RUN_MODE == 2:
+        # Verify files exist before running evaluation
+        print("🔍 Verifying required files...")
+
+        if verify_file_contents(ALL_IMAGES_LIST, 3):
+            print("  ✅ All images list verified")
+        else:
+            print("  ❌ All images list not found or empty!")
+            print("  Please run with RUN_MODE=1 first")
+
+        if verify_file_contents(PERSON_IMAGES_LIST, 3):
+            print("  ✅ Person images list verified")
+        else:
+            print("  ❌ Person images list not found or empty!")
+            print("  Please run with RUN_MODE=1 first")
+
+        # Run evaluation
+        evaluate_model()
+    else:
+        print("❌ Invalid RUN_MODE. Please set to 1 or 2.")
