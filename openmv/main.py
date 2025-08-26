@@ -245,6 +245,13 @@ async def sim_send_heartbeat(heartbeat_data):
         log(f"Error sending cellular heartbeat: {e}")
         return False
 
+def possible_paths(sender=None):
+    possible_paths = []
+    # All neighbors excluding sender if any. Shortest path head pushed to top.
+    # Note that sender should never be the shortest path head
+    if len(shortest_path_to_cc) > 0:
+        possible_paths.append(shortest_path_to_cc[0])
+    return possible_paths
 
 loranode = None
 
@@ -307,7 +314,8 @@ async def image_sending_loop():
     global images_to_send
     while True:
         await asyncio.sleep(5)
-        if len(shortest_path_to_cc) == 0:
+        destlist = possible_paths(None)
+        if len(destlist) == 0:
             log("No shortest path yet so cant send")
             continue
         if len(images_to_send) > 0:
@@ -318,24 +326,22 @@ async def image_sending_loop():
             log(f"Sending {len(imgbytes)} bytes to the network")
             msgbytes = encrypt_if_needed("P", imgbytes)
 
-            peer_addr = shortest_path_to_cc[0]
-            transmission_start = time_msec()
-            asyncio.create_task(acquire_image_lock())
-            sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
-            release_image_lock()
+            sent_succ = False
+            for peer_addr in destlist:
+                transmission_start = time_msec()
+                asyncio.create_task(acquire_image_lock())
+                sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
+                release_image_lock()
+                if sent_succ:
+                    break
+
             if not sent_succ:
                 images_to_send.append(imagefile) # pushed to back of queue
+ 
             transmission_end = time_msec()
-
             transmission_time = transmission_end - transmission_start
             log(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
             await asyncio.sleep(PHOTO_SENDING_DELAY)
-            # Draw visual annotations on the image
-            # img.draw_rectangle((0, 0, img.width(), img.height()), color=(255, 0, 0), thickness=2)  # Full image border
-            # img.draw_string(4, 4, f"Person: {confidence:.2f}", color=(255, 255, 255), scale=2)      # Label text
-            # TODO(anand): As we are have a memory constrain on the sd card(<=2GB), Need to calculate max number of images that can be saved and how images will be deleted after transmission.
-            # processed_path = f"{IMAGE_DIR}/processed_{person_image_count}.jpg"
-            # img.save(processed_path)  # Save image with annotations
 
 msgs_sent = []
 msgs_unacked = []
@@ -647,7 +653,8 @@ def end_chunk(mid, msg):
 
 hb_map = {}
 
-async def hb_process(mid, msgbytes):
+async def hb_process(mid, msgbytes, sender):
+    destlist = possible_paths(sender)
     creator = int(mid[1])
     if running_as_cc():
         if creator not in hb_map:
@@ -680,16 +687,21 @@ async def hb_process(mid, msgbytes):
             log(f"Only for debugging : HB msg = {msgbytes.decode()}")
         # asyncio.create_task(sim_send_heartbeat(msgbytes))
         return
-    elif len(shortest_path_to_cc) > 0:
-        peer_addr = shortest_path_to_cc[0]
-        log(f"Propogating H to {peer_addr}")
-        asyncio.create_task(send_msg("H", creator, msgbytes, peer_addr))
+    elif len(destlist) > 0:
+        sent_succ = False
+        for peer_addr in destlist:
+            log(f"Propogating H to {peer_addr}")
+            sent_succ = await asyncio.create_task(send_msg("H", creator, msgbytes, peer_addr))
+            if sent_succ:
+                break
+        if not sent_succ:
+            log(f"Error forwarding HB to possible_paths : {possible_paths}")
     else:
         log(f"Can't forward HB because I dont have Spath yet")
 
 images_saved_at_cc = []
 
-def img_process(cid, msg, creator):
+def img_process(cid, msg, creator, sender):
     clear_chunkid(cid)
     if running_as_cc():
         log(f"Received image of size {len(msg)}")
@@ -707,13 +719,15 @@ def img_process(cid, msg, creator):
         # ------------------------------------------------------
         asyncio.create_task(sim_send_image(creator, msg))
     else:
-        if len(shortest_path_to_cc) > 0:
-            peer_addr = shortest_path_to_cc[0]
+        destlist = possible_paths(sender)
+        sent_succ = False
+        for peer_addr in destlist:
             log(f"Propogating Image to {peer_addr}")
-            #await send_msg("P", creator, msg, peer_addr)
-            asyncio.create_task(send_msg("P", creator, msg, peer_addr))
-        else:
-            log(f"Can't forward Photo because I dont have Spath yet")
+            sent_succ = await asyncio.create_task(send_msg("P", creator, msg, peer_addr)) # is this await ok?
+            if sent_succ:
+                break
+        if not sent_succ:
+            log(f"Failed propagating image to possible_paths : {possible_paths}")
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
@@ -771,7 +785,7 @@ def process_message(data):
     elif mst == "S":
         spath_process(mid, msg.decode())
     elif mst == "H":
-        asyncio.create_task(hb_process(mid, msg))
+        asyncio.create_task(hb_process(mid, msg, sender))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif mst == "B":
         asyncio.create_task(acquire_image_lock())
@@ -790,7 +804,7 @@ def process_message(data):
             ackmessage += b":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             if recompiled:
-                img_process(cid, recompiled, creator)
+                img_process(cid, recompiled, creator, sender)
             else:
                 log(f"No recompiled, so not sending")
         else:
@@ -831,40 +845,39 @@ async def send_heartbeat():
             await asyncio.sleep(200)
             continue
         log(f"Shortest path = {shortest_path_to_cc}")
-        if len(shortest_path_to_cc) > 0:
-            # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
-            if gps_last_time > 0:
-                gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
-            else:
-                gps_staleness = -1
-            hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
-            log(f"HBSTR = {hbmsgstr}")
+        destlist = possible_paths(None)
+        # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
+        if gps_last_time > 0:
+            gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
+        else:
+            gps_staleness = -1
+        hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
+        log(f"HBSTR = {hbmsgstr}")
 
-            hbmsg = hbmsgstr.encode()
-            peer_addr = shortest_path_to_cc[0]
-            msgbytes = encrypt_if_needed("H", hbmsg)
-            success = await send_msg("H", my_addr, msgbytes, peer_addr)
-            if success:
+        hbmsg = hbmsgstr.encode()
+        msgbytes = encrypt_if_needed("H", hbmsg)
+        sent_succ = False
+        for peer_addr in destlist:
+            sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
+            if sent_succ:
                 consecutive_hb_failures = 0
                 log(f"heartbeat sent successfully to {peer_addr}")
-            else:
-                consecutive_hb_failures += 1
-                log(f"Failed to send heartbeat to {peer_addr}, consecutive failures = {consecutive_hb_failures}")
-                if consecutive_hb_failures > 1:
-                    log(f"Too many consecutive failures, reinitializing LoRa")
-                    try:
-                        await init_lora()
-                        consecutive_hb_failures = 0
-                    except Exception as e:
-                        log(f"Error reinitializing LoRa: {e}")
-        else:
-            log("Not sending heartbeat right now because i dont know my shortest path")
+                break
+        if not sent_succ:
+            consecutive_hb_failures += 1
+            log(f"Failed to send heartbeat to {possible_paths}, consecutive failures = {consecutive_hb_failures}")
+            if consecutive_hb_failures > 1:
+                log(f"Too many consecutive failures, reinitializing LoRa")
+                try:
+                    await init_lora()
+                    consecutive_hb_failures = 0
+                except Exception as e:
+                    log(f"Error reinitializing LoRa: {e}")
         i += 1
         if i < DISCOVERY_COUNT:
             await asyncio.sleep(HB_WAIT + random.randint(3,10))
         else:
             await asyncio.sleep(HB_WAIT_2 + random.randint(1, 120))
-
 
 async def send_scan():
     global seen_neighbours
