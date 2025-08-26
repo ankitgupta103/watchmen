@@ -703,7 +703,6 @@ async def hb_process(mid, msgbytes, sender):
 images_saved_at_cc = []
 
 async def img_process(cid, msg, creator, sender):
-    print(f"DEBUGGING In img_process")
     clear_chunkid(cid)
     if running_as_cc():
         log(f"Received image of size {len(msg)}")
@@ -789,6 +788,8 @@ def process_message(data):
     elif mst == "H":
         asyncio.create_task(hb_process(mid, msg, sender))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+    elif mst == "C":
+        asyncio.create_task(command_process(mid, msg))
     elif mst == "B":
         asyncio.create_task(acquire_image_lock())
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
@@ -801,13 +802,11 @@ def process_message(data):
     elif mst == "E":
         alldone, missing_str, cid, recompiled, creator = end_chunk(mid, msg.decode())
         if alldone:
-            print(f"DEBUGGING Alldone!!!!")
             release_image_lock()
             # Also when it fails
             ackmessage += b":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             if recompiled:
-                print("DEBUGGING Recompiled message available, processing image")
                 asyncio.create_task(img_process(cid, recompiled, creator, sender))
             else:
                 log(f"No recompiled, so not sending")
@@ -920,6 +919,67 @@ async def send_spath():
         else:
             await asyncio.sleep(SPATH_WAIT_2 + random.randint(1,120))
 
+def get_next_on_path(cpath):
+    for i in range(len(cpath) - 1):
+        n = cpath[i]
+        if n == my_addr:
+            return cpath[i+1]
+    return None
+
+def execute_command(command):
+    log(f"Gonna execute_command {command} on {my_addr}")
+
+def fake_listen_http():
+    command = "SENDHB"
+    dest = 222
+    cpath = [9,222]
+    return (command, dest, cpath)
+
+def command_process(mid, msg):
+    try:
+        msgstr = msg.decode()
+    except Exception as e:
+        log(f"Could not decode {msg} : {e}")
+    parts = msgstr.split(";")
+    if len(parts) != 3:
+        log(f"Error parsing msgstr")
+    dest = int(parts[0])
+    cpath = parts[1].split(",")
+    command = parts[2]
+    if dest == my_addr:
+        execute_command(command)
+        return
+    next_dest = get_next_on_path(cpath)
+    if next_dest is not None:
+        log(f"Propogating command to {next_dest}")
+        await send_msg("C", my_addr, msgstr.encnode(), next_dest)
+    else:
+        log(f"Next dest seems None for {msg}")
+
+async def listen_commands_from_cloud():
+    while True:
+        await asyncio.sleep(3)
+        if random.randint(1, 100) >= 10:
+            continue
+        command, dest, cpath = fake_listen_http()
+        global image_in_progress
+        if image_in_progress:
+            log(f"Skipping print summary because image in progress")
+            await asyncio.sleep(200)
+            continue
+        log(f"Randomly sending a command {command} to {dest}, via {cpath}")
+        if dest == my_addr:
+            execute_command(command)
+            continue
+        next_dest = get_next_on_path(cpath)
+        if next_dest is not None:
+            log(f"Propogating command to {next_dest}")
+            cpathstr = ",".join(str(x) for x in cpath)
+            command = f"{dest};{cpathstr};{command}"
+            await send_msg("C", my_addr, command.encode(), next_dest)
+        else:
+            log(f"Next dest seems to be None")
+
 async def print_summary_and_flush_logs():
     while True:
         await asyncio.sleep(30)
@@ -974,6 +1034,7 @@ async def main():
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(send_spath())
+        asyncio.create_task(listen_commands_from_cloud())
     else:
         asyncio.create_task(send_scan())
         await asyncio.sleep(8)
