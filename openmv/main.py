@@ -10,7 +10,6 @@ import binascii
 import machine
 import sys
 import random
-import json
 import ubinascii
 
 import enc
@@ -681,7 +680,7 @@ async def hb_process(mid, msgbytes):
             log(f"Only for debugging : HB msg = {msgbytes.decode()}")
         # asyncio.create_task(sim_send_heartbeat(msgbytes))
         return
-    if len(shortest_path_to_cc) > 0:
+    elif len(shortest_path_to_cc) > 0:
         peer_addr = shortest_path_to_cc[0]
         log(f"Propogating H to {peer_addr}")
         asyncio.create_task(send_msg("H", creator, msgbytes, peer_addr))
