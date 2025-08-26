@@ -956,9 +956,10 @@ def command_process(mid, msg):
     else:
         log(f"Next dest seems None for {msg}")
 
+# Randomly sends, with 10% probability every 20 seconds.
 async def listen_commands_from_cloud():
     while True:
-        await asyncio.sleep(3)
+        await asyncio.sleep(20)
         if random.randint(1, 100) >= 10:
             continue
         command, dest, cpath = fake_listen_http()
