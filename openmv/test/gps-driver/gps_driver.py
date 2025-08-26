@@ -66,7 +66,7 @@ class SC16IS750:
         return data
 
 class GPS:
-    """Simple GPS coordinate extractor"""
+    """GPS coordinate extractor - clean output"""
 
     def __init__(self, uart):
         self.uart = uart
@@ -78,6 +78,7 @@ class GPS:
     def update(self):
         """Read GPS data and update coordinates"""
         data = self.uart.read_data()
+
         if not data:
             return
 
@@ -85,15 +86,27 @@ class GPS:
 
         # Process complete sentences
         while '\n' in self.buffer or '\r' in self.buffer:
-            # Find line end
             cr_pos = self.buffer.find('\r')
             lf_pos = self.buffer.find('\n')
-            end_pos = min(p for p in [cr_pos, lf_pos] if p >= 0)
+            
+            if cr_pos == -1:
+                end_pos = lf_pos
+            elif lf_pos == -1:
+                end_pos = cr_pos
+            else:
+                end_pos = min(cr_pos, lf_pos)
 
             sentence = self.buffer[:end_pos].strip()
-            self.buffer = self.buffer[end_pos + 1:]
+            
+            remaining = self.buffer[end_pos:]
+            if remaining.startswith('\r\n'):
+                self.buffer = remaining[2:]
+            elif remaining.startswith('\n') or remaining.startswith('\r'):
+                self.buffer = remaining[1:]
+            else:
+                self.buffer = remaining
 
-            if sentence.startswith('$') and '*' in sentence:
+            if sentence.startswith('$') and '*' in sentence and len(sentence) > 15:
                 self._parse_sentence(sentence)
 
     def _parse_sentence(self, sentence):
@@ -112,15 +125,22 @@ class GPS:
             for char in data_part:
                 calc_checksum ^= ord(char)
 
-            if calc_checksum != int(checksum_str, 16):
-                return  # Invalid checksum
+            try:
+                expected_checksum = int(checksum_str, 16)
+            except ValueError:
+                return
 
-            # Parse GGA sentences (best for coordinates)
+            if calc_checksum != expected_checksum:
+                return
+
+            # Parse both GGA and RMC sentences
             if sentence.startswith('$GNGGA') or sentence.startswith('$GPGGA'):
                 self._parse_gga(sentence)
+            elif sentence.startswith('$GNRMC') or sentence.startswith('$GPRMC'):
+                self._parse_rmc(sentence)
 
         except:
-            pass  # Ignore parsing errors
+            pass
 
     def _parse_gga(self, sentence):
         """Parse GGA sentence for lat/lon"""
@@ -133,7 +153,7 @@ class GPS:
             quality = int(parts[6]) if parts[6] else 0
             self.fix_quality = quality
 
-            if quality == 0:  # No fix
+            if quality == 0:
                 return
 
             # Extract coordinates
@@ -142,8 +162,38 @@ class GPS:
             lon_str = parts[4]
             lon_dir = parts[5]
 
-            if lat_str and lon_str:
-                # Convert from DDMM.MMMM to decimal degrees
+            if lat_str and lon_str and lat_dir and lon_dir:
+                lat = self._nmea_to_decimal(lat_str, lat_dir)
+                lon = self._nmea_to_decimal(lon_str, lon_dir)
+
+                if lat is not None and lon is not None:
+                    self.latitude = lat
+                    self.longitude = lon
+
+        except:
+            pass
+
+    def _parse_rmc(self, sentence):
+        """Parse RMC sentence for lat/lon"""
+        try:
+            parts = sentence.split(',')
+            if len(parts) < 12:
+                return
+
+            # Check if data is valid (A = active, V = void)
+            status = parts[2]
+            if status != 'A':
+                return
+
+            self.fix_quality = 1
+
+            # Extract coordinates
+            lat_str = parts[3]
+            lat_dir = parts[4]
+            lon_str = parts[5]
+            lon_dir = parts[6]
+
+            if lat_str and lon_str and lat_dir and lon_dir:
                 lat = self._nmea_to_decimal(lat_str, lat_dir)
                 lon = self._nmea_to_decimal(lon_str, lon_dir)
 
@@ -193,20 +243,13 @@ class GPS:
 
 
 def main():
-    """Main GPS coordinate reader"""
-    print("GPS Coordinate Reader")
-    print("Initializing...")
-
+    """Main GPS coordinate reader - clean output"""
     # Initialize hardware
     uart = SC16IS750(spi_bus=1, cs_pin="P3")
     uart.init_gps()
 
     # Initialize GPS
     gps = GPS(uart)
-
-    print("Ready. Searching for GPS fix...")
-    print("(Move to outdoor location with clear sky view)")
-    print("-" * 50)
 
     last_fix_time = 0
 
@@ -223,14 +266,12 @@ def main():
                 if gps.has_fix():
                     lat, lon = gps.get_coordinates()
                     if lat is not None and lon is not None:
-                        print(f"LAT: {lat:.6f}, LON: {lon:.6f}")
-                else:
-                    print("Searching for satellites...")
+                        print(f"{lat:.6f}, {lon:.6f}")
 
             time.sleep_ms(100)
 
     except KeyboardInterrupt:
-        print("\nStopped.")
+        pass
 
 if __name__ == "__main__":
     main()
