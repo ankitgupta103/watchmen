@@ -63,13 +63,13 @@ seen_neighbours = []
 rtc = RTC()
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 if uid == b'e076465dd7194025':
-    my_addr = 223
+    my_addr = 9
 elif uid == b'e076465dd7091027':
     my_addr = 221
 elif uid == b'e076465dd7194211':
     my_addr = 222
 elif uid == b'e076465dd7193a09':
-    my_addr = 9
+    my_addr = 223
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -338,7 +338,7 @@ async def image_sending_loop():
 
             if not sent_succ:
                 images_to_send.append(imagefile) # pushed to back of queue
- 
+
             transmission_end = time_msec()
             transmission_time = transmission_end - transmission_start
             log(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
@@ -970,7 +970,7 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
-        #await init_sim()
+        await init_sim()
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(send_spath())
