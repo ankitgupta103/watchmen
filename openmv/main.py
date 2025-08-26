@@ -696,7 +696,7 @@ async def hb_process(mid, msgbytes, sender):
             if sent_succ:
                 break
         if not sent_succ:
-            log(f"Error forwarding HB to possible_paths : {possible_paths}")
+            log(f"Error forwarding HB to possible_paths : {destlist}")
     else:
         log(f"Can't forward HB because I dont have Spath yet")
 
