@@ -939,6 +939,10 @@ def execute_command(command):
     log(f"Gonna execute_command {command} on {my_addr}")
     if command == "SENDHB":
         send_heartbeat()
+    elif command == "RESET":
+        log(f"Resetting maching")
+        log_to_file()
+        machine.reset()
 
 def fake_listen_http():
     command = "SENDHB"
@@ -992,6 +996,16 @@ async def listen_commands_from_cloud():
         else:
             log(f"Next dest seems to be None")
 
+def log_to_file():
+    with open(LOG_FILE_PATH, "a") as log_file:
+        global log_entries_buffer
+        tmp = log_entries_buffer
+        log_entries_buffer = []
+        log(f"Writing {len(tmp)} lines to logfile")
+        for x in tmp:
+            log_file.write(x + "\n")
+        log_file.flush()
+
 async def print_summary_and_flush_logs():
     while True:
         await asyncio.sleep(30)
@@ -1001,18 +1015,10 @@ async def print_summary_and_flush_logs():
             await asyncio.sleep(200)
             continue
         log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa reinits: {lora_reinit_count}")
-        with open(LOG_FILE_PATH, "a") as log_file:
-            global log_entries_buffer
-            tmp = log_entries_buffer
-            log_entries_buffer = []
-            log(f"Writing {len(tmp)} lines to logfile")
-            for x in tmp:
-                log_file.write(x + "\n")
-            log_file.flush()
+        log_to_file()
         #log(msgs_sent)
         #log(msgs_recd)
         #log(msgs_unacked)
-        
 
 async def keep_updating_gps():
     global gps_str, gps_last_time
