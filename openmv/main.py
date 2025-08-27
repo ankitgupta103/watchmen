@@ -31,7 +31,7 @@ SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
 PHOTO_TAKING_DELAY = 800 # TODO change to 1 second.
 PHOTO_SENDING_DELAY = 600
-GPS_WAIT_SEC = 30
+GPS_WAIT_SEC = 5
 
 MIDLEN = 7
 FLAKINESS = 0
@@ -69,7 +69,10 @@ elif uid == b'e076465dd7091027':
 elif uid == b'e076465dd7194211':
     my_addr = 222
 elif uid == b'e076465dd7193a09':
+    my_addr = 224
+elif uid == b'e076465dd7091843':
     my_addr = 223
+    # shortest_path_to_cc == [221, 9]
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -1001,26 +1004,55 @@ async def print_summary_and_flush_logs():
         #log(msgs_sent)
         #log(msgs_recd)
         #log(msgs_unacked)
+        
 
 async def keep_updating_gps():
-    global gps_str
+    global gps_str, gps_last_time
     log("Initializing GPS...")
-    uart = gps_driver.SC16IS750(spi_bus=1, cs_pin="P3")
-    uart.init_gps()
-    gps = gps_driver.GPS(uart)
+    
+    # Wait for LoRa to settle
+    await asyncio.sleep(3)
+    
+    try:
+        uart = gps_driver.SC16IS750(spi_bus=1, cs_pin="P3")
+        uart.init_gps()
+        gps = gps_driver.GPS(uart)
+        log("GPS hardware initialized successfully - starting continuous read loop")
+    except Exception as e:
+        log(f"GPS initialization failed: {e}")
+        return
+    
+    # Add a counter to verify the loop is running
+    read_count = 0
+    
+    # Continuous reading loop
     while True:
-        gps.update()
-        log(f"Trying to update gps")
-        if gps.has_fix():
-            lat, lon = gps.get_coordinates()
-            if lat is not None and lon is not None:
-                gps_str = f"{lat:.6f},{lon:.6f}"
-                log(gps_str)
-                gps_last_time = time_msec()
+        try:
+            read_count += 1
+            
+            # Log every 10th read to verify loop is active
+            if read_count % 10 == 1:
+                log(f"GPS read attempt #{read_count}")
+            
+            gps.update()
+            
+            if gps.has_fix():
+                lat, lon = gps.get_coordinates()
+                if lat is not None and lon is not None:
+                    gps_str = f"{lat:.6f},{lon:.6f}"
+                    log(f"GPS: {gps_str}")
+                    gps_last_time = time_msec()
+                else:
+                    if read_count % 5 == 1:  # Log occasionally
+                        log("GPS has fix but no coordinates")
             else:
-                log(f"Empty latlong")
-        else:
-            log(f"GPS has no fix")
+                if read_count % 5 == 1:  # Log occasionally  
+                    log("GPS has no fix")
+            
+        except Exception as e:
+            log(f"GPS read error: {e}")
+        
+        # Essential: yield control to other tasks
         await asyncio.sleep(GPS_WAIT_SEC)
 
 async def main():
@@ -1041,7 +1073,7 @@ async def main():
         await asyncio.sleep(8)
         asyncio.create_task(send_heartbeat())
         await asyncio.sleep(2)
-        # asyncio.create_task(keep_updating_gps())
+        asyncio.create_task(keep_updating_gps())
         asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
