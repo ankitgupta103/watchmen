@@ -1022,18 +1022,23 @@ async def keep_updating_gps():
         log(f"GPS initialization failed: {e}")
         return
     
-    # Add a counter to verify the loop is running
     read_count = 0
+    last_successful_read = 0
     
     # Continuous reading loop
     while True:
         try:
             read_count += 1
             
-            # Log every 10th read to verify loop is active
-            if read_count % 10 == 1:
-                log(f"GPS read attempt #{read_count}")
+            # Skip GPS if heavy operations are running
+            if image_in_progress:
+                await asyncio.sleep(GPS_WAIT_SEC * 2)
+                continue
             
+            # Clear any stale data in buffer first
+            stale_data = uart.read_data()
+            
+            # Process fresh GPS data
             gps.update()
             
             if gps.has_fix():
@@ -1042,18 +1047,44 @@ async def keep_updating_gps():
                     gps_str = f"{lat:.6f},{lon:.6f}"
                     log(f"GPS: {gps_str}")
                     gps_last_time = time_msec()
+                    last_successful_read = read_count
                 else:
-                    if read_count % 5 == 1:  # Log occasionally
+                    if read_count % 10 == 1:
                         log("GPS has fix but no coordinates")
             else:
-                if read_count % 5 == 1:  # Log occasionally  
+                if read_count % 20 == 1:
                     log("GPS has no fix")
+                    # Show raw data for debugging
+                    raw_debug = uart.read_data()
+                    if raw_debug:
+                        sample = raw_debug[:60].replace('\r', '\\r').replace('\n', '\\n')
+                        log(f"GPS raw: {sample}")
+            
+            # Clear buffer periodically to prevent overflow
+            if read_count % 30 == 0:
+                while uart.read_data():  # Clear all buffered data
+                    pass
+                gps.buffer = ""  # Clear internal parser buffer
+                log("GPS buffer cleared")
+            
+            # Reinitialize if too many failures
+            if last_successful_read > 0 and (read_count - last_successful_read) > 100:
+                log("GPS not working, reinitializing...")
+                try:
+                    uart.init_gps()
+                    gps = gps_driver.GPS(uart)
+                    await asyncio.sleep(2)
+                    last_successful_read = read_count
+                except Exception as e:
+                    log(f"GPS reinit failed: {e}")
+                    await asyncio.sleep(10)
             
         except Exception as e:
             log(f"GPS read error: {e}")
+            await asyncio.sleep(2)
         
-        # Essential: yield control to other tasks
-        await asyncio.sleep(GPS_WAIT_SEC)
+        # Shorter sleep to prevent buffer overflow
+        await asyncio.sleep(max(1, GPS_WAIT_SEC))  # At least 1 second
 
 async def main():
     log(f"[INFO] Started device {my_addr}")
