@@ -251,10 +251,13 @@ async def sim_send_heartbeat(heartbeat_data):
 
 def possible_paths(sender=None):
     possible_paths = []
-    # All neighbors excluding sender if any. Shortest path head pushed to top.
-    # Note that sender should never be the shortest path head
+    sp0 = None
     if len(shortest_path_to_cc) > 0:
+        sp0 = shortest_path_to_cc[0]
         possible_paths.append(shortest_path_to_cc[0])
+    for x in seen_neighbours:
+        if x != my_addr and x != sender and x != sp0:
+            possible_paths.append(x)
     return possible_paths
 
 loranode = None
