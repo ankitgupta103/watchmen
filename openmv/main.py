@@ -317,6 +317,23 @@ async def person_detection_loop():
         await asyncio.sleep(PHOTO_TAKING_DELAY)
         log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
 
+def send_image_to_mesh(imgbytes):
+    log(f"Sending {len(imgbytes)} bytes to the network")
+    msgbytes = encrypt_if_needed("P", imgbytes)
+    sent_succ = False
+    for peer_addr in destlist:
+        transmission_start = time_msec()
+        asyncio.create_task(acquire_image_lock())
+        sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
+        release_image_lock()
+        if sent_succ:
+            return True
+    return False
+
+def take_image_and_send_now():
+    img = sensor.snapshot()
+    send_image_to_mesh(img.to_jpeg().bytearray())
+
 async def image_sending_loop():
     global images_to_send
     while True:
@@ -330,18 +347,7 @@ async def image_sending_loop():
             imagefile = images_to_send.pop(0)
             img = image.Image(imagefile)
             imgbytes = img.bytearray()
-            log(f"Sending {len(imgbytes)} bytes to the network")
-            msgbytes = encrypt_if_needed("P", imgbytes)
-
-            sent_succ = False
-            for peer_addr in destlist:
-                transmission_start = time_msec()
-                asyncio.create_task(acquire_image_lock())
-                sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
-                release_image_lock()
-                if sent_succ:
-                    break
-
+            sent_succ = send_image_to_mesh(imgbytes)
             if not sent_succ:
                 images_to_send.append(imagefile) # pushed to back of queue
 
@@ -939,6 +945,8 @@ def execute_command(command):
     log(f"Gonna execute_command {command} on {my_addr}")
     if command == "SENDHB":
         send_heartbeat()
+    elif command == "SENDIMG":
+        take_image_and_send_now()
     elif command == "RESET":
         log(f"Resetting maching")
         log_to_file()
