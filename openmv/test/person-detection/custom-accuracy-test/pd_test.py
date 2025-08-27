@@ -4,12 +4,10 @@
 
 import os
 import ml
+from ml.postprocessing import yolo_lc_postprocess
 import image
 import time
 import gc
-import machine
-
-led = machine.LED("LED_RED")
 
 # --- SCRIPT MODE ---
 # Step 1: Set RUN_MODE to 1 and run the script. This will create file lists.
@@ -17,7 +15,7 @@ led = machine.LED("LED_RED")
 RUN_MODE = 2  # 1 = List Files, 2 = Evaluate Model
 
 # --- CONFIGURATION ---
-MODEL_PATH = "/sdcard/custom_person_det.tflite"  # Update with your model path
+MODEL_PATH = "/rom/st_yolo_lc_v1_256_int8.tflite"  # Update with your model path
 TARGET_LABEL = "person"
 ALL_IMAGES_DIR = (
     "/sdcard/netrajaal/totalfiles"  # Folder with all images (positive + negative)
@@ -198,6 +196,7 @@ def evaluate_model():
     print("\n🧠 Loading model...")
     try:
         model = ml.Model(MODEL_PATH)
+        print(f"{model}")
         print(f"  ✅ Model loaded successfully")
         print(f"  Input size: {MODEL_INPUT_SIZE}x{MODEL_INPUT_SIZE}")
     except Exception as e:
@@ -218,7 +217,7 @@ def evaluate_model():
     # --- CHANGE 1 of 2: Store only the FILENAME for ground truth ---
     # Instead of the full path, we store just the filename (e.g., "person1.jpg").
     for path in person_paths:
-        img_filename = path.split("/")[-1]
+        img_filename = path.split('/')[-1]
         person_images.add(img_filename)
     # ----------------------------------------------------------------
 
@@ -272,7 +271,7 @@ def evaluate_model():
 
         # --- CHANGE 2 of 2: Check using the FILENAME ---
         # We extract the filename from the current path and check against our set.
-        img_filename = img_path.split("/")[-1]
+        img_filename = img_path.split('/')[-1]
         is_person_image = img_filename in person_images
         # ------------------------------------------------
 
@@ -284,7 +283,6 @@ def evaluate_model():
 
         # Process image
         score = process_single_image(model, img_path, MODEL_INPUT_SIZE)
-        print(f"Score: {score}")
 
         current_result = {}
         if score is None:
@@ -404,52 +402,116 @@ def evaluate_model():
     print("=" * 60)
 
 
+# def process_single_image(model, img_path, target_size):
+#     """
+#     Process a single image and return confidence score.
+#     Returns None if processing fails.
+#     """
+#     try:
+#         # --- FIX: RESIZING LOGIC ---
+#         # Reverted to using the correct 'scale' and 'crop' methods to fix the error.
+#         img = image.Image(img_path, copy_to_fb=False)
+
+#         # Get original dimensions
+#         w = img.width()
+#         h = img.height()
+
+#         # Determine scale factor to fit the image inside the target square, maintaining aspect ratio
+#         if w > h:
+#             scale_factor = target_size / h
+#         else:
+#             scale_factor = target_size / w
+
+#         # The scale() method returns a new, scaled image object.
+#         img = img.scale(x_scale=scale_factor, y_scale=scale_factor, hint=image.BICUBIC)
+
+#         # Perform a center crop to get the final square image
+#         x_offset = (img.width() - target_size) // 2
+#         y_offset = (img.height() - target_size) // 2
+#         img = img.crop(roi=(x_offset, y_offset, target_size, target_size))
+
+#         # --- CORRECT INFERENCE LOGIC (from previous fix) ---
+#         # Run inference to get the raw prediction tensor
+#         prediction_tensor = model.predict([img])
+#         del img
+#         gc.collect()
+
+#         # Parse the raw tensor to find the confidence score for "person"
+#         scores = zip(model.labels, prediction_tensor[0].flatten().tolist())
+#         person_confidence = 0.0
+#         for label, confidence in scores:
+#             if label == TARGET_LABEL:
+#                 person_confidence = confidence
+#                 break # Exit loop once the "person" score is found
+
+#         return person_confidence
+
+#     except Exception as e:
+#         print(f"  ❌ Failed processing {img_path}: {e}")
+#         gc.collect()
+#         return None
+
 def process_single_image(model, img_path, target_size):
     """
-    Process a single image and return confidence score for a YOLO model
-    that outputs a raw tensor.
+    Process a single image with YOLO model and return confidence score.
+    Returns None if processing fails.
     """
     try:
-        led.toggle()
-        # --- Image Resizing Logic (Unchanged) ---
+        # Import YOLO postprocessing function
+        from ml.postprocessing import yolo_lc_postprocess
+
+        # Load and preprocess image (same as before)
         img = image.Image(img_path, copy_to_fb=False)
+
+        # Get original dimensions
         w = img.width()
         h = img.height()
+
+        # Determine scale factor to fit the image inside the target square, maintaining aspect ratio
         if w > h:
             scale_factor = target_size / h
         else:
             scale_factor = target_size / w
+
+        # The scale() method returns a new, scaled image object.
         img = img.scale(x_scale=scale_factor, y_scale=scale_factor, hint=image.BICUBIC)
+
+        # Perform a center crop to get the final square image
         x_offset = (img.width() - target_size) // 2
         y_offset = (img.height() - target_size) // 2
         img = img.crop(roi=(x_offset, y_offset, target_size, target_size))
 
-        # --- Run Inference ---
-        prediction_output = model.predict([img])
+        # --- CORRECTED YOLO INFERENCE LOGIC ---
+        # Use YOLO postprocessing with a low threshold to get all detections
+        boxes = model.predict([img], callback=yolo_lc_postprocess(threshold=0.1))
         del img
         gc.collect()
 
-        # The model returns a list containing one main tensor.
-        if isinstance(prediction_output, list) and len(prediction_output) > 0:
-            # The tensor shape is (1, 5, 1344). We access the first (and only) item.
-            tensor = prediction_output[0]
+        # boxes is a list of lists per class
+        # For "person" class (index 0), get the highest confidence detection
+        person_confidence = 0.0
 
-            # The confidence scores are the first row of the main data block.
-            confidence_scores = tensor[0][4]
+        if len(boxes) > 0 and len(boxes[0]) > 0:
+            # boxes[0] contains detections for "person" class
+            # Each detection is ((x, y, w, h), score)
+            person_detections = boxes[0]
 
-            # The highest value in this list is our max confidence for a person.
-            max_confidence = max(confidence_scores)
-            return max_confidence
-        else:
-            # If the output format is unexpected, return 0.
-            print(f"  ⚠️ Unexpected model output format for {img_path}")
-            return 0.0
+            if person_detections:
+                # Find the detection with highest confidence
+                max_score = 0.0
+                for detection in person_detections:
+                    bbox, score = detection  # Unpack (x,y,w,h) and score
+                    if score > max_score:
+                        max_score = score
+
+                person_confidence = max_score
+
+        return person_confidence
 
     except Exception as e:
         print(f"  ❌ Failed processing {img_path}: {e}")
         gc.collect()
         return None
-
 
 # --- MODIFICATION --- This function now only saves the summary text file.
 def save_results_csv(metrics, total_time, total_processed):
@@ -516,9 +578,5 @@ if __name__ == "__main__":
 
         # Run evaluation
         evaluate_model()
-
-        while True:
-            led.toggle()
-            time.sleep(0.1)
     else:
         print("❌ Invalid RUN_MODE. Please set to 1 or 2.")
