@@ -66,7 +66,7 @@ class SC16IS750:
         return data
 
 class GPS:
-    """GPS coordinate extractor - clean output"""
+    """GPS coordinate extractor - handles both GGA and RMC sentences"""
 
     def __init__(self, uart):
         self.uart = uart
@@ -88,7 +88,7 @@ class GPS:
         while '\n' in self.buffer or '\r' in self.buffer:
             cr_pos = self.buffer.find('\r')
             lf_pos = self.buffer.find('\n')
-            
+
             if cr_pos == -1:
                 end_pos = lf_pos
             elif lf_pos == -1:
@@ -97,7 +97,7 @@ class GPS:
                 end_pos = min(cr_pos, lf_pos)
 
             sentence = self.buffer[:end_pos].strip()
-            
+
             remaining = self.buffer[end_pos:]
             if remaining.startswith('\r\n'):
                 self.buffer = remaining[2:]
