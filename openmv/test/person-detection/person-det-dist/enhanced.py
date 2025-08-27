@@ -7,6 +7,9 @@ import ml
 import image
 import time
 import gc
+import machine
+
+led = machine.LED("LED_RED")
 
 # --- SCRIPT MODE ---
 # Step 1: Set RUN_MODE to 1 and run the script. This will create file lists.
@@ -14,7 +17,7 @@ import gc
 RUN_MODE = 2  # 1 = List Files, 2 = Evaluate Model
 
 # --- CONFIGURATION ---
-MODEL_PATH = "/sdcard/best_full_integer_quant.tflite"  # Update with your model path
+MODEL_PATH = "/sdcard/custom_person_det.tflite"  # Update with your model path
 TARGET_LABEL = "person"
 ALL_IMAGES_DIR = (
     "/sdcard/netrajaal/totalfiles"  # Folder with all images (positive + negative)
@@ -281,6 +284,7 @@ def evaluate_model():
 
         # Process image
         score = process_single_image(model, img_path, MODEL_INPUT_SIZE)
+        print(f"Score: {score}")
 
         current_result = {}
         if score is None:
@@ -402,47 +406,44 @@ def evaluate_model():
 
 def process_single_image(model, img_path, target_size):
     """
-    Process a single image and return confidence score.
-    Returns None if processing fails.
+    Process a single image and return confidence score for a YOLO model
+    that outputs a raw tensor.
     """
     try:
-        # --- FIX: RESIZING LOGIC ---
-        # Reverted to using the correct 'scale' and 'crop' methods to fix the error.
+        led.toggle()
+        # --- Image Resizing Logic (Unchanged) ---
         img = image.Image(img_path, copy_to_fb=False)
-
-        # Get original dimensions
         w = img.width()
         h = img.height()
-
-        # Determine scale factor to fit the image inside the target square, maintaining aspect ratio
         if w > h:
             scale_factor = target_size / h
         else:
             scale_factor = target_size / w
-
-        # The scale() method returns a new, scaled image object.
         img = img.scale(x_scale=scale_factor, y_scale=scale_factor, hint=image.BICUBIC)
-
-        # Perform a center crop to get the final square image
         x_offset = (img.width() - target_size) // 2
         y_offset = (img.height() - target_size) // 2
         img = img.crop(roi=(x_offset, y_offset, target_size, target_size))
 
-        # --- CORRECT INFERENCE LOGIC (from previous fix) ---
-        # Run inference to get the raw prediction tensor
-        prediction_tensor = model.predict([img])
+        # --- Run Inference ---
+        prediction_output = model.predict([img])
         del img
         gc.collect()
 
-        # Parse the raw tensor to find the confidence score for "person"
-        scores = zip(model.labels, prediction_tensor[0].flatten().tolist())
-        person_confidence = 0.0
-        for label, confidence in scores:
-            if label == TARGET_LABEL:
-                person_confidence = confidence
-                break  # Exit loop once the "person" score is found
+        # The model returns a list containing one main tensor.
+        if isinstance(prediction_output, list) and len(prediction_output) > 0:
+            # The tensor shape is (1, 5, 1344). We access the first (and only) item.
+            tensor = prediction_output[0]
 
-        return person_confidence
+            # The confidence scores are the first row of the main data block.
+            confidence_scores = tensor[0][4]
+
+            # The highest value in this list is our max confidence for a person.
+            max_confidence = max(confidence_scores)
+            return max_confidence
+        else:
+            # If the output format is unexpected, return 0.
+            print(f"  ⚠️ Unexpected model output format for {img_path}")
+            return 0.0
 
     except Exception as e:
         print(f"  ❌ Failed processing {img_path}: {e}")
@@ -515,5 +516,9 @@ if __name__ == "__main__":
 
         # Run evaluation
         evaluate_model()
+
+        while True:
+            led.toggle()
+            time.sleep(0.1)
     else:
         print("❌ Invalid RUN_MODE. Please set to 1 or 2.")
