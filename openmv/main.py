@@ -843,7 +843,27 @@ async def validate_and_remove_neighbours():
             seen_neighbours.remove(x)
         await asyncio.sleep(VALIDATE_WAIT_SEC)
 
-async def send_heartbeat():
+def send_heartbeat():
+    destlist = possible_paths(None)
+    # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
+    if gps_last_time > 0:
+        gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
+    else:
+        gps_staleness = -1
+    hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
+    log(f"HBSTR = {hbmsgstr}")
+    hbmsg = hbmsgstr.encode()
+    msgbytes = encrypt_if_needed("H", hbmsg)
+    sent_succ = False
+    for peer_addr in destlist:
+        sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
+        if sent_succ:
+            consecutive_hb_failures = 0
+            log(f"heartbeat sent successfully to {peer_addr}")
+            return True
+    return False
+
+async def keep_sending_heartbeat():
     global consecutive_hb_failures
     i = 1
     while True:
@@ -854,24 +874,7 @@ async def send_heartbeat():
             await asyncio.sleep(200)
             continue
         log(f"Shortest path = {shortest_path_to_cc}")
-        destlist = possible_paths(None)
-        # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
-        if gps_last_time > 0:
-            gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
-        else:
-            gps_staleness = -1
-        hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
-        log(f"HBSTR = {hbmsgstr}")
-
-        hbmsg = hbmsgstr.encode()
-        msgbytes = encrypt_if_needed("H", hbmsg)
-        sent_succ = False
-        for peer_addr in destlist:
-            sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
-            if sent_succ:
-                consecutive_hb_failures = 0
-                log(f"heartbeat sent successfully to {peer_addr}")
-                break
+        sent_succ = send_heartbeat()
         if not sent_succ:
             consecutive_hb_failures += 1
             log(f"Failed to send heartbeat to {possible_paths}, consecutive failures = {consecutive_hb_failures}")
@@ -934,6 +937,8 @@ def get_next_on_path(cpath):
 
 def execute_command(command):
     log(f"Gonna execute_command {command} on {my_addr}")
+    if command == "SENDHB":
+        send_heartbeat()
 
 def fake_listen_http():
     command = "SENDHB"
@@ -1105,7 +1110,7 @@ async def main():
     else:
         asyncio.create_task(send_scan())
         await asyncio.sleep(8)
-        asyncio.create_task(send_heartbeat())
+        asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
         asyncio.create_task(keep_updating_gps())
         asyncio.create_task(person_detection_loop())
