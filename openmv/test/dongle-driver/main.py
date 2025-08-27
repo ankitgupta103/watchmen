@@ -94,7 +94,7 @@ def init_cellular():
     global cellular_system
 
     print("\n=== Initializing Cellular System ===")
-    cellular_system = Cellular(machine_id=MACHINE_ID)
+    cellular_system = Cellular()
 
     if not cellular_system.initialize():
         print("Cellular initialization failed!")
@@ -136,7 +136,7 @@ def upload_image(img_jpeg):
         return False
 
 def main():
-   
+
     # Image every 30 seconds
     # Verify device ID
     uid = binascii.hexlify(machine.unique_id())
