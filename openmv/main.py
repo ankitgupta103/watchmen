@@ -851,6 +851,7 @@ async def validate_and_remove_neighbours():
 
 def send_heartbeat():
     destlist = possible_paths(None)
+    log(f"Will send HB to {destlist}")
     # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
     if gps_last_time > 0:
         gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
@@ -862,6 +863,7 @@ def send_heartbeat():
     msgbytes = encrypt_if_needed("H", hbmsg)
     sent_succ = False
     for peer_addr in destlist:
+        log(f"Sending HB to {peer_addr}")
         sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
         if sent_succ:
             consecutive_hb_failures = 0
@@ -883,7 +885,7 @@ async def keep_sending_heartbeat():
         sent_succ = send_heartbeat()
         if not sent_succ:
             consecutive_hb_failures += 1
-            log(f"Failed to send heartbeat to {possible_paths}, consecutive failures = {consecutive_hb_failures}")
+            log(f"Failed to send heartbeat, consecutive failures = {consecutive_hb_failures}")
             if consecutive_hb_failures > 1:
                 log(f"Too many consecutive failures, reinitializing LoRa")
                 try:
