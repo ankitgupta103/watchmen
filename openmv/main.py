@@ -285,6 +285,11 @@ async def person_detection_loop():
     global person_image_count, total_image_count
     while True:
         await asyncio.sleep(5)
+        global image_in_progress
+        if image_in_progress:
+            log(f"Skipping DETECTION because image in progress")
+            await asyncio.sleep(20)
+            continue
         total_image_count += 1
         img = sensor.snapshot()
         person_detected = detector.check_person(img)

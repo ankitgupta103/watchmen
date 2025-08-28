@@ -76,6 +76,7 @@ class Detector:
         return self.check_thermal_body() or self.check_image(img)
 
 def main():
+    print(f"In Main of Detect")
     sensor.reset()
     sensor.set_pixformat(sensor.RGB565)
     sensor.set_framesize(sensor.QVGA)
