@@ -57,8 +57,7 @@ class Detector:
         return img
         # --- Run Inference ---
 
-    def check_image(self):
-        img = sensor.snapshot()
+    def check_image(self, img):
         # img = resize_image(img, MODEL_INPUT_SIZE)
         prediction_output = self.model.predict([img])
 
@@ -80,8 +79,8 @@ class Detector:
             print(f"  ⚠️ Unexpected model output")
         return False
 
-    def check_person(self):
-        return self.check_thermal_body() or self.check_image()
+    def check_person(self, img):
+        return self.check_thermal_body() or self.check_image(img)
 
 def main():
     d = Detector()
