@@ -322,7 +322,6 @@ def send_image_to_mesh(imgbytes):
     msgbytes = encrypt_if_needed("P", imgbytes)
     sent_succ = False
     for peer_addr in destlist:
-        transmission_start = time_msec()
         asyncio.create_task(acquire_image_lock())
         sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
         release_image_lock()
@@ -347,6 +346,7 @@ async def image_sending_loop():
             imagefile = images_to_send.pop(0)
             img = image.Image(imagefile)
             imgbytes = img.bytearray()
+            transmission_start = time_msec()
             sent_succ = send_image_to_mesh(imgbytes)
             if not sent_succ:
                 images_to_send.append(imagefile) # pushed to back of queue
@@ -1128,7 +1128,7 @@ async def main():
         await asyncio.sleep(8)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
-        asyncio.create_task(keep_updating_gps())
+        #asyncio.create_task(keep_updating_gps())
         asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
