@@ -16,6 +16,7 @@ import enc
 import sx1262
 import gps_driver
 from cellular_driver import Cellular
+import detect
 
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
@@ -29,7 +30,7 @@ SPATH_WAIT_2 = 1200
 SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
-PHOTO_TAKING_DELAY = 800 # TODO change to 1 second.
+PHOTO_TAKING_DELAY = 10 # TODO change to 1 second.
 PHOTO_SENDING_DELAY = 600
 GPS_WAIT_SEC = 5
 
@@ -72,7 +73,8 @@ elif uid == b'e076465dd7193a09':
     my_addr = 222
 elif uid == b'e076465dd7091843':
     my_addr = 223
-    # shortest_path_to_cc == [221, 9]
+elif uid == b'e076465dd7090d1c':
+    my_addr = 225
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -297,10 +299,7 @@ def detect_person(img):
 images_to_send = []
 
 # ------- Person detection loop ---------
-# TODO this should save files and then put them in a queue which radio should send.
-# Else we are blocking photos until radio.
-# Else we are also not retrying if transmission of a photo fails.
-async def person_detection_loop():
+async def person_detection_loop_old():
     global person_image_count, total_image_count
     while True:
         img = sensor.snapshot()
@@ -311,6 +310,25 @@ async def person_detection_loop():
             person_image_count += 1
             r = get_rand()
             raw_path = f"{IMAGE_DIR}/raw_{r}_{person_detected}_{confidence:.2f}.jpg"
+            log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
+            img.save(raw_path)
+            images_to_send.append(raw_path)
+        await asyncio.sleep(PHOTO_TAKING_DELAY)
+        log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
+
+detector = detect.Detector()
+
+async def person_detection_loop():
+    global person_image_count, total_image_count
+    while True:
+        await asyncio.sleep(5)
+        total_image_count += 1
+        person_detected = detector.check_person()
+        if person_detected:
+            img = sensor.snapshot()
+            person_image_count += 1
+            r = get_rand()
+            raw_path = f"{IMAGE_DIR}/raw_{r}.jpg"
             log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
             img.save(raw_path)
             images_to_send.append(raw_path)

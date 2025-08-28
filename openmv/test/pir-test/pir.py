@@ -14,14 +14,16 @@ sensor.skip_frames(time=2000)
 sensor.set_auto_gain(False)
 sensor.set_auto_whitebal(False)
 
-# Initialize PIR sensor pin (adjust pin number based on your wiring)
-# Connect PIR sensor output to a digital pin
-PIR_PIN = Pin('P13', Pin.IN, Pin.PULL_DOWN)  # Adjust pin as needed
-
+# ====== TURNING IR EMITTER ON ========================
 p1_pin = Pin('P14', Pin.OUT)  # Configure as output
 p1_pin.on()                  # Make it HIGH
 # or
 p1_pin.value(1)             # Alternative way to make it HIGH
+# ======================================================
+
+# Initialize PIR sensor pin (adjust pin number based on your wiring)
+# Connect PIR sensor output to a digital pin
+PIR_PIN = Pin('P13', Pin.IN, Pin.PULL_DOWN)  # Adjust pin as needed
 
 # Initialize LED pins for status indication
 red_led = Pin('P1', Pin.OUT)     # Thermal body detected
