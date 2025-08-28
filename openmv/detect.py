@@ -86,7 +86,8 @@ def main():
     d = Detector()
     for i in range(100):
         time.sleep_ms(500)
-        person_detected = d.check_person()
+        img = sensor.snapshot()
+        person_detected = d.check_person(img)
         print(f"Person detected = {person_detected}")
 
 if __name__ == "__main__":
