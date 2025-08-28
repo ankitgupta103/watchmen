@@ -4,13 +4,6 @@ import ml
 import sensor
 import image
 
-sensor.reset()
-sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.QVGA)
-sensor.skip_frames(time=2000)
-sensor.set_auto_gain(False)
-sensor.set_auto_whitebal(False)
-
 # ====== TURNING IR EMITTER ON ========================
 p1_pin = Pin('P14', Pin.OUT)  # Configure as output
 def turn_ON_IR_emitter():
@@ -83,6 +76,12 @@ class Detector:
         return self.check_thermal_body() or self.check_image(img)
 
 def main():
+    sensor.reset()
+    sensor.set_pixformat(sensor.RGB565)
+    sensor.set_framesize(sensor.QVGA)
+    sensor.skip_frames(time=2000)
+    sensor.set_auto_gain(False)
+    sensor.set_auto_whitebal(False)
     d = Detector()
     for i in range(100):
         time.sleep_ms(500)
