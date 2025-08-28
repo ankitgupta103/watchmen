@@ -67,9 +67,9 @@ if uid == b'e076465dd7194025':
 elif uid == b'e076465dd7091027':
     my_addr = 221
 elif uid == b'e076465dd7194211':
-    my_addr = 222
-elif uid == b'e076465dd7193a09':
     my_addr = 9
+elif uid == b'e076465dd7193a09':
+    my_addr = 222
 elif uid == b'e076465dd7091843':
     my_addr = 223
     # shortest_path_to_cc == [221, 9]
@@ -1118,7 +1118,7 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
-        await init_sim()
+        #await init_sim()
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(send_spath())
