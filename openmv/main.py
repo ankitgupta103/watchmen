@@ -22,7 +22,7 @@ ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.3
 
 DISCOVERY_COUNT = 100
-HB_WAIT = 300
+HB_WAIT = 120
 HB_WAIT_2 = 1200
 SPATH_WAIT = 30
 SPATH_WAIT_2 = 1200
@@ -147,10 +147,10 @@ async def acquire_image_lock():
     log(f"Acquiring Image Lock")
     image_in_progress = True
     await asyncio.sleep(120)
-    log(f"Going to release the image lock after 120 seconds, current lock state = {image_in_progress}")
+    log(f"Releasing image lock after 120 seconds, current lock state = {image_in_progress}")
     image_in_progress = False
 
-async def release_image_lock():
+def release_image_lock():
     log(f"Releasing Image Lock")
     global image_in_progress
     image_in_progress = False
@@ -226,7 +226,7 @@ async def sim_send_image(creator, encimb):
         log(f"Error in sim_send_image: {e}")
         return False
 
-async def sim_send_heartbeat(heartbeat_data):
+async def sim_upload_hb(heartbeat_data):
     """Send heartbeat data via cellular (for command center)"""
     global cellular_system
 
@@ -317,10 +317,11 @@ async def person_detection_loop():
         await asyncio.sleep(PHOTO_TAKING_DELAY)
         log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
 
-def send_image_to_mesh(imgbytes):
+async def send_image_to_mesh(imgbytes):
     log(f"Sending {len(imgbytes)} bytes to the network")
     msgbytes = encrypt_if_needed("P", imgbytes)
     sent_succ = False
+    destlist = possible_paths(None)
     for peer_addr in destlist:
         asyncio.create_task(acquire_image_lock())
         sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
@@ -331,12 +332,12 @@ def send_image_to_mesh(imgbytes):
 
 def take_image_and_send_now():
     img = sensor.snapshot()
-    send_image_to_mesh(img.to_jpeg().bytearray())
+    asyncio.create_task(send_image_to_mesh(img.to_jpeg().bytearray()))
 
 async def image_sending_loop():
     global images_to_send
     while True:
-        await asyncio.sleep(5)
+        await asyncio.sleep(4)
         destlist = possible_paths(None)
         if len(destlist) == 0:
             log("No shortest path yet so cant send")
@@ -347,7 +348,7 @@ async def image_sending_loop():
             img = image.Image(imagefile)
             imgbytes = img.bytearray()
             transmission_start = time_msec()
-            sent_succ = send_image_to_mesh(imgbytes)
+            sent_succ = await asyncio.create_task(send_image_to_mesh(imgbytes))
             if not sent_succ:
                 images_to_send.append(imagefile) # pushed to back of queue
 
@@ -690,7 +691,7 @@ async def hb_process(mid, msgbytes, sender):
         }
 
         log(f"Sending raw heartbeat data of length {len(msgbytes)} bytes")
-        asyncio.create_task(sim_send_heartbeat(heartbeat_payload))
+        asyncio.create_task(sim_upload_hb(heartbeat_payload))
 
         for i in images_saved_at_cc:
             log(i)
@@ -698,7 +699,7 @@ async def hb_process(mid, msgbytes, sender):
             log(f"Only for debugging : HB msg = {enc.decrypt_rsa(msgbytes, encnode.get_prv_key(creator))}")
         else:
             log(f"Only for debugging : HB msg = {msgbytes.decode()}")
-        # asyncio.create_task(sim_send_heartbeat(msgbytes))
+        # asyncio.create_task(sim_upload_hb(msgbytes))
         return
     elif len(destlist) > 0:
         sent_succ = False
@@ -815,6 +816,8 @@ def process_message(data):
         alldone, missing_str, cid, recompiled, creator = end_chunk(mid, msg.decode())
         if alldone:
             release_image_lock()
+            global image_in_progress
+            image_in_progress = False
             # Also when it fails
             ackmessage += b":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
@@ -849,7 +852,7 @@ async def validate_and_remove_neighbours():
             seen_neighbours.remove(x)
         await asyncio.sleep(VALIDATE_WAIT_SEC)
 
-def send_heartbeat():
+async def send_heartbeat():
     destlist = possible_paths(None)
     log(f"Will send HB to {destlist}")
     # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
@@ -875,14 +878,14 @@ async def keep_sending_heartbeat():
     global consecutive_hb_failures
     i = 1
     while True:
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
         global image_in_progress
         if image_in_progress:
             log(f"Skipping HB send because image in progress")
             await asyncio.sleep(200)
             continue
-        log(f"Shortest path = {shortest_path_to_cc}")
-        sent_succ = send_heartbeat()
+        log(f"In send HB loop, Shortest path = {shortest_path_to_cc}")
+        sent_succ = await asyncio.create_task(send_heartbeat())
         if not sent_succ:
             consecutive_hb_failures += 1
             log(f"Failed to send heartbeat, consecutive failures = {consecutive_hb_failures}")
@@ -946,7 +949,7 @@ def get_next_on_path(cpath):
 def execute_command(command):
     log(f"Gonna execute_command {command} on {my_addr}")
     if command == "SENDHB":
-        send_heartbeat()
+        asyncio.create_task(send_heartbeat())
     elif command == "SENDIMG":
         take_image_and_send_now()
     elif command == "RESET":
@@ -1118,14 +1121,14 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
-        #await init_sim()
+        await init_sim()
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(send_spath())
-        asyncio.create_task(listen_commands_from_cloud())
+        #asyncio.create_task(listen_commands_from_cloud())
     else:
         asyncio.create_task(send_scan())
-        await asyncio.sleep(8)
+        await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
         #asyncio.create_task(keep_updating_gps())
