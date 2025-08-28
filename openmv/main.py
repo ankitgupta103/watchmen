@@ -30,8 +30,8 @@ SPATH_WAIT_2 = 1200
 SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
-PHOTO_TAKING_DELAY = 10 # TODO change to 1 second.
-PHOTO_SENDING_DELAY = 600
+PHOTO_TAKING_DELAY = 1
+PHOTO_SENDING_DELAY = 65
 GPS_WAIT_SEC = 5
 
 MIDLEN = 7
@@ -128,11 +128,6 @@ def log(msg):
     print(log_entry)
 
 log("Running on device : " + uid.decode())
-# ------ Configuration for tensorflow model ------
-MODEL_PATH = "/rom/person_detect.tflite"
-model = ml.Model(MODEL_PATH)
-log(model)
-CONFIDENCE_THRESHOLD = 0.75
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
@@ -283,39 +278,7 @@ async def init_lora():
     log(f"Node address: {loranode.addr}")
     log(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
 
-# ------- Person Detection + snapshot ---------
-def detect_person(img):
-    prediction = model.predict([img])
-    scores = zip(model.labels, prediction[0].flatten().tolist())
-    scores = sorted(scores, key=lambda x: x[1], reverse=True)  # Highest confidence first
-    p_conf = 0.0
-    for label, conf in scores:
-        if label == "person":
-            p_conf = conf
-            if conf >= CONFIDENCE_THRESHOLD:
-                return (True, p_conf)
-    return (False, p_conf)
-
 images_to_send = []
-
-# ------- Person detection loop ---------
-async def person_detection_loop_old():
-    global person_image_count, total_image_count
-    while True:
-        img = sensor.snapshot()
-        total_image_count += 1
-        person_detected, confidence = detect_person(img)
-        log(f"Person detected = {person_detected}, confidence = {confidence}")
-        if True: #person_detected:
-            person_image_count += 1
-            r = get_rand()
-            raw_path = f"{IMAGE_DIR}/raw_{r}_{person_detected}_{confidence:.2f}.jpg"
-            log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
-            img.save(raw_path)
-            images_to_send.append(raw_path)
-        await asyncio.sleep(PHOTO_TAKING_DELAY)
-        log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
-
 detector = detect.Detector()
 
 async def person_detection_loop():
@@ -323,9 +286,9 @@ async def person_detection_loop():
     while True:
         await asyncio.sleep(5)
         total_image_count += 1
-        person_detected = detector.check_person()
+        img = sensor.snapshot()
+        person_detected = detector.check_person(img)
         if person_detected:
-            img = sensor.snapshot()
             person_image_count += 1
             r = get_rand()
             raw_path = f"{IMAGE_DIR}/raw_{r}.jpg"
