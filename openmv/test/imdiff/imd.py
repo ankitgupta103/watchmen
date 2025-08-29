@@ -1,5 +1,6 @@
 import sys
 from PIL import Image
+import io
 
 def im2bytes(fname):
     img = Image.open(fname)
@@ -8,7 +9,7 @@ def im2bytes(fname):
     print(f"Image width: {width} pixels")
     print(f"Image height: {height} pixels")
     pixel_bytes = img.tobytes()
-    print(f"Pillow bytelen = {len(pixel_bytes)}")
+    print(f"Pillow bytelen = {len(pixel_bytes)} : Min:{min(pixel_bytes)}, Max:{max(pixel_bytes)}")
     return pixel_bytes
 
 def diff_ims(f1, f2):
@@ -20,8 +21,14 @@ def diff_ims(f1, f2):
         print("Size mismatch")
         return None
     d = []
+    db = b''
     for x in range(len(b1)):
-        d.append(abs(b2[x] - b1[x]))
+        di = abs(b2[x] - b1[x])
+        d.append(di)
+        db += di.to_bytes(1)
+    d_image = Image.frombytes("L", (1280,720), db)
+    d_image.show()
+
     num_diff = 0
     for x in d:
         if x > 32:
