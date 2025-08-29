@@ -133,26 +133,69 @@ export const getStatusColor = (isOnline: boolean): string => {
 };
 
 /**
+ * Validates if a coordinate is valid
+ * @param lat - Latitude value
+ * @param lng - Longitude value
+ * @returns boolean indicating if coordinates are valid
+ */
+export const isValidCoordinate = (lat: number, lng: number): boolean => {
+  // Check if values are numbers and not NaN
+  if (
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    isNaN(lat) ||
+    isNaN(lng)
+  ) {
+    return false;
+  }
+
+  // Check if latitude is within valid range (-90 to 90)
+  if (lat < -90 || lat > 90) {
+    return false;
+  }
+
+  // Check if longitude is within valid range (-180 to 180)
+  if (lng < -180 || lng > 180) {
+    return false;
+  }
+
+  return true;
+};
+
+/**
  * Calculates map center from array of machines
  */
 export const calculateMapCenter = (machines: Machine[]): [number, number] => {
-  const DEFAULT_LAT = 12.9716; // Bangalore
-  const DEFAULT_LNG = 77.5946;
+  // 12.9205776,77.6485081
+  const DEFAULT_LAT = 12.9205776; // VyomOs
+  const DEFAULT_LNG = 77.6485081;
 
   if (machines.length === 0) return [DEFAULT_LAT, DEFAULT_LNG];
 
-  const bounds = machines.reduce(
-    (acc, machine) => ({
-      minLat: Math.min(acc.minLat, machine?.last_location?.lat ?? DEFAULT_LAT),
-      maxLat: Math.max(acc.maxLat, machine?.last_location?.lat ?? DEFAULT_LAT),
-      minLng: Math.min(acc.minLng, machine?.last_location?.long ?? DEFAULT_LNG),
-      maxLng: Math.max(acc.maxLng, machine?.last_location?.long ?? DEFAULT_LNG),
+  // Get coordinates for each machine, using defaults for invalid ones
+  const machineCoords = machines.map(machine => {
+    const hasValidCoords = machine?.last_location?.lat && 
+      machine?.last_location?.long &&
+      isValidCoordinate(machine.last_location.lat, machine.last_location.long);
+    
+    return {
+      lat: hasValidCoords ? machine.last_location.lat : DEFAULT_LAT,
+      lng: hasValidCoords ? machine.last_location.long : DEFAULT_LNG
+    };
+  });
+
+  const bounds = machineCoords.reduce(
+    (acc, coords) => ({
+      minLat: Math.min(acc.minLat, coords.lat),
+      maxLat: Math.max(acc.maxLat, coords.lat),
+      minLng: Math.min(acc.minLng, coords.lng),
+      maxLng: Math.max(acc.maxLng, coords.lng),
     }),
     {
-      minLat: machines[0]?.last_location?.lat ?? DEFAULT_LAT,
-      maxLat: machines[0]?.last_location?.lat ?? DEFAULT_LAT,
-      minLng: machines[0]?.last_location?.long ?? DEFAULT_LNG,
-      maxLng: machines[0]?.last_location?.long ?? DEFAULT_LNG,
+      minLat: machineCoords[0].lat,
+      maxLat: machineCoords[0].lat,
+      minLng: machineCoords[0].lng,
+      maxLng: machineCoords[0].lng,
     },
   );
 
@@ -166,23 +209,32 @@ export const calculateMapCenter = (machines: Machine[]): [number, number] => {
  * Calculates optimal zoom level based on machine distribution
  */
 export const calculateOptimalZoom = (machines: Machine[]): number => {
-  const DEFAULT_LAT = 12.9716;
-  const DEFAULT_LNG = 77.5946;
-
   if (machines.length <= 1) return 12;
 
-  const bounds = machines.reduce(
-    (acc, machine) => ({
-      minLat: Math.min(acc.minLat, machine?.last_location?.lat ?? DEFAULT_LAT),
-      maxLat: Math.max(acc.maxLat, machine?.last_location?.lat ?? DEFAULT_LAT),
-      minLng: Math.min(acc.minLng, machine?.last_location?.long ?? DEFAULT_LNG),
-      maxLng: Math.max(acc.maxLng, machine?.last_location?.long ?? DEFAULT_LNG),
+  // Get coordinates for each machine, using defaults for invalid ones
+  const machineCoords = machines.map(machine => {
+    const hasValidCoords = machine?.last_location?.lat && 
+      machine?.last_location?.long &&
+      isValidCoordinate(machine.last_location.lat, machine.last_location.long);
+    
+    return {
+      lat: hasValidCoords ? machine.last_location.lat : 12.9205776,
+      lng: hasValidCoords ? machine.last_location.long : 77.6485081
+    };
+  });
+
+  const bounds = machineCoords.reduce(
+    (acc, coords) => ({
+      minLat: Math.min(acc.minLat, coords.lat),
+      maxLat: Math.max(acc.maxLat, coords.lat),
+      minLng: Math.min(acc.minLng, coords.lng),
+      maxLng: Math.max(acc.maxLng, coords.lng),
     }),
     {
-      minLat: machines[0]?.last_location?.lat ?? DEFAULT_LAT,
-      maxLat: machines[0]?.last_location?.lat ?? DEFAULT_LAT,
-      minLng: machines[0]?.last_location?.long ?? DEFAULT_LNG,
-      maxLng: machines[0]?.last_location?.long ?? DEFAULT_LNG,
+      minLat: machineCoords[0].lat,
+      maxLat: machineCoords[0].lat,
+      minLng: machineCoords[0].lng,
+      maxLng: machineCoords[0].lng,
     },
   );
 

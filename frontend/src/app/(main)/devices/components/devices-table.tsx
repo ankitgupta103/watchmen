@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import useOrganization from '@/hooks/use-organization';
 import useToken from '@/hooks/use-token';
+import { Camera, Clock, Eye, Network, Route } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -85,12 +86,16 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
       }
 
       // Get original tags for comparison
-      const originalTags = (machines.find(m => m.id === machineId)?.tags || []);
-      
+      const originalTags = machines.find((m) => m.id === machineId)?.tags || [];
+
       // Update existing tags that have changed
       for (const tag of updatedTags) {
-        const originalTag = originalTags.find(ot => ot.id === tag.id);
-        if (originalTag && (originalTag.name !== tag.name || originalTag.description !== tag.description)) {
+        const originalTag = originalTags.find((ot) => ot.id === tag.id);
+        if (
+          originalTag &&
+          (originalTag.name !== tag.name ||
+            originalTag.description !== tag.description)
+        ) {
           // Tag has been modified, update it
           await createOrUpdateTag(
             machineId,
@@ -121,21 +126,61 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
   };
 
   return (
-    <div >
+    <div>
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50/50 border-b border-gray-200">
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">ID</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Name</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Location</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Tags</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Uptime</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Photos Taken</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Events Seen</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">GPS Staleness</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Neighbours</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Shortest Path</TableHead>
-            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Actions</TableHead>
+          <TableRow className="border-b border-gray-200 bg-gray-50/50">
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              ID
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              Name
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              Location
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              Tags
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-gray-400" />
+                Uptime
+              </div>
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              <div className="flex items-center gap-2">
+                <Camera className="h-4 w-4 text-gray-400" />
+                Photos Taken
+              </div>
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-gray-400" />
+                Events Seen
+              </div>
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-gray-400" />
+                GPS Staleness
+              </div>
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              <div className="flex items-center gap-2">
+                <Network className="h-4 w-4 text-gray-400" />
+                Neighbours
+              </div>
+            </TableHead>
+            <TableHead className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
+              <div className="flex items-center gap-2">
+                <Route className="h-4 w-4 text-gray-400" />
+                Shortest Path
+              </div>
+            </TableHead>
+            <TableHead className="text-xs font-semibold text-gray-700 uppercase">
+              Actions
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

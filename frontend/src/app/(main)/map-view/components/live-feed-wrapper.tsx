@@ -9,11 +9,9 @@ import { MapPin, Shield, Zap } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 
 import { FeedEvent } from '@/lib/types/activity';
 import { CroppedImage, Machine } from '@/lib/types/machine';
-import { cn } from '@/lib/utils';
 import { calculateSeverity } from '@/lib/utils/severity';
 
 // import EventNotification from './event-notification';
@@ -36,7 +34,6 @@ const globalProcessedEvents = new Set<string>();
 
 export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
   const { organizationId } = useOrganization();
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [machineEvents, setMachineEvents] = useState<
     Record<number, FeedEvent[]>
   >({});
@@ -116,7 +113,8 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
       processedEventKeysRef.current.add(eventKey);
       globalProcessedEvents.add(eventKey);
 
-      const severity = data.severity || calculateSeverity(data.cropped_images || []);
+      const severity =
+        data.severity || calculateSeverity(data.cropped_images || []);
       const classNames =
         data.cropped_images?.map((c) => c.class_name).join(', ') || 'Event';
 
@@ -129,7 +127,8 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
       // Create event using dashboard structure
       const newEvent: FeedEvent = {
         original_image_path: data.original_image_path || '',
-        annotated_image_path: data.annotated_image_path || data.original_image_path || '',
+        annotated_image_path:
+          data.annotated_image_path || data.original_image_path || '',
         cropped_images: data.cropped_images || [],
         timestamp: data.timestamp || Math.floor(Date.now() / 1000),
         machine_id: machineId,
@@ -168,15 +167,6 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
     parseJson: true,
   });
 
-  const handleRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    setMachineEvents({});
-    setPulsatingMachines({});
-    processedEventKeysRef.current.clear();
-    globalProcessedEvents.clear();
-    setTimeout(() => setIsRefreshing(false), 1500);
-  }, []);
-
   // Calculate device status based on last_location timestamp
   const getDeviceStatus = useCallback((machine: Machine) => {
     if (!machine.last_location?.timestamp) return 'offline';
@@ -187,7 +177,7 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
 
   const deviceStatusCounts = useMemo(() => {
     const counts = { online: 0, offline: 0 };
-    machines.forEach(machine => {
+    machines.forEach((machine) => {
       const status = getDeviceStatus(machine);
       counts[status]++;
     });
@@ -247,39 +237,6 @@ export default function LiveFeedWrapper({ machines }: { machines: Machine[] }) {
               </Badge>
             )}
           </div>
-        </div>
-
-        {/* Refresh button */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="hover:bg-blue-50"
-          >
-            <div
-              className={cn(
-                'mr-2 h-4 w-4 transition-transform',
-                isRefreshing && 'animate-spin',
-              )}
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-            </div>
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
         </div>
       </div>
 

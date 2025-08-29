@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { Machine } from '@/lib/types/machine';
+import { isValidCoordinate } from '@/lib/utils';
+
 // Remove isMachineOnline import as it's deprecated
 
 interface MapBounds {
@@ -151,20 +153,36 @@ const MapFilter = ({
 
   // Calculate map center and zoom
   const getMapCenter = (): [number, number] => {
-    if (!machines.length) return [12.9716, 77.5946]; // Default to Bangalore
 
-    const bounds = machines.reduce(
-      (acc, m) => ({
-        minLat: Math.min(acc.minLat, m?.last_location?.lat ?? 12.9716),
-        maxLat: Math.max(acc.maxLat, m?.last_location?.lat ?? 12.9716),
-        minLng: Math.min(acc.minLng, m?.last_location?.long ?? 77.5946),
-        maxLng: Math.max(acc.maxLng, m?.last_location?.long ?? 77.5946),
+    const DEFAULT_LAT = 12.9205776; // VyomOS
+    const DEFAULT_LNG = 77.6485081;
+    
+    if (!machines.length) return [DEFAULT_LAT, DEFAULT_LNG];
+
+    // Get coordinates for each machine, using defaults for invalid ones
+    const machineCoords = machines.map(machine => {
+      const hasValidCoords = machine?.last_location?.lat && 
+        machine?.last_location?.long &&
+        isValidCoordinate(machine.last_location.lat, machine.last_location.long);
+      
+      return {
+        lat: hasValidCoords ? machine.last_location.lat : DEFAULT_LAT,
+        lng: hasValidCoords ? machine.last_location.long : DEFAULT_LNG
+      };
+    });
+
+    const bounds = machineCoords.reduce(
+      (acc, coords) => ({
+        minLat: Math.min(acc.minLat, coords.lat),
+        maxLat: Math.max(acc.maxLat, coords.lat),
+        minLng: Math.min(acc.minLng, coords.lng),
+        maxLng: Math.max(acc.maxLng, coords.lng),
       }),
       {
-        minLat: machines[0]?.last_location?.lat ?? 12.9716,
-        maxLat: machines[0]?.last_location?.lat ?? 12.9716,
-        minLng: machines[0]?.last_location?.long ?? 77.5946,
-        maxLng: machines[0]?.last_location?.long ?? 77.5946,
+        minLat: machineCoords[0].lat,
+        maxLat: machineCoords[0].lat,
+        minLng: machineCoords[0].lng,
+        maxLng: machineCoords[0].lng,
       },
     );
 
@@ -177,18 +195,30 @@ const MapFilter = ({
   const getOptimalZoom = (): number => {
     if (machines.length <= 1) return 12;
 
-    const bounds = machines.reduce(
-      (acc, m) => ({
-        minLat: Math.min(acc.minLat, m?.last_location?.lat ?? 12.9716),
-        maxLat: Math.max(acc.maxLat, m?.last_location?.lat ?? 12.9716),
-        minLng: Math.min(acc.minLng, m?.last_location?.long ?? 77.5946),
-        maxLng: Math.max(acc.maxLng, m?.last_location?.long ?? 77.5946),
+    // Get coordinates for each machine, using defaults for invalid ones
+    const machineCoords = machines.map(machine => {
+      const hasValidCoords = machine?.last_location?.lat && 
+        machine?.last_location?.long &&
+        isValidCoordinate(machine.last_location.lat, machine.last_location.long);
+      
+      return {
+        lat: hasValidCoords ? machine.last_location.lat : 12.9205776,
+        lng: hasValidCoords ? machine.last_location.long : 77.6485081
+      };
+    });
+
+    const bounds = machineCoords.reduce(
+      (acc, coords) => ({
+        minLat: Math.min(acc.minLat, coords.lat),
+        maxLat: Math.max(acc.maxLat, coords.lat),
+        minLng: Math.min(acc.minLng, coords.lng),
+        maxLng: Math.max(acc.maxLng, coords.lng),
       }),
       {
-        minLat: machines[0]?.last_location?.lat ?? 12.9716,
-        maxLat: machines[0]?.last_location?.lat ?? 12.9716,
-        minLng: machines[0]?.last_location?.long ?? 77.5946,
-        maxLng: machines[0]?.last_location?.long ?? 77.5946,
+        minLat: machineCoords[0].lat,
+        maxLat: machineCoords[0].lat,
+        minLng: machineCoords[0].lng,
+        maxLng: machineCoords[0].lng,
       },
     );
 
@@ -215,14 +245,20 @@ const MapFilter = ({
   const isMachineInBounds = (machine: Machine) => {
     if (!tempBounds) return false;
     if (!machine?.last_location) return false;
-    
-    const inBounds = (
+
+    // Check if coordinates are valid
+    if (
+      !isValidCoordinate(machine.last_location.lat, machine.last_location.long)
+    ) {
+      return false;
+    }
+
+    const inBounds =
       machine.last_location.lat >= tempBounds.south &&
       machine.last_location.lat <= tempBounds.north &&
       machine.last_location.long >= tempBounds.west &&
-      machine.last_location.long <= tempBounds.east
-    );
-    
+      machine.last_location.long <= tempBounds.east;
+
     return inBounds;
   };
 
@@ -316,8 +352,8 @@ const MapFilter = ({
                   <Marker
                     key={machine.id}
                     position={[
-                      machine?.last_location?.lat ?? 12.9716,
-                      machine?.last_location?.long ?? 77.5946,
+                      machine?.last_location?.lat ?? 12.9205776,
+                      machine?.last_location?.long ?? 77.6485081,
                     ]}
                     icon={createMachineIcon(
                       machine,
@@ -359,8 +395,8 @@ const MapFilter = ({
                     <Circle
                       key={`coverage-${machine.id}`}
                       center={[
-                        machine?.last_location?.lat ?? 12.9716,
-                        machine?.last_location?.long ?? 77.5946,
+                        machine?.last_location?.lat ?? 12.9205776,
+                        machine?.last_location?.long ?? 77.6485081,
                       ]}
                       radius={200}
                       pathOptions={{

@@ -41,7 +41,6 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
   const [editingName, setEditingName] = useState('');
   const [editingDescription, setEditingDescription] = useState('');
 
-
   const handleRemoveTag = (tagToRemove: MachineTag) => {
     if (tagToRemove.id > 0) {
       setDeletedTagIds([...deletedTagIds, tagToRemove.id]);
@@ -64,7 +63,7 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
               name: editingName.trim(),
               description: editingDescription.trim(),
             }
-          : tag
+          : tag,
       );
       setTags(updatedTags);
       setEditingTag(null);
@@ -149,17 +148,17 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <Tag className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
+            <div className="py-8 text-center">
+              <Tag className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
               <p className="text-muted-foreground text-sm">
                 This machine has no tags to edit.
               </p>
-              <p className="text-muted-foreground text-xs mt-1">
+              <p className="text-muted-foreground mt-1 text-xs">
                 Use &quot;Add Tags&quot; to create new tags for this machine.
               </p>
             </div>
           )}
-          
+
           {/* Edit Tag Form */}
           {editingTag && (
             <div className="grid gap-4 rounded-lg border p-4">
@@ -199,9 +198,9 @@ const EditTagsModal: React.FC<EditTagsModalProps> = ({
                     placeholder="Enter tag description (optional)"
                     className="flex-1"
                   />
-                  <Button 
-                    type="button" 
-                    onClick={handleSaveEdit} 
+                  <Button
+                    type="button"
+                    onClick={handleSaveEdit}
                     size="sm"
                     disabled={!editingName.trim()}
                   >
