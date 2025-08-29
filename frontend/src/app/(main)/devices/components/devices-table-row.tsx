@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { MapPin, MoreHorizontal, Plus, Tag } from 'lucide-react';
+import { MoreHorizontal, Plus, Tag } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { TableCell, TableRow } from '@/components/ui/table';
 import { Machine } from '@/lib/types/machine';
 
 import TagDisplay from './tag-display';
+import LocationMap from './location-map';
 
 interface DevicesTableRowProps {
   machine: Machine;
@@ -30,46 +31,52 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
   onAddTags,
   onEditTags,
 }) => {
-  const getConnectionStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'online':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'offline':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'connecting':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+
+
+  const formatUptime = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      return `${minutes}m`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      return `${hours}h`;
     }
   };
 
-  const formatLocation = (location: {
-    lat: number;
-    long: number;
-    timestamp: string;
-  }) => {
-    return `${location?.lat}, ${location?.long}`;
+  const formatGpsStaleness = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      return `${minutes}m`;
+    } else if (seconds < 86400) {
+      const hours = Math.floor(seconds / 3600);
+      return `${hours}h`;
+    } else {
+      const days = Math.floor(seconds / 86400);
+      return `${days}d`;
+    }
   };
 
   return (
     <TableRow key={machine.id}>
+      <TableCell>{machine.id}</TableCell>
       <TableCell className="font-medium">{machine.name}</TableCell>
-      <TableCell>{machine.type}</TableCell>
-      <TableCell>
+      {/* <TableCell>
         <Badge
           variant="outline"
           className={`border ${getConnectionStatusColor(machine.connection_status)}`}
         >
           {machine.connection_status}
         </Badge>
-      </TableCell>
+      </TableCell> */}
       <TableCell>
-        <div className="flex items-center gap-2">
-          <MapPin className="text-muted-foreground h-4 w-4" />
-          <span className="text-sm">
-            {formatLocation(machine.last_location)}
-          </span>
-        </div>
+        <LocationMap 
+          lat={machine.last_location?.lat} 
+          long={machine.last_location?.long}
+        />
       </TableCell>
       <TableCell>
         <TagDisplay
@@ -78,11 +85,23 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
           showDeleteButtons={true}
         />
       </TableCell>
-      <TableCell>{machine?.specifications?.uptime ? `${machine?.specifications?.uptime}s` : '-'}</TableCell>
+      <TableCell>{machine?.specifications?.uptime ? formatUptime(machine.specifications.uptime) : '-'}</TableCell>
       <TableCell>{machine?.specifications?.photos_taken ? `${machine?.specifications?.photos_taken}` : '-'}</TableCell>
       <TableCell>{machine?.specifications?.events_seen ? `${machine?.specifications?.events_seen}` : '-'}</TableCell>
-      <TableCell>{machine?.specifications?.gps_staleness ? `${machine?.specifications?.gps_staleness}s` : '-'}</TableCell>
-      <TableCell>{machine?.specifications?.neighbours ? `${machine?.specifications?.neighbours}` : '-'}</TableCell>
+      <TableCell>{machine?.specifications?.gps_staleness ? formatGpsStaleness(machine.specifications.gps_staleness) : '-'}</TableCell>
+      <TableCell>
+        {machine?.specifications?.neighbours && machine.specifications.neighbours.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {machine.specifications.neighbours.map((neighbour, index) => (
+              <Badge key={index} variant="secondary" className="text-xs">
+                {neighbour}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          '-'
+        )}
+      </TableCell>
       <TableCell>{machine?.specifications?.shortest_path ? `${machine?.specifications?.shortest_path}` : '-'}</TableCell>
       <TableCell>
         <DropdownMenu>

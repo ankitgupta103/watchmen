@@ -8,6 +8,8 @@ import { Machine } from '@/lib/types/machine';
 import DevicesTable from './components/devices-table';
 import PageHeader from './components/page-header';
 
+export const revalidate = 60;
+
 export default async function DevicesPage() {
   const { organization_uid } = await getOrg();
 

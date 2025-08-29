@@ -8,6 +8,8 @@ import { Machine, MachineTag } from '@/lib/types/machine';
 import EventsFeed from './components/events-feed';
 import PageHeader from './components/page-header';
 
+export const revalidate = 60;
+
 export default async function DashboardPage() {
   const { organization_uid } = await getOrg();
 

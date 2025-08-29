@@ -8,6 +8,8 @@ import { Machine } from '@/lib/types/machine';
 import HeatMapCalendar from './components/heat-map-calendar';
 import PageHeader from './components/page-header';
 
+export const revalidate = 60;
+
 export default async function CalendarPage() {
   const { organization_uid, organization_id } = await getOrg();
   const { data: machines } = await fetcher<{

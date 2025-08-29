@@ -125,9 +125,8 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>ID</TableHead>
             <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Connection</TableHead>
             <TableHead>Location</TableHead>
             <TableHead>Tags</TableHead>
             <TableHead>Uptime</TableHead>
