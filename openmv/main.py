@@ -600,6 +600,7 @@ def add_chunk(msgbytes):
     cdata = msgbytes[5:]
     if cid not in chunk_map:
         log(f"ERROR : no entry yet for {cid}")
+        return
     chunk_map[cid][2].append((citer, cdata))
     _, expected_chunks, _ = chunk_map[cid]
     missing = get_missing_chunks(cid)
