@@ -122,20 +122,21 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
 
   return (
     <div className="w-full">
+      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>Tags</TableHead>
-            <TableHead>Uptime</TableHead>
-            <TableHead>Photos Taken</TableHead>
-            <TableHead>Events Seen</TableHead>
-            <TableHead>GPS Staleness</TableHead>
-            <TableHead>Neighbours</TableHead>
-            <TableHead>Shortest Path</TableHead>
-            <TableHead>Actions</TableHead>
+          <TableRow className="bg-gray-50/50 border-b border-gray-200">
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">ID</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Name</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Location</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Tags</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Uptime</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Photos Taken</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Events Seen</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">GPS Staleness</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Neighbours</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Shortest Path</TableHead>
+            <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -150,6 +151,7 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
           ))}
         </TableBody>
       </Table>
+      </div>
 
       {/* Add Tags Modal */}
       {addTagsModalOpen && (
