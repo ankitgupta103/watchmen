@@ -28,7 +28,7 @@ PERSON_ONLY_DIR = (
 OUTPUT_DIR = "/sdcard/results"
 
 # Model input size - check your model requirements
-MODEL_INPUT_SIZE = 96  # Change to 128 if your model needs 128x128
+MODEL_INPUT_SIZE = 256
 
 # File paths for the generated lists
 ALL_IMAGES_LIST = "/sdcard/all_images.txt"
