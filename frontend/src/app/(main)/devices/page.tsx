@@ -20,7 +20,7 @@ export default async function DevicesPage() {
   return (
     <section className="flex h-full w-full flex-col gap-4 p-4">
       <PageHeader />
-      <div className="bg-background h-full w-full overflow-y-auto rounded-lg border p-6">
+      <div className="bg-background h-full w-full overflow-y-auto rounded-lg border">
         {machines.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
             <div className="text-muted-foreground">No machines found.</div>
