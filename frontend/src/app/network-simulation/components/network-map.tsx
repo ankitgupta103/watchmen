@@ -48,7 +48,7 @@ type WebSocketMessage =
   | { type: 'log_message'; message: string; timestamp: number };
 
 // --- Constants ---
-const BANGALORE_CENTER: [number, number] = [12.9716, 77.5946];
+const BANGALORE_CENTER: [number, number] = [12.9205776, 77.6485081];
 const MAP_ZOOM_LEVEL = 13;
 const COORD_SCALE_FACTOR = 0.015;
 

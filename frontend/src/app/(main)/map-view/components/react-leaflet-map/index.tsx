@@ -17,6 +17,7 @@ import { Machine, MachineData } from '@/lib/types/machine';
 import {
   calculateMapCenter,
   calculateOptimalZoom,
+  isValidCoordinate,
 } from '@/lib/utils';
 
 import MachineMarker from './machine-marker';
@@ -28,93 +29,143 @@ interface MapProps {
   getDeviceStatus: (machine: Machine) => 'online' | 'offline';
 }
 
+// Interface for machines with processed coordinates
+interface MachineWithCoords extends Machine {
+  last_location: {
+    lat: number;
+    long: number;
+    timestamp: string;
+  };
+  usingDefaultCoords: boolean;
+}
+
 export default function ReactLeafletMap({
   machines,
   machineEvents,
   pulsatingMachines,
   getDeviceStatus,
 }: MapProps) {
+  // Get valid coordinates for each machine, using defaults for invalid ones
+  const machinesWithCoords: MachineWithCoords[] = machines.map(machine => {
+    const hasValidCoords = machine?.last_location?.lat && 
+      machine?.last_location?.long &&
+      isValidCoordinate(machine.last_location.lat, machine.last_location.long);
+    
+    return {
+      ...machine,
+      last_location: {
+        lat: hasValidCoords ? machine.last_location.lat : 12.9205776, // Default to VyomOS
+        long: hasValidCoords ? machine.last_location.long : 77.6485081,
+        timestamp: machine.last_location?.timestamp || new Date().toISOString()
+      },
+      usingDefaultCoords: !hasValidCoords
+    };
+  });
+
   const center = calculateMapCenter(machines);
   const zoom = calculateOptimalZoom(machines);
 
   // Debug logging
   console.log('🗺️ [MapView] Rendering map with:', {
     machinesCount: machines.length,
+    machinesWithValidCoords: machinesWithCoords.filter(m => !m.usingDefaultCoords).length,
+    machinesUsingDefaultCoords: machinesWithCoords.filter(m => m.usingDefaultCoords).length,
     machineEvents: Object.keys(machineEvents).length,
     pulsatingMachines: Object.keys(pulsatingMachines).length,
     pulsatingMachinesState: pulsatingMachines,
+    center,
+    zoom,
   });
 
+  // Log machines using default coordinates for debugging
+  const machinesUsingDefaults = machinesWithCoords.filter(m => m.usingDefaultCoords);
+  if (machinesUsingDefaults.length > 0) {
+    console.warn('🗺️ [MapView] Machines using default coordinates:', 
+      machinesUsingDefaults.map(m => ({
+        id: m.id,
+        name: m.name,
+        originalLocation: machines.find(orig => orig.id === m.id)?.last_location
+      }))
+    );
+  }
+
   return (
-    <MapContainer
-      style={{ height: '100%', width: '100%' }}
-      zoom={zoom}
-      center={center}
-      zoomControl={false}
-      className="h-full w-full"
-    >
-      <ZoomControl position="topleft" />
-      <ScaleControl position="bottomleft" />
+  
+      <MapContainer
+        style={{ height: '100%', width: '100%' }}
+        zoom={zoom}
+        center={center}
+        zoomControl={false}
+        className="h-full w-full"
+      >
+        <ZoomControl position="topleft" />
+        <ScaleControl position="bottomleft" />
 
-      {/* Simplified layer control */}
-      <LayersControl position="topright">
-        <LayersControl.BaseLayer checked name="Satellite">
-          <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'satellite'} />
-        </LayersControl.BaseLayer>
-        <LayersControl.BaseLayer name="Roadmap">
-          <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'roadmap'} />
-        </LayersControl.BaseLayer>
-      </LayersControl>
+        {/* Simplified layer control */}
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Satellite">
+            <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'satellite'} />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Roadmap">
+            <ReactLeafletGoogleLayer apiKey={MAPS_API_KEY} type={'roadmap'} />
+          </LayersControl.BaseLayer>
+        </LayersControl>
 
-      {/* Machine markers */}
-      {machines.map((machine) => {
-        const events = machineEvents[machine.id] || [];
-        const lastEvent = events[0];
-        const isPulsating = pulsatingMachines[machine.id] || false;
+        {/* Machine markers - show all machines with valid or default coordinates */}
+        {machinesWithCoords.map((machine) => {
+          const events = machineEvents[machine.id] || [];
+          const lastEvent = events[0];
+          const isPulsating = pulsatingMachines[machine.id] || false;
 
-        console.log(`🔍 [MapView] Creating marker for machine ${machine.id}:`, {
-          isPulsating,
-          pulsatingMachinesState: pulsatingMachines,
-          machineId: machine.id,
-        });
+          console.log(`🔍 [MapView] Creating marker for machine ${machine.id}:`, {
+            isPulsating,
+            pulsatingMachinesState: pulsatingMachines,
+            machineId: machine.id,
+            location: machine.last_location,
+            usingDefaultCoords: machine.usingDefaultCoords,
+          });
 
-        // Convert FeedEvent from activity.ts to the format expected by MachineData
-        const convertedEvents = events.map(event => ({
-          id: `${event.machine_id}_${event.timestamp}`,
-          machineId: parseInt(event.machine_id as string),
-          machineName: machine.name,
-          machineType: machine.type,
-          timestamp: new Date(event.timestamp * 1000),
-          original_image_path: event.original_image_path,
-          cropped_images: event.cropped_images,
-          fullImageUrl: event.annotated_image_path || event.original_image_path,
-          croppedImageUrls: [],
-          imagesLoaded: false,
-          severity: event.severity,
-        }));
+          // Convert FeedEvent from activity.ts to the format expected by MachineData
+          const convertedEvents = events.map((event) => ({
+            id: `${event.machine_id}_${event.timestamp}`,
+            machineId: parseInt(event.machine_id as string),
+            machineName: machine.name,
+            machineType: machine.type,
+            timestamp: new Date(event.timestamp * 1000),
+            original_image_path: event.original_image_path,
+            cropped_images: event.cropped_images,
+            fullImageUrl: event.annotated_image_path || event.original_image_path,
+            croppedImageUrls: [],
+            imagesLoaded: false,
+            severity: event.severity,
+          }));
 
-        const machineData: MachineData = {
-          machine_id: machine.id,
-          events: convertedEvents,
-          event_count: events.length,
-          last_event: lastEvent ? convertedEvents[0] : undefined,
-          last_updated: lastEvent ? new Date(lastEvent.timestamp * 1000).toISOString() : new Date().toISOString(),
-          is_online: getDeviceStatus(machine) === 'online',
-          is_pulsating: isPulsating,
-          is_critical: lastEvent ? lastEvent.severity >= 3 : false,
-          location: machine.last_location,
-          stats_data: {},
-          buffer_size: 0,
-        };
+          const machineData: MachineData = {
+            machine_id: machine.id,
+            events: convertedEvents,
+            event_count: events.length,
+            last_event: lastEvent ? convertedEvents[0] : undefined,
+            last_updated: lastEvent
+              ? new Date(lastEvent.timestamp * 1000).toISOString()
+              : new Date().toISOString(),
+            is_online: getDeviceStatus(machine) === 'online',
+            is_pulsating: isPulsating,
+            is_critical: lastEvent ? lastEvent.severity >= 3 : false,
+            location: machine.last_location,
+            stats_data: {},
+            buffer_size: 0,
+          };
 
-        return (
-          <MachineMarker
-            key={machine.id}
-            machine={machine}
-            machineData={machineData}
-          />
-        );
-      })}
-    </MapContainer>
+          return (
+            <MachineMarker
+              key={machine.id}
+              machine={machine}
+              machineData={machineData}
+              usingDefaultCoords={machine.usingDefaultCoords}
+            />
+          );
+        })}
+      </MapContainer>
+    
   );
 }

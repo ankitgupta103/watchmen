@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
+import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 
 import 'leaflet/dist/leaflet.css';
 
@@ -13,28 +13,44 @@ interface LocationMapProps {
 }
 
 // Fix for default marker icons in React Leaflet
-delete (L.Icon.Default.prototype as unknown as { _getIconUrl: unknown })._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl: unknown })
+  ._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconRetinaUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const LocationMap: React.FC<LocationMapProps> = ({ lat, long, className = '' }) => {
-  const defaultLat = 12.9205724;
-  const defaultLong = 77.651083;
-  
+const LocationMap: React.FC<LocationMapProps> = ({
+  lat,
+  long,
+  className = '',
+}) => {
+  const defaultLat = 12.9205776;
+  const defaultLong = 77.6485081;
+
   // Helper function to safely validate and convert coordinates
-  const getValidCoordinate = (coord: number | undefined | null, isLongitude: boolean = false): number => {
+  const getValidCoordinate = (
+    coord: number | undefined | null,
+    isLongitude: boolean = false,
+  ): number => {
     try {
       // Convert to number if it's a string or other type
       const numCoord = Number(coord);
-      
+
       // Check if it's a valid finite number and not zero
-      if (typeof numCoord === 'number' && !isNaN(numCoord) && isFinite(numCoord) && numCoord !== 0) {
+      if (
+        typeof numCoord === 'number' &&
+        !isNaN(numCoord) &&
+        isFinite(numCoord) &&
+        numCoord !== 0
+      ) {
         return numCoord;
       }
-      
+
       // Return appropriate default based on coordinate type
       return isLongitude ? defaultLong : defaultLat;
     } catch (error) {
@@ -42,7 +58,7 @@ const LocationMap: React.FC<LocationMapProps> = ({ lat, long, className = '' }) 
       return isLongitude ? defaultLong : defaultLat;
     }
   };
-  
+
   // Use provided coordinates or fall back to defaults
   const displayLat = getValidCoordinate(lat, false);
   const displayLong = getValidCoordinate(long, true);
@@ -50,7 +66,7 @@ const LocationMap: React.FC<LocationMapProps> = ({ lat, long, className = '' }) 
   // Create custom marker with coordinates text
   const createCustomMarker = () => {
     const coordinatesText = `${Number(displayLat).toFixed(2)}, ${Number(displayLong).toFixed(2)}`;
-    
+
     // Create a custom HTML element for the marker
     const markerHtml = `
       <div style="
@@ -97,7 +113,7 @@ const LocationMap: React.FC<LocationMapProps> = ({ lat, long, className = '' }) 
       html: markerHtml,
       className: 'custom-marker',
       iconSize: [120, 60],
-      iconAnchor: [0, -10]
+      iconAnchor: [0, -10],
     });
   };
 
@@ -114,11 +130,9 @@ const LocationMap: React.FC<LocationMapProps> = ({ lat, long, className = '' }) 
         touchZoom={false}
         className="rounded-md border"
       >
-        <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        />
-        <Marker 
-          position={[displayLat, displayLong]} 
+        <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+        <Marker
+          position={[displayLat, displayLong]}
           icon={createCustomMarker()}
         />
       </MapContainer>

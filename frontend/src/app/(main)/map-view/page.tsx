@@ -7,8 +7,6 @@ import CriticalAlertSystem from './components/live-alert';
 import LiveFeedWrapper from './components/live-feed-wrapper';
 import PageHeader from './components/page-header';
 
-export const revalidate = 60;
-
 export default async function LiveFeed() {
   const { organization_uid, organization_id } = await getOrg();
 

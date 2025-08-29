@@ -18,7 +18,7 @@ export default function Event({
   machines: Machine[];
 }) {
   const machine = machines.find(
-    (machine) => machine.id === parseInt(event?.machine_id as string)
+    (machine) => machine.id === parseInt(event?.machine_id as string),
   );
 
   return (

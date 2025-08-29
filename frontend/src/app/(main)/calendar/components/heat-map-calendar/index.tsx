@@ -29,7 +29,7 @@ import dynamic from 'next/dynamic';
 import { API_BASE_URL } from '@/lib/constants';
 import { fetcherClient } from '@/lib/fetcher-client';
 import { Machine, S3EventData } from '@/lib/types/machine';
-import { cn } from '@/lib/utils';
+import { cn, isValidCoordinate } from '@/lib/utils';
 import { getPresignedUrl } from '@/lib/utils/presigned-url';
 
 import ImageViewerModal from './image-viewer';
@@ -115,6 +115,10 @@ export default function HeatMapCalendar({
     return machines.filter(
       (machine) =>
         machine.last_location &&
+        isValidCoordinate(
+          machine.last_location.lat,
+          machine.last_location.long,
+        ) &&
         machine.last_location.lat >= areaFilter.south &&
         machine.last_location.lat <= areaFilter.north &&
         machine.last_location.long >= areaFilter.west &&
@@ -154,7 +158,9 @@ export default function HeatMapCalendar({
                     const timestampNum = Number(event.timestamp);
                     // If timestamp is in seconds (typical Unix timestamp), convert to milliseconds
                     // If timestamp is already in milliseconds, use as is
-                    eventTimestamp = new Date(timestampNum < 1e12 ? timestampNum * 1000 : timestampNum);
+                    eventTimestamp = new Date(
+                      timestampNum < 1e12 ? timestampNum * 1000 : timestampNum,
+                    );
                   } else {
                     // Fallback to noon of the selected date
                     eventTimestamp = new Date(dateStr + 'T12:00:00');
@@ -334,14 +340,18 @@ export default function HeatMapCalendar({
 
   const selectedDateEvents = useMemo(
     () =>
-      (events[selectedDate.toLocaleDateString('en-CA')] || []).sort(
-        (a, b) => {
-          // Since timestamp is now already a Date object, we can directly compare
-          const aTime = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
-          const bTime = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
-          return bTime - aTime; // Sort in descending order (newest first)
-        }
-      ),
+      (events[selectedDate.toLocaleDateString('en-CA')] || []).sort((a, b) => {
+        // Since timestamp is now already a Date object, we can directly compare
+        const aTime =
+          a.timestamp instanceof Date
+            ? a.timestamp.getTime()
+            : new Date(a.timestamp).getTime();
+        const bTime =
+          b.timestamp instanceof Date
+            ? b.timestamp.getTime()
+            : new Date(b.timestamp).getTime();
+        return bTime - aTime; // Sort in descending order (newest first)
+      }),
     [events, selectedDate],
   );
 
@@ -587,20 +597,22 @@ export default function HeatMapCalendar({
                         <div className="text-xs text-gray-600">
                           Time:{' '}
                           <span className="font-medium">
-                            {event.timestamp instanceof Date 
+                            {event.timestamp instanceof Date
                               ? event.timestamp.toLocaleTimeString('en-US', {
                                   hour: '2-digit',
                                   minute: '2-digit',
                                   second: '2-digit',
-                                  hour12: true
+                                  hour12: true,
                                 })
-                              : new Date(event.timestamp).toLocaleTimeString('en-US', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit',
-                                  hour12: true
-                                })
-                            }
+                              : new Date(event.timestamp).toLocaleTimeString(
+                                  'en-US',
+                                  {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                    hour12: true,
+                                  },
+                                )}
                           </span>
                         </div>
                         {event.eventstr && (

@@ -155,25 +155,16 @@ const createStatusIcon = (
 interface MachineMarkerProps {
   machine: Machine;
   machineData: MachineData;
+  usingDefaultCoords?: boolean;
 }
 
 export default function MachineMarker({
   machine,
   machineData,
+  usingDefaultCoords = false,
 }: MachineMarkerProps) {
   const markerRef = useRef<L.Marker>(null);
   const [showName, setShowName] = useState(false);
-
-  // Debug logging
-  console.log('📍 [MapView] Machine marker:', {
-    machineId: machine.id,
-    machineName: machine.name,
-    isOnline: machineData.is_online,
-    lastLocationTimestamp: machine.last_location?.timestamp,
-    isPulsating: machineData.is_pulsating,
-    severity: machineData.last_event?.severity,
-    eventCount: machineData.event_count,
-  });
 
   // Force icon update when pulsating state changes
   useEffect(() => {
@@ -187,7 +178,7 @@ export default function MachineMarker({
       const newIcon = createStatusIcon(machine, machineData, showName);
       markerRef.current.setIcon(newIcon);
     }
-  }, [machineData.is_pulsating, machine, machineData, showName]);
+  }, [machineData.is_pulsating, machine, machineData, showName, usingDefaultCoords]);
 
   const handleClick = () => {
     if (markerRef.current) {
