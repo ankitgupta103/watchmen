@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { MoreHorizontal, Plus, Tag } from 'lucide-react';
+import { MoreHorizontal, Plus, Tag, Clock, Camera, Eye, Network, Route, ArrowRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ interface DevicesTableRowProps {
   onDeleteTag: (machineId: number, tagId: number) => void;
   onAddTags: (machine: Machine) => void;
   onEditTags: (machine: Machine) => void;
+  isEven?: boolean;
 }
 
 const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
@@ -30,6 +31,7 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
   onDeleteTag,
   onAddTags,
   onEditTags,
+  isEven = false,
 }) => {
 
 
@@ -60,10 +62,37 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
     }
   };
 
+  const renderShortestPath = (path: number[] | string) => {
+    let machineIds: string[];
+    
+    if (Array.isArray(path)) {
+      machineIds = path.map(id => id.toString());
+    } else {
+      machineIds = path.split(',').map(id => id.trim());
+    }
+    
+    return (
+      <div className="flex items-center gap-1 flex-wrap">
+        {machineIds.map((machineId, index) => (
+          <React.Fragment key={index}>
+            <span className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">
+              {machineId}
+            </span>
+            {index < machineIds.length - 1 && (
+              <ArrowRight className="h-3 w-3 text-gray-400 flex-shrink-0" />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <TableRow key={machine.id}>
-      <TableCell>{machine.id}</TableCell>
-      <TableCell className="font-medium">{machine.name}</TableCell>
+    <TableRow key={machine.id} className={`border-b border-gray-100 transition-colors duration-200 ${
+      isEven ? 'bg-gray-25/30 hover:bg-gray-50/60' : 'bg-white hover:bg-gray-50/40'
+    }`}>
+      <TableCell className="font-mono text-sm text-gray-600">{machine.id}</TableCell>
+      <TableCell className="font-semibold text-gray-900">{machine.name}</TableCell>
       {/* <TableCell>
         <Badge
           variant="outline"
@@ -85,24 +114,79 @@ const DevicesTableRow: React.FC<DevicesTableRowProps> = ({
           showDeleteButtons={true}
         />
       </TableCell>
-      <TableCell>{machine?.specifications?.uptime ? formatUptime(machine.specifications.uptime) : '-'}</TableCell>
-      <TableCell>{machine?.specifications?.photos_taken ? `${machine?.specifications?.photos_taken}` : '-'}</TableCell>
-      <TableCell>{machine?.specifications?.events_seen ? `${machine?.specifications?.events_seen}` : '-'}</TableCell>
-      <TableCell>{machine?.specifications?.gps_staleness ? formatGpsStaleness(machine.specifications.gps_staleness) : '-'}</TableCell>
       <TableCell>
-        {machine?.specifications?.neighbours && machine.specifications.neighbours.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {machine.specifications.neighbours.map((neighbour, index) => (
-              <Badge key={index} variant="secondary" className="text-xs">
-                {neighbour}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          '-'
-        )}
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-gray-400" />
+          {machine?.specifications?.uptime ? (
+            <span className="font-medium">
+              {formatUptime(machine.specifications.uptime)}
+            </span>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
       </TableCell>
-      <TableCell>{machine?.specifications?.shortest_path ? `${machine?.specifications?.shortest_path}` : '-'}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Camera className="h-4 w-4 text-gray-400" />
+          {machine?.specifications?.photos_taken ? (
+            <span className="font-medium">
+              {machine.specifications.photos_taken.toLocaleString()}
+            </span>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Eye className="h-4 w-4 text-gray-400" />
+          {machine?.specifications?.events_seen ? (
+            <span className="font-medium">
+              {machine.specifications.events_seen.toLocaleString()}
+            </span>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          {machine?.specifications?.gps_staleness ? (
+            <span className="font-medium">
+              {formatGpsStaleness(machine.specifications.gps_staleness)}
+            </span>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Network className="h-4 w-4 text-gray-400" />
+          {machine?.specifications?.neighbours && machine.specifications.neighbours.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {machine.specifications.neighbours.map((neighbour, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {neighbour}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Route className="h-4 w-4 text-gray-400" />
+          {machine?.specifications?.shortest_path ? (
+            renderShortestPath(machine.specifications.shortest_path)
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      </TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
