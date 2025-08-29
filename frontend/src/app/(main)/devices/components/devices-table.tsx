@@ -121,8 +121,7 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
   };
 
   return (
-    <div className="w-full">
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div >
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50/50 border-b border-gray-200">
@@ -151,7 +150,6 @@ const DevicesTable: React.FC<DevicesTableProps> = ({ machines }) => {
           ))}
         </TableBody>
       </Table>
-      </div>
 
       {/* Add Tags Modal */}
       {addTagsModalOpen && (
