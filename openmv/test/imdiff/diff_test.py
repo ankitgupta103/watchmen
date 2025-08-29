@@ -1,5 +1,6 @@
 import os
 import sys
+import shutil
 from PIL import Image
 from collections import defaultdict
 import re
@@ -86,13 +87,30 @@ def find_reference_image(reference_name, image_files):
             return img_path
     return None
 
-def rename_images_in_directory(image_results, location_id, output_file):
-    """Rename image files in directory to maintain sorted order"""
-    print(f"\nRenaming images in directory to maintain sorted order...")
-    output_file.write(f"\nFile renaming operations:\n")
+def copy_images_to_output_directory(image_results, location_id, base_directory, reference_name, output_file):
+    """Copy and rename image files to a new output directory"""
+    # Create output directory name
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    reference_base = os.path.splitext(reference_name)[0]
+    output_dir_name = f"sorted_location_{location_id}_{reference_base}_{timestamp}"
+    output_directory = os.path.join(base_directory, output_dir_name)
+    
+    # Create output directory
+    try:
+        os.makedirs(output_directory, exist_ok=True)
+        print(f"\nCreated output directory: {output_directory}")
+        output_file.write(f"\nOutput directory created: {output_directory}\n")
+    except Exception as e:
+        error_msg = f"Error creating output directory: {e}"
+        print(f"Error: {error_msg}")
+        output_file.write(f"ERROR: {error_msg}\n")
+        return None, []
+    
+    print(f"Copying and renaming images to output directory...")
+    output_file.write(f"\nFile copying operations:\n")
     output_file.write("-" * 50 + "\n")
     
-    renamed_files = []
+    copied_files = []
     
     for i, result in enumerate(image_results, 1):
         if result.get('error'):
@@ -100,7 +118,6 @@ def rename_images_in_directory(image_results, location_id, output_file):
             
         old_path = result['path']
         old_name = result['name']
-        directory = os.path.dirname(old_path)
         
         # Create new filename with order prefix and diff percentage
         name_without_ext = os.path.splitext(old_name)[0]
@@ -111,29 +128,31 @@ def rename_images_in_directory(image_results, location_id, output_file):
         else:
             new_name = f"{i:03d}_{name_without_ext}_diff_{result['diff']:.2f}%{extension}"
         
-        new_path = os.path.join(directory, new_name)
+        new_path = os.path.join(output_directory, new_name)
         
         try:
-            os.rename(old_path, new_path)
-            rename_msg = f"Renamed: {old_name} -> {new_name}"
-            print(f"  {rename_msg}")
-            output_file.write(f"{rename_msg}\n")
+            shutil.copy2(old_path, new_path)  # copy2 preserves metadata
+            copy_msg = f"Copied: {old_name} -> {new_name}"
+            print(f"  {copy_msg}")
+            output_file.write(f"{copy_msg}\n")
             
-            renamed_files.append({
+            copied_files.append({
                 'old_name': old_name,
                 'new_name': new_name,
+                'old_path': old_path,
+                'new_path': new_path,
                 'diff': result['diff'],
                 'order': i
             })
             
         except Exception as e:
-            error_msg = f"Error renaming {old_name}: {e}"
+            error_msg = f"Error copying {old_name}: {e}"
             print(f"  {error_msg}")
             output_file.write(f"{error_msg}\n")
     
-    return renamed_files
+    return output_directory, copied_files
 
-def process_location_group(location_id, image_files, reference_name, output_file):
+def process_location_group(location_id, image_files, reference_name, base_directory, output_file):
     """Process all images in a location group against reference image and record results"""
     print(f"\n{'='*60}")
     print(f"Processing Location ID: {location_id}")
@@ -193,7 +212,7 @@ def process_location_group(location_id, image_files, reference_name, output_file
     # Sort by difference percentage (ascending order)
     image_results.sort(key=lambda x: x['diff'])
     
-    # Write sorted results (before renaming)
+    # Write sorted results (before copying)
     output_file.write(f"\nOriginal images sorted by difference from reference (ascending order):\n")
     output_file.write("-" * 70 + "\n")
     
@@ -208,16 +227,22 @@ def process_location_group(location_id, image_files, reference_name, output_file
         print(line)
         output_file.write(line + "\n")
     
-    # Rename files in directory to maintain sorted order
-    renamed_files = rename_images_in_directory(image_results, location_id, output_file)
+    # Copy files to output directory with new names
+    output_directory, copied_files = copy_images_to_output_directory(
+        image_results, location_id, base_directory, reference_name, output_file
+    )
     
-    # Write final sorted filenames after renaming
-    output_file.write(f"\nFinal sorted filenames in directory:\n")
-    output_file.write("-" * 50 + "\n")
-    
-    for renamed_file in renamed_files:
-        line = f"{renamed_file['order']:2d}. {renamed_file['new_name']}"
-        output_file.write(line + "\n")
+    if output_directory:
+        # Write final sorted filenames in output directory
+        output_file.write(f"\nSorted files in output directory ({os.path.basename(output_directory)}):\n")
+        output_file.write("-" * 50 + "\n")
+        
+        for copied_file in copied_files:
+            line = f"{copied_file['order']:2d}. {copied_file['new_name']}"
+            output_file.write(line + "\n")
+        
+        print(f"\nAll files copied to: {output_directory}")
+        output_file.write(f"\nAll files copied to: {output_directory}\n")
     
     # Summary for this location
     valid_comparisons = [r for r in image_results if not r.get('error') and not r.get('is_reference')]
@@ -235,7 +260,8 @@ Location {location_id} Summary:
 - Reference image: {reference_name}
 - Total images compared: {len(image_results)}
 - Valid comparisons: {len(valid_comparisons)}
-- Files successfully renamed: {len(renamed_files)}
+- Files successfully copied: {len(copied_files)}
+- Output directory: {os.path.basename(output_directory) if output_directory else 'N/A'}
 - Minimum difference: {min_diff:.2f}%
 - Maximum difference: {max_diff:.2f}%
 - Average difference: {avg_diff:.2f}%
@@ -298,7 +324,7 @@ def main():
         
         # Process the specific location
         image_files = location_groups[reference_location]
-        process_location_group(reference_location, image_files, reference_name, output_file)
+        process_location_group(reference_location, image_files, reference_name, image_directory, output_file)
         
         # Write final summary
         final_summary = f"""
