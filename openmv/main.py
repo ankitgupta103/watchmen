@@ -56,7 +56,7 @@ lora_reinit_count = 0
 
 image_in_progress = False
 
-COMMAN_CENTER_ADDR = 209
+COMMAN_CENTER_ADDR = 219
 my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
@@ -64,7 +64,7 @@ seen_neighbours = []
 rtc = RTC()
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 if uid == b'e076465dd7194025':
-    my_addr = 209
+    my_addr = 219
 elif uid == b'e076465dd7091027':
     my_addr = 221
 elif uid == b'e076465dd7193a09':
@@ -842,7 +842,7 @@ async def validate_and_remove_neighbours():
 async def send_heartbeat():
     destlist = possible_paths(None)
     log(f"Will send HB to {destlist}")
-    # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,209])
+    # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,219])
     if gps_last_time > 0:
         gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
     else:
@@ -947,7 +947,7 @@ def execute_command(command):
 def fake_listen_http():
     command = "SENDHB"
     dest = 222
-    cpath = [209,222]
+    cpath = [219,222]
     return (command, dest, cpath)
 
 def command_process(mid, msg):
