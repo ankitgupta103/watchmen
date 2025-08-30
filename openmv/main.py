@@ -70,11 +70,9 @@ elif uid == b'e076465dd7091027':
 elif uid == b'e076465dd7193a09':
     my_addr = 222
 elif uid == b'e076465dd7091843':
-    my_addr = 223
-elif uid == b'e076465dd7194211':
-    my_addr = 224
-elif uid == b'e076465dd7090d1c':
     my_addr = 225
+elif uid == b'e076465dd7090d1c':
+    my_addr = 223
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -839,15 +837,57 @@ async def validate_and_remove_neighbours():
             seen_neighbours.remove(x)
         await asyncio.sleep(VALIDATE_WAIT_SEC)
 
+def read_gps_from_file():
+    """Read GPS coordinates from gps_coordinate.txt file"""
+    try:
+        with open("gps_coordinate.txt", "r") as f:
+            line = f.readline()
+            if len(line) > 5:
+                # line contains something like 12.34567,98.76543
+                coords = lines[0].strip()
+                if coords and ',' in coords:
+                    return coords
+        return ""
+    except Expetion as e :
+        log(f"Error reading GPS file: {e}")
+        return ""
+
+def get_gps_file_staleness():
+    """Get staleness of GPS file in seconds"""
+    try:
+        import os
+        stat = os.stat("gps_coordinate.txt")
+        last_seen = int(stat[8])
+        return last_seen
+    except Exception as e:
+        log(f"Error getting gps frile staleness: {e}")
+        return -1
+
+
 async def send_heartbeat():
     destlist = possible_paths(None)
     log(f"Will send HB to {destlist}")
+<<<<<<< HEAD
     # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,219])
     if gps_last_time > 0:
         gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
     else:
         gps_staleness = -1
     hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
+=======
+
+
+    # if gps_last_time > 0:
+    #     gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
+    # else:
+    #     gps_staleness = -1
+
+    gps_coords = read_gps_from_file()
+    gps_staleness = get_gps_file_staleness()
+
+    # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
+    hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_coords}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
+>>>>>>> 056b0e8 (openmv/main.py: adde to get lat long from gps_coordinate.py)
     log(f"HBSTR = {hbmsgstr}")
     hbmsg = hbmsgstr.encode()
     msgbytes = encrypt_if_needed("H", hbmsg)
@@ -1023,10 +1063,10 @@ async def print_summary_and_flush_logs():
 async def keep_updating_gps():
     global gps_str, gps_last_time
     log("Initializing GPS...")
-    
+
     # Wait for LoRa to settle
     await asyncio.sleep(3)
-    
+
     try:
         uart = gps_driver.SC16IS750(spi_bus=1, cs_pin="P3")
         uart.init_gps()
@@ -1035,26 +1075,26 @@ async def keep_updating_gps():
     except Exception as e:
         log(f"GPS initialization failed: {e}")
         return
-    
+
     read_count = 0
     last_successful_read = 0
-    
+
     # Continuous reading loop
     while True:
         try:
             read_count += 1
-            
+
             # Skip GPS if heavy operations are running
             if image_in_progress:
                 await asyncio.sleep(GPS_WAIT_SEC * 2)
                 continue
-            
+
             # Clear any stale data in buffer first
             stale_data = uart.read_data()
-            
+
             # Process fresh GPS data
             gps.update()
-            
+
             if gps.has_fix():
                 lat, lon = gps.get_coordinates()
                 if lat is not None and lon is not None:
@@ -1073,14 +1113,14 @@ async def keep_updating_gps():
                     if raw_debug:
                         sample = raw_debug[:60].replace('\r', '\\r').replace('\n', '\\n')
                         log(f"GPS raw: {sample}")
-            
+
             # Clear buffer periodically to prevent overflow
             if read_count % 30 == 0:
                 while uart.read_data():  # Clear all buffered data
                     pass
                 gps.buffer = ""  # Clear internal parser buffer
                 log("GPS buffer cleared")
-            
+
             # Reinitialize if too many failures
             if last_successful_read > 0 and (read_count - last_successful_read) > 100:
                 log("GPS not working, reinitializing...")
@@ -1092,11 +1132,11 @@ async def keep_updating_gps():
                 except Exception as e:
                     log(f"GPS reinit failed: {e}")
                     await asyncio.sleep(10)
-            
+
         except Exception as e:
             log(f"GPS read error: {e}")
             await asyncio.sleep(2)
-        
+
         # Shorter sleep to prevent buffer overflow
         await asyncio.sleep(max(1, GPS_WAIT_SEC))  # At least 1 second
 
