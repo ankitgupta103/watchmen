@@ -74,10 +74,24 @@ class GPS:
         self.latitude = None
         self.longitude = None
         self.fix_quality = 0
+        self.filename = "gps_coordinate.txt"
+
+    def write_coordinates_to_file(self, lat, lon):
+        """Write coordinates to file, replacing previous content"""
+        try:
+            with open(self.filename, 'w') as f:
+                f.write(f"{lat:.6f},{lon:.6f}\n")
+                f.write(f"Latitude: {lat:.6f}\n")
+                f.write(f"Longitude: {lon:.6f}\n")
+                f.write(f"Updated: {time.time()}\n")
+        except Exception as e:
+            print(f"Error writing to file: {e}")
 
     def update(self):
         """Read GPS data and update coordinates"""
         data = self.uart.read_data()
+
+        print(f"Raw Data: {data}")
 
         if not data:
             return
@@ -88,7 +102,7 @@ class GPS:
         while '\n' in self.buffer or '\r' in self.buffer:
             cr_pos = self.buffer.find('\r')
             lf_pos = self.buffer.find('\n')
-            
+
             if cr_pos == -1:
                 end_pos = lf_pos
             elif lf_pos == -1:
@@ -97,7 +111,7 @@ class GPS:
                 end_pos = min(cr_pos, lf_pos)
 
             sentence = self.buffer[:end_pos].strip()
-            
+
             remaining = self.buffer[end_pos:]
             if remaining.startswith('\r\n'):
                 self.buffer = remaining[2:]
@@ -167,8 +181,11 @@ class GPS:
                 lon = self._nmea_to_decimal(lon_str, lon_dir)
 
                 if lat is not None and lon is not None:
-                    self.latitude = lat
-                    self.longitude = lon
+                    # Check if coordinates have changed before writing to file
+                    if self.latitude != lat or self.longitude != lon:
+                        self.latitude = lat
+                        self.longitude = lon
+                        self.write_coordinates_to_file(lat, lon)
 
         except:
             pass
@@ -198,8 +215,11 @@ class GPS:
                 lon = self._nmea_to_decimal(lon_str, lon_dir)
 
                 if lat is not None and lon is not None:
-                    self.latitude = lat
-                    self.longitude = lon
+                    # Check if coordinates have changed before writing to file
+                    if self.latitude != lat or self.longitude != lon:
+                        self.latitude = lat
+                        self.longitude = lon
+                        self.write_coordinates_to_file(lat, lon)
 
         except:
             pass
@@ -266,7 +286,7 @@ def main():
                 if gps.has_fix():
                     lat, lon = gps.get_coordinates()
                     if lat is not None and lon is not None:
-                        print(f"{lat:.6f}, {lon:.6f}")
+                        print(f"Location detail: {lat:.6f}, {lon:.6f}")
 
             time.sleep_ms(100)
 
