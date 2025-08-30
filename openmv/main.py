@@ -24,7 +24,7 @@ CHUNK_SLEEP = 0.3
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 120
-HB_WAIT_2 = 1200
+HB_WAIT_2 = 120
 SPATH_WAIT = 30
 SPATH_WAIT_2 = 1200
 SCAN_WAIT = 30
@@ -837,42 +837,33 @@ async def validate_and_remove_neighbours():
             seen_neighbours.remove(x)
         await asyncio.sleep(VALIDATE_WAIT_SEC)
 
-def read_gps_from_file():
-    """Read GPS coordinates from gps_coordinate.txt file"""
+def get_gps_file_staleness():
     try:
         with open("gps_coordinate.txt", "r") as f:
-            line = f.readline()
-            if len(line) > 5:
-                # line contains something like 12.34567,98.76543
-                coords = lines[0].strip()
-                if coords and ',' in coords:
-                    return coords
-        return ""
-    except Expetion as e :
-        log(f"Error reading GPS file: {e}")
-        return ""
-
-def get_gps_file_staleness():
-    """Get staleness of GPS file in seconds"""
-    try:
-        import os
-        stat = os.stat("gps_coordinate.txt")
-        last_seen = int(stat[8])
-        return last_seen
-    except Exception as e:
-        log(f"Error getting gps frile staleness: {e}")
+            lines = f.readlines()
+            for line in lines:
+                if line.startswith("Updated:"):
+                    timestamp = int(line.split(":")[1].strip())
+                    return timestamp
         return -1
+    except:
+        return -1
+
+def read_gps_from_file():
+    try:
+        with open("gps_coordinate.txt", "r") as f:
+            coords = f.readline().strip()
+            if coords and ',' in coords:
+                return coords
+        return ""
+    except:
+        return ""
 
 
 async def send_heartbeat():
     destlist = possible_paths(None)
     log(f"Will send HB to {destlist}")
 
-
-    # if gps_last_time > 0:
-    #     gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
-    # else:
-    #     gps_staleness = -1
 
     gps_coords = read_gps_from_file()
     gps_staleness = get_gps_file_staleness()
