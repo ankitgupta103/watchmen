@@ -867,14 +867,6 @@ def get_gps_file_staleness():
 async def send_heartbeat():
     destlist = possible_paths(None)
     log(f"Will send HB to {destlist}")
-<<<<<<< HEAD
-    # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,219])
-    if gps_last_time > 0:
-        gps_staleness = int(utime.ticks_diff(utime.ticks_ms(), gps_last_time) / 1000) # compute time difference
-    else:
-        gps_staleness = -1
-    hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_str}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
-=======
 
 
     # if gps_last_time > 0:
@@ -887,7 +879,6 @@ async def send_heartbeat():
 
     # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
     hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_coords}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
->>>>>>> 056b0e8 (openmv/main.py: adde to get lat long from gps_coordinate.py)
     log(f"HBSTR = {hbmsgstr}")
     hbmsg = hbmsgstr.encode()
     msgbytes = encrypt_if_needed("H", hbmsg)
