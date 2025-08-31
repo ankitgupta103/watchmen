@@ -69,11 +69,12 @@ class Detector:
                 return True
         else:
             # If the output format is unexpected, return 0.
-            print(f"  ⚠️ Unexpected model output")
+            print(f"   Unexpected model output")
         return False
 
     def check_person(self, img):
-        return self.check_thermal_body() or self.check_image(img)
+        # return self.check_thermal_body() or self.check_image(img)
+        return self.check_thermal_body()
 
 def main():
     print(f"In Main of Detect")
