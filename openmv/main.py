@@ -129,7 +129,7 @@ log("Running on device : " + uid.decode())
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.VGA)
+sensor.set_framesize(sensor.HD)
 sensor.skip_frames(time=2000)
 
 sent_count = 0
