@@ -5,15 +5,40 @@ import sensor
 import image
 
 # ====== TURNING IR EMITTER ON ========================
-p1_pin = Pin('P14', Pin.OUT)  # Configure as output
+# p1_pin = Pin('P14', Pin.OUT)  # Configure as output
+# def turn_ON_IR_emitter():
+#     p1_pin.on()                  # Make it HIGH
+#     # or
+#     # p1_pin.value(1)             # Alternative way to make it HIGH
+# def turn_OFF_IR_emitter():
+#     p1_pin.value(0)
+# turn_ON_IR_emitter()
+
+
+# ====== SMART IR EMITTER CONTROL ========================
+ir_emitter = Pin('P14', Pin.OUT)  # Configure as output
+ir_emitter_active = False
+IR_WARMUP_TIME = 100  # Time to wait for IR emitter to stabilize (ms)
+
 def turn_ON_IR_emitter():
-    p1_pin.on()                  # Make it HIGH
-    # or
-    # p1_pin.value(1)             # Alternative way to make it HIGH
+    global ir_emitter_active
+    if not ir_emitter_active:
+        ir_emitter.on()
+        ir_emitter_active = True
+        print("IR emitter ON - Enhanced night vision active")
+        time.sleep_ms(IR_WARMUP_TIME)  # Let IR emitter stabilize
+
 def turn_OFF_IR_emitter():
-    p1_pin.value(0)
-turn_ON_IR_emitter()
+    global ir_emitter_active
+    if ir_emitter_active:
+        ir_emitter.off()
+        ir_emitter_active = False
+        print("IR emitter OFF - Power saving mode")
+
+# Start with IR emitter OFF
+turn_OFF_IR_emitter()
 # ======================================================
+
 
 # Initialize PIR sensor pin (adjust pin number based on your wiring)
 # Connect PIR sensor output to a digital pin
@@ -31,8 +56,10 @@ class Detector:
         is_thermal = PIR_PIN.value()
         if is_thermal:
             print(f"PIR DETECTED THERMAL BODY")
+            turn_ON_IR_emitter()
             return True
         else:
+            turn_OFF_IR_emitter()
             return False
 
     def resize_image(self, img, target_size):
