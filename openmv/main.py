@@ -67,8 +67,10 @@ if uid == b'e076465dd7194025':
     my_addr = 219
 elif uid == b'e076465dd7091027':
     my_addr = 221
+    shortest_path_to_cc = [223, 219]
 elif uid == b'e076465dd7193a09':
     my_addr = 222
+    shortest_path_to_cc = [221, 223, 219]
 elif uid == b'e076465dd7091843':
     my_addr = 225
 elif uid == b'e076465dd7090d1c':
