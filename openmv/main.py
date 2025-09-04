@@ -508,6 +508,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
         log(f"Failed sending chunk begin")
         return False
     for i in range(len(chunks)):
+        asyncio.create_task(acquire_image_lock())
         if i % 10 == 0:
             log(f"Sending chunk {i}")
         await asyncio.sleep(CHUNK_SLEEP)
@@ -526,6 +527,7 @@ def send_msg_internal(msgtype, creator, msgbytes, dest):
         for mc in missing_chunks:
             await asyncio.sleep(CHUNK_SLEEP)
             chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
+            asyncio.create_task(acquire_image_lock())
             _ = await send_single_msg("I", creator, chunkbytes, dest)
     return False
 
@@ -596,6 +598,7 @@ def add_chunk(msgbytes):
     if len(msgbytes) < 5:
         log(f"ERROR : Not enough bytes {len(msgbytes)} : {msgbytes}")
         return
+    asyncio.create_task(acquire_image_lock())
     cid = msgbytes[0:3].decode()
     citer = int.from_bytes(msgbytes[3:5])
     #log(f"Got chunk id {citer}")
