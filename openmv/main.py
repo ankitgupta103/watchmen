@@ -75,6 +75,8 @@ elif uid == b'e076465dd7091843':
     my_addr = 225
 elif uid == b'e076465dd7090d1c':
     my_addr = 223
+    shortest_path_to_cc = [219]
+
 else:
     print("Unknown device ID for " + omv.board_id())
     sys.exit()
