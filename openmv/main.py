@@ -31,7 +31,7 @@ SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
 PHOTO_TAKING_DELAY = 1
-PHOTO_SENDING_DELAY = 65
+PHOTO_SENDING_DELAY = 600
 GPS_WAIT_SEC = 5
 
 MIDLEN = 7
@@ -293,7 +293,7 @@ async def person_detection_loop():
         total_image_count += 1
         img = sensor.snapshot()
         person_detected = detector.check_person(img)
-        if person_detected:
+        if my_addr == 222:
             person_image_count += 1
             r = get_rand()
             raw_path = f"{IMAGE_DIR}/raw_{r}.jpg"
