@@ -146,7 +146,8 @@ async def acquire_image_lock():
     log(f"Acquiring Image Lock")
     image_in_progress = True
     await asyncio.sleep(120)
-    log(f"Releasing image lock after 120 seconds, current lock state = {image_in_progress}")
+    if image_in_progress:
+        log(f"Releasing image lock after 120 seconds, current lock state = {image_in_progress}")
     image_in_progress = False
 
 def release_image_lock():
