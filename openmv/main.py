@@ -866,7 +866,6 @@ async def send_heartbeat():
     destlist = possible_paths(None)
     log(f"Will send HB to {destlist}")
 
-
     gps_coords = read_gps_from_file()
     gps_staleness = get_gps_file_staleness()
 
@@ -1133,12 +1132,12 @@ async def main():
     if running_as_cc():
         log(f"Starting command center")
         await init_sim()
-        asyncio.create_task(send_scan())
+        # asyncio.create_task(send_scan())
         await asyncio.sleep(2)
-        asyncio.create_task(send_spath())
+        # asyncio.create_task(send_spath())
         #asyncio.create_task(listen_commands_from_cloud())
     else:
-        asyncio.create_task(send_scan())
+        # asyncio.create_task(send_scan())
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
