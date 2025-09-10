@@ -24,7 +24,7 @@ CHUNK_SLEEP = 0.3
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 120
-HB_WAIT_2 = 120
+HB_WAIT_2 = 1200
 SPATH_WAIT = 30
 SPATH_WAIT_2 = 1200
 SCAN_WAIT = 30
@@ -67,14 +67,15 @@ if uid == b'e076465dd7194025':
     my_addr = 219
 elif uid == b'e076465dd7091027':
     my_addr = 221
-    shortest_path_to_cc = [223, 219]
+    shortest_path_to_cc = [219]
 elif uid == b'e076465dd7193a09':
     my_addr = 222
-    shortest_path_to_cc = [221, 223, 219]
-elif uid == b'e076465dd7091843':
-    my_addr = 225
+    shortest_path_to_cc = [219]
 elif uid == b'e076465dd7090d1c':
     my_addr = 223
+    shortest_path_to_cc = [219]
+elif uid == b'e076465dd7091843':
+    my_addr = 225
     shortest_path_to_cc = [219]
 
 else:
@@ -296,7 +297,7 @@ async def person_detection_loop():
         total_image_count += 1
         img = sensor.snapshot()
         person_detected = detector.check_person(img)
-        if my_addr == 222:
+        if person_detected:
             person_image_count += 1
             r = get_rand()
             raw_path = f"{IMAGE_DIR}/raw_{r}.jpg"
