@@ -296,7 +296,7 @@ async def person_detection_loop():
             continue
         total_image_count += 1
         img = sensor.snapshot()
-        person_detected = detector.check_person(img)
+        person_detected = detector.check_person()
         if person_detected:
             person_image_count += 1
             r = get_rand()

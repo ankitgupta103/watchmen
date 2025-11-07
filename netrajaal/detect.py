@@ -99,7 +99,8 @@ class Detector:
             print(f"   Unexpected model output")
         return False
 
-    def check_person(self, img):
+    def check_person(self):                                       
+        # Removed img parameter as we are not doing model.predict on image
         # return self.check_thermal_body() or self.check_image(img)
         return self.check_thermal_body()
 
