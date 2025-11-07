@@ -926,7 +926,7 @@ async def send_scan():
         global image_in_progress
         if image_in_progress:
             log(f"Skipping scan send because image in progress")
-            await asyncio.sleep(200)
+            await asyncio.sleep(SCAN_WAIT)
             continue
         scanmsg = my_addr.to_bytes()
         # 65535 is for Broadcast
