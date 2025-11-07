@@ -49,7 +49,8 @@ MODEL_INPUT_SIZE = 256
 
 class Detector:
     def __init__(self):
-        self.model = ml.Model(MODEL_PATH)
+        # self.model = ml.Model(MODEL_PATH)
+        pass
 
     def check_thermal_body(self):
         """Check if thermal body is present in PIR sensor path"""
