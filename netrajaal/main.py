@@ -1106,7 +1106,7 @@ def command_process(mid, msg):
     next_dest = get_next_on_path(cpath)
     if next_dest is not None:
         log(f"Propogating command to {next_dest}")
-        await send_msg("C", my_addr, msgstr.encnode(), next_dest)
+        await send_msg("C", my_addr, msgstr.encode(), next_dest)
     else:
         log(f"Next dest seems None for {msg}")
 
