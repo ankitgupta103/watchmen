@@ -1030,7 +1030,7 @@ async def send_scan():
             continue
         scanmsg = my_addr.to_bytes()
         # 65535 is for Broadcast
-        await send_msg("N", my_addr, scanmsg, 65535)
+        await send_msg_internal("N", my_addr, scanmsg, 65535)
         if i < DISCOVERY_COUNT:
             await asyncio.sleep(SCAN_WAIT)
         else:
