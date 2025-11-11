@@ -1106,7 +1106,7 @@ def fake_listen_http():
     cpath = [219,222]
     return (command, dest, cpath)
 
-def command_process(mid, msg):
+async def command_process(mid, msg):
     # Input: mid: bytes, msg: bytes command payload; Output: None (executes or forwards command)
     try:
         msgstr = msg.decode()
