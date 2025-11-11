@@ -104,15 +104,20 @@ def get_fs_root_for_storage():
 
 FS_ROOT = get_fs_root_for_storage()
 print(f"Using FS_ROOT : {FS_ROOT}")
-if running_as_cc():
-    IMAGE_DIR = f"{FS_ROOT}/ccimages"
-else:
-    IMAGE_DIR = f"{FS_ROOT}/images"
+MY_IMAGE_DIR = f"{FS_ROOT}/myimages"
+NET_IMAGE_DIR = f"{FS_ROOT}/netimages"
+
 try:
-    os.mkdir(IMAGE_DIR)
-    print(f"Created {IMAGE_DIR} directory")
+    os.mkdir(NET_IMAGE_DIR)
+    print(f"Created {NET_IMAGE_DIR} directory")
 except OSError:
-    print(f"{IMAGE_DIR} directory already exists")
+    print(f"{NET_IMAGE_DIR} directory already exists")
+try:
+    os.mkdir(MY_IMAGE_DIR)
+    print(f"Created {MY_IMAGE_DIR} directory")
+except OSError:
+    print(f"{MY_IMAGE_DIR} directory already exists")
+
 LOG_FILE_PATH = f"{FS_ROOT}/mainlog.txt"
 
 print(f"MyAddr = {my_addr}")
@@ -717,7 +722,7 @@ async def img_process(cid, msg, creator, sender):
             img_bytes = msg
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         log(len(img_bytes))
-        fname = f"{IMAGE_DIR}/cc_{creator}_{cid}.jpg"
+        fname = f"{NET_IMAGE_DIR}/cc_{creator}_{cid}.jpg"
         log(f"Saving to file {fname}")
         images_saved_at_cc.append(fname)
         img.save(fname)
@@ -757,7 +762,7 @@ async def person_detection_loop():
             img = sensor.snapshot()
             person_image_count += 1
             r = get_rand()
-            raw_path = f"{IMAGE_DIR}/raw_{r}.jpg"
+            raw_path = f"{MY_IMAGE_DIR}/raw_{r}.jpg"
             log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
             img.save(raw_path)
             images_to_send.append(raw_path)
@@ -789,7 +794,7 @@ async def image_sending_loop():
     while True:
         await asyncio.sleep(4)
         destlist = possible_paths(None)
-        if len(destlist) == 0:
+        if not running_as_cc() and len(destlist) == 0:
             log("No shortest path yet so cant send")
             continue
         if len(images_to_send) > 0:
@@ -798,7 +803,10 @@ async def image_sending_loop():
             img = image.Image(imagefile)
             imgbytes = img.bytearray()
             transmission_start = time_msec()
-            sent_succ = await asyncio.create_task(send_image_to_mesh(imgbytes))
+            if running_as_cc:
+                sent_succ = await asyncio.create_task(sim_send_image(my_addr, imgbytes))
+            else:
+                sent_succ = await asyncio.create_task(send_image_to_mesh(imgbytes))
             if not sent_succ:
                 images_to_send.append(imagefile) # pushed to back of queue
 
@@ -980,13 +988,23 @@ async def send_heartbeat():
     hbmsg = hbmsgstr.encode()
     msgbytes = encrypt_if_needed("H", hbmsg)
     sent_succ = False
-    for peer_addr in destlist:
-        log(f"Sending HB to {peer_addr}")
-        sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
-        if sent_succ:
-            consecutive_hb_failures = 0
-            log(f"heartbeat sent successfully to {peer_addr}")
-            return True
+    if running_as_cc():
+        heartbeat_payload =  {
+                "machine_id": my_addr,
+                "message_type": "heartbeat",
+                "heartbeat_data": msgbytes,
+            }
+        log(f"Sending raw heartbeat data of length {len(heartbeat_payload)} bytes")
+        sent_succ = await sim_upload_hb(heartbeat_payload)
+        return sent_succ
+    else:
+        for peer_addr in destlist:
+            log(f"Sending HB to {peer_addr}")
+            sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
+            if sent_succ:
+                consecutive_hb_failures = 0
+                log(f"heartbeat sent successfully to {peer_addr}")
+                return True
     return False
 
 async def keep_sending_heartbeat():
@@ -1253,11 +1271,14 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
-        # await init_sim()
+        await init_sim()
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(send_spath())
         #asyncio.create_task(listen_commands_from_cloud())
+        asyncio.create_task(keep_sending_heartbeat())
+        asyncio.create_task(person_detection_loop())
+        asyncio.create_task(image_sending_loop())
     else:
         asyncio.create_task(send_scan())
         await asyncio.sleep(1)
