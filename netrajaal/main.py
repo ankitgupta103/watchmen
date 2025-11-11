@@ -823,7 +823,7 @@ def scan_process(mid, msg):
         log(f"Adding nodeaddr {nodeaddr} to seen_neighbours")
         seen_neighbours.append(nodeaddr)
 
-def spath_process(mid, msg):
+async def spath_process(mid, msg):
     # Input: mid: bytes, msg: str shortest-path data; Output: None (updates shortest_path_to_cc and propagates)
     global shortest_path_to_cc
     if running_as_cc():
@@ -872,7 +872,7 @@ def process_message(data):
     elif mst == "V":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif mst == "S":
-        spath_process(mid, msg.decode())
+        asyncio.create_task(spath_process(mid, msg.decode()))
     elif mst == "H":
         asyncio.create_task(hb_process(mid, msg, sender))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
