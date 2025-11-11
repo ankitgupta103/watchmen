@@ -169,13 +169,30 @@ def get_rand():
     return rstr
 
 # TypeSourceDestRRRandom
+def encode_node_id(node_id):
+    # Input: node_id: int; Output: single-byte representation
+    if not isinstance(node_id, int):
+        raise TypeError(f"Node id must be int, got {type(node_id)}")
+    if not 0 <= node_id <= 255:
+        raise ValueError(f"Node id {node_id} out of range (0-255)")
+    return bytes((node_id,))
+
+def encode_dest(dest):
+    # Input: dest: int; Output: single-byte representation or broadcast marker
+    if dest in (0, 65535):
+        return b'*'
+    return encode_node_id(dest)
+
 def get_msg_id(msgtype, creator, dest):
     # Input: msgtype: str, creator: int, dest: int; Output: bytes message identifier
     rrr = get_rand()
-    if dest == 0 or dest == 65535:
-        mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + b'*' + rrr.encode()
-    else:
-        mid = msgtype.encode() + creator.to_bytes() + my_addr.to_bytes() + dest.to_bytes() + rrr.encode()
+    mid = (
+        msgtype.encode()
+        + encode_node_id(creator)
+        + encode_node_id(my_addr)
+        + encode_dest(dest)
+        + rrr.encode()
+    )
     return mid
 
 def parse_header(data):
@@ -1046,7 +1063,7 @@ async def send_scan():
             log(f"Skipping scan send because image in progress")
             await asyncio.sleep(SCAN_WAIT)
             continue
-        scanmsg = my_addr.to_bytes()
+        scanmsg = encode_node_id(my_addr)
         # 65535 is for Broadcast
         await send_msg_internal("N", my_addr, scanmsg, 65535)
         if i < DISCOVERY_COUNT:
