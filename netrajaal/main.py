@@ -371,7 +371,7 @@ def encrypt_if_needed(mst, msg):
     return msg
 
 # === Send Function ===
-def send_msg_internal(msgtype, creator, msgbytes, dest):
+async def send_msg_internal(msgtype, creator, msgbytes, dest):
     # Input: msgtype: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
     if msgtype == "P":
         log(f"Sending photo of length {len(msgbytes)}")
@@ -1253,7 +1253,7 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
-        await init_sim()
+        # await init_sim()
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(send_spath())
