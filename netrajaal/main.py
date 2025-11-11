@@ -752,9 +752,9 @@ async def person_detection_loop():
             await asyncio.sleep(20)
             continue
         total_image_count += 1
-        img = sensor.snapshot()
         person_detected = detector.check_person()
         if person_detected:
+            img = sensor.snapshot()
             person_image_count += 1
             r = get_rand()
             raw_path = f"{IMAGE_DIR}/raw_{r}.jpg"
