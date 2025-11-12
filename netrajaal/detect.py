@@ -18,7 +18,7 @@ def log(msg):
     t = get_human_ts()
     log_entry = f"{t} : {msg}"
     log_entries_buffer.append(log_entry)
-    log(log_entry)
+    print(log_entry)
     
 # ====== TURNING IR EMITTER ON ========================
 # p1_pin = Pin('P14', Pin.OUT)  # Configure as output

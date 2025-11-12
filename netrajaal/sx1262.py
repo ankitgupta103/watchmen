@@ -20,7 +20,7 @@ def log(msg):
     t = get_human_ts()
     log_entry = f"{t} : {msg}"
     log_entries_buffer.append(log_entry)
-    log(log_entry)
+    print(log_entry)
 
 class sx126x:
 
