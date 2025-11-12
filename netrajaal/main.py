@@ -833,13 +833,13 @@ async def person_detection_loop():
             try:
                 img = sensor.snapshot()
                 person_image_count += 1
-                r = get_rand()
-                raw_path = f"{MY_IMAGE_DIR}/raw_{r}.jpg"
-                log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
+                raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
+                log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
                 img.save(raw_path)
                 images_to_send.append(raw_path)
+                log(f"Saved image: {raw_path}")
             except Exception as e:
-                log(f"ERROR: in _take_image_and_save, {str(e)}")
+                log(f"ERROR: Unexpected error in image taking and saving: {e}")
         await asyncio.sleep(PHOTO_TAKING_DELAY)
         log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
 
