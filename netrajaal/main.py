@@ -45,9 +45,11 @@ AIR_SPEED = 19200
 ENCRYPTION_ENABLED = True
 
 # WiFi Configuration
-WIFI_SSID = "Airtel_anki_3363_5g"  
-WIFI_PASSWORD = "air34854" 
-WIFI_ENABLED = True  
+# WIFI_SSID = "Airtel_anki_3363_5g"
+# WIFI_PASSWORD = "air34854"
+WIFI_SSID = "A"
+WIFI_PASSWORD = "123456789"
+WIFI_ENABLED = True
 
 cellular_system = None
 wifi_nic = None
@@ -1342,7 +1344,7 @@ async def init_wifi():
         # Connect to WiFi access point
         log(f"Connecting to WiFi network: {WIFI_SSID}")
         wifi_nic.connect(WIFI_SSID, WIFI_PASSWORD)
-        
+
         # Wait for connection with timeout
         max_wait = 20  # Maximum wait time in seconds
         wait_count = 0
@@ -1356,7 +1358,7 @@ async def init_wifi():
                 log(f"Gateway: {ifconfig[2]}")
                 log(f"DNS server: {ifconfig[3]}")
                 return True
-            
+
             # Check for connection errors (if status() is available)
             try:
                 status = wifi_nic.status()
@@ -1377,10 +1379,10 @@ async def init_wifi():
             except:
                 # Status checking not available, just log wait time
                 log(f"WiFi connecting... (wait: {wait_count}s)")
-            
+
             await asyncio.sleep(1)
             wait_count += 1
-        
+
         # Timeout
         log(f"WiFi connection timeout after {max_wait} seconds")
         wifi_nic.active(False)
@@ -1479,29 +1481,42 @@ async def wifi_upload_hb(heartbeat_data):
     global wifi_nic
     if not wifi_nic or not wifi_nic.isconnected():
         return False
-
+    
     try:
         try:
             import requests
             use_requests = True
         except ImportError:
             use_requests = False
-
+        
         if use_requests:
+            # Convert heartbeat_data bytes to base64 string if needed
+            payload = heartbeat_data.copy()
+            if "heartbeat_data" in payload:
+                hb_data = payload["heartbeat_data"]
+                if isinstance(hb_data, bytes):
+                    # Convert bytes to base64 string
+                    payload["heartbeat_data"] = ubinascii.b2a_base64(hb_data).decode('utf-8').strip()
+                elif not isinstance(hb_data, str):
+                    # If it's not a string, convert to string
+                    payload["heartbeat_data"] = str(hb_data)
+            
             headers = {"Content-Type": "application/json"}
-            json_payload = json.dumps(heartbeat_data)
+            json_payload = json.dumps(payload)
             r = requests.post(URL, data=json_payload, headers=headers)
             if r.status_code == 200:
-                node_id = heartbeat_data.get("machine_id", "unknown")
+                node_id = payload.get("machine_id", "unknown")
                 log(f"Heartbeat from node {node_id} sent via WiFi successfully")
                 return True
             else:
                 log(f"WiFi heartbeat upload failed: status {r.status_code}")
+                if hasattr(r, 'text'):
+                    log(f"Response: {r.text[:200]}")
                 return False
         else:
             log("requests library not available, WiFi upload skipped")
             return False
-
+            
     except Exception as e:
         log(f"Error in wifi_upload_hb: {e}")
         return False
