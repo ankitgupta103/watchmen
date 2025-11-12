@@ -312,9 +312,10 @@ async def init_lora():
         m1_pin='P7'        # M1 control pin - adjust to your wiring
     )
 
-    log(f"LoRa module initialized successfully! (Total reinitializations: {lora_reinit_count})")
+    log(f"LoRa module (Total Initializations: {lora_reinit_count})")
     log(f"Node address: {loranode.addr}")
     log(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
+    log(f"===> LoRa module initialized successfully! <===\n")
 
 msgs_sent = []
 msgs_unacked = []
@@ -823,13 +824,16 @@ async def person_detection_loop():
         total_image_count += 1
         person_detected = detector.check_person()
         if person_detected:
-            img = sensor.snapshot()
-            person_image_count += 1
-            r = get_rand()
-            raw_path = f"{MY_IMAGE_DIR}/raw_{r}.jpg"
-            log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
-            img.save(raw_path)
-            images_to_send.append(raw_path)
+            try:
+                img = sensor.snapshot()
+                person_image_count += 1
+                r = get_rand()
+                raw_path = f"{MY_IMAGE_DIR}/raw_{r}.jpg"
+                log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}")
+                img.save(raw_path)
+                images_to_send.append(raw_path)
+            except Exception as e:
+                log(f"Error in _take_image_and_save, {str(e)}")
         await asyncio.sleep(PHOTO_TAKING_DELAY)
         log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
 
