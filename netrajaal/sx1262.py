@@ -250,8 +250,7 @@ class sx126x:
         while self.ser.any():
             self.ser.read()
 
-        # Debug: Print configuration being sent
-        log(f"Sending configuration:", [hex(x) for x in self.cfg_reg])
+        log(f"Sending configuration: {[hex(x) for x in self.cfg_reg]}")
 
         for i in range(3):  # Try 3 times instead of 2
             log(f"Configuration attempt {i+1}")
