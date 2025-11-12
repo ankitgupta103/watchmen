@@ -1,4 +1,23 @@
 from rsa.key import PublicKey, PrivateKey
+from machine import RTC
+
+rtc = RTC()
+def get_human_ts():
+    # Input: None; Output: str formatted as mm:ss
+    _,_,_,_,h,m,s,_ = rtc.datetime()
+    t=f"{m}:{s}"
+    return t
+
+log_entries_buffer = []
+
+def log(msg):
+    # Input: msg: str; Output: None (side effects: buffer append and console log)
+    t = get_human_ts()
+    log_entry = f"{t} : {msg}"
+    log_entries_buffer.append(log_entry)
+    log(log_entry)
+
+
 
 class PrivKeyRepo:
     def __init__(self):
@@ -82,13 +101,13 @@ class PrivKeyRepo:
 
     def get_pvt_key(self, nodeaddr):
         if nodeaddr not in self.pvtkey:
-            print(f"No pvt key for {nodeaddr}")
+            log(f"ERROR: No pvt key for {nodeaddr}")
             return None
         return self.pvtkey[nodeaddr]
 
 def main():
     p = PrivKeyRepo()
-    print(p.get_pvt_key(9))
+    log(p.get_pvt_key(9))
 
 if __name__ == "__main__":
     main()

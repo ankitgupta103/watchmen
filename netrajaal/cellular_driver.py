@@ -1,7 +1,23 @@
 import time
 import json
-from machine import SPI, Pin
+from machine import SPI, Pin, RTC
 import gc
+
+rtc = RTC()
+def get_human_ts():
+    # Input: None; Output: str formatted as mm:ss
+    _,_,_,_,h,m,s,_ = rtc.datetime()
+    t=f"{m}:{s}"
+    return t
+
+log_entries_buffer = []
+
+def log(msg):
+    # Input: msg: str; Output: None (side effects: buffer append and console log)
+    t = get_human_ts()
+    log_entry = f"{t} : {msg}"
+    log_entries_buffer.append(log_entry)
+    log(log_entry)
 
 class SC16IS750:
     """ Optimized SC16IS750 driver """
@@ -119,7 +135,7 @@ class Cellular:
         apn = apn_config["apn"]
         name = apn_config["name"]
         
-        print(f"Testing {name}: {apn}")
+        log(f"Testing {name}: {apn}")
         
         try:
             # Reset connection
@@ -143,7 +159,7 @@ class Cellular:
                     ip_part = response.split("+CGPADDR:")[1]
                     ip_address = ip_part.split(",")[1].strip().strip('"')
                     if ip_address and ip_address != "0.0.0.0":
-                        print(f"Connected! IP: {ip_address}")
+                        log(f"Connected! IP: {ip_address}")
                         self.ip_address = ip_address
                         self.working_apn = apn
                         return True
@@ -153,7 +169,7 @@ class Cellular:
             return False
             
         except Exception as e:
-            print(f"    Exception: {e}")
+            log(f"    Exception: {e}")
             return False
     
     def initialize(self):
@@ -181,7 +197,7 @@ class Cellular:
             if "+CSQ:" in response:
                 signal = response.split("+CSQ:")[1].split(",")[0].strip()
                 if signal.isdigit() and int(signal) > 0:
-                    print(f"Signal strength: {signal}/31")
+                    log(f"Signal strength: {signal}/31")
                     
             # Set network mode
             self._send_at("AT+CNMP=38")
@@ -199,11 +215,11 @@ class Cellular:
                 return False
             
             # Try APNs
-            print(f"=== Connecting to Network ===")
+            log(f"=== Connecting to Network ===")
             for apn_config in self.apn_configs:
                 if self._test_apn(apn_config):
                     self.connected = True
-                    print(f"Connected with {apn_config['name']}")
+                    log(f"Connected with {apn_config['name']}")
                     break
                 time.sleep_ms(1000)
             
@@ -215,15 +231,15 @@ class Cellular:
             if not self._init_http():
                 return False
             
-            print(f"\nSYSTEM READY")
-            print(f"APN: {self.working_apn}")
-            print(f"IP: {self.ip_address}")
-            print(f"Ready for data uploads\n")
+            log(f"\nSYSTEM READY")
+            log(f"APN: {self.working_apn}")
+            log(f"IP: {self.ip_address}")
+            log(f"===> Ready for data uploads <===")
             
             return True
             
         except Exception as e:
-            print(f"Initialization error: {e}")
+            log(f"Initialization error: {e}")
             return False
     
     def _init_http(self):
@@ -269,7 +285,7 @@ class Cellular:
         
         try:
             self.upload_count += 1
-            print(f"\n=== Upload #{self.upload_count} ===")
+            log(f"\n=== Upload #{self.upload_count} ===")
             
             # Prepare payload
             if isinstance(data_payload, dict):
@@ -280,7 +296,7 @@ class Cellular:
                 json_data = str(data_payload)
             
             data_size = len(json_data)
-            print(f"Uploading {data_size} bytes ({data_size/1024:.2f} KB)")
+            log(f"Uploading {data_size} bytes ({data_size/1024:.2f} KB)")
             
             # Set URL
             success, response = self._send_at(f'AT+HTTPPARA="URL","{url}"', timeout_ms=5000)
@@ -301,7 +317,7 @@ class Cellular:
                 upload_time = time.ticks_diff(time.ticks_ms(), upload_start) / 1000
                 
                 if upload_success:
-                    print(f"Data uploaded in {upload_time:.2f}s")
+                    log(f"Data uploaded in {upload_time:.2f}s")
                     
                     # Execute POST
                     success, response = self._send_at("AT+HTTPACTION=1", timeout_ms=30000)
@@ -320,7 +336,7 @@ class Cellular:
                                 if len(parts) >= 3:
                                     status_code = int(parts[1])
                                     response_length = int(parts[2])
-                                    print(f"Server response: HTTP {status_code}")
+                                    log(f"Server response: HTTP {status_code}")
                             except:
                                 pass
                         
@@ -346,9 +362,9 @@ class Cellular:
                         }
                         
                         if status_code == 200:
-                            print(f"SUCCESS: Upload #{self.upload_count}")
+                            log(f"SUCCESS: Upload #{self.upload_count}")
                         else:
-                            print(f"HTTP {status_code}: Upload #{self.upload_count}")
+                            log(f"HTTP {status_code}: Upload #{self.upload_count}")
                         
                         return result
                     else:
@@ -358,11 +374,11 @@ class Cellular:
                     print("Data upload failed")
                     return None
             else:
-                print(f"No DOWNLOAD prompt")
+                log(f"No DOWNLOAD prompt")
                 return None
                 
         except Exception as e:
-            print(f"Upload error: {e}")
+            log(f"Upload error: {e}")
             return None
     
     def check_connection(self):

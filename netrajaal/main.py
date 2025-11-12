@@ -71,7 +71,6 @@ my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
 
-rtc = RTC()
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 if uid == b'e076465dd7194025':
     my_addr = 219
@@ -89,51 +88,11 @@ elif uid == b'e076465dd7091843':
     shortest_path_to_cc = [219]
 
 else:
-    print("Unknown device ID for " + omv.board_id())
+    print("Error: Unknown device ID for " + omv.board_id())
     sys.exit()
 clock_start = utime.ticks_ms() # get millisecond counter
 
-def running_as_cc():
-    # Input: None; Output: bool indicating if this device is the command center
-    return my_addr == COMMAN_CENTER_ADDR
-
-def get_fs_root_for_storage():
-    # Input: None; Output: str path for filesystem root
-    has_sdcard = True
-    try:
-        os.listdir('/sdcard')
-        print("SD card available")
-    except OSError:
-        print("ERROR: SD card not found!")
-        has_sdcard = False
-
-    if has_sdcard:
-        return "/sdcard"
-    else:
-        return "/flash"
-
-FS_ROOT = get_fs_root_for_storage()
-print(f"Using FS_ROOT : {FS_ROOT}")
-MY_IMAGE_DIR = f"{FS_ROOT}/myimages"
-NET_IMAGE_DIR = f"{FS_ROOT}/netimages"
-
-try:
-    os.mkdir(NET_IMAGE_DIR)
-    print(f"Created {NET_IMAGE_DIR} directory")
-except OSError:
-    print(f"{NET_IMAGE_DIR} directory already exists")
-try:
-    os.mkdir(MY_IMAGE_DIR)
-    print(f"Created {MY_IMAGE_DIR} directory")
-except OSError:
-    print(f"{MY_IMAGE_DIR} directory already exists")
-
-LOG_FILE_PATH = f"{FS_ROOT}/mainlog.txt"
-
-print(f"MyAddr = {my_addr}")
-encnode = enc.EncNode(my_addr)
-print(f"Logs will be written at {LOG_FILE_PATH}")
-
+rtc = RTC()
 def get_human_ts():
     # Input: None; Output: str formatted as mm:ss
     _,_,_,_,h,m,s,_ = rtc.datetime()
@@ -145,9 +104,54 @@ log_entries_buffer = []
 def log(msg):
     # Input: msg: str; Output: None (side effects: buffer append and console log)
     t = get_human_ts()
-    log_entry = f"{my_addr}@{t} : {msg}"
+    # log_entry = f"{my_addr}@{t} : {msg}"
+    log_entry = f"{t} : {msg}"
     log_entries_buffer.append(log_entry)
     print(log_entry)
+    
+    
+
+def running_as_cc():
+    # Input: None; Output: bool indicating if this device is the command center
+    return my_addr == COMMAN_CENTER_ADDR
+
+def get_fs_root_for_storage():
+    # Input: None; Output: str path for filesystem root
+    has_sdcard = True
+    try:
+        os.listdir('/sdcard')
+        log("SD card available")
+    except OSError:
+        log("ERROR: SD card not found!")
+        has_sdcard = False
+
+    if has_sdcard:
+        return "/sdcard"
+    else:
+        return "/flash"
+
+FS_ROOT = get_fs_root_for_storage()
+log(f"Using FS_ROOT : {FS_ROOT}")
+MY_IMAGE_DIR = f"{FS_ROOT}/myimages"
+NET_IMAGE_DIR = f"{FS_ROOT}/netimages"
+
+try:
+    os.mkdir(NET_IMAGE_DIR)
+    log(f"Created {NET_IMAGE_DIR} directory")
+except OSError:
+    log(f"{NET_IMAGE_DIR} directory already exists")
+try:
+    os.mkdir(MY_IMAGE_DIR)
+    log(f"Created {MY_IMAGE_DIR} directory")
+except OSError:
+    log(f"{MY_IMAGE_DIR} directory already exists")
+
+LOG_FILE_PATH = f"{FS_ROOT}/mainlog.txt"
+
+log(f"MyAddr = {my_addr}")
+encnode = enc.EncNode(my_addr)
+log(f"Logs will be written at {LOG_FILE_PATH}")
+
 
 log("Running on device : " + uid.decode())
 
@@ -216,7 +220,7 @@ def parse_header(data):
     try:
         mid = data[:MIDLEN]
     except Exception as e:
-        log(f"ERROR PARSING {data[:MIDLEN]}  :  Error : {e}")
+        log(f"ERROR: PARSING {data[:MIDLEN]}  :  Error : {e}")
         return
     mst = chr(mid[0])
     creator = int(mid[1])
@@ -329,7 +333,7 @@ def radio_send(dest, data):
     sent_count = sent_count + 1
     lendata = len(data)
     if len(data) > 254:
-        log(f"Error msg too large : {len(data)}")
+        log(f"ERROR: msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
     loranode.send(dest, data)
@@ -495,7 +499,7 @@ def begin_chunk(msg):
     # Input: msg: str formatted as "<type>:<chunk_id>:<num_chunks>"; Output: None (initializes chunk tracking)
     parts = msg.split(":")
     if len(parts) != 3:
-        log(f"ERROR : begin message unparsable {msg}")
+        log(f"ERROR: : begin message unparsable {msg}")
         return
     mst = parts[0]
     cid = parts[1]
@@ -517,7 +521,7 @@ def get_missing_chunks(cid):
 def add_chunk(msgbytes):
     # Input: msgbytes: bytes containing chunk id + index + payload; Output: None (stores chunk data)
     if len(msgbytes) < 5:
-        log(f"ERROR : Not enough bytes {len(msgbytes)} : {msgbytes}")
+        log(f"ERROR: : Not enough bytes {len(msgbytes)} : {msgbytes}")
         return
     asyncio.create_task(acquire_image_lock())
     cid = msgbytes[0:3].decode()
@@ -525,7 +529,7 @@ def add_chunk(msgbytes):
     #log(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
     if cid not in chunk_map:
-        log(f"ERROR : no entry yet for {cid}")
+        log(f"ERROR: : no entry yet for {cid}")
         return
     chunk_map[cid][2].append((citer, cdata))
     _, expected_chunks, _ = chunk_map[cid]
@@ -656,7 +660,7 @@ async def sim_send_image(creator, encimb):
         return False
 
     except Exception as e:
-        log(f"Error in sim_send_image: {e}")
+        log(f"ERROR: in sim_send_image: {e}")
         return False
 
 async def sim_upload_hb(heartbeat_data):
@@ -680,7 +684,7 @@ async def sim_upload_hb(heartbeat_data):
             return False
 
     except Exception as e:
-        log(f"Error sending cellular heartbeat: {e}")
+        log(f"ERROR: sending cellular heartbeat: {e}")
         return False
 
 async def upload_image(creator, encimb):
@@ -769,7 +773,7 @@ async def hb_process(mid, msgbytes, sender):
             if sent_succ:
                 break
         if not sent_succ:
-            log(f"Error forwarding HB to possible_paths : {destlist}")
+            log(f"ERROR: forwarding HB to possible_paths : {destlist}")
     else:
         log(f"Can't forward HB because I dont have Spath yet")
 
@@ -833,7 +837,7 @@ async def person_detection_loop():
                 img.save(raw_path)
                 images_to_send.append(raw_path)
             except Exception as e:
-                log(f"Error in _take_image_and_save, {str(e)}")
+                log(f"ERROR: in _take_image_and_save, {str(e)}")
         await asyncio.sleep(PHOTO_TAKING_DELAY)
         log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
 
@@ -952,7 +956,7 @@ def process_message(data):
         try:
             begin_chunk(msg.decode())
         except Exception as e:
-            log(f"Error decoding unicode {e} : {msg}")
+            log(f"ERROR: decoding unicode {e} : {msg}")
     elif mst == "I":
         add_chunk(msg)
     elif mst == "E":
@@ -1097,7 +1101,7 @@ async def keep_sending_heartbeat():
                     await init_lora()
                     consecutive_hb_failures = 0
                 except Exception as e:
-                    log(f"Error reinitializing LoRa: {e}")
+                    log(f"ERROR: reinitializing LoRa: {e}")
         i += 1
         if i < DISCOVERY_COUNT:
             await asyncio.sleep(HB_WAIT + random.randint(3,10))
@@ -1182,7 +1186,7 @@ async def command_process(mid, msg):
         log(f"Could not decode {msg} : {e}")
     parts = msgstr.split(";")
     if len(parts) != 3:
-        log(f"Error parsing msgstr")
+        log(f"ERROR: parsing msgstr")
     dest = int(parts[0])
     cpath = parts[1].split(",")
     command = parts[2]
@@ -1434,7 +1438,7 @@ def get_wifi_status():
                 "status": wifi_nic.status()
             }
     except Exception as e:
-        log(f"Error getting WiFi status: {e}")
+        log(f"ERROR: getting WiFi status: {e}")
         return {"enabled": True, "connected": False, "error": str(e)}
 
 async def wifi_send_image(creator, encimb):
@@ -1476,7 +1480,7 @@ async def wifi_send_image(creator, encimb):
             return False
 
     except Exception as e:
-        log(f"Error in wifi_send_image: {e}")
+        log(f"ERROR: in wifi_send_image: {e}")
         return False
 
 async def wifi_upload_hb(heartbeat_data):
@@ -1522,7 +1526,7 @@ async def wifi_upload_hb(heartbeat_data):
             return False
             
     except Exception as e:
-        log(f"Error in wifi_upload_hb: {e}")
+        log(f"ERROR: in wifi_upload_hb: {e}")
         return False
 
 # ---------------------------------------------------------------------------

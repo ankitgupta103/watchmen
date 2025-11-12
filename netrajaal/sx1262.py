@@ -1,10 +1,26 @@
 try:
-    from machine import Pin, UART
+    from machine import Pin, UART, RTC
 except ImportError:
-    print("machine module not found. not running on openmv OpenMV.")
+    print("ERROR: machine module not found. not running on openmv OpenMV.")
     raise
 
 import time
+
+rtc = RTC()
+def get_human_ts():
+    # Input: None; Output: str formatted as mm:ss
+    _,_,_,_,h,m,s,_ = rtc.datetime()
+    t=f"{m}:{s}"
+    return t
+
+log_entries_buffer = []
+
+def log(msg):
+    # Input: msg: str; Output: None (side effects: buffer append and console log)
+    t = get_human_ts()
+    log_entry = f"{t} : {msg}"
+    log_entries_buffer.append(log_entry)
+    log(log_entry)
 
 class sx126x:
 
@@ -93,7 +109,7 @@ class sx126x:
 
         self.target_baud = 115200
         
-        print(f"Initializing with UART {uart_num}, M0={m0_pin}, M1={m1_pin}")
+        log(f"Initializing with UART {uart_num}, M0={m0_pin}, M1={m1_pin}")
         
         # Initialize GPIO pins for M0 and M1
         try:
@@ -101,7 +117,7 @@ class sx126x:
             self.M1 = Pin(m1_pin, Pin.OUT)
             print("GPIO pins initialized successfully")
         except Exception as e:
-            print(f"GPIO initialization failed: {e}")
+            log(f"GPIO initialization failed: {e}")
             raise
             
         # Set initial pin states
@@ -112,9 +128,9 @@ class sx126x:
         # Initialize UART for OpenMV
         try:
             self.ser = UART(uart_num, 9600, timeout=2000)  # 2 second timeout
-            print(f"UART {uart_num} initialized at 9600 baud")
+            log(f"UART {uart_num} initialized at 9600 baud")
         except Exception as e:
-            print(f"UART initialization failed: {e}")
+            log(f"UART initialization failed: {e}")
             raise
             
         # Give module time to initialize
@@ -136,9 +152,9 @@ class sx126x:
 
         try:
             self.ser = UART(uart_num, self.target_baud, timeout=2000)
-            print(f"UART {uart_num} reopened at {self.target_baud} baud")
+            log(f"UART {uart_num} reopened at {self.target_baud} baud")
         except Exception as e:
-            print(f"UART initialization failed: {e}")
+            log(f"UART initialization failed: {e}")
             raise
 
         while self.ser.any():
@@ -238,21 +254,21 @@ class sx126x:
         print("Sending configuration:", [hex(x) for x in self.cfg_reg])
 
         for i in range(3):  # Try 3 times instead of 2
-            print(f"Configuration attempt {i+1}")
+            log(f"Configuration attempt {i+1}")
             self.ser.write(bytes(self.cfg_reg))
             time.sleep_ms(300)  # Longer delay
             
             if self.ser.any():
                 time.sleep_ms(200)  # Longer wait for response
                 r_buff = self.ser.read()
-                print(f"Received response: {[hex(x) for x in r_buff] if r_buff else 'None'}")
+                log(f"Received response: {[hex(x) for x in r_buff] if r_buff else 'None'}")
                 
                 if r_buff and len(r_buff) > 0 and r_buff[0] == 0xC1:
                     print("LoRa module configured successfully")
                     self.config_success = True
                     break
                 else:
-                    print(f"Configuration failed, unexpected response: {r_buff}")
+                    log(f"Configuration failed, unexpected response: {r_buff}")
             else:
                 print("No response from module")
                 
@@ -297,7 +313,7 @@ class sx126x:
         
         # Validate response
         if not response or len(response) < 12 or response[0] != 0xC1 or response[2] != 0x09:
-            print(f"Invalid response: {[hex(x) for x in response] if response else 'None'}")
+            log(f"Invalid response: {[hex(x) for x in response] if response else 'None'}")
             self.M1.value(0)
             return
         
@@ -345,16 +361,16 @@ class sx126x:
         print("=" * 40)
         print("      LoRa Module Settings")
         print("=" * 40)
-        print(f"Node Address    : {node_addr} (0x{node_addr:04X})")
-        print(f"Network ID      : {net_id}")
-        print(f"Frequency       : {frequency}.125 MHz")
-        print(f"UART Baud Rate  : {uart_baud} bps")
-        print(f"Air Data Rate   : {air_speed} bps") 
-        print(f"TX Power        : {power} dBm")
-        print(f"Buffer Size     : {buffer_size} bytes")
-        print(f"Encryption Key  : {crypt_key} (0x{crypt_key:04X})")
-        print(f"Packet RSSI     : {'Enabled' if rssi_enabled else 'Disabled'}")
-        print(f"Noise RSSI      : {'Enabled' if noise_rssi_enabled else 'Disabled'}")
+        log(f"Node Address    : {node_addr} (0x{node_addr:04X})")
+        log(f"Network ID      : {net_id}")
+        log(f"Frequency       : {frequency}.125 MHz")
+        log(f"UART Baud Rate  : {uart_baud} bps")
+        log(f"Air Data Rate   : {air_speed} bps") 
+        log(f"TX Power        : {power} dBm")
+        log(f"Buffer Size     : {buffer_size} bytes")
+        log(f"Encryption Key  : {crypt_key} (0x{crypt_key:04X})")
+        log(f"Packet RSSI     : {'Enabled' if rssi_enabled else 'Disabled'}")
+        log(f"Noise RSSI      : {'Enabled' if noise_rssi_enabled else 'Disabled'}")
         print("=" * 40)
         
         # Return to normal mode
@@ -375,7 +391,7 @@ class sx126x:
                bytes([self.addr & 0xff]) + \
                bytes([self.offset_freq]) + \
                message + b'\n'
-        #print(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
+        #log(f"Sending {len(data)} bytes: {[hex(x) for x in data[:10]]}{'...' if len(data) > 10 else ''}")
         self.ser.write(data)
         time.sleep_ms(150)
 
@@ -386,7 +402,7 @@ class sx126x:
             if r_buff and len(r_buff) >= 6:
                 # sender_addr = (r_buff[0] << 8) + r_buff[1]
                 # frequency = r_buff[2] + self.start_freq
-                # print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
+                # log(f"Received message from node address {sender_addr} at {frequency}.125MHz")
                 # Extract message payload (skip first 3 bytes for address and freq)
                 msg = r_buff[3:-1]
                 # msg = msg.replace(b'{}{}', b'\n')
@@ -410,7 +426,7 @@ class sx126x:
             re_temp = self.ser.read()
             
             if re_temp and len(re_temp) >= 4 and re_temp[0] == 0xC1 and re_temp[1] == 0x00 and re_temp[2] == 0x02:
-                print(f"Current noise RSSI: -{256-re_temp[3]}dBm")
+                log(f"Current noise RSSI: -{256-re_temp[3]}dBm")
             else:
                 print("Failed to receive RSSI value")
         else:

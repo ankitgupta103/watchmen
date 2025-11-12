@@ -1,6 +1,24 @@
-
+from machine import RTC
 import sensor
 import time
+
+
+rtc = RTC()
+def get_human_ts():
+    # Input: None; Output: str formatted as mm:ss
+    _,_,_,_,h,m,s,_ = rtc.datetime()
+    t=f"{m}:{s}"
+    return t
+
+log_entries_buffer = []
+
+def log(msg):
+    # Input: msg: str; Output: None (side effects: buffer append and console log)
+    t = get_human_ts()
+    log_entry = f"{t} : {msg}"
+    log_entries_buffer.append(log_entry)
+    log(log_entry)
+    
 
 sensor.reset()
 sensor.set_pixformat(sensor.GRAYSCALE)
@@ -31,16 +49,16 @@ def get_difference(dd, n):
         num_more = float(dd[x]/n)
         delta = x * num_more
         cum_delta += delta
-        print(f"{x} : {num_more} : {delta} : {cum_delta}")
-    print(cum_delta)
+        log(f"{x} : {num_more} : {delta} : {cum_delta}")
+    log(cum_delta)
     return cum_delta
 
 def get_diff():
     img1 = sensor.snapshot()
-    print(len(img1.bytearray()))
+    log(len(img1.bytearray()))
     time.sleep(1)
     img2 = sensor.snapshot()
-    print(len(img2.bytearray()))
+    log(len(img2.bytearray()))
     idiff = []
     for i in range(len(img1.bytearray())):
         p1 = int(img1.bytearray()[i])
@@ -48,9 +66,9 @@ def get_diff():
         dd = p2-p1
         idiff.append(abs(dd))
     dd = det_distribution(idiff)
-    print(dd)
+    log(dd)
     dm = get_difference(dd, len(idiff))
-    print(f"FINAL DIFF = {dm}")
+    log(f"FINAL DIFF = {dm}")
 
 while True:
     get_diff()

@@ -85,7 +85,7 @@ class GPS:
                 f.write(f"Longitude: {lon:.6f}\n")
                 f.write(f"Updated: {time.time()}\n")
         except Exception as e:
-            print(f"Error writing to file: {e}")
+            print(f"ERROR: writing to file: {e}")
 
     def update(self):
         """Read GPS data and update coordinates"""
