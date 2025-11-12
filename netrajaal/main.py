@@ -137,16 +137,24 @@ log(f"Using FS_ROOT : {FS_ROOT}")
 MY_IMAGE_DIR = f"{FS_ROOT}/myimages"
 NET_IMAGE_DIR = f"{FS_ROOT}/netimages"
 
-try:
-    os.mkdir(NET_IMAGE_DIR)
-    log(f"Created {NET_IMAGE_DIR} directory")
-except OSError:
-    log(f"{NET_IMAGE_DIR} directory already exists")
-try:
-    os.mkdir(MY_IMAGE_DIR)
-    log(f"Created {MY_IMAGE_DIR} directory")
-except OSError:
-    log(f"{MY_IMAGE_DIR} directory already exists")
+def create_dir_if_not_exists(dir_path):
+    try:
+        parts = [p for p in dir_path.split('/') if p]
+        if len(parts) < 2:
+            log(f"WARNING: Invalid directory path (no parent): {dir_path}")
+            return
+        parent = '/' + '/'.join(parts[:-1])
+        dir_name = parts[-1]
+        if dir_name not in os.listdir(parent):
+            os.mkdir(dir_path)
+            log(f"Created {dir_path}")
+        else:
+            log(f"{dir_path} already exists")
+    except OSError as e:
+        log(f"ERROR: Failed to create/access {dir_path}: {e}")
+
+create_dir_if_not_exists(NET_IMAGE_DIR)
+create_dir_if_not_exists(MY_IMAGE_DIR)
 
 LOG_FILE_PATH = f"{FS_ROOT}/mainlog.txt"
 
