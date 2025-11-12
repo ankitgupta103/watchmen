@@ -45,9 +45,9 @@ AIR_SPEED = 19200
 ENCRYPTION_ENABLED = True
 
 # WiFi Configuration
-WIFI_SSID = "Airtel_anki_3363_5g"  # Change this to your WiFi SSID
-WIFI_PASSWORD = "air34854"  # Change this to your WiFi password
-WIFI_ENABLED = False  # Set to True to enable WiFi connection
+WIFI_SSID = "Airtel_anki_3363_5g"  
+WIFI_PASSWORD = "air34854" 
+WIFI_ENABLED = True  
 
 cellular_system = None
 wifi_nic = None
@@ -64,7 +64,7 @@ lora_reinit_count = 0
 
 image_in_progress = False
 
-COMMAN_CENTER_ADDR = 219
+COMMAN_CENTER_ADDR = 223
 my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
@@ -688,12 +688,12 @@ async def upload_image(creator, encimb):
         if result:
             return True
         log("Cellular upload failed, trying WiFi fallback...")
-    
+
     if wifi_nic and wifi_nic.isconnected():
         result = await wifi_send_image(creator, encimb)
         if result:
             return True
-    
+
     log("Image upload failed (cellular and WiFi both unavailable or failed)")
     return False
 
@@ -702,18 +702,18 @@ async def upload_heartbeat(heartbeat_data):
     """Unified heartbeat upload: tries cellular first, falls back to WiFi"""
     if not running_as_cc():
         return False
-    
+
     if cellular_system:
         result = await sim_upload_hb(heartbeat_data)
         if result:
             return True
         log("Cellular heartbeat upload failed, trying WiFi fallback...")
-    
+
     if wifi_nic and wifi_nic.isconnected():
         result = await wifi_upload_hb(heartbeat_data)
         if result:
             return True
-    
+
     log("Heartbeat upload failed (cellular and WiFi both unavailable or failed)")
     return False
 
@@ -1330,15 +1330,15 @@ async def init_wifi():
     if not WIFI_ENABLED:
         log("WiFi is disabled (WIFI_ENABLED = False)")
         return False
-    
+
     try:
         log(f"Initializing WiFi connection to SSID: {WIFI_SSID}")
         # Create WLAN interface in station mode
         wifi_nic = network.WLAN(network.WLAN.IF_STA)
-        
+
         # Activate the interface
         wifi_nic.active(True)
-        
+
         # Connect to WiFi access point
         log(f"Connecting to WiFi network: {WIFI_SSID}")
         wifi_nic.connect(WIFI_SSID, WIFI_PASSWORD)
@@ -1347,8 +1347,7 @@ async def init_wifi():
         max_wait = 20  # Maximum wait time in seconds
         wait_count = 0
         while wait_count < max_wait:
-            status = wifi_nic.status()
-            if status == network.WLAN.STAT_GOT_IP:
+            if wifi_nic.isconnected():
                 # Connection successful
                 ifconfig = wifi_nic.ifconfig()
                 log(f"WiFi connected successfully!")
@@ -1357,20 +1356,28 @@ async def init_wifi():
                 log(f"Gateway: {ifconfig[2]}")
                 log(f"DNS server: {ifconfig[3]}")
                 return True
-            elif status == network.WLAN.STAT_WRONG_PASSWORD:
-                log(f"WiFi connection failed: Wrong password")
-                wifi_nic.active(False)
-                return False
-            elif status == network.WLAN.STAT_NO_AP_FOUND:
-                log(f"WiFi connection failed: Access point not found")
-                wifi_nic.active(False)
-                return False
-            elif status == network.WLAN.STAT_CONNECT_FAIL:
-                log(f"WiFi connection failed: Connection failed")
-                wifi_nic.active(False)
-                return False
             
-            log(f"WiFi connecting... (status: {status}, wait: {wait_count}s)")
+            # Check for connection errors (if status() is available)
+            try:
+                status = wifi_nic.status()
+                # Try to detect common error statuses if constants exist
+                if hasattr(network.WLAN, 'STAT_WRONG_PASSWORD') and status == network.WLAN.STAT_WRONG_PASSWORD:
+                    log(f"WiFi connection failed: Wrong password")
+                    wifi_nic.active(False)
+                    return False
+                elif hasattr(network.WLAN, 'STAT_NO_AP_FOUND') and status == network.WLAN.STAT_NO_AP_FOUND:
+                    log(f"WiFi connection failed: Access point not found")
+                    wifi_nic.active(False)
+                    return False
+                elif hasattr(network.WLAN, 'STAT_CONNECT_FAIL') and status == network.WLAN.STAT_CONNECT_FAIL:
+                    log(f"WiFi connection failed: Connection failed")
+                    wifi_nic.active(False)
+                    return False
+                log(f"WiFi connecting... (status: {status}, wait: {wait_count}s)")
+            except:
+                # Status checking not available, just log wait time
+                log(f"WiFi connecting... (wait: {wait_count}s)")
+            
             await asyncio.sleep(1)
             wait_count += 1
         
@@ -1378,7 +1385,7 @@ async def init_wifi():
         log(f"WiFi connection timeout after {max_wait} seconds")
         wifi_nic.active(False)
         return False
-        
+
     except Exception as e:
         log(f"WiFi initialization error: {e}")
         if wifi_nic:
@@ -1393,7 +1400,7 @@ def get_wifi_status():
     global wifi_nic
     if not wifi_nic or not WIFI_ENABLED:
         return {"enabled": False, "connected": False}
-    
+
     try:
         is_connected = wifi_nic.isconnected()
         if is_connected:
@@ -1431,7 +1438,7 @@ async def wifi_send_image(creator, encimb):
     if not wifi_nic or not wifi_nic.isconnected():
         log("WiFi not connected")
         return False
-    
+
     try:
         # Try to import requests
         try:
@@ -1439,14 +1446,14 @@ async def wifi_send_image(creator, encimb):
             use_requests = True
         except ImportError:
             use_requests = False
-        
+
         imgbytes = ubinascii.b2a_base64(encimb).decode('utf-8')
         payload = {
             "machine_id": creator,
             "message_type": "event",
             "image": imgbytes,
         }
-        
+
         if use_requests:
             headers = {"Content-Type": "application/json"}
             json_payload = json.dumps(payload)
@@ -1461,7 +1468,7 @@ async def wifi_send_image(creator, encimb):
             # Fallback to socket-based HTTP (not implemented for brevity)
             log("requests library not available, WiFi upload skipped")
             return False
-            
+
     except Exception as e:
         log(f"Error in wifi_send_image: {e}")
         return False
@@ -1472,14 +1479,14 @@ async def wifi_upload_hb(heartbeat_data):
     global wifi_nic
     if not wifi_nic or not wifi_nic.isconnected():
         return False
-    
+
     try:
         try:
             import requests
             use_requests = True
         except ImportError:
             use_requests = False
-        
+
         if use_requests:
             headers = {"Content-Type": "application/json"}
             json_payload = json.dumps(heartbeat_data)
@@ -1494,7 +1501,7 @@ async def wifi_upload_hb(heartbeat_data):
         else:
             log("requests library not available, WiFi upload skipped")
             return False
-            
+
     except Exception as e:
         log(f"Error in wifi_upload_hb: {e}")
         return False
@@ -1506,18 +1513,18 @@ async def wifi_upload_hb(heartbeat_data):
 async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
     log(f"[INFO] Started device {my_addr}")
-    
+
     # Initialize WiFi if enabled
     if WIFI_ENABLED:
         await init_wifi()
-    
+
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
-        await init_sim()
+        # await init_sim()
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
         asyncio.create_task(send_spath())
