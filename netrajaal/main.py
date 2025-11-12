@@ -66,26 +66,28 @@ lora_reinit_count = 0
 
 image_in_progress = False
 
-COMMAN_CENTER_ADDR = 223
+COMMAN_CENTER_ADDRS = [219, 223]
 my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
+# COMMAND CENTERS
 if uid == b'e076465dd7194025':
     my_addr = 219
+elif uid == b'e076465dd7090d1c':
+    my_addr = 223
+
+# OTHER NODES
 elif uid == b'e076465dd7091027':
     my_addr = 221
     shortest_path_to_cc = [219]
 elif uid == b'e076465dd7193a09':
     my_addr = 222
-    shortest_path_to_cc = [219]
-elif uid == b'e076465dd7090d1c':
-    my_addr = 223
-    shortest_path_to_cc = [219]
+    shortest_path_to_cc = [223]
 elif uid == b'e076465dd7091843':
     my_addr = 225
-    shortest_path_to_cc = [219]
+    shortest_path_to_cc = [223]
 
 else:
     print("Error: Unknown device ID for " + omv.board_id())
