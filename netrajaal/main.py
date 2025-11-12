@@ -25,7 +25,7 @@ ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.3
 
 DISCOVERY_COUNT = 100
-HB_WAIT = 120
+HB_WAIT = 300
 HB_WAIT_2 = 1200
 SPATH_WAIT = 30
 SPATH_WAIT_2 = 1200
@@ -45,10 +45,8 @@ AIR_SPEED = 19200
 ENCRYPTION_ENABLED = True
 
 # WiFi Configuration
-# WIFI_SSID = "Airtel_anki_3363_5g"
-# WIFI_PASSWORD = "air34854"
-WIFI_SSID = "A"
-WIFI_PASSWORD = "123456789"
+WIFI_SSID = "Airtel_anki_3363_2.4G"
+WIFI_PASSWORD = "air34854"
 WIFI_ENABLED = True
 
 cellular_system = None
@@ -110,8 +108,8 @@ def log(msg):
     log_entry = f"{t} : {msg}"
     log_entries_buffer.append(log_entry)
     print(log_entry)
-    
-    
+
+
 
 def running_as_cc():
     # Input: None; Output: bool indicating if this device is the command center
@@ -1499,14 +1497,14 @@ async def wifi_upload_hb(heartbeat_data):
     global wifi_nic
     if not wifi_nic or not wifi_nic.isconnected():
         return False
-    
+
     try:
         try:
             import requests
             use_requests = True
         except ImportError:
             use_requests = False
-        
+
         if use_requests:
             # Convert heartbeat_data bytes to base64 string if needed
             payload = heartbeat_data.copy()
@@ -1518,7 +1516,7 @@ async def wifi_upload_hb(heartbeat_data):
                 elif not isinstance(hb_data, str):
                     # If it's not a string, convert to string
                     payload["heartbeat_data"] = str(hb_data)
-            
+
             headers = {"Content-Type": "application/json"}
             json_payload = json.dumps(payload)
             r = requests.post(URL, data=json_payload, headers=headers)
@@ -1534,7 +1532,7 @@ async def wifi_upload_hb(heartbeat_data):
         else:
             log("requests library not available, WiFi upload skipped")
             return False
-            
+
     except Exception as e:
         log(f"ERROR: in wifi_upload_hb: {e}")
         return False
