@@ -115,7 +115,7 @@ class sx126x:
         try:
             self.M0 = Pin(m0_pin, Pin.OUT)
             self.M1 = Pin(m1_pin, Pin.OUT)
-            print("GPIO pins initialized successfully")
+            log(f"GPIO pins initialized successfully")
         except Exception as e:
             log(f"GPIO initialization failed: {e}")
             raise
@@ -123,7 +123,7 @@ class sx126x:
         # Set initial pin states
         self.M0.value(0)  # LOW
         self.M1.value(1)  # HIGH
-        print("M0=LOW, M1=HIGH (configuration mode)")
+        log(f"M0=LOW, M1=HIGH (configuration mode)")
 
         # Initialize UART for OpenMV
         try:
@@ -138,7 +138,7 @@ class sx126x:
         
         self.set(freq, addr, power, rssi, air_speed, net_id, buffer_size, crypt, relay, lbt, wor)
 
-        print("[INFO] Reopeining UART with target baud rate")
+        log(f"[INFO] Reopeining UART with target baud rate")
         self.ser.deinit()  # Close current UART
         time.sleep_ms(300) # Wait for UART to close properly
 
@@ -146,7 +146,7 @@ class sx126x:
         # critical : put module back in configuration mode for baudrate verification
         self.M0.value(0)  # LOW
         self.M1.value(1)  # HIGH - config mode 
-        print("M0=LOW, M1=HIGH (configuration mode)")
+        log(f"M0=LOW, M1=HIGH (configuration mode)")
 
         time.sleep_ms(500)  # Wait for module to enter config mode
 
@@ -169,7 +169,7 @@ class sx126x:
 
         self.M0.value(0)  # LOW
         self.M1.value(0)  # LOW - normal mode
-        print("M0=LOW, M1=LOW (normal mode)")
+        log(f"M0=LOW, M1=LOW (normal mode)")
         time.sleep_ms(100)  # Allow time for mode switch
 
     def set(self, freq, addr, power, rssi, air_speed=2400,\
@@ -251,7 +251,7 @@ class sx126x:
             self.ser.read()
 
         # Debug: Print configuration being sent
-        print("Sending configuration:", [hex(x) for x in self.cfg_reg])
+        log(f"Sending configuration:", [hex(x) for x in self.cfg_reg])
 
         for i in range(3):  # Try 3 times instead of 2
             log(f"Configuration attempt {i+1}")
@@ -264,13 +264,13 @@ class sx126x:
                 log(f"Received response: {[hex(x) for x in r_buff] if r_buff else 'None'}")
                 
                 if r_buff and len(r_buff) > 0 and r_buff[0] == 0xC1:
-                    print("LoRa module configured successfully")
+                    log(f"LoRa module configured successfully")
                     self.config_success = True
                     break
                 else:
                     log(f"Configuration failed, unexpected response: {r_buff}")
             else:
-                print("No response from module")
+                log(f"No response from module")
                 
             # Clear input buffer before retry
             while self.ser.any():
@@ -278,11 +278,11 @@ class sx126x:
             time.sleep_ms(500)
             
             if i == 2:
-                print("Configuration failed after 3 attempts. Check:")
-                print("- UART connections (TX/RX swapped?)")
-                print("- M0/M1 pin connections")
-                print("- Power supply (3.3V)")
-                print("- Baud rate compatibility")
+                log(f"Configuration failed after 3 attempts. Check:")
+                log(f"- UART connections (TX/RX swapped?)")
+                log(f"- M0/M1 pin connections")
+                log(f"- Power supply (3.3V)")
+                log(f"- Baud rate compatibility")
                 self.config_success = False
 
         self.M0.value(0)  # LOW
@@ -305,7 +305,7 @@ class sx126x:
         time.sleep_ms(200)
         
         if not self.ser.any():
-            print("No response from module")
+            log(f"No response from module")
             self.M1.value(0)
             return
         
@@ -358,9 +358,9 @@ class sx126x:
         noise_rssi_enabled = bool(power_buffer_reg & 0x20)
         
         # Display parsed settings
-        print("=" * 40)
-        print("      LoRa Module Settings")
-        print("=" * 40)
+        log(f"=" * 40)
+        log(f"      LoRa Module Settings")
+        log(f"=" * 40)
         log(f"Node Address    : {node_addr} (0x{node_addr:04X})")
         log(f"Network ID      : {net_id}")
         log(f"Frequency       : {frequency}.125 MHz")
@@ -371,14 +371,14 @@ class sx126x:
         log(f"Encryption Key  : {crypt_key} (0x{crypt_key:04X})")
         log(f"Packet RSSI     : {'Enabled' if rssi_enabled else 'Disabled'}")
         log(f"Noise RSSI      : {'Enabled' if noise_rssi_enabled else 'Disabled'}")
-        print("=" * 40)
+        log(f"=" * 40)
         
         # Return to normal mode
         self.M1.value(0)  # LOW
 
     def send(self, target_addr, message):
         if not hasattr(self, 'config_success') or not self.config_success:
-            print("Warning: Module not properly configured, send may fail")
+            log(f"Warning: Module not properly configured, send may fail")
         
         # message = message.replace(b'\n', b'{}{}')
 
@@ -428,6 +428,6 @@ class sx126x:
             if re_temp and len(re_temp) >= 4 and re_temp[0] == 0xC1 and re_temp[1] == 0x00 and re_temp[2] == 0x02:
                 log(f"Current noise RSSI: -{256-re_temp[3]}dBm")
             else:
-                print("Failed to receive RSSI value")
+                log(f"Failed to receive RSSI value")
         else:
-            print("No RSSI response received")
+            log(f"No RSSI response received")
