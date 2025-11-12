@@ -115,7 +115,7 @@ def log(msg):
 
 def running_as_cc():
     # Input: None; Output: bool indicating if this device is the command center
-    return my_addr == COMMAN_CENTER_ADDR
+    return my_addr in COMMAN_CENTER_ADDRS
 
 def get_fs_root_for_storage():
     # Input: None; Output: str path for filesystem root
@@ -885,7 +885,7 @@ async def image_sending_loop():
             img = image.Image(imagefile)
             imgbytes = img.bytearray()
             transmission_start = time_msec()
-            if running_as_cc:
+            if running_as_cc():
                 sent_succ = await asyncio.create_task(upload_image(my_addr, imgbytes))
             else:
                 sent_succ = await asyncio.create_task(send_image_to_mesh(imgbytes))
