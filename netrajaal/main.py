@@ -60,7 +60,7 @@ gps_str = ""
 gps_last_time = -1
 
 consecutive_hb_failures = 0
-lora_reinit_count = 0
+lora_init_count = 0
 
 image_in_progress = False
 
@@ -79,7 +79,7 @@ elif uid == b'e076465dd7090d1c':
 # OTHER NODES
 elif uid == b'e076465dd7091027':
     my_addr = 221
-    shortest_path_to_cc = [219]
+    shortest_path_to_cc = [223]
 elif uid == b'e076465dd7193a09':
     my_addr = 222
     shortest_path_to_cc = [223]
@@ -309,8 +309,8 @@ loranode = None
 
 async def init_lora():
     # Input: None; Output: None (initializes global loranode, updates lora_reinit_count)
-    global loranode, lora_reinit_count
-    lora_reinit_count += 1
+    global loranode, lora_init_count
+    lora_init_count += 1
     log(f"Initializing LoRa SX126X module... my lora addr = {my_addr}")
     loranode = sx1262.sx126x(
         uart_num=1,        # UART port number - adjust as needed
@@ -323,7 +323,7 @@ async def init_lora():
         m1_pin='P7'        # M1 control pin - adjust to your wiring
     )
 
-    log(f"LoRa module (Total Initializations: {lora_reinit_count})")
+    log(f"LoRa module (Total Initializations: {lora_init_count})")
     log(f"Node address: {loranode.addr}")
     log(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
     log(f"===> LoRa module initialized successfully! <===\n")
@@ -1111,7 +1111,7 @@ async def keep_sending_heartbeat():
                 log(f"_____HB RESUMED_____")
             print_resume = False
             print_pause = True
-        
+
         # log(f"In send HB loop, Shortest path = {shortest_path_to_cc}")
         sent_succ = await asyncio.create_task(send_heartbeat())
         if not sent_succ:
@@ -1263,7 +1263,7 @@ async def print_summary_and_flush_logs():
             log(f"Skipping print summary because image in progress")
             await asyncio.sleep(200)
             continue
-        log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa reinits: {lora_reinit_count}")
+        log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa inits: {lora_init_count}")
         log_to_file()
         #log(msgs_sent)
         #log(msgs_recd)
@@ -1555,16 +1555,16 @@ async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
     log(f"[INFO] Started device {my_addr}")
 
-    # Initialize WiFi if enabled
-    if WIFI_ENABLED:
-        await init_wifi()
-
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
     asyncio.create_task(validate_and_remove_neighbours())
     if running_as_cc():
         log(f"Starting command center")
+        # Initialize WiFi if enabled
+        if WIFI_ENABLED:
+            await init_wifi()
+
         # await init_sim()
         asyncio.create_task(send_scan())
         await asyncio.sleep(2)
