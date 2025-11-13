@@ -55,6 +55,7 @@ wifi_nic = None
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 person_image_count = 0                 # Counter to keep tranck of saved images
+total_image_count = 0
 gps_str = ""
 gps_last_time = -1
 
@@ -840,6 +841,7 @@ async def person_detection_loop():
             try:
                 img = sensor.snapshot()
                 person_image_count += 1
+                total_image_count += 1
                 raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
                 log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
                 img.save(raw_path)
