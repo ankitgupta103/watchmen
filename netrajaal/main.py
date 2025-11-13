@@ -1481,7 +1481,9 @@ async def wifi_send_image(creator, encimb):
         except ImportError:
             use_requests = False
 
-        imgbytes = ubinascii.b2a_base64(encimb).decode('utf-8')
+        imgbytes = ubinascii.b2a_base64(encimb)
+        log(f"Sending image of size {len(imgbytes)} bytes")
+        # Prepare payload with additional metadata
         payload = {
             "machine_id": creator,
             "message_type": "event",
@@ -1489,6 +1491,7 @@ async def wifi_send_image(creator, encimb):
         }
 
         if use_requests:
+            # Use same format as SIM upload - pass bytes directly (MicroPython json.dumps handles bytes)
             headers = {"Content-Type": "application/json"}
             json_payload = json.dumps(payload)
             r = requests.post(URL, data=json_payload, headers=headers)
@@ -1522,17 +1525,8 @@ async def wifi_upload_hb(heartbeat_data):
             use_requests = False
 
         if use_requests:
-            # Convert heartbeat_data bytes to base64 string if needed
+            # Use heartbeat_data directly (same format as SIM upload)
             payload = heartbeat_data.copy()
-            if "heartbeat_data" in payload:
-                hb_data = payload["heartbeat_data"]
-                if isinstance(hb_data, bytes):
-                    # Convert bytes to base64 string
-                    payload["heartbeat_data"] = ubinascii.b2a_base64(hb_data).decode('utf-8').strip()
-                elif not isinstance(hb_data, str):
-                    # If it's not a string, convert to string
-                    payload["heartbeat_data"] = str(hb_data)
-
             headers = {"Content-Type": "application/json"}
             json_payload = json.dumps(payload)
             r = requests.post(URL, data=json_payload, headers=headers)
