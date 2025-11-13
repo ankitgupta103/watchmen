@@ -94,10 +94,9 @@ clock_start = utime.ticks_ms() # get millisecond counter
 
 rtc = RTC()
 def get_human_ts():
-    # Input: None; Output: str formatted as mm:ss
+    # Input: None; Output: str formatted as HH:MM:SS
     _,_,_,_,h,m,s,_ = rtc.datetime()
-    t=f"{m}:{s}"
-    return t
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 log_entries_buffer = []
 
