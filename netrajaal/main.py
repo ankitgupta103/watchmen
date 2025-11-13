@@ -685,13 +685,13 @@ async def sim_upload_hb(heartbeat_data):
             log(f"Heartbeat from node {node_id} sent to cloud successfully")
             return True
         else:
-            log("Failed to send heartbeat to cloud via cellular")
+            log("[ERROR]: Failed to send heartbeat to cloud via cellular")
             if result:
                 log(f"HTTP Status: {result.get('status_code', 'Unknown')}")
             return False
 
     except Exception as e:
-        log(f"ERROR: sending cellular heartbeat: {e}")
+        log(f"[ERROR]: sending cellular heartbeat: {e}")
         return False
 
 async def upload_image(creator, encimb):
@@ -721,14 +721,18 @@ async def upload_heartbeat(heartbeat_data):
         result = await sim_upload_hb(heartbeat_data)
         if result:
             return True
-        log("Cellular heartbeat upload failed, trying WiFi fallback...")
+        log("[ERROR]: Cellular heartbeat upload failed, trying WiFi fallback...")
+    else:
+        log("[ERROR]: Cellular system not initialized, trying WiFi fallback...")
 
     if wifi_nic and wifi_nic.isconnected():
         result = await wifi_upload_hb(heartbeat_data)
         if result:
             return True
+        log("[ERROR]: WiFi heartbeat upload failed, skipping heartbeat...")
+    else:
+        log("[ERROR]: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)")
 
-    log("Heartbeat upload failed (cellular and WiFi both unavailable or failed)")
     return False
 
 # ---------------------------------------------------------------------------
@@ -1090,25 +1094,38 @@ async def keep_sending_heartbeat():
     # Input: None; Output: None (loops to periodically send heartbeats and handle retries)
     global consecutive_hb_failures
     i = 1
+    print_pause = True
+    print_resume = False
     while True:
         await asyncio.sleep(3)
         global image_in_progress
         if image_in_progress:
-            log(f"Skipping HB send because image in progress")
+            if print_pause:
+                log(f"_____HB PAUSED_____")
+            print_pause = False
+            print_resume = True
             await asyncio.sleep(200)
             continue
-        log(f"In send HB loop, Shortest path = {shortest_path_to_cc}")
+        else:
+            if print_resume:
+                log(f"_____HB RESUMED_____")
+            print_resume = False
+            print_pause = True
+        
+        # log(f"In send HB loop, Shortest path = {shortest_path_to_cc}")
         sent_succ = await asyncio.create_task(send_heartbeat())
         if not sent_succ:
             consecutive_hb_failures += 1
-            log(f"Failed to send heartbeat, consecutive failures = {consecutive_hb_failures}")
+            log(f"[ERROR]: consecutive heartbeat failures = {consecutive_hb_failures}")
             if consecutive_hb_failures > 1:
-                log(f"Too many consecutive failures, reinitializing LoRa")
+                log(f"[ERROR]: Too many consecutive heartbeat failures, reinitializing LoRa...")
                 try:
                     await init_lora()
                     consecutive_hb_failures = 0
                 except Exception as e:
                     log(f"ERROR: reinitializing LoRa: {e}")
+        else:
+            log(f"HB SUCCESS, shortest path = {shortest_path_to_cc}")
         i += 1
         if i < DISCOVERY_COUNT:
             await asyncio.sleep(HB_WAIT + random.randint(3,10))
