@@ -25,7 +25,7 @@ ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.3
 
 DISCOVERY_COUNT = 100
-HB_WAIT = 300
+HB_WAIT = 600
 HB_WAIT_2 = 1200
 SPATH_WAIT = 30
 SPATH_WAIT_2 = 1200
@@ -1072,12 +1072,17 @@ async def send_heartbeat():
     msgbytes = encrypt_if_needed("H", hbmsg)
     sent_succ = False
     if running_as_cc():
+        # Convert bytes to base64 for JSON transmission, same as hb_process()
+        if isinstance(msgbytes, bytes):
+            hb_data = ubinascii.b2a_base64(msgbytes)
+        else:
+            hb_data = msgbytes
         heartbeat_payload =  {
                 "machine_id": my_addr,
                 "message_type": "heartbeat",
-                "heartbeat_data": msgbytes,
+                "heartbeat_data": hb_data,
             }
-        log(f"Sending raw heartbeat data of length {len(heartbeat_payload)} bytes")
+        log(f"Sending raw heartbeat data of length {len(msgbytes)} bytes")
         sent_succ = await upload_heartbeat(heartbeat_payload)
         return sent_succ
     else:
@@ -1481,9 +1486,10 @@ async def wifi_send_image(creator, encimb):
         except ImportError:
             use_requests = False
 
+        # Load and process image - same format as SIM upload
         imgbytes = ubinascii.b2a_base64(encimb)
         log(f"Sending image of size {len(imgbytes)} bytes")
-        # Prepare payload with additional metadata
+        # Prepare payload with additional metadata - same format as SIM upload
         payload = {
             "machine_id": creator,
             "message_type": "event",
@@ -1491,9 +1497,16 @@ async def wifi_send_image(creator, encimb):
         }
 
         if use_requests:
-            # Use same format as SIM upload - pass bytes directly (MicroPython json.dumps handles bytes)
+            # Convert bytes to string for requests library (standard Python json needs strings)
+            # Match SIM upload format: MicroPython json.dumps converts bytes to string automatically
+            # We need to manually convert to match that behavior
+            payload_str = payload.copy()
+            if "image" in payload_str and isinstance(payload_str["image"], bytes):
+                # Decode base64 bytes to base64 string, remove all newlines to match MicroPython behavior
+                # ubinascii.b2a_base64 may include newlines every 76 chars, remove them
+                payload_str["image"] = payload_str["image"].decode('utf-8').replace('\n', '').replace('\r', '')
             headers = {"Content-Type": "application/json"}
-            json_payload = json.dumps(payload)
+            json_payload = json.dumps(payload_str)
             r = requests.post(URL, data=json_payload, headers=headers)
             if r.status_code == 200:
                 log(f"Image uploaded via WiFi successfully")
@@ -1525,8 +1538,14 @@ async def wifi_upload_hb(heartbeat_data):
             use_requests = False
 
         if use_requests:
-            # Use heartbeat_data directly (same format as SIM upload)
+            # Convert bytes to strings for requests library (standard Python json needs strings)
+            # Match SIM upload format: MicroPython json.dumps converts bytes to string automatically
+            # We need to manually convert to match that behavior
             payload = heartbeat_data.copy()
+            if "heartbeat_data" in payload and isinstance(payload["heartbeat_data"], bytes):
+                # Decode base64 bytes to base64 string, remove all newlines to match MicroPython behavior
+                # ubinascii.b2a_base64 may include newlines every 76 chars, remove them
+                payload["heartbeat_data"] = payload["heartbeat_data"].decode('utf-8').replace('\n', '').replace('\r', '')
             headers = {"Content-Type": "application/json"}
             json_payload = json.dumps(payload)
             r = requests.post(URL, data=json_payload, headers=headers)
