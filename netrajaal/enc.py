@@ -58,6 +58,10 @@ def setup_aes():
     aes_key = os.urandom(32)
     return aes_key
 
+def setup_iv():
+    iv = os.urandom(16)
+    return iv
+
 def load_rsa(encnode):
     pubkey = encnode.get_pub_key()
     privkey = encnode.get_prv_key_self()
@@ -71,12 +75,11 @@ def unpad(data):
     num_bytes_to_remove = 0 - int(data[-1])
     return data[:num_bytes_to_remove]
 
-def encrypt_aes(msg, aes_key):
-    iv = os.urandom(16)
+def encrypt_aes(msg, aes_key, iv):
     aes = ucryptolib.aes(aes_key, 2, iv)  # mode 2 = CBC
     padded_data = pad(msg)
     encrypted_data = aes.encrypt(padded_data)
-    return (iv, encrypted_data)
+    return encrypted_data
 
 def decrypt_aes(encrypted_msg, iv, aes_key):
     aes = ucryptolib.aes(aes_key, 2, iv)  # mode 2 = CBC
@@ -91,10 +94,13 @@ def decrypt_rsa(msgstr, private_key):
 
 def encrypt_hybrid(msg, public_key):
     # AES key 32 bytes, IV 16bytes, Message encrypted.
+    iv = os.urandom(16)
     aes_key = os.urandom(32)
-    (iv, msg_aes) = encrypt_aes(msg, aes_key)
+    # keys RSA
     iv_rsa = encrypt_rsa(iv, public_key)
     aes_key_rsa = encrypt_rsa(aes_key, public_key)
+    # msg, AES
+    msg_aes = encrypt_aes(msg, aes_key, iv)
     return aes_key_rsa + iv_rsa + msg_aes
 
 def decrypt_hybrid(msg, private_key):
@@ -118,6 +124,7 @@ def test_encryption(encnode, nodeaddr, n2, enctype):
         public_key, private_key = load_rsa(encnode)
     elif enctype == "AES":
         aes_key = setup_aes()
+        iv = setup_iv()
     else:
         log("WRONG INPUT")
         return
@@ -132,7 +139,7 @@ def test_encryption(encnode, nodeaddr, n2, enctype):
             teststr_enc = encrypt_rsa(teststr.encode(), public_key)
             # cipher_bytes = teststr_enc.to_bytes((get_bit_length(teststr_enc) + 7) // 8, 'big')
         elif enctype == "AES":
-            iv, teststr_enc = encrypt_aes(teststr.encode(), aes_key)
+            teststr_enc = encrypt_aes(teststr.encode(), aes_key, iv)
         elif enctype == "HYBRID":
             teststr_enc = encrypt_hybrid(teststr.encode(), public_key)
         else:

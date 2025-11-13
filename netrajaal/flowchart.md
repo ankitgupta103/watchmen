@@ -156,11 +156,11 @@ decrypt_rsa(msgstr, private_key)
   └─> Decrypt RSA-encrypted message
       └─> Return decrypted bytes
 
-encrypt_aes(msg, aes_key)
-  ├─> Generate random IV (16 bytes)
+encrypt_aes(msg, aes_key, iv)
+  ├─> Takes iv, a random IV (16 bytes)
   ├─> Create AES cipher (CBC mode)
   ├─> Pad message to 16-byte boundary
-  └─> Return (IV, encrypted_data)
+  └─> Return encrypted_msg
 
 decrypt_aes(encrypted_msg, iv, aes_key)
   ├─> Create AES cipher (CBC mode)
