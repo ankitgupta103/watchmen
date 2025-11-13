@@ -55,7 +55,6 @@ wifi_nic = None
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 person_image_count = 0                 # Counter to keep tranck of saved images
-total_image_count = 0
 gps_str = ""
 gps_last_time = -1
 
@@ -836,7 +835,6 @@ async def person_detection_loop():
             log(f"Skipping DETECTION because image in progress")
             await asyncio.sleep(20)
             continue
-        total_image_count += 1
         person_detected = detector.check_person()
         if person_detected:
             try:
@@ -850,7 +848,7 @@ async def person_detection_loop():
             except Exception as e:
                 log(f"ERROR: Unexpected error in image taking and saving: {e}")
         await asyncio.sleep(PHOTO_TAKING_DELAY)
-        log(f"Total_image_count = {total_image_count}, Person Image count: {person_image_count}")
+        log(f"Person detected Image count: {person_image_count}")
 
 async def send_image_to_mesh(imgbytes):
     # Input: imgbytes: bytes raw image; Output: bool indicating if image was forwarded successfully
