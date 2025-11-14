@@ -34,7 +34,7 @@ SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
 PHOTO_TAKING_DELAY = 120
-PHOTO_SENDING_DELAY = 600  # Delay after successful upload (when queue is empty)
+PHOTO_SENDING_DELAY = 250  # Delay after successful upload (when queue is empty)
 PHOTO_SENDING_INTERVAL = 5  # Delay between uploads when queue has multiple images
 GPS_WAIT_SEC = 5
 
@@ -1147,11 +1147,7 @@ async def image_sending_loop():
     # Input: None; Output: None (periodically sends queued images across mesh)
     global images_to_send
     while True:
-        # For command center, check queue frequently (every 5s)
-        # For mesh nodes, check every 4s initially, then use longer delays
-        check_interval = PHOTO_SENDING_INTERVAL if running_as_cc() else 4
-        await asyncio.sleep(check_interval)
-        
+        await asyncio.sleep(4)
         destlist = possible_paths(None)
         if not running_as_cc() and len(destlist) == 0:
             log("No shortest path yet so cant send")
@@ -1159,13 +1155,13 @@ async def image_sending_loop():
         
         # Process all queued images one by one until queue is empty
         # This ensures all captured images get uploaded promptly
-        queue_size = len(images_to_send)
-        if queue_size > 0:
-            log(f"[IMG] Starting upload loop, {queue_size} images in queue")
+        # queue_size = len(images_to_send)
+        # if queue_size > 0:
+        #     log(f"[IMG] Starting upload loop, {queue_size} images in queue")
             
         while len(images_to_send) > 0:
             queue_size = len(images_to_send)
-            log(f"[IMG] Images to send = {queue_size}")
+            # log(f"[IMG] Images to send = {queue_size}")
             imagefile = images_to_send.pop(0)
             log(f"[IMG] Processing: {imagefile}")
             img = None
@@ -1191,12 +1187,11 @@ async def image_sending_loop():
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
                 log(f"[IMG] Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
-                log(f"[IMG] Remaining in queue: {len(images_to_send)}")
+                # log(f"[IMG] Remaining in queue: {len(images_to_send)}")
                 
                 # Wait a short interval before processing next image in queue
                 # This prevents overwhelming the network/upload service
                 if len(images_to_send) > 0:
-                    log(f"[IMG] Waiting {PHOTO_SENDING_INTERVAL}s before next upload")
                     await asyncio.sleep(PHOTO_SENDING_INTERVAL)
                 else:
                     log(f"[IMG] Queue empty, all images uploaded")
@@ -1241,20 +1236,14 @@ async def image_sending_loop():
                 # Help GC reclaim memory
                 gc.collect()
         
-        # For command center, always check queue frequently (no long sleep)
-        # For mesh nodes, use longer delay only if queue is empty
-        if running_as_cc():
-            # CC should check queue frequently (already slept check_interval above)
-            # No additional sleep needed - continue to next iteration immediately
-            pass
+        # After processing all queued images (or queue is empty), wait longer before checking again
+        # Only use long delay if queue is empty to avoid missing new images
+        if len(images_to_send) == 0:
+            # Queue is empty, sleep longer
+            await asyncio.sleep(PHOTO_SENDING_DELAY)
         else:
-            # Mesh node: use longer delay if queue is empty
-            if len(images_to_send) == 0:
-                # Queue is empty, sleep longer
-                await asyncio.sleep(PHOTO_SENDING_DELAY)
-            else:
-                # Queue still has items (from failed uploads), check again soon
-                await asyncio.sleep(PHOTO_SENDING_INTERVAL)
+            # Queue still has items (from failed uploads), check again soon
+            await asyncio.sleep(PHOTO_SENDING_INTERVAL)
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
@@ -1852,7 +1841,7 @@ async def wifi_send_image(creator, encimb):
 
         # Load and process image - same format as SIM upload
         imgbytes = ubinascii.b2a_base64(encimb)
-        log(f"Sending image of size {len(imgbytes)} bytes")
+        # log(f"Sending image of size {len(imgbytes)} bytes")
         # Prepare payload with additional metadata - same format as SIM upload
         payload = {
             "machine_id": creator,
