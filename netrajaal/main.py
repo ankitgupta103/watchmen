@@ -356,10 +356,10 @@ async def init_lora():
         m1_pin='P7'        # M1 control pin - adjust to your wiring
     )
 
-    log(f"LoRa module (Total Initializations: {lora_init_count})")
-    log(f"Node address: {loranode.addr}")
-    log(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
-    log(f"===> LoRa module initialized successfully! <===\n")
+    # log(f"LoRa module (Total Initializations: {lora_init_count})")
+    # log(f"Node address: {loranode.addr}")
+    # log(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
+    # log(f"===> LoRa module initialized successfully! <===\n")
 
 msgs_sent = []
 msgs_unacked = []
