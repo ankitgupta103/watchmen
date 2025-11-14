@@ -981,7 +981,7 @@ images_to_send = []
 detector = detect.Detector()
 
 # ============================================================================
-# PIR SENSOR DETECTION: INTERRUPT-DRIVEN (ACTIVE)
+# PIR SENSOR DETECTION: INTERRUPT-DRIVEN 
 # ============================================================================
 # This implementation uses hardware interrupts - more efficient and responsive
 # The task blocks waiting for PIR interrupt, only wakes when motion detected
@@ -1055,10 +1055,9 @@ async def person_detection_loop():
 
 
 # ============================================================================
-# PIR SENSOR DETECTION: POLLING-BASED (COMMENTED OUT)
+# PIR SENSOR DETECTION: POLLING-BASED 
 # ============================================================================
 # This is the previous implementation using software polling
-# Uncomment this and comment out the interrupt-driven version above to use polling
 # 
 # ADVANTAGES of polling:
 #   - Simpler code (no interrupt handlers)
@@ -1170,12 +1169,34 @@ async def image_sending_loop():
                 log(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
             finally:
                 # Explicitly clean up image objects
-                if img is not None:
-                    del img
-                if imgbytes is not None:
-                    del imgbytes
-                if encimgbytes is not None and encimgbytes is not imgbytes:
-                    del encimgbytes
+                # Variables are initialized before try block, so they should always exist
+                # Use try-except for safety in case of unusual scoping issues
+                try:
+                    if img is not None:
+                        del img
+                except NameError:
+                    pass  # Variable not defined (shouldn't happen, but safe)
+                except:
+                    pass
+                try:
+                    if imgbytes is not None:
+                        del imgbytes
+                except NameError:
+                    pass
+                except:
+                    pass
+                try:
+                    # Only delete encimgbytes if it was assigned and is different from imgbytes
+                    # encimgbytes is only assigned when running_as_cc(), so check carefully
+                    if encimgbytes is not None:
+                        # Only delete if imgbytes is None or they're different objects
+                        # This avoids deleting the same object twice
+                        if imgbytes is None or encimgbytes is not imgbytes:
+                            del encimgbytes
+                except NameError:
+                    pass  # Variable not defined (e.g., if exception occurred before assignment)
+                except:
+                    pass
                 # Help GC reclaim memory
                 gc.collect()
             await asyncio.sleep(PHOTO_SENDING_DELAY)
