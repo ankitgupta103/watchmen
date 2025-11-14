@@ -1,4 +1,4 @@
-from machine import RTC, UART
+from machine import RTC, UART, Pin
 import uasyncio as asyncio
 import utime
 import sensor
@@ -980,42 +980,143 @@ async def img_process(cid, msg, creator, sender):
 images_to_send = []
 detector = detect.Detector()
 
+# ============================================================================
+# PIR SENSOR DETECTION: INTERRUPT-DRIVEN (ACTIVE)
+# ============================================================================
+# This implementation uses hardware interrupts - more efficient and responsive
+# The task blocks waiting for PIR interrupt, only wakes when motion detected
+
+# PIR Sensor Interrupt-driven Setup
+pir_trigger_event = asyncio.Event()
+pir_last_trigger_time = 0
+PIR_DEBOUNCE_MS = 2000  # 2 seconds debounce to prevent multiple triggers from single motion
+
+def pir_interrupt_handler(pin):
+    """IRQ handler for PIR sensor - triggers on RISING edge (HIGH signal)"""
+    global pir_last_trigger_time, pir_trigger_event
+    current_time = utime.ticks_ms()
+    # Debounce: ignore triggers within PIR_DEBOUNCE_MS of last trigger
+    if utime.ticks_diff(current_time, pir_last_trigger_time) > PIR_DEBOUNCE_MS:
+        pir_last_trigger_time = current_time
+        # Set event to wake up person_detection_loop
+        pir_trigger_event.set()
+        log(f"[PIR] Motion detected (interrupt)")
+
 async def person_detection_loop():
-    # Input: None; Output: None (runs continuous detection, updates counters and queue)
+    # Input: None; Output: None (runs on PIR interrupt, updates counters and queue)
     global person_image_count, total_image_count
+    global pir_trigger_event, image_in_progress
+    
+    # Setup PIR sensor pin for interrupt
+    # Get PIR pin from detect module
+    from detect import PIR_PIN
+    # Configure IRQ on RISING edge (when PIR goes HIGH)
+    PIR_PIN.irq(trigger=Pin.IRQ_RISING, handler=pir_interrupt_handler)
+    log(f"[PIR] Interrupt-driven detection initialized on pin {PIR_PIN}")
+    
     while True:
-        await asyncio.sleep(5)
-        global image_in_progress
+        # Wait for PIR interrupt event (blocks until PIR detects motion)
+        # Task is suspended here - uses minimal CPU until interrupt fires
+        await pir_trigger_event.wait()
+        # Clear the event for next trigger
+        pir_trigger_event.clear()
+        
+        # Check if image processing is in progress
         if image_in_progress:
-            log(f"Skipping DETECTION because image in progress")
-            await asyncio.sleep(20)
+            log(f"[PIR] Skipping detection - image already in progress")
             continue
-        # person_detected = detector.check_person()
-        if True:
-            img = None
-            try:
-                img = sensor.snapshot()
-                person_image_count += 1
-                total_image_count += 1
-                raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
-                log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
-                img.save(raw_path)
-                # Limit queue size to prevent memory overflow
-                if len(images_to_send) >= MAX_IMAGES_TO_SEND:
-                    # Remove oldest entry
-                    oldest = images_to_send.pop(0)
-                    log(f"Queue full, removing oldest image: {oldest}")
-                images_to_send.append(raw_path)
-                log(f"Saved image: {raw_path}")
-            except Exception as e:
-                log(f"ERROR: Unexpected error in image taking and saving: {e}")
-            finally:
-                # Explicitly clean up image object
-                if img is not None:
-                    del img
-                    gc.collect()  # Help GC reclaim memory immediately
-        await asyncio.sleep(PHOTO_TAKING_DELAY)
-        log(f"Person detected Image count: {person_image_count}")
+        
+        # Motion detected - capture image
+        img = None
+        try:
+            log(f"[PIR] Motion detected - capturing image...")
+            img = sensor.snapshot()
+            person_image_count += 1
+            total_image_count += 1
+            raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
+            log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
+            img.save(raw_path)
+            
+            # Limit queue size to prevent memory overflow
+            if len(images_to_send) >= MAX_IMAGES_TO_SEND:
+                # Remove oldest entry
+                oldest = images_to_send.pop(0)
+                log(f"Queue full, removing oldest image: {oldest}")
+            images_to_send.append(raw_path)
+            log(f"Saved image: {raw_path}")
+            log(f"Person detected Image count: {person_image_count}")
+        except Exception as e:
+            log(f"ERROR: Unexpected error in image taking and saving: {e}")
+        finally:
+            # Explicitly clean up image object
+            if img is not None:
+                del img
+                gc.collect()  # Help GC reclaim memory immediately
+
+
+# ============================================================================
+# PIR SENSOR DETECTION: POLLING-BASED (COMMENTED OUT)
+# ============================================================================
+# This is the previous implementation using software polling
+# Uncomment this and comment out the interrupt-driven version above to use polling
+# 
+# ADVANTAGES of polling:
+#   - Simpler code (no interrupt handlers)
+#   - Good for slow-changing signals
+# 
+# DISADVANTAGES of polling:
+#   - Wastes CPU cycles (wakes every 5 seconds even with no motion)
+#   - Delayed response (up to 5 seconds delay)
+#   - Higher power consumption (constant wake-ups)
+#   - Can miss brief motions between polls
+
+# async def person_detection_loop():
+#     """Previous polling-based implementation"""
+#     # Input: None; Output: None (runs continuous detection, updates counters and queue)
+#     global person_image_count, total_image_count
+#     
+#     while True:
+#         # Poll every 5 seconds - wastes CPU even when no motion
+#         await asyncio.sleep(5)
+#         
+#         global image_in_progress
+#         if image_in_progress:
+#             log(f"Skipping DETECTION because image in progress")
+#             await asyncio.sleep(20)
+#             continue
+#         
+#         # Software polling: Read PIR pin value (inefficient)
+#         # This actively checks the pin every 5 seconds
+#         person_detected = detector.check_person()  # Calls PIR_PIN.value()
+#         
+#         # For testing without actual PIR: use if True instead
+#         # if True:
+#         if person_detected:
+#             img = None
+#             try:
+#                 img = sensor.snapshot()
+#                 person_image_count += 1
+#                 total_image_count += 1
+#                 raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
+#                 log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
+#                 img.save(raw_path)
+#                 # Limit queue size to prevent memory overflow
+#                 if len(images_to_send) >= MAX_IMAGES_TO_SEND:
+#                     # Remove oldest entry
+#                     oldest = images_to_send.pop(0)
+#                     log(f"Queue full, removing oldest image: {oldest}")
+#                 images_to_send.append(raw_path)
+#                 log(f"Saved image: {raw_path}")
+#             except Exception as e:
+#                 log(f"ERROR: Unexpected error in image taking and saving: {e}")
+#             finally:
+#                 # Explicitly clean up image object
+#                 if img is not None:
+#                     del img
+#                     gc.collect()  # Help GC reclaim memory immediately
+#         
+#         await asyncio.sleep(PHOTO_TAKING_DELAY)
+#         log(f"Person detected Image count: {person_image_count}")
 
 async def send_image_to_mesh(imgbytes):
     # Input: imgbytes: bytes raw image; Output: bool indicating if image was forwarded successfully
