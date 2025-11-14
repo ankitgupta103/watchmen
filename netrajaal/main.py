@@ -887,7 +887,9 @@ async def image_sending_loop():
             imgbytes = img.bytearray()
             transmission_start = time_msec()
             if running_as_cc():
-                sent_succ = await asyncio.create_task(upload_image(my_addr, imgbytes))
+                # Encrypt image before uploading (same format as images from other units)
+                encimgbytes = encrypt_if_needed("P", imgbytes)
+                sent_succ = await asyncio.create_task(upload_image(my_addr, encimgbytes))
             else:
                 sent_succ = await asyncio.create_task(send_image_to_mesh(imgbytes))
             if not sent_succ:
