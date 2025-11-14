@@ -13,6 +13,7 @@ import random
 import ubinascii
 import network
 import json
+import gc                   # garbage collection for memory management
 
 import enc
 import sx1262
@@ -32,9 +33,21 @@ SPATH_WAIT_2 = 1200
 SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
-PHOTO_TAKING_DELAY = 1
+PHOTO_TAKING_DELAY = 120
 PHOTO_SENDING_DELAY = 600
 GPS_WAIT_SEC = 5
+
+# Memory Management Constants
+MAX_MSGS_SENT = 500          # Maximum messages in sent buffer
+MAX_MSGS_RECD = 500          # Maximum messages in received buffer
+MAX_MSGS_UNACKED = 100       # Maximum unacknowledged messages
+MAX_CHUNK_MAP_SIZE = 50      # Maximum chunk entries (chunk_id to chunks)
+MAX_IMAGES_SAVED_AT_CC = 200 # Maximum image filenames to track at CC
+MAX_IMAGES_TO_SEND = 50      # Maximum images in send queue
+MAX_LOG_BUFFER_SIZE = 100    # Maximum log entries before flushing
+MAX_OLD_MSG_AGE_SEC = 3600   # Age threshold (seconds) for cleaning old messages
+MEM_CLEANUP_INTERVAL_SEC = 300  # Run memory cleanup every 5 minutes
+GC_COLLECT_INTERVAL_SEC = 60    # Run garbage collection every minute
 
 MIDLEN = 7
 FLAKINESS = 0
@@ -100,12 +113,30 @@ def get_human_ts():
 
 log_entries_buffer = []
 
+def get_free_memory():
+    """Get available free memory in bytes"""
+    try:
+        # MicroPython's gc module provides mem_free()
+        gc.collect()
+        return gc.mem_free()
+    except AttributeError:
+        # If gc.mem_free() doesn't exist, try machine.mem_free()
+        try:
+            return machine.mem_free() if hasattr(machine, 'mem_free') else -1
+        except:
+            return -1
+    except Exception:
+        return -1
+
 def log(msg):
     # Input: msg: str; Output: None (side effects: buffer append and console log)
     t = get_human_ts()
     # log_entry = f"{my_addr}@{t} : {msg}"
     log_entry = f"{t} : {msg}"
     log_entries_buffer.append(log_entry)
+    # Limit log buffer size to prevent memory overflow
+    if len(log_entries_buffer) > MAX_LOG_BUFFER_SIZE:
+        log_to_file()
     print(log_entry)
 
 
@@ -331,6 +362,109 @@ async def init_lora():
 msgs_sent = []
 msgs_unacked = []
 msgs_recd = []
+
+# Memory Management Functions
+def cleanup_old_messages():
+    """Remove old messages from buffers based on age and size limits"""
+    global msgs_sent, msgs_recd, msgs_unacked
+    current_time = time_msec()
+    age_threshold_ms = MAX_OLD_MSG_AGE_SEC * 1000
+
+    # Clean msgs_sent - remove messages older than threshold
+    msgs_sent = [(mid, msg, t) for mid, msg, t in msgs_sent
+                 if (current_time - t) < age_threshold_ms]
+    # Also limit by size
+    if len(msgs_sent) > MAX_MSGS_SENT:
+        msgs_sent = msgs_sent[-MAX_MSGS_SENT:]
+        log(f"Trimmed msgs_sent to {MAX_MSGS_SENT} entries")
+
+    # Clean msgs_recd - remove messages older than threshold
+    msgs_recd = [(mid, msg, t) for mid, msg, t in msgs_recd
+                 if (current_time - t) < age_threshold_ms]
+    # Also limit by size
+    if len(msgs_recd) > MAX_MSGS_RECD:
+        msgs_recd = msgs_recd[-MAX_MSGS_RECD:]
+        log(f"Trimmed msgs_recd to {MAX_MSGS_RECD} entries")
+
+    # Clean msgs_unacked - remove very old unacked messages (they likely failed)
+    old_unacked = []
+    new_unacked = []
+    for mid, msg, t in msgs_unacked:
+        age = current_time - t
+        if age > age_threshold_ms * 2:  # Double threshold for unacked (more lenient)
+            old_unacked.append(mid)
+        else:
+            new_unacked.append((mid, msg, t))
+    msgs_unacked = new_unacked
+
+    if len(old_unacked) > 0:
+        log(f"Removed {len(old_unacked)} old unacked messages")
+
+    # Also limit by size
+    if len(msgs_unacked) > MAX_MSGS_UNACKED:
+        # Remove oldest ones
+        msgs_unacked.sort(key=lambda x: x[2])  # Sort by timestamp
+        msgs_unacked = msgs_unacked[-MAX_MSGS_UNACKED:]
+        log(f"Trimmed msgs_unacked to {MAX_MSGS_UNACKED} entries")
+
+def cleanup_chunk_map():
+    """Clean up old/incomplete chunk entries"""
+    global chunk_map
+    if len(chunk_map) > MAX_CHUNK_MAP_SIZE:
+        # Remove oldest entries (FIFO)
+        # Note: Python dicts maintain insertion order (Python 3.7+)
+        entries_to_remove = len(chunk_map) - MAX_CHUNK_MAP_SIZE
+        keys_to_remove = list(chunk_map.keys())[:entries_to_remove]
+        for key in keys_to_remove:
+            chunk_map.pop(key)
+        log(f"Cleaned {entries_to_remove} old chunk_map entries")
+
+def cleanup_cc_images_list():
+    """Clean up the images_saved_at_cc list if too large"""
+    global images_saved_at_cc
+    if len(images_saved_at_cc) > MAX_IMAGES_SAVED_AT_CC:
+        # Keep only the most recent entries
+        images_saved_at_cc = images_saved_at_cc[-MAX_IMAGES_SAVED_AT_CC:]
+        log(f"Trimmed images_saved_at_cc to {MAX_IMAGES_SAVED_AT_CC} entries")
+
+async def periodic_memory_cleanup():
+    """Periodically clean up memory buffers and run garbage collection"""
+    while True:
+        try:
+            await asyncio.sleep(MEM_CLEANUP_INTERVAL_SEC)
+            free_before = get_free_memory()
+
+            log(f"[MEM] Starting memory cleanup (free: {free_before/1024:.1f}KB)")
+
+            # Clean up message buffers
+            cleanup_old_messages()
+
+            # Clean up chunk map
+            cleanup_chunk_map()
+
+            # Clean up CC images list
+            if running_as_cc():
+                cleanup_cc_images_list()
+
+            # Run garbage collection
+            gc.collect()
+
+            free_after = get_free_memory()
+            freed = free_after - free_before if free_before > 0 and free_after > 0 else 0
+            log(f"[MEM] Cleanup complete (free: {free_after/1024:.1f}KB, freed: {freed/1024:.1f}KB)")
+            log(f"[MEM] Buffers - sent:{len(msgs_sent)}, recd:{len(msgs_recd)}, unacked:{len(msgs_unacked)}, chunks:{len(chunk_map)}")
+
+        except Exception as e:
+            log(f"[MEM] Error in memory cleanup: {e}")
+
+async def periodic_gc():
+    """Run garbage collection more frequently for aggressive cleanup"""
+    while True:
+        try:
+            await asyncio.sleep(GC_COLLECT_INTERVAL_SEC)
+            gc.collect()
+        except Exception as e:
+            log(f"[MEM] Error in periodic GC: {e}")
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
@@ -568,7 +702,13 @@ def recompile_msg(cid):
 def clear_chunkid(cid):
     # Input: cid: str chunk identifier; Output: None (removes chunk tracking entry)
     if cid in chunk_map:
-        chunk_map.pop(cid)
+        entry = chunk_map.pop(cid)
+        # Explicitly delete chunk data to free memory
+        if len(entry) > 2 and isinstance(entry[2], list):
+            for _, chunk_data in entry[2]:
+                del chunk_data
+        del entry
+        gc.collect()  # Help GC reclaim memory immediately
     else:
         log(f"Couldnt find {cid} in {chunk_map}")
 
@@ -796,18 +936,32 @@ async def img_process(cid, msg, creator, sender):
     if running_as_cc():
         log(f"Received image of size {len(msg)}")
         # ----- TODO REMOVE THIS IS FOR DEBUGGING ONLY -------
-        if ENCRYPTION_ENABLED:
-            img_bytes = enc.decrypt_hybrid(msg, encnode.get_prv_key(creator))
-        else:
-            img_bytes = msg
-        img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
-        log(len(img_bytes))
-        fname = f"{NET_IMAGE_DIR}/cc_{creator}_{cid}.jpg"
-        log(f"Saving to file {fname}")
-        images_saved_at_cc.append(fname)
-        img.save(fname)
-        # ------------------------------------------------------
-        asyncio.create_task(upload_image(creator, msg))
+        img_bytes = None
+        img = None
+        try:
+            if ENCRYPTION_ENABLED:
+                img_bytes = enc.decrypt_hybrid(msg, encnode.get_prv_key(creator))
+            else:
+                img_bytes = msg
+            img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
+            log(len(img_bytes))
+            fname = f"{NET_IMAGE_DIR}/cc_{creator}_{cid}.jpg"
+            log(f"Saving to file {fname}")
+            images_saved_at_cc.append(fname)
+            # Limit list size
+            if len(images_saved_at_cc) > MAX_IMAGES_SAVED_AT_CC:
+                images_saved_at_cc.pop(0)
+            img.save(fname)
+            # ------------------------------------------------------
+            asyncio.create_task(upload_image(creator, msg))
+        finally:
+            # Explicitly clean up image objects
+            if img_bytes is not None:
+                del img_bytes
+            if img is not None:
+                del img
+            # Help GC reclaim memory
+            gc.collect()
     else:
         destlist = possible_paths(sender)
         sent_succ = False
@@ -838,6 +992,7 @@ async def person_detection_loop():
             continue
         person_detected = detector.check_person()
         if person_detected:
+            img = None
             try:
                 img = sensor.snapshot()
                 person_image_count += 1
@@ -845,10 +1000,20 @@ async def person_detection_loop():
                 raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
                 log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
                 img.save(raw_path)
+                # Limit queue size to prevent memory overflow
+                if len(images_to_send) >= MAX_IMAGES_TO_SEND:
+                    # Remove oldest entry
+                    oldest = images_to_send.pop(0)
+                    log(f"Queue full, removing oldest image: {oldest}")
                 images_to_send.append(raw_path)
                 log(f"Saved image: {raw_path}")
             except Exception as e:
                 log(f"ERROR: Unexpected error in image taking and saving: {e}")
+            finally:
+                # Explicitly clean up image object
+                if img is not None:
+                    del img
+                    gc.collect()  # Help GC reclaim memory immediately
         await asyncio.sleep(PHOTO_TAKING_DELAY)
         log(f"Person detected Image count: {person_image_count}")
 
@@ -883,21 +1048,35 @@ async def image_sending_loop():
         if len(images_to_send) > 0:
             log(f"Images to send = {len(images_to_send)}")
             imagefile = images_to_send.pop(0)
-            img = image.Image(imagefile)
-            imgbytes = img.bytearray()
-            transmission_start = time_msec()
-            if running_as_cc():
-                # Encrypt image before uploading (same format as images from other units)
-                encimgbytes = encrypt_if_needed("P", imgbytes)
-                sent_succ = await asyncio.create_task(upload_image(my_addr, encimgbytes))
-            else:
-                sent_succ = await asyncio.create_task(send_image_to_mesh(imgbytes))
-            if not sent_succ:
-                images_to_send.append(imagefile) # pushed to back of queue
+            img = None
+            imgbytes = None
+            encimgbytes = None
+            try:
+                img = image.Image(imagefile)
+                imgbytes = img.bytearray()
+                transmission_start = time_msec()
+                if running_as_cc():
+                    # Encrypt image before uploading (same format as images from other units)
+                    encimgbytes = encrypt_if_needed("P", imgbytes)
+                    sent_succ = await asyncio.create_task(upload_image(my_addr, encimgbytes))
+                else:
+                    sent_succ = await asyncio.create_task(send_image_to_mesh(imgbytes))
+                if not sent_succ:
+                    images_to_send.append(imagefile) # pushed to back of queue
 
-            transmission_end = time_msec()
-            transmission_time = transmission_end - transmission_start
-            log(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
+                transmission_end = time_msec()
+                transmission_time = transmission_end - transmission_start
+                log(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
+            finally:
+                # Explicitly clean up image objects
+                if img is not None:
+                    del img
+                if imgbytes is not None:
+                    del imgbytes
+                if encimgbytes is not None and encimgbytes is not imgbytes:
+                    del encimgbytes
+                # Help GC reclaim memory
+                gc.collect()
             await asyncio.sleep(PHOTO_SENDING_DELAY)
 
 # If N messages seen in the last M minutes.
@@ -1270,7 +1449,10 @@ async def print_summary_and_flush_logs():
             log(f"Skipping print summary because image in progress")
             await asyncio.sleep(200)
             continue
-        log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa inits: {lora_init_count}")
+        free_mem = get_free_memory()
+        mem_str = f", Free: {free_mem/1024:.1f}KB" if free_mem > 0 else ""
+        log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa inits: {lora_init_count}{mem_str}")
+        log(f"Chunks: {len(chunk_map)}, Images at CC: {len(images_saved_at_cc) if running_as_cc() else 0}")
         log_to_file()
         #log(msgs_sent)
         #log(msgs_recd)
@@ -1580,6 +1762,10 @@ async def main():
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
     asyncio.create_task(validate_and_remove_neighbours())
+    # Start memory management tasks
+    asyncio.create_task(periodic_memory_cleanup())
+    asyncio.create_task(periodic_gc())
+    log(f"Memory management tasks started (free: {get_free_memory()/1024:.1f}KB)")
     if running_as_cc():
         log(f"Starting command center")
         # Initialize WiFi if enabled
