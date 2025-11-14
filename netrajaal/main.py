@@ -990,8 +990,8 @@ async def person_detection_loop():
             log(f"Skipping DETECTION because image in progress")
             await asyncio.sleep(20)
             continue
-        person_detected = detector.check_person()
-        if person_detected:
+        # person_detected = detector.check_person()
+        if True:
             img = None
             try:
                 img = sensor.snapshot()
