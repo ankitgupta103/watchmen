@@ -298,20 +298,17 @@ class sx126x:
         self.set(freq, addr, power, rssi, air_speed, net_id, buffer_size, crypt, relay, lbt, wor)
         
         # Reopen UART at target baud rate (115200)
-        log(f"[INFO] Reopening UART with target baud rate")
         self.ser.deinit()  # Close current UART
         time.sleep_ms(300)  # Wait for UART to close properly
         
         # Critical: Module must be back in configuration mode for baud rate verification
         self.M0.value(0)  # LOW
         self.M1.value(1)  # HIGH
-        log(f"M0=LOW, M1=HIGH (configuration mode)")
         time.sleep_ms(UART_INIT_DELAY_MS)
         
         # Reinitialize UART at target baud rate
         try:
             self.ser = UART(uart_num, self.target_baud, timeout=UART_TIMEOUT_MS)
-            log(f"UART {uart_num} reopened at {self.target_baud} baud")
         except Exception as e:
             log(f"UART reinitialization failed: {e}")
             raise
@@ -329,7 +326,6 @@ class sx126x:
         # Exit configuration mode: M0=LOW, M1=LOW (normal operation mode)
         self.M0.value(0)  # LOW
         self.M1.value(0)  # LOW
-        log(f"M0=LOW, M1=LOW (normal mode)")
         time.sleep_ms(MODE_SWITCH_DELAY_MS)  # Allow time for mode switch
     
     def set(self, freq, addr, power, rssi, air_speed=2400,
@@ -513,19 +509,19 @@ class sx126x:
                         
                         if config_match:
                             log(f"=" * 60)
-                            log(f"  ✓ CONFIGURATION SUCCESSFUL")
+                            log(f"  CONFIGURATION SUCCESSFUL")
                             log(f"  All parameters match sent configuration")
                             log(f"=" * 60)
                         else:
                             log(f"=" * 60)
-                            log(f"  ⚠ CONFIGURATION PARTIALLY SUCCESSFUL")
+                            log(f"  CONFIGURATION PARTIALLY SUCCESSFUL")
                             log(f"  Some parameters don't match:")
                             for mismatch in mismatches:
                                 log(f"    - {mismatch}")
                             log(f"=" * 60)
                     else:
                         log(f"=" * 60)
-                        log(f"  ✓ CONFIGURATION SUCCESSFUL")
+                        log(f"  CONFIGURATION SUCCESSFUL")
                         log(f"  Module acknowledged configuration")
                         log(f"=" * 60)
                     
