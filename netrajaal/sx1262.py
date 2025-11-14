@@ -305,7 +305,7 @@ class sx126x:
         # Critical: Module must be back in configuration mode for baud rate verification
         self.M0.value(0)  # LOW
         self.M1.value(1)  # HIGH
-        log(f"M0=LOW, M1=HIGH (configuration mode)")
+        # log(f"M0=LOW, M1=HIGH (configuration mode)")
         time.sleep_ms(UART_INIT_DELAY_MS)
         
         # Reinitialize UART at target baud rate
