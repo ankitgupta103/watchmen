@@ -459,7 +459,12 @@ class sx126x:
         while self.ser.any():
             self.ser.read()
         
-        log(f"Sending configuration: {[hex(x) for x in self.cfg_reg]}")
+        # Parse and display configuration being sent
+        sent_config = self._parse_config_bytes(self.cfg_reg)
+        if sent_config:
+            self._display_config_table("CONFIGURATION TO BE SENT", sent_config)
+        else:
+            log(f"Sending configuration: {[hex(x) for x in self.cfg_reg]}")
         
         # Send configuration with retry logic
         # Module should respond with 0xC1 header to confirm success
@@ -474,15 +479,60 @@ class sx126x:
             if self.ser.any():
                 time.sleep_ms(CFG_RESPONSE_WAIT_MS)  # Wait for complete response
                 r_buff = self.ser.read()
-                log(f"Received response: {[hex(x) for x in r_buff] if r_buff else 'None'}")
                 
                 # Validate response: first byte should be 0xC1 (success)
                 if r_buff and len(r_buff) > 0 and r_buff[0] == RESPONSE_SUCCESS:
-                    log(f"LoRa module configured successfully")
+                    # Parse and display received configuration
+                    received_config = self._parse_config_bytes(r_buff)
+                    if received_config:
+                        self._display_config_table("CONFIGURATION RECEIVED (CONFIRMED)", received_config)
+                    else:
+                        log(f"Received response: {[hex(x) for x in r_buff]}")
+                    
+                    # Verify configuration matches (compare parameter values)
+                    if received_config and sent_config:
+                        config_match = True
+                        mismatches = []
+                        
+                        # Compare key parameters (ignore header as it may differ)
+                        if received_config['node_addr'] != sent_config['node_addr']:
+                            config_match = False
+                            mismatches.append(f"Node Address: sent={sent_config['node_addr']}, received={received_config['node_addr']}")
+                        if received_config['frequency'] != sent_config['frequency']:
+                            config_match = False
+                            mismatches.append(f"Frequency: sent={sent_config['frequency']}, received={received_config['frequency']}")
+                        if received_config['uart_baud'] != sent_config['uart_baud']:
+                            config_match = False
+                            mismatches.append(f"UART Baud: sent={sent_config['uart_baud']}, received={received_config['uart_baud']}")
+                        if received_config['air_speed'] != sent_config['air_speed']:
+                            config_match = False
+                            mismatches.append(f"Air Speed: sent={sent_config['air_speed']}, received={received_config['air_speed']}")
+                        if received_config['power'] != sent_config['power']:
+                            config_match = False
+                            mismatches.append(f"TX Power: sent={sent_config['power']}, received={received_config['power']}")
+                        
+                        if config_match:
+                            log(f"=" * 60)
+                            log(f"  ✓ CONFIGURATION SUCCESSFUL")
+                            log(f"  All parameters match sent configuration")
+                            log(f"=" * 60)
+                        else:
+                            log(f"=" * 60)
+                            log(f"  ⚠ CONFIGURATION PARTIALLY SUCCESSFUL")
+                            log(f"  Some parameters don't match:")
+                            for mismatch in mismatches:
+                                log(f"    - {mismatch}")
+                            log(f"=" * 60)
+                    else:
+                        log(f"=" * 60)
+                        log(f"  ✓ CONFIGURATION SUCCESSFUL")
+                        log(f"  Module acknowledged configuration")
+                        log(f"=" * 60)
+                    
                     self.config_success = True
                     break
                 else:
-                    log(f"Configuration failed, unexpected response: {r_buff}")
+                    log(f"Configuration failed, unexpected response: {[hex(x) for x in r_buff] if r_buff else 'None'}")
             else:
                 log(f"No response from module")
             
@@ -493,17 +543,137 @@ class sx126x:
             
             # Final attempt failed
             if attempt == CFG_RETRY_ATTEMPTS - 1:
-                log(f"Configuration failed after {CFG_RETRY_ATTEMPTS} attempts. Check:")
-                log(f"- UART connections (TX/RX swapped?)")
-                log(f"- M0/M1 pin connections")
-                log(f"- Power supply (3.3V)")
-                log(f"- Baud rate compatibility")
+                log(f"=" * 60)
+                log(f"  ✗ CONFIGURATION FAILED")
+                log(f"  Attempted {CFG_RETRY_ATTEMPTS} times with no valid response")
+                log(f"  Troubleshooting:")
+                log(f"    - Check UART connections (TX/RX swapped?)")
+                log(f"    - Verify M0/M1 pin connections")
+                log(f"    - Ensure power supply is 3.3V and stable")
+                log(f"    - Check baud rate compatibility")
+                log(f"=" * 60)
                 self.config_success = False
         
         # Exit configuration mode: return to normal operation
         self.M0.value(0)  # LOW
         self.M1.value(0)  # LOW
         time.sleep_ms(MODE_SWITCH_DELAY_MS)
+    
+    def _parse_config_bytes(self, cfg_bytes):
+        """
+        Parse configuration bytes and return human-readable parameter dictionary.
+        
+        Args:
+            cfg_bytes (list or bytes): 12-byte configuration register array
+            
+        Returns:
+            dict: Dictionary with parsed configuration parameters
+        """
+        # Convert to list if bytes object
+        if isinstance(cfg_bytes, bytes):
+            cfg_bytes = list(cfg_bytes)
+        
+        if len(cfg_bytes) < 12:
+            return None
+        
+        # Parse bytes
+        high_addr = cfg_bytes[REG_ADDR_ADDR_H]
+        low_addr = cfg_bytes[REG_ADDR_ADDR_L]
+        net_id = cfg_bytes[REG_ADDR_NET_ID]
+        uart_speed_reg = cfg_bytes[REG_ADDR_UART_AIR]
+        power_buffer_reg = cfg_bytes[REG_ADDR_BUFFER_PWR]
+        freq_offset = cfg_bytes[REG_ADDR_FREQ_OFFSET]
+        mode_rssi_reg = cfg_bytes[REG_ADDR_MODE_RSSI]
+        h_crypt = cfg_bytes[REG_ADDR_CRYPT_H]
+        l_crypt = cfg_bytes[REG_ADDR_CRYPT_L]
+        
+        # Calculate derived values
+        node_addr = (high_addr << 8) + low_addr
+        frequency = freq_offset + self.start_freq
+        
+        # Decode UART baud rate (upper 3 bits of register 6)
+        uart_rates = {
+            0x00: 1200, 0x20: 2400, 0x40: 4800, 0x60: 9600,
+            0x80: 19200, 0xA0: 38400, 0xC0: 57600, 0xE0: 115200
+        }
+        uart_baud = uart_rates.get(uart_speed_reg & 0xE0, "Unknown")
+        
+        # Decode air data rate (lower 3 bits of register 6)
+        air_speeds = {0x01: 1200, 0x02: 2400, 0x03: 4800, 0x04: 9600,
+                      0x05: 19200, 0x06: 38400, 0x07: 62500}
+        air_speed = air_speeds.get(uart_speed_reg & 0x07, "Unknown")
+        
+        # Decode buffer size (upper 2 bits of register 7)
+        buffer_sizes = {0x00: 240, 0x40: 128, 0x80: 64, 0xC0: 32}
+        buffer_size = buffer_sizes.get(power_buffer_reg & 0xC0, "Unknown")
+        
+        # Decode TX power (lower 2 bits of register 7)
+        power_levels = {0x00: 22, 0x01: 17, 0x02: 13, 0x03: 10}
+        power = power_levels.get(power_buffer_reg & 0x03, "Unknown")
+        
+        # Decode encryption key
+        crypt_key = (h_crypt << 8) + l_crypt
+        
+        # Decode flags
+        rssi_enabled = bool(mode_rssi_reg & 0x80)
+        noise_rssi_enabled = bool(power_buffer_reg & 0x20)
+        cfg_header = cfg_bytes[REG_ADDR_HEADER]
+        cfg_persistent = "Persistent (0xC0)" if cfg_header == CFG_HEADER_PERSISTENT else "Volatile (0xC2)"
+        
+        # Determine operating mode from register 9
+        mode_val = mode_rssi_reg & 0x7F  # Mask out RSSI bit
+        if mode_val == 0x43:
+            op_mode = "Fixed Point"
+        elif mode_val == 0x03:
+            op_mode = "Relay Mode"
+        else:
+            op_mode = f"Unknown (0x{mode_val:02X})"
+        
+        return {
+            'header': cfg_persistent,
+            'node_addr': node_addr,
+            'net_id': net_id,
+            'frequency': frequency,
+            'uart_baud': uart_baud,
+            'air_speed': air_speed,
+            'power': power,
+            'buffer_size': buffer_size,
+            'crypt_key': crypt_key,
+            'rssi_enabled': rssi_enabled,
+            'noise_rssi_enabled': noise_rssi_enabled,
+            'op_mode': op_mode,
+            'raw_bytes': cfg_bytes
+        }
+    
+    def _display_config_table(self, title, config_dict):
+        """
+        Display configuration parameters in a formatted table.
+        
+        Args:
+            title (str): Table title
+            config_dict (dict): Dictionary returned by _parse_config_bytes()
+        """
+        if not config_dict:
+            log(f"{title}: Invalid configuration")
+            return
+        
+        log(f"=" * 60)
+        log(f"  {title}")
+        log(f"=" * 60)
+        log(f"  Configuration Header : {config_dict['header']}")
+        log(f"  Node Address         : {config_dict['node_addr']} (0x{config_dict['node_addr']:04X})")
+        log(f"  Network ID           : {config_dict['net_id']}")
+        log(f"  Frequency            : {config_dict['frequency']}.125 MHz")
+        log(f"  UART Baud Rate       : {config_dict['uart_baud']} bps")
+        log(f"  Air Data Rate        : {config_dict['air_speed']} bps")
+        log(f"  TX Power             : {config_dict['power']} dBm")
+        log(f"  Buffer Size          : {config_dict['buffer_size']} bytes")
+        log(f"  Operating Mode       : {config_dict['op_mode']}")
+        log(f"  Encryption Key       : {config_dict['crypt_key']} (0x{config_dict['crypt_key']:04X})")
+        log(f"  Packet RSSI          : {'Enabled' if config_dict['rssi_enabled'] else 'Disabled'}")
+        log(f"  Noise RSSI           : {'Enabled' if config_dict['noise_rssi_enabled'] else 'Disabled'}")
+        log(f"  Raw Bytes            : {[hex(x) for x in config_dict['raw_bytes']]}")
+        log(f"=" * 60)
     
     def get_settings(self):
         """
