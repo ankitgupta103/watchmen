@@ -1147,7 +1147,11 @@ async def image_sending_loop():
     # Input: None; Output: None (periodically sends queued images across mesh)
     global images_to_send
     while True:
-        await asyncio.sleep(4)
+        # For command center, check queue frequently (every 5s)
+        # For mesh nodes, check every 4s initially, then use longer delays
+        check_interval = PHOTO_SENDING_INTERVAL if running_as_cc() else 4
+        await asyncio.sleep(check_interval)
+        
         destlist = possible_paths(None)
         if not running_as_cc() and len(destlist) == 0:
             log("No shortest path yet so cant send")
@@ -1237,14 +1241,20 @@ async def image_sending_loop():
                 # Help GC reclaim memory
                 gc.collect()
         
-        # After processing all queued images (or queue is empty), wait longer before checking again
-        # Only use long delay if queue is empty to avoid missing new images
-        if len(images_to_send) == 0:
-            # Queue is empty, sleep longer
-            await asyncio.sleep(PHOTO_SENDING_DELAY)
+        # For command center, always check queue frequently (no long sleep)
+        # For mesh nodes, use longer delay only if queue is empty
+        if running_as_cc():
+            # CC should check queue frequently (already slept check_interval above)
+            # No additional sleep needed - continue to next iteration immediately
+            pass
         else:
-            # Queue still has items (from failed uploads), check again soon
-            await asyncio.sleep(PHOTO_SENDING_INTERVAL)
+            # Mesh node: use longer delay if queue is empty
+            if len(images_to_send) == 0:
+                # Queue is empty, sleep longer
+                await asyncio.sleep(PHOTO_SENDING_DELAY)
+            else:
+                # Queue still has items (from failed uploads), check again soon
+                await asyncio.sleep(PHOTO_SENDING_INTERVAL)
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
