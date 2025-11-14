@@ -34,7 +34,8 @@ SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
 PHOTO_TAKING_DELAY = 120
-PHOTO_SENDING_DELAY = 600
+PHOTO_SENDING_DELAY = 600  # Delay after successful upload (when queue is empty)
+PHOTO_SENDING_INTERVAL = 5  # Delay between uploads when queue has multiple images
 GPS_WAIT_SEC = 5
 
 # Memory Management Constants
@@ -69,6 +70,7 @@ wifi_nic = None
 #clock = time.clock()            # measure frame/sec
 person_image_count = 0                 # Counter to keep tranck of saved images
 total_image_count = 0
+center_captured_image_count = 0        # Counter for images captured on center device
 gps_str = ""
 gps_last_time = -1
 
@@ -199,7 +201,7 @@ def log_to_file():
         global log_entries_buffer
         tmp = log_entries_buffer
         log_entries_buffer = []
-        log(f"Writing {len(tmp)} lines to logfile")
+        # log(f"Writing {len(tmp)} lines to logfile")
         for x in tmp:
             log_file.write(x + "\n")
         log_file.flush()
@@ -1000,11 +1002,11 @@ def pir_interrupt_handler(pin):
         pir_last_trigger_time = current_time
         # Set event to wake up person_detection_loop
         pir_trigger_event.set()
-        log(f"[PIR] Motion detected (interrupt)")
+        # log(f"[PIR] Motion detected (interrupt)")
 
 async def person_detection_loop():
     # Input: None; Output: None (runs on PIR interrupt, updates counters and queue)
-    global person_image_count, total_image_count
+    global person_image_count, total_image_count, center_captured_image_count
     global pir_trigger_event, image_in_progress
     
     # Setup PIR sensor pin for interrupt
@@ -1029,10 +1031,13 @@ async def person_detection_loop():
         # Motion detected - capture image
         img = None
         try:
-            log(f"[PIR] Motion detected - capturing image...")
+            log(f"[PIR] Motion detected - (interrupt) capturing image...")
             img = sensor.snapshot()
             person_image_count += 1
             total_image_count += 1
+            # Track center's own captured images separately
+            if running_as_cc():
+                center_captured_image_count += 1
             raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
             log(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
             img.save(raw_path)
@@ -1043,8 +1048,10 @@ async def person_detection_loop():
                 oldest = images_to_send.pop(0)
                 log(f"Queue full, removing oldest image: {oldest}")
             images_to_send.append(raw_path)
-            log(f"Saved image: {raw_path}")
-            log(f"Person detected Image count: {person_image_count}")
+            # log(f"Saved image: {raw_path}")
+            # log(f"Person detected Image count: {person_image_count}")
+            # if running_as_cc():
+            #     log(f"Center captured images: {center_captured_image_count}")
         except Exception as e:
             log(f"ERROR: Unexpected error in image taking and saving: {e}")
         finally:
@@ -1145,9 +1152,18 @@ async def image_sending_loop():
         if not running_as_cc() and len(destlist) == 0:
             log("No shortest path yet so cant send")
             continue
-        if len(images_to_send) > 0:
-            log(f"Images to send = {len(images_to_send)}")
+        
+        # Process all queued images one by one until queue is empty
+        # This ensures all captured images get uploaded promptly
+        queue_size = len(images_to_send)
+        if queue_size > 0:
+            log(f"[IMG] Starting upload loop, {queue_size} images in queue")
+            
+        while len(images_to_send) > 0:
+            queue_size = len(images_to_send)
+            log(f"[IMG] Images to send = {queue_size}")
             imagefile = images_to_send.pop(0)
+            log(f"[IMG] Processing: {imagefile}")
             img = None
             imgbytes = None
             encimgbytes = None
@@ -1158,15 +1174,36 @@ async def image_sending_loop():
                 if running_as_cc():
                     # Encrypt image before uploading (same format as images from other units)
                     encimgbytes = encrypt_if_needed("P", imgbytes)
-                    sent_succ = await asyncio.create_task(upload_image(my_addr, encimgbytes))
+                    log(f"[IMG] Uploading encrypted image (size: {len(encimgbytes)} bytes)")
+                    sent_succ = await upload_image(my_addr, encimgbytes)
                 else:
-                    sent_succ = await asyncio.create_task(send_image_to_mesh(imgbytes))
+                    sent_succ = await send_image_to_mesh(imgbytes)
                 if not sent_succ:
                     images_to_send.append(imagefile) # pushed to back of queue
+                    log(f"[IMG] Upload failed, image re-queued: {imagefile}")
+                    # If upload failed, wait longer before retrying
+                    break
 
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
-                log(f"Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
+                log(f"[IMG] Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
+                log(f"[IMG] Remaining in queue: {len(images_to_send)}")
+                
+                # Wait a short interval before processing next image in queue
+                # This prevents overwhelming the network/upload service
+                if len(images_to_send) > 0:
+                    log(f"[IMG] Waiting {PHOTO_SENDING_INTERVAL}s before next upload")
+                    await asyncio.sleep(PHOTO_SENDING_INTERVAL)
+                else:
+                    log(f"[IMG] Queue empty, all images uploaded")
+                    
+            except Exception as e:
+                log(f"[IMG] ERROR: Unexpected error processing image {imagefile}: {e}")
+                import sys
+                sys.print_exception(e)
+                # Re-queue image on error
+                images_to_send.append(imagefile)
+                break
             finally:
                 # Explicitly clean up image objects
                 # Variables are initialized before try block, so they should always exist
@@ -1199,7 +1236,15 @@ async def image_sending_loop():
                     pass
                 # Help GC reclaim memory
                 gc.collect()
+        
+        # After processing all queued images (or queue is empty), wait longer before checking again
+        # Only use long delay if queue is empty to avoid missing new images
+        if len(images_to_send) == 0:
+            # Queue is empty, sleep longer
             await asyncio.sleep(PHOTO_SENDING_DELAY)
+        else:
+            # Queue still has items (from failed uploads), check again soon
+            await asyncio.sleep(PHOTO_SENDING_INTERVAL)
 
 # If N messages seen in the last M minutes.
 def scan_process(mid, msg):
@@ -1574,7 +1619,10 @@ async def print_summary_and_flush_logs():
         free_mem = get_free_memory()
         mem_str = f", Free: {free_mem/1024:.1f}KB" if free_mem > 0 else ""
         log(f"Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa inits: {lora_init_count}{mem_str}")
-        log(f"Chunks: {len(chunk_map)}, Images at CC: {len(images_saved_at_cc) if running_as_cc() else 0}")
+        if running_as_cc():
+            log(f"Chunks: {len(chunk_map)}, Images at CC (received): {len(images_saved_at_cc)}, Center captured: {center_captured_image_count}, Queued: {len(images_to_send)}")
+        else:
+            log(f"Chunks: {len(chunk_map)}, Queued images: {len(images_to_send)}")
         log_to_file()
         #log(msgs_sent)
         #log(msgs_recd)
