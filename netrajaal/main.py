@@ -33,7 +33,7 @@ SPATH_WAIT_2 = 1200
 SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
-PHOTO_TAKING_DELAY = 120
+PHOTO_TAKING_DELAY = 600
 PHOTO_SENDING_DELAY = 250  # Delay after successful upload (when queue is empty)
 PHOTO_SENDING_INTERVAL = 5  # Delay between uploads when queue has multiple images
 GPS_WAIT_SEC = 5
@@ -1093,11 +1093,11 @@ async def person_detection_loop():
         
         # Software polling: Read PIR pin value (inefficient)
         # This actively checks the pin every 5 seconds
-        person_detected = detector.check_person()  # Calls PIR_PIN.value()
+        # person_detected = detector.check_person()  # Calls PIR_PIN.value()
         
         # For testing without actual PIR: use if True instead
         # if True:
-        if person_detected:
+        if True:
             img = None
             try:
                 img = sensor.snapshot()
