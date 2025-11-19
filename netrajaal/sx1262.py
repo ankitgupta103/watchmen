@@ -881,9 +881,7 @@ class sx126x:
                     # Decode RSSI: actual_RSSI = -(256 - value) dBm
                     rssi_dbm = -(256 - rssi_byte)
                     
-                    # Debug: Check if message starts with frequency offset byte (indicates extraction issue)
-                    # Frequency offset for 868.125 MHz is 18 (0x12) from 850 MHz base
-                    # If message starts with frequency offset byte, it means we're not skipping enough bytes
+                    # Check if message starts with frequency offset byte (indicates extraction issue)
                     if len(msg) > 0 and hasattr(self, 'offset_freq') and msg[0] == self.offset_freq:
                         # Message starts with frequency offset - this shouldn't happen
                         # This suggests an extra byte is being included in the payload

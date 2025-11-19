@@ -255,7 +255,8 @@ def parse_header(data):
     if data == None:
         log(f"[LORA] Weird that data is none")
         return None
-    if len(data) < 9:
+    # Minimum message is MIDLEN (7 bytes) + separator (1 byte) = 8 bytes
+    if len(data) < MIDLEN + 1:
         return None
     try:
         mid = data[:MIDLEN]
