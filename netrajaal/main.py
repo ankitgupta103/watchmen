@@ -1745,11 +1745,11 @@ async def init_wifi():
             if wifi_nic.isconnected():
                 # Connection successful
                 ifconfig = wifi_nic.ifconfig()
-                log(f"[WIFI] WiFi connected successfully!")
-                log(f"[WIFI] IP address: {ifconfig[0]}")
-                log(f"[WIFI] Subnet mask: {ifconfig[1]}")
-                log(f"[WIFI] Gateway: {ifconfig[2]}")
-                log(f"[WIFI] DNS server: {ifconfig[3]}")
+                log(f"[WIFI] WiFi connected successfully!, IP add: {ifconfig[0]}, Subnet mask: {ifconfig[1]}, Gateway: {ifconfig[2]}, DNS: {ifconfig[3]}")
+                # log(f"[WIFI] IP address: {ifconfig[0]}")
+                # log(f"[WIFI] Subnet mask: {ifconfig[1]}")
+                # log(f"[WIFI] Gateway: {ifconfig[2]}")
+                # log(f"[WIFI] DNS server: {ifconfig[3]}")
                 return True
 
             # Check for connection errors (if status() is available)
