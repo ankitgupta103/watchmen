@@ -1278,9 +1278,9 @@ async def spath_process(mid, msg):
 def process_message(data, rssi=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
     if rssi is not None:
-        log(f"[RECV {len(data)} rssi : {rssi}] {data} at {time_msec()}")
+        log(f"[RECV : {len(data)} bytes, rssi : {rssi}] {data} at {time_msec()}")
     else:
-        log(f"[RECV {len(data)}] {data} at {time_msec()}")
+        log(f"[RECV : {len(data)} bytes] {data} at {time_msec()}")
     parsed = parse_header(data)
     if not parsed:
         log(f"[LORA] ERROR: Failure parsing incoming data : {data}")
