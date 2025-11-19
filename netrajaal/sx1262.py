@@ -839,31 +839,59 @@ class sx126x:
         [0-1]  Sender address (2 bytes: high, low)
         [2]    Frequency offset
         [3+]   Message payload
+        [last-1] RSSI value (if RSSI enabled, only present if rssi=True)
         [last] Newline character (0x0A, stripped)
         
         If RSSI is enabled, the last byte before newline contains RSSI value.
         
         Returns:
-            bytes: Message payload (excluding addressing header), or None if no data
+            tuple: (message_payload, rssi_value) where:
+                - message_payload (bytes): Message payload (excluding addressing header and RSSI)
+                - rssi_value (int or None): RSSI in dBm if enabled, None otherwise
+            Returns (None, None) if no data available
             
         Note:
             - Module must be in normal mode (M0=LOW, M1=LOW)
             - Minimum message size is 6 bytes (3 header + 3 payload + newline)
+            - If RSSI enabled: minimum is 7 bytes (3 header + 3 payload + 1 RSSI + newline)
             - Reads complete line to avoid partial messages
+            - RSSI value is decoded as: rssi_dbm = -(256 - rssi_byte)
         """
         if self.ser.any():
             time.sleep_ms(RX_DELAY_MS)  # Wait for complete message
             r_buff = self.ser.readline()
             
             # Validate message has minimum required length
-            # Need at least: sender_addr(2) + freq(1) + payload(1) + newline(1) = 5 bytes
-            if r_buff and len(r_buff) >= 6:
-                # Extract message payload (skip first 3 bytes: sender address + frequency)
-                # Remove newline character at the end
-                msg = r_buff[3:-1]
-                return msg
+            # Note: readline() already strips the newline character
+            # Without RSSI: sender_addr(2) + freq(1) + payload(1) = 4 bytes minimum (after newline stripped)
+            # With RSSI: sender_addr(2) + freq(1) + payload(1) + RSSI(1) = 5 bytes minimum (after newline stripped)
+            if r_buff and len(r_buff) >= 5:
+                # Check if RSSI is enabled - if so, the last byte is RSSI (newline already stripped by readline)
+                if self.rssi:
+                    # RSSI enabled: format is [header(3)][payload][RSSI(1)]
+                    # readline() already removed the newline, so RSSI is at the last position
+                    # Minimum length with RSSI: 3 (header) + 1 (payload) + 1 (RSSI) = 5 bytes
+                    # Extract RSSI value (last byte, since newline was already stripped)
+                    rssi_byte = r_buff[-1]
+                    # Extract message payload (skip first 3 bytes, exclude RSSI)
+                    msg = r_buff[3:-1]
+                    # Decode RSSI: actual_RSSI = -(256 - value) dBm
+                    rssi_dbm = -(256 - rssi_byte)
+                    return (msg, rssi_dbm)
+                else:
+                    # RSSI disabled: format is [header(3)][payload]
+                    # readline() already removed the newline
+                    # Extract message payload (skip first 3 bytes)
+                    msg = r_buff[3:]
+                    return (msg, None)
+            elif r_buff and len(r_buff) >= 4:
+                # Very short message without RSSI (minimum length: 4 bytes after newline stripped)
+                # Format: [header(3)][payload(1)]
+                if not self.rssi:
+                    msg = r_buff[3:]
+                    return (msg, None)
         
-        return None
+        return (None, None)
     
     def get_channel_rssi(self):
         """

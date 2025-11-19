@@ -94,7 +94,7 @@ elif uid == b'e076465dd7090d1c':
 # OTHER NODES
 elif uid == b'e076465dd7091027':
     my_addr = 221
-    shortest_path_to_cc = [223]
+    shortest_path_to_cc = [219]
 elif uid ==  b'e076465dd7194211':
     my_addr = 222
     shortest_path_to_cc = [223]
@@ -350,7 +350,7 @@ async def init_lora():
         freq=868,          # Frequency in MHz
         addr=my_addr,      # Node address
         power=22,          # Transmission power in dBm
-        rssi=False,         # Enable RSSI reporting
+        rssi=True,         # Enable RSSI reporting
         air_speed=AIR_SPEED,# Air data rate
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
@@ -1275,9 +1275,12 @@ async def spath_process(mid, msg):
             log(f"[NET] Propogating spath from {spath} to {nmsg}")
             asyncio.create_task(send_msg("S", int(mid[1]), nmsg.encode(), n))
 
-def process_message(data):
-    # Input: data: bytes raw LoRa payload; Output: bool indicating if message was processed
-    log(f"[RECV {len(data)}] {data} at {time_msec()}")
+def process_message(data, rssi=None):
+    # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
+    if rssi is not None:
+        log(f"[RECV {len(data)} rssi : {rssi}] {data} at {time_msec()}")
+    else:
+        log(f"[RECV {len(data)}] {data} at {time_msec()}")
     parsed = parse_header(data)
     if not parsed:
         log(f"[LORA] ERROR: Failure parsing incoming data : {data}")
@@ -1344,10 +1347,10 @@ def process_message(data):
 async def radio_read():
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
     while True:
-        message = loranode.receive()
+        message, rssi = loranode.receive()
         if message:
             message = message.replace(b"{}[]", b"\n")
-            process_message(message)
+            process_message(message, rssi)
         await asyncio.sleep(0.1)
 
 async def validate_and_remove_neighbours():
