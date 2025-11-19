@@ -862,30 +862,45 @@ class sx126x:
             r_buff = self.ser.readline()
             
             # Validate message has minimum required length
-            # Note: readline() already strips the newline character
-            # Without RSSI: sender_addr(2) + freq(1) + payload(1) = 4 bytes minimum (after newline stripped)
-            # With RSSI: sender_addr(2) + freq(1) + payload(1) + RSSI(1) = 5 bytes minimum (after newline stripped)
+            # Handle newline: readline() may or may not strip it depending on MicroPython version
+            # Strip newline manually if present (0x0A)
+            if r_buff and len(r_buff) > 0 and r_buff[-1] == 0x0A:
+                r_buff = r_buff[:-1]
+            
+            # Without RSSI: sender_addr(2) + freq(1) + payload(1) = 4 bytes minimum
+            # With RSSI: sender_addr(2) + freq(1) + payload(1) + RSSI(1) = 5 bytes minimum
             if r_buff and len(r_buff) >= 5:
-                # Check if RSSI is enabled - if so, the last byte is RSSI (newline already stripped by readline)
+                # Check if RSSI is enabled - if so, the last byte is RSSI
                 if self.rssi:
                     # RSSI enabled: format is [header(3)][payload][RSSI(1)]
-                    # readline() already removed the newline, so RSSI is at the last position
                     # Minimum length with RSSI: 3 (header) + 1 (payload) + 1 (RSSI) = 5 bytes
-                    # Extract RSSI value (last byte, since newline was already stripped)
+                    # Extract RSSI value (last byte)
                     rssi_byte = r_buff[-1]
                     # Extract message payload (skip first 3 bytes, exclude RSSI)
                     msg = r_buff[3:-1]
                     # Decode RSSI: actual_RSSI = -(256 - value) dBm
                     rssi_dbm = -(256 - rssi_byte)
+                    
+                    # Debug: Check if message starts with frequency offset byte (indicates extraction issue)
+                    # Frequency offset for 868.125 MHz is 18 (0x12) from 850 MHz base
+                    # If message starts with frequency offset byte, it means we're not skipping enough bytes
+                    if len(msg) > 0 and hasattr(self, 'offset_freq') and msg[0] == self.offset_freq:
+                        # Message starts with frequency offset - this shouldn't happen
+                        # This suggests an extra byte is being included in the payload
+                        # Try extracting message starting from byte 4 instead of 3 (skip one more byte)
+                        if len(r_buff) >= 6:
+                            # Skip one more byte (the frequency byte that's incorrectly in payload)
+                            msg = r_buff[4:-1]
+                            log(f"[RSSI] DEBUG: Adjusted extraction - skipped extra frequency byte")
+                    
                     return (msg, rssi_dbm)
                 else:
                     # RSSI disabled: format is [header(3)][payload]
-                    # readline() already removed the newline
                     # Extract message payload (skip first 3 bytes)
                     msg = r_buff[3:]
                     return (msg, None)
             elif r_buff and len(r_buff) >= 4:
-                # Very short message without RSSI (minimum length: 4 bytes after newline stripped)
+                # Very short message without RSSI (minimum length: 4 bytes)
                 # Format: [header(3)][payload(1)]
                 if not self.rssi:
                     msg = r_buff[3:]
