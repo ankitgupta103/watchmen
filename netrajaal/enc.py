@@ -1,27 +1,13 @@
 import ucryptolib
 import os
-from machine import RTC
 import time as utime
 from rsa.key import newkeys, PublicKey, PrivateKey
 from rsa.pkcs1 import encrypt, decrypt, sign, verify
 import rsa
+from logger import logger
 
 import random
 
-rtc = RTC()
-def get_human_ts():
-    # Input: None; Output: str formatted as HH:MM:SS
-    _,_,_,_,h,m,s,_ = rtc.datetime()
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-log_entries_buffer = []
-
-def log(msg):
-    # Input: msg: str; Output: None (side effects: buffer append and console log)
-    t = get_human_ts()
-    log_entry = f"{t} : {msg}"
-    log_entries_buffer.append(log_entry)
-    print(log_entry)
     
 # ===== REMOVE BEFORE FINALIZING =====
 run_on_omv = True
@@ -42,7 +28,7 @@ class EncNode:
         pub_file = open(pub_filename, "r")
         n_pub_from_file = int(pub_file.readline().strip())
         self.pubkey = PublicKey(n_pub_from_file, e_pub)
-        log(f"Loading public key from file {pub_filename}")
+        logger.info(f"Loading public key from file {pub_filename}")
         self.rsa_priv = enc_priv.PrivKeyRepo() # TODO REMOVE
 
     def get_pub_key(self):
@@ -126,10 +112,10 @@ def test_encryption(encnode, nodeaddr, n2, enctype):
         aes_key = setup_aes()
         iv = setup_iv()
     else:
-        log("WRONG INPUT")
+        logger.error("WRONG INPUT")
         return
     t1 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-    log(f"Setup key in time {t1-t0} mili seconds")
+    logger.info(f"Setup key in time {t1-t0} mili seconds")
     lenstr = 1
     for i in range(1,n2):
         t2 = utime.ticks_diff(utime.ticks_ms(), clock_start)
@@ -154,9 +140,9 @@ def test_encryption(encnode, nodeaddr, n2, enctype):
         else:
             return
         t5 = utime.ticks_diff(utime.ticks_ms(), clock_start)
-        log(f"{enctype}@{nodeaddr} : Encrypting {len(teststr)} to {len(teststr_enc)}, creation time = {t3-t2}, enc time = {t4-t3}, decrypt time = {t5-t4}")
+        logger.info(f"{enctype}@{nodeaddr} : Encrypting {len(teststr)} to {len(teststr_enc)}, creation time = {t3-t2}, enc time = {t4-t3}, decrypt time = {t5-t4}")
         if teststr.encode() != teststr_decrypt:
-            log(f"Strings DONT match {teststr} != {teststr_decrypt}")
+            logger.error(f"Strings DONT match {teststr} != {teststr_decrypt}")
         lenstr = lenstr*2
 
 def main():

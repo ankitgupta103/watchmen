@@ -1,22 +1,8 @@
 import time
 import json
-from machine import SPI, Pin, RTC
+from machine import SPI, Pin
 import gc
-
-rtc = RTC()
-def get_human_ts():
-    # Input: None; Output: str formatted as HH:MM:SS
-    _,_,_,_,h,m,s,_ = rtc.datetime()
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-log_entries_buffer = []
-
-def log(msg):
-    # Input: msg: str; Output: None (side effects: buffer append and console log)
-    t = get_human_ts()
-    log_entry = f"{t} : {msg}"
-    log_entries_buffer.append(log_entry)
-    print(log_entry)
+from logger import logger
 
 class SC16IS750:
     """ Optimized SC16IS750 driver """
@@ -134,7 +120,7 @@ class Cellular:
         apn = apn_config["apn"]
         name = apn_config["name"]
         
-        log(f"Testing {name}: {apn}")
+        logger.info(f"Testing {name}: {apn}")
         
         try:
             # Reset connection
@@ -158,7 +144,7 @@ class Cellular:
                     ip_part = response.split("+CGPADDR:")[1]
                     ip_address = ip_part.split(",")[1].strip().strip('"')
                     if ip_address and ip_address != "0.0.0.0":
-                        log(f"Connected! IP: {ip_address}")
+                        logger.info(f"Connected! IP: {ip_address}")
                         self.ip_address = ip_address
                         self.working_apn = apn
                         return True
@@ -168,18 +154,18 @@ class Cellular:
             return False
             
         except Exception as e:
-            log(f"    Exception: {e}")
+            logger.error(f"    Exception: {e}")
             return False
     
     def initialize(self):
         """One-time initialization - call this at startup"""
-        print("=== Initialization ===")
+        logger.info("=== Initialization ===")
         
         try:
             # Basic setup
             success, _ = self._send_at("AT", timeout_ms=2000)
             if not success:
-                print("Modem not responding")
+                logger.error("Modem not responding")
                 return False
             
             self._send_at("ATE0")
@@ -187,58 +173,58 @@ class Cellular:
             # Check SIM
             success, response = self._send_at("AT+CPIN?", timeout_ms=5000)
             if "READY" not in response:
-                print("SIM card not ready")
+                logger.error("SIM card not ready")
                 return False
-            print("SIM card ready")
+            logger.info("SIM card ready")
                 
             # Check signal
             success, response = self._send_at("AT+CSQ")
             if "+CSQ:" in response:
                 signal = response.split("+CSQ:")[1].split(",")[0].strip()
                 if signal.isdigit() and int(signal) > 0:
-                    log(f"Signal strength: {signal}/31")
+                    logger.info(f"Signal strength: {signal}/31")
                     
             # Set network mode
             self._send_at("AT+CNMP=38")
             
             # Wait for registration
-            print("Waiting for network registration...")
+            logger.info("Waiting for network registration...")
             for attempt in range(30):
                 success, response = self._send_at("AT+CREG?")
                 if "+CREG:" in response and (",1" in response or ",5" in response):
-                    print("Network registered")
+                    logger.info("Network registered")
                     break
                 time.sleep_ms(1000)
             else:
-                print("Registration timeout")
+                logger.error("Registration timeout")
                 return False
             
             # Try APNs
-            log(f"=== Connecting to Network ===")
+            logger.info(f"=== Connecting to Network ===")
             for apn_config in self.apn_configs:
                 if self._test_apn(apn_config):
                     self.connected = True
-                    log(f"Connected with {apn_config['name']}")
+                    logger.info(f"Connected with {apn_config['name']}")
                     break
                 time.sleep_ms(1000)
             
             if not self.connected:
-                print("All APNs failed")
+                logger.error("All APNs failed")
                 return False
             
             # Initialize HTTP
             if not self._init_http():
                 return False
             
-            log(f"\nSYSTEM READY")
-            log(f"APN: {self.working_apn}")
-            log(f"IP: {self.ip_address}")
-            log(f"===> Ready for data uploads <===")
+            logger.info(f"\nSYSTEM READY")
+            logger.info(f"APN: {self.working_apn}")
+            logger.info(f"IP: {self.ip_address}")
+            logger.info(f"===> Ready for data uploads <===")
             
             return True
             
         except Exception as e:
-            log(f"Initialization error: {e}")
+            logger.error(f"Initialization error: {e}")
             return False
     
     def _init_http(self):
@@ -246,7 +232,7 @@ class Cellular:
         if self.http_initialized:
             return True
             
-        print("Initializing HTTP...")
+        logger.info("Initializing HTTP...")
         
         # Terminate any existing session
         self._send_at("AT+HTTPTERM")
@@ -255,7 +241,7 @@ class Cellular:
         # Initialize
         success, response = self._send_at("AT+HTTPINIT")
         if not success:
-            print("HTTP init failed")
+            logger.error("HTTP init failed")
             return False
         
         # Set parameters
@@ -265,7 +251,7 @@ class Cellular:
         time.sleep_ms(500)
         
         self.http_initialized = True
-        print("HTTP ready")
+        logger.info("HTTP ready")
         return True
     
     def _send_data_raw(self, data):
@@ -279,12 +265,12 @@ class Cellular:
     def upload_data(self, data_payload, url="https://n8n.vyomos.org/webhook/watchmen-detect"):
         """Upload data"""
         if not self.connected or not self.http_initialized:
-            print("  System not initialized")
+            logger.warning("  System not initialized")
             return None
         
         try:
             self.upload_count += 1
-            log(f"\n=== Upload #{self.upload_count} ===")
+            logger.info(f"\n=== Upload #{self.upload_count} ===")
             
             # Prepare payload
             if isinstance(data_payload, dict):
@@ -295,12 +281,12 @@ class Cellular:
                 json_data = str(data_payload)
             
             data_size = len(json_data)
-            log(f"Uploading {data_size} bytes ({data_size/1024:.2f} KB)")
+            logger.info(f"Uploading {data_size} bytes ({data_size/1024:.2f} KB)")
             
             # Set URL
             success, response = self._send_at(f'AT+HTTPPARA="URL","{url}"', timeout_ms=5000)
             if not success:
-                print("Failed to set URL")
+                logger.error("Failed to set URL")
                 return None
             
             # Set content type
@@ -316,7 +302,7 @@ class Cellular:
                 upload_time = time.ticks_diff(time.ticks_ms(), upload_start) / 1000
                 
                 if upload_success:
-                    log(f"Data uploaded in {upload_time:.2f}s")
+                    logger.info(f"Data uploaded in {upload_time:.2f}s")
                     
                     # Execute POST
                     success, response = self._send_at("AT+HTTPACTION=1", timeout_ms=30000)
@@ -335,7 +321,7 @@ class Cellular:
                                 if len(parts) >= 3:
                                     status_code = int(parts[1])
                                     response_length = int(parts[2])
-                                    log(f"Server response: HTTP {status_code}")
+                                    logger.info(f"Server response: HTTP {status_code}")
                             except:
                                 pass
                         
@@ -361,23 +347,23 @@ class Cellular:
                         }
                         
                         if status_code == 200:
-                            log(f"SUCCESS: Upload #{self.upload_count}")
+                            logger.info(f"SUCCESS: Upload #{self.upload_count}")
                         else:
-                            log(f"HTTP {status_code}: Upload #{self.upload_count}")
+                            logger.warning(f"HTTP {status_code}: Upload #{self.upload_count}")
                         
                         return result
                     else:
-                        print("POST execution failed")
+                        logger.error("POST execution failed")
                         return None
                 else:
-                    print("Data upload failed")
+                    logger.error("Data upload failed")
                     return None
             else:
-                log(f"No DOWNLOAD prompt")
+                logger.warning(f"No DOWNLOAD prompt")
                 return None
                 
         except Exception as e:
-            log(f"Upload error: {e}")
+            logger.error(f"Upload error: {e}")
             return None
     
     def check_connection(self):
@@ -392,7 +378,7 @@ class Cellular:
     
     def reconnect(self):
         """Reconnect if connection is lost"""
-        print("=== Reconnecting ===")
+        logger.info("=== Reconnecting ===")
         self.connected = False
         self.http_initialized = False
         return self.initialize()
@@ -405,4 +391,4 @@ class Cellular:
         if self.connected:
             self._send_at("AT+CGACT=0,1")
             self.connected = False
-        print("  System shutdown")
+        logger.info("  System shutdown")

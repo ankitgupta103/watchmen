@@ -23,12 +23,13 @@ Author: Watchmen Project
 """
 
 try:
-    from machine import Pin, UART, RTC
+    from machine import Pin, UART
 except ImportError:
     print("ERROR: machine module not found. not running on openmv OpenMV.")
     raise
 
 import time
+from logger import logger
 
 # =============================================================================
 # Configuration Constants
@@ -91,42 +92,6 @@ RX_DELAY_MS = 150            # Delay before reading received message
 RSSI_CMD_BYTES = bytes([0xC0, 0xC1, 0xC2, 0xC3, 0x00, 0x02])
 RSSI_RESPONSE_HEADER = bytes([0xC1, 0x00, 0x02])
 RSSI_WAIT_MS = 500
-
-# =============================================================================
-# Utility Functions
-# =============================================================================
-
-rtc = RTC()
-log_entries_buffer = []
-
-
-def get_human_ts():
-    """
-    Get formatted timestamp string from RTC.
-    
-    Returns:
-        str: Formatted timestamp as "HH:MM:SS"
-    """
-    _, _, _, _, h, m, s, _ = rtc.datetime()
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-
-def log(msg):
-    """
-    Log a message with timestamp.
-    
-    Args:
-        msg (str): Message to log
-        
-    Side effects:
-        - Appends timestamped message to log_entries_buffer
-        - Prints message to console
-    """
-    t = get_human_ts()
-    log_entry = f"{t} : {msg}"
-    log_entries_buffer.append(log_entry)
-    print(log_entry)
-
 
 # =============================================================================
 # SX126x LoRa Module Driver Class
@@ -261,15 +226,15 @@ class sx126x:
         else:
             raise ValueError(f"Frequency {freq} MHz out of valid range (410-493 or 850-930)")
         
-        log(f"Initializing with UART {uart_num}, M0={m0_pin}, M1={m1_pin}")
+        logger.info(f"Initializing with UART {uart_num}, M0={m0_pin}, M1={m1_pin}")
         
         # Initialize GPIO pins for mode control (M0, M1)
         try:
             self.M0 = Pin(m0_pin, Pin.OUT)
             self.M1 = Pin(m1_pin, Pin.OUT)
-            log(f"GPIO pins initialized successfully")
+            logger.info(f"GPIO pins initialized successfully")
         except Exception as e:
-            log(f"GPIO initialization failed: {e}")
+            logger.error(f"GPIO initialization failed: {e}")
             raise
         
         # Enter configuration mode: M0=LOW, M1=HIGH
@@ -282,9 +247,9 @@ class sx126x:
         # Configuration must be done at 9600 baud initially
         try:
             self.ser = UART(uart_num, UART_CONFIG_BAUD, timeout=UART_TIMEOUT_MS)
-            log(f"UART {uart_num} initialized at {UART_CONFIG_BAUD} baud")
+            logger.info(f"UART {uart_num} initialized at {UART_CONFIG_BAUD} baud")
         except Exception as e:
-            log(f"UART initialization failed: {e}")
+            logger.error(f"UART initialization failed: {e}")
             raise
         
         # Give module time to stabilize after UART initialization
@@ -311,9 +276,9 @@ class sx126x:
         # Reinitialize UART at target baud rate
         try:
             self.ser = UART(uart_num, self.target_baud, timeout=UART_TIMEOUT_MS)
-            # log(f"UART {uart_num} reopened at {self.target_baud} baud")
+            # logger.debug(f"UART {uart_num} reopened at {self.target_baud} baud")
         except Exception as e:
-            log(f"UART reinitialization failed: {e}")
+            logger.error(f"UART reinitialization failed: {e}")
             raise
         
         # Clear any stale data from input buffer
@@ -464,12 +429,12 @@ class sx126x:
         if sent_config:
             self._display_config_table("CONFIGURATION TO BE SENT", sent_config)
         else:
-            log(f"Sending configuration: {[hex(x) for x in self.cfg_reg]}")
+            logger.debug(f"Sending configuration: {[hex(x) for x in self.cfg_reg]}")
         
         # Send configuration with retry logic
         # Module should respond with 0xC1 header to confirm success
         for attempt in range(CFG_RETRY_ATTEMPTS):
-            log(f"Configuration attempt {attempt + 1}")
+            logger.info(f"Configuration attempt {attempt + 1}")
             
             # Send 12-byte configuration register
             self.ser.write(bytes(self.cfg_reg))
@@ -487,7 +452,7 @@ class sx126x:
                     if received_config:
                         self._display_config_table("CONFIGURATION RECEIVED (CONFIRMED)", received_config)
                     else:
-                        log(f"Received response: {[hex(x) for x in r_buff]}")
+                        logger.debug(f"Received response: {[hex(x) for x in r_buff]}")
                     
                     # Verify configuration matches (compare parameter values)
                     if received_config and sent_config:
@@ -512,29 +477,29 @@ class sx126x:
                             mismatches.append(f"TX Power: sent={sent_config['power']}, received={received_config['power']}")
                         
                         if config_match:
-                            log(f"=" * 60)
-                            log(f"  CONFIGURATION SUCCESSFUL")
-                            log(f"  All parameters match sent configuration")
-                            log(f"=" * 60 + "\n")
+                            logger.info(f"=" * 60)
+                            logger.info(f"  CONFIGURATION SUCCESSFUL")
+                            logger.info(f"  All parameters match sent configuration")
+                            logger.info(f"=" * 60 + "\n")
                         else:
-                            log(f"=" * 60)
-                            log(f"  CONFIGURATION PARTIALLY SUCCESSFUL")
-                            log(f"  Some parameters don't match:")
+                            logger.warning(f"=" * 60)
+                            logger.warning(f"  CONFIGURATION PARTIALLY SUCCESSFUL")
+                            logger.warning(f"  Some parameters don't match:")
                             for mismatch in mismatches:
-                                log(f"    - {mismatch}")
-                            log(f"=" * 60)
+                                logger.warning(f"    - {mismatch}")
+                            logger.warning(f"=" * 60)
                     else:
-                        log(f"=" * 60)
-                        log(f"  CONFIGURATION SUCCESSFUL")
-                        log(f"  Module acknowledged configuration")
-                        log(f"=" * 60)
+                        logger.info(f"=" * 60)
+                        logger.info(f"  CONFIGURATION SUCCESSFUL")
+                        logger.info(f"  Module acknowledged configuration")
+                        logger.info(f"=" * 60)
                     
                     self.config_success = True
                     break
                 else:
-                    log(f"Configuration failed, unexpected response: {[hex(x) for x in r_buff] if r_buff else 'None'}")
+                    logger.warning(f"Configuration failed, unexpected response: {[hex(x) for x in r_buff] if r_buff else 'None'}")
             else:
-                log(f"No response from module")
+                logger.warning(f"No response from module")
             
             # Clear input buffer before retry
             while self.ser.any():
@@ -543,15 +508,15 @@ class sx126x:
             
             # Final attempt failed
             if attempt == CFG_RETRY_ATTEMPTS - 1:
-                log(f"=" * 60)
-                log(f"  ✗ CONFIGURATION FAILED")
-                log(f"  Attempted {CFG_RETRY_ATTEMPTS} times with no valid response")
-                log(f"  Troubleshooting:")
-                log(f"    - Check UART connections (TX/RX swapped?)")
-                log(f"    - Verify M0/M1 pin connections")
-                log(f"    - Ensure power supply is 3.3V and stable")
-                log(f"    - Check baud rate compatibility")
-                log(f"=" * 60)
+                logger.error(f"=" * 60)
+                logger.error(f"  ✗ CONFIGURATION FAILED")
+                logger.error(f"  Attempted {CFG_RETRY_ATTEMPTS} times with no valid response")
+                logger.error(f"  Troubleshooting:")
+                logger.error(f"    - Check UART connections (TX/RX swapped?)")
+                logger.error(f"    - Verify M0/M1 pin connections")
+                logger.error(f"    - Ensure power supply is 3.3V and stable")
+                logger.error(f"    - Check baud rate compatibility")
+                logger.error(f"=" * 60)
                 self.config_success = False
         
         # Exit configuration mode: return to normal operation
@@ -654,26 +619,26 @@ class sx126x:
             config_dict (dict): Dictionary returned by _parse_config_bytes()
         """
         if not config_dict:
-            log(f"{title}: Invalid configuration")
+            logger.warning(f"{title}: Invalid configuration")
             return
         
-        log(f"=" * 60)
-        log(f"  {title}")
-        log(f"=" * 60)
-        log(f"  Configuration Header : {config_dict['header']}")
-        log(f"  Node Address         : {config_dict['node_addr']} (0x{config_dict['node_addr']:04X})")
-        log(f"  Network ID           : {config_dict['net_id']}")
-        log(f"  Frequency            : {config_dict['frequency']}.125 MHz")
-        log(f"  UART Baud Rate       : {config_dict['uart_baud']} bps")
-        log(f"  Air Data Rate        : {config_dict['air_speed']} bps")
-        log(f"  TX Power             : {config_dict['power']} dBm")
-        log(f"  Buffer Size          : {config_dict['buffer_size']} bytes")
-        log(f"  Operating Mode       : {config_dict['op_mode']}")
-        log(f"  Encryption Key       : {config_dict['crypt_key']} (0x{config_dict['crypt_key']:04X})")
-        log(f"  Packet RSSI          : {'Enabled' if config_dict['rssi_enabled'] else 'Disabled'}")
-        log(f"  Noise RSSI           : {'Enabled' if config_dict['noise_rssi_enabled'] else 'Disabled'}")
-        log(f"  Raw Bytes            : {[hex(x) for x in config_dict['raw_bytes']]}")
-        log(f"=" * 60)
+        logger.info(f"=" * 60)
+        logger.info(f"  {title}")
+        logger.info(f"=" * 60)
+        logger.info(f"  Configuration Header : {config_dict['header']}")
+        logger.info(f"  Node Address         : {config_dict['node_addr']} (0x{config_dict['node_addr']:04X})")
+        logger.info(f"  Network ID           : {config_dict['net_id']}")
+        logger.info(f"  Frequency            : {config_dict['frequency']}.125 MHz")
+        logger.info(f"  UART Baud Rate       : {config_dict['uart_baud']} bps")
+        logger.info(f"  Air Data Rate        : {config_dict['air_speed']} bps")
+        logger.info(f"  TX Power             : {config_dict['power']} dBm")
+        logger.info(f"  Buffer Size          : {config_dict['buffer_size']} bytes")
+        logger.info(f"  Operating Mode       : {config_dict['op_mode']}")
+        logger.info(f"  Encryption Key       : {config_dict['crypt_key']} (0x{config_dict['crypt_key']:04X})")
+        logger.info(f"  Packet RSSI          : {'Enabled' if config_dict['rssi_enabled'] else 'Disabled'}")
+        logger.info(f"  Noise RSSI           : {'Enabled' if config_dict['noise_rssi_enabled'] else 'Disabled'}")
+        logger.info(f"  Raw Bytes            : {[hex(x) for x in config_dict['raw_bytes']]}")
+        logger.info(f"=" * 60)
     
     def get_settings(self):
         """
@@ -708,7 +673,7 @@ class sx126x:
         
         # Check for response
         if not self.ser.any():
-            log(f"No response from module")
+            logger.warning(f"No response from module")
             self.M1.value(0)  # Exit config mode
             return
         
@@ -716,7 +681,7 @@ class sx126x:
         
         # Validate response header and length
         if not response or len(response) < 12 or response[0] != RESPONSE_SUCCESS or response[2] != 0x09:
-            log(f"Invalid response: {[hex(x) for x in response] if response else 'None'}")
+            logger.warning(f"Invalid response: {[hex(x) for x in response] if response else 'None'}")
             self.M1.value(0)  # Exit config mode
             return
         
@@ -763,20 +728,20 @@ class sx126x:
         noise_rssi_enabled = bool(power_buffer_reg & 0x20)  # Bit 5 of register 7
         
         # Display parsed settings
-        log(f"=" * 40)
-        log(f"      LoRa Module Settings")
-        log(f"=" * 40)
-        log(f"Node Address    : {node_addr} (0x{node_addr:04X})")
-        log(f"Network ID      : {net_id}")
-        log(f"Frequency       : {frequency}.125 MHz")
-        log(f"UART Baud Rate  : {uart_baud} bps")
-        log(f"Air Data Rate   : {air_speed} bps")
-        log(f"TX Power        : {power} dBm")
-        log(f"Buffer Size     : {buffer_size} bytes")
-        log(f"Encryption Key  : {crypt_key} (0x{crypt_key:04X})")
-        log(f"Packet RSSI     : {'Enabled' if rssi_enabled else 'Disabled'}")
-        log(f"Noise RSSI      : {'Enabled' if noise_rssi_enabled else 'Disabled'}")
-        log(f"=" * 40)
+        logger.info(f"=" * 40)
+        logger.info(f"      LoRa Module Settings")
+        logger.info(f"=" * 40)
+        logger.info(f"Node Address    : {node_addr} (0x{node_addr:04X})")
+        logger.info(f"Network ID      : {net_id}")
+        logger.info(f"Frequency       : {frequency}.125 MHz")
+        logger.info(f"UART Baud Rate  : {uart_baud} bps")
+        logger.info(f"Air Data Rate   : {air_speed} bps")
+        logger.info(f"TX Power        : {power} dBm")
+        logger.info(f"Buffer Size     : {buffer_size} bytes")
+        logger.info(f"Encryption Key  : {crypt_key} (0x{crypt_key:04X})")
+        logger.info(f"Packet RSSI     : {'Enabled' if rssi_enabled else 'Disabled'}")
+        logger.info(f"Noise RSSI      : {'Enabled' if noise_rssi_enabled else 'Disabled'}")
+        logger.info(f"=" * 40)
         
         # Return to normal mode
         self.M1.value(0)  # LOW
@@ -808,7 +773,7 @@ class sx126x:
         """
         # Warn if module wasn't properly configured
         if not hasattr(self, 'config_success') or not self.config_success:
-            log(f"Warning: Module not properly configured, send may fail")
+            logger.warning(f"Module not properly configured, send may fail")
         
         # Calculate frequency offset for target
         offset_frequency = self.freq - (FREQ_RANGE_900MHZ_START if self.freq > FREQ_RANGE_900MHZ_START else FREQ_RANGE_400MHZ_START)
@@ -889,7 +854,7 @@ class sx126x:
                         if len(r_buff) >= 6:
                             # Skip one more byte (the frequency byte that's incorrectly in payload)
                             msg = r_buff[4:-1]
-                            log(f"[RSSI] DEBUG: Adjusted extraction - skipped extra frequency byte")
+                            logger.debug(f"[RSSI] Adjusted extraction - skipped extra frequency byte")
                     
                     return (msg, rssi_dbm)
                 else:
@@ -951,8 +916,8 @@ class sx126x:
                re_temp[2] == RSSI_RESPONSE_HEADER[2]:
                 # Decode RSSI value: -(256 - value) dBm
                 rssi_value = -(256 - re_temp[3])
-                log(f"Current noise RSSI: {rssi_value}dBm")
+                logger.info(f"Current noise RSSI: {rssi_value}dBm")
             else:
-                log(f"Failed to receive RSSI value")
+                logger.warning(f"Failed to receive RSSI value")
         else:
-            log(f"No RSSI response received")
+            logger.warning(f"No RSSI response received")

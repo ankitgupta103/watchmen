@@ -1,23 +1,9 @@
-from machine import RTC, Pin
+from machine import Pin
 import time
 import ml
 import sensor
 import image
-
-rtc = RTC()
-def get_human_ts():
-    # Input: None; Output: str formatted as HH:MM:SS
-    _,_,_,_,h,m,s,_ = rtc.datetime()
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-log_entries_buffer = []
-
-def log(msg):
-    # Input: msg: str; Output: None (side effects: buffer append and console log)
-    t = get_human_ts()
-    log_entry = f"{t} : {msg}"
-    log_entries_buffer.append(log_entry)
-    print(log_entry)
+from logger import logger
     
 # ====== TURNING IR EMITTER ON ========================
 # p1_pin = Pin('P14', Pin.OUT)  # Configure as output
@@ -40,7 +26,7 @@ def turn_ON_IR_emitter():
     if not ir_emitter_active:
         ir_emitter.on()
         ir_emitter_active = True
-        log("IR emitter ON - Enhanced night vision active")
+        logger.info("IR emitter ON - Enhanced night vision active")
         time.sleep_ms(IR_WARMUP_TIME)  # Let IR emitter stabilize
 
 def turn_OFF_IR_emitter():
@@ -48,7 +34,7 @@ def turn_OFF_IR_emitter():
     if ir_emitter_active:
         ir_emitter.off()
         ir_emitter_active = False
-        log("IR emitter OFF - Power saving mode")
+        logger.info("IR emitter OFF - Power saving mode")
 
 # Start with IR emitter OFF
 turn_OFF_IR_emitter()
@@ -71,7 +57,7 @@ class Detector:
         """Check if thermal body is present in PIR sensor path"""
         is_thermal = PIR_PIN.value()
         if is_thermal:
-            log(f"PIR DETECTED THERMAL BODY")
+            logger.info(f"PIR DETECTED THERMAL BODY")
             turn_ON_IR_emitter()
             return True
         else:
@@ -85,7 +71,7 @@ class Detector:
             scale_factor = target_size / h
         else:
             scale_factor = target_size / w
-        log(f"Scale factor : {scale_factor}, target size = {target_size}, {h}, {w}")
+        logger.debug(f"Scale factor : {scale_factor}, target size = {target_size}, {h}, {w}")
         # img = img.scale(x_scale=scale_factor, y_scale=scale_factor, hint=image.BICUBIC)
         x_offset = (img.width() - target_size) // 2
         y_offset = (img.height() - target_size) // 2
@@ -108,11 +94,11 @@ class Detector:
             # The highest value in this list is our max confidence for a person.
             max_confidence = max(confidence_scores)
             if max_confidence > 0.5:
-                log(f"Image detection with confidence {max_confidence}")
+                logger.info(f"Image detection with confidence {max_confidence}")
                 return True
         else:
             # If the output format is unexpected, return 0.
-            log(f"   Unexpected model output")
+            logger.warning(f"   Unexpected model output")
         return False
 
     def check_person(self):                                       
@@ -121,7 +107,7 @@ class Detector:
         return self.check_thermal_body()
 
 def main():
-    log(f"In Main of Detect")
+    logger.info(f"In Main of Detect")
     sensor.reset()
     sensor.set_pixformat(sensor.RGB565)
     sensor.set_framesize(sensor.QVGA)
@@ -133,7 +119,7 @@ def main():
         time.sleep_ms(500)
         img = sensor.snapshot()
         person_detected = d.check_person(img)
-        log(f"Person detected = {person_detected}")
+        logger.info(f"Person detected = {person_detected}")
 
 if __name__ == "__main__":
     main()

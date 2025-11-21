@@ -1,5 +1,6 @@
 import time
 from machine import SPI, Pin
+from logger import logger
 
 class SC16IS750:
     """SC16IS750 UART bridge driver"""
@@ -85,13 +86,13 @@ class GPS:
                 f.write(f"Longitude: {lon:.6f}\n")
                 f.write(f"Updated: {time.time()}\n")
         except Exception as e:
-            print(f"ERROR: writing to file: {e}")
+            logger.error(f"writing to file: {e}")
 
     def update(self):
         """Read GPS data and update coordinates"""
         data = self.uart.read_data()
 
-        print(f"Raw Data: {data}")
+        logger.debug(f"Raw Data: {data}")
 
         if not data:
             return
@@ -286,7 +287,7 @@ def main():
                 if gps.has_fix():
                     lat, lon = gps.get_coordinates()
                     if lat is not None and lon is not None:
-                        print(f"Location detail: {lat:.6f}, {lon:.6f}")
+                        logger.info(f"Location detail: {lat:.6f}, {lon:.6f}")
 
             time.sleep_ms(100)
 
