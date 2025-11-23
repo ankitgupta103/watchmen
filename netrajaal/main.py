@@ -1311,6 +1311,7 @@ def process_message(data, rssi=None):
 # ---------------------------------------------------------------------------
 
 async def radio_read():
+    logger.info(f"===> Readio Read, LoRa receive loop started... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
     while True:
         message, rssi = loranode.receive()
@@ -1322,6 +1323,7 @@ async def radio_read():
 async def validate_and_remove_neighbours():
     # Input: None; Output: None (verifies neighbours via ping and prunes unreachable ones)
     global shortest_path_to_cc
+    logger.info(f"===> Validate/Remove, Neighbour validation loop started... <===\n")
     while True:
         logger.info(f"[NET] Going to validate neighbours : {seen_neighbours}")
         to_be_removed = []
@@ -1901,10 +1903,9 @@ async def main():
     # Start memory management tasks
     asyncio.create_task(periodic_memory_cleanup())
     asyncio.create_task(periodic_gc())
-    logger.info(f"[MEM] Memory management tasks started (free: {get_free_memory()/1024:.1f}KB)")
-    logger.info(f"=" * 60)
+    logger.info(f"[MEM] Memory management tasks started (free: {get_free_memory()/1024:.1f}KB)\n")
     if running_as_cc():
-        logger.info(f"[INIT] Starting command center node")
+        logger.info(f"[INIT] ===> Starting command center node <===")
         # Initialize WiFi if enabled
         if WIFI_ENABLED:
             await init_wifi()
@@ -1918,7 +1919,7 @@ async def main():
         asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     else:
-        logger.info(f"[INIT] Starting unit node")
+        logger.info(f"[INIT] ===> Starting unit node <===")
         asyncio.create_task(send_scan())
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
