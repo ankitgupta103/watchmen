@@ -86,7 +86,7 @@ UART_STABILIZE_DELAY_MS = 30  # Delay for UART to stabilize
 
 # Message transmission delays
 TX_DELAY_MS = 150  # Delay after sending message
-RX_DELAY_MS = 200  # Delay before reading received message (increased for better reliability)
+RX_DELAY_MS = 250  # Delay before reading received message (increased for better reliability with RSSI)
 
 # RSSI command
 RSSI_CMD_BYTES = bytes([0xC0, 0xC1, 0xC2, 0xC3, 0x00, 0x02])
@@ -953,15 +953,40 @@ class sx126x:
         """
         if self.ser.any():
             time.sleep_ms(RX_DELAY_MS)  # Wait for complete message
-            # Read all available data first to ensure we get complete message
-            # readline() should handle newline, but we want to ensure complete reception
+            
+            # Read message - try readline first, but also check for complete message
             r_buff = self.ser.readline()
-            # If message seems incomplete (no newline and more data available), wait a bit more
-            if r_buff and len(r_buff) > 0 and r_buff[-1] != 0x0A and self.ser.any():
-                time.sleep_ms(50)  # Additional wait for remaining data
-                additional = self.ser.readline()
-                if additional:
-                    r_buff = r_buff + additional
+            
+            # If readline() didn't get newline, try reading more data
+            # This handles cases where message arrives in chunks or is incomplete
+            if r_buff and len(r_buff) > 0 and r_buff[-1] != 0x0A:
+                # Wait a bit more and check if more data is available
+                time.sleep_ms(100)  # Increased wait for complete message
+                if self.ser.any():
+                    # Try readline again to get the rest
+                    additional = self.ser.readline()
+                    if additional:
+                        r_buff = r_buff + additional
+                    else:
+                        # If readline doesn't work, read available bytes directly
+                        available = self.ser.any()
+                        if available > 0:
+                            additional = self.ser.read(available)
+                            if additional:
+                                r_buff = r_buff + additional
+                                # Look for newline in the combined buffer
+                                newline_pos = r_buff.find(b'\n')
+                                if newline_pos >= 0:
+                                    r_buff = r_buff[:newline_pos+1]
+                                # If still no newline, wait one more time for very long messages
+                                elif self.ser.any():
+                                    time.sleep_ms(50)
+                                    more_data = self.ser.read(self.ser.any())
+                                    if more_data:
+                                        r_buff = r_buff + more_data
+                                        newline_pos = r_buff.find(b'\n')
+                                        if newline_pos >= 0:
+                                            r_buff = r_buff[:newline_pos+1]
 
             # Handle newline: readline() may or may not strip it depending on MicroPython version
             # Strip newline manually if present (0x0A)

@@ -566,8 +566,10 @@ def ack_time(smid):
         if chr(rmid[0]) == "A":
             # Match ACK: the payload should start with the MID we're waiting for
             # Handle cases where payload might be exactly MIDLEN bytes or longer
-            if len(msgbytes) >= MIDLEN:
-                if smid == msgbytes[:MIDLEN]:
+            # Also handle cases where last byte might be missing (truncation issue)
+            if len(msgbytes) >= MIDLEN - 1:  # Allow 1 byte shorter due to truncation
+                # Try exact match first
+                if len(msgbytes) >= MIDLEN and smid == msgbytes[:MIDLEN]:
                     missingids = []
                     # For End (E) chunk messages, check for missing chunk IDs
                     if len(msgbytes) > MIDLEN and msgbytes[MIDLEN:MIDLEN+1] == b':':
@@ -582,8 +584,12 @@ def ack_time(smid):
                                 missingids = []
                     logger.debug(f"[ACK] Matched ACK for {smid}, missing chunks: {missingids}")
                     return (t, missingids)
+                # Try match with missing last byte (workaround for truncation issue)
+                elif len(msgbytes) == MIDLEN - 1 and smid[:MIDLEN-1] == msgbytes:
+                    logger.debug(f"[ACK] Matched ACK for {smid} with truncated payload (missing last byte)")
+                    return (t, [])
             else:
-                logger.debug(f"[ACK] ACK payload too short: {len(msgbytes)} bytes, expected at least {MIDLEN}")
+                logger.debug(f"[ACK] ACK payload too short: {len(msgbytes)} bytes, expected at least {MIDLEN-1}")
     return (-1, None)
 
 async def log_status():
