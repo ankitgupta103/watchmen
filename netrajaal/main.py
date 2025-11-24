@@ -316,7 +316,7 @@ async def init_lora():
         freq=868,          # Frequency in MHz
         addr=my_addr,      # Node address
         power=22,          # Transmission power in dBm
-        rssi=False,         # Enable RSSI reporting
+        rssi=True,         # Enable RSSI reporting
         air_speed=AIR_SPEED,# Air data rate
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
