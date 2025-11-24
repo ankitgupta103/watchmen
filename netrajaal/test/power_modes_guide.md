@@ -11,7 +11,7 @@ The OpenMV RT1062 offers several power modes to optimize energy consumption:
 - **Wake-up**: N/A (already awake)
 
 ### 2. **Idle Mode**
-- **Power Consumption**: Moderate reduction (~50-80mA)
+- **Power Consumption**: ~50-80mA at 5V (~250-400mW)
 - **State**: CPU halts, peripherals remain active
 - **RAM**: Maintained
 - **Wake-up**: Immediate (via interrupt or timer)
@@ -19,7 +19,7 @@ The OpenMV RT1062 offers several power modes to optimize energy consumption:
 - **Limitation**: Doesn't significantly reduce power
 
 ### 3. **Light Sleep Mode** (`machine.lightsleep()`)
-- **Power Consumption**: ~10-30mA (significant reduction)
+- **Power Consumption**: ~10-30mA at 5V (~50-150mW) (significant reduction)
 - **State**: CPU and most peripherals stopped
 - **RAM**: **Maintained** (all variables preserved)
 - **Wake-up Sources**: 
@@ -32,7 +32,7 @@ The OpenMV RT1062 offers several power modes to optimize energy consumption:
 - **Best For**: Applications needing to preserve RAM state
 
 ### 4. **Deep Sleep Mode** (`machine.deepsleep()`)
-- **Power Consumption**: **< 30µA** when powered via battery connector (lowest power)
+- **Power Consumption**: **< 30µA at 5V (< 0.15mW)** when powered via battery connector (lowest power)
 - **State**: Most components shut down, only RTC and essential circuits active
 - **RAM**: **Lost** (all variables cleared)
 - **Wake-up Sources**:
@@ -48,7 +48,7 @@ The OpenMV RT1062 offers several power modes to optimize energy consumption:
 
 | Feature | Light Sleep | Deep Sleep |
 |---------|-------------|------------|
-| **Power Consumption** | ~10-30mA | **< 30µA** |
+| **Power Consumption** | ~10-30mA (~50-150mW) | **< 30µA (< 0.15mW)** |
 | **RAM State** | ✅ Preserved | ❌ Lost (reset) |
 | **Wake-up Time** | < 1ms | ~100-200ms (reset) |
 | **Code Continuity** | ✅ Continues after sleep | ❌ Restarts from beginning |
@@ -69,7 +69,7 @@ Deep Sleep:      < 30µA  (< 0.15mW) ▏ (barely visible!)
 ### **Recommended: Deep Sleep Mode**
 
 **Why Deep Sleep?**
-1. **Lowest Power**: < 30µA (1000x lower than light sleep!)
+1. **Lowest Power**: < 30µA at 5V (< 0.15mW) - 1000x lower than light sleep!
 2. **External Interrupt Support**: GPIO pins can wake the module
 3. **Battery Life**: Can run for months/years on battery
 4. **Perfect for**: Sensor monitoring, event-triggered applications
@@ -91,8 +91,8 @@ Deep Sleep:      < 30µA  (< 0.15mW) ▏ (barely visible!)
 ## Other Considerations
 
 ### Power Source Impact
-- **USB Power**: Higher power consumption even in sleep (~1-5mA)
-- **Battery Connector**: Lowest power consumption (< 30µA in deep sleep)
+- **USB Power**: Higher power consumption even in sleep (~1-5mA at 5V, ~5-25mW)
+- **Battery Connector**: Lowest power consumption (< 30µA at 5V, < 0.15mW in deep sleep)
 - **For minimal power**: Always use battery connector
 
 ### Peripheral Management
