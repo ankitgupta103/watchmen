@@ -983,6 +983,22 @@ class sx126x:
                         logger.debug(f"[RSSI] Message too short: {len(r_buff)} bytes, expected at least 5")
                         return (None, None)
                     
+                    # Validate that the first bytes look like a valid address header
+                    # Address bytes should be in reasonable range (0-255), but typically 0-250 for node addresses
+                    # If bytes look corrupted (e.g., very high values or unusual patterns), reject early
+                    if len(r_buff) >= 3:
+                        # Check if this might be a corrupted message (missing header bytes)
+                        # Valid messages should have reasonable address values
+                        # If byte[0] or byte[1] are > 250, it might be corrupted
+                        # Also check if byte[2] matches expected frequency (but allow mismatch for now)
+                        addr_h, addr_l = r_buff[0], r_buff[1]
+                        if addr_h > 250 or addr_l > 250:
+                            logger.debug(
+                                f"[RSSI] Suspicious address bytes: [0x{addr_h:02X}, 0x{addr_l:02X}], "
+                                f"raw_len={len(r_buff)}, rejecting as potentially corrupted"
+                            )
+                            return (None, None)
+                    
                     # Extract RSSI value (last byte)
                     rssi_byte = r_buff[-1]
                     # Decode RSSI: actual_RSSI = -(256 - value) dBm
@@ -992,6 +1008,20 @@ class sx126x:
                     # Format: [addr_h][addr_l][freq][payload][RSSI]
                     # We skip bytes 0-2 (3 bytes total: addr_h, addr_l, freq) and exclude the last byte (RSSI)
                     msg = r_buff[3:-1]
+                    
+                    # Validate that extracted message starts with a valid message type
+                    # Valid message types: N, H, A, B, E, C, I, S, V, P
+                    if len(msg) > 0:
+                        first_byte = msg[0]
+                        valid_msg_types = [ord('N'), ord('H'), ord('A'), ord('B'), ord('E'), ord('C'), ord('I'), ord('S'), ord('V'), ord('P')]
+                        if first_byte not in valid_msg_types:
+                            logger.debug(
+                                f"[RSSI] Invalid message type: 0x{first_byte:02X} ('{chr(first_byte) if 32 <= first_byte < 127 else '?'}'), "
+                                f"raw_len={len(r_buff)}, header=[0x{r_buff[0]:02X}, 0x{r_buff[1]:02X}], "
+                                f"freq=0x{r_buff[2]:02X}, payload_start=[{', '.join(f'0x{b:02X}' for b in msg[:min(5, len(msg))])}], "
+                                f"rssi={rssi_dbm}dBm - rejecting as corrupted"
+                            )
+                            return (None, None)
                     
                     # Validate frequency byte matches expected (for debugging)
                     if (
