@@ -1033,11 +1033,25 @@ class sx126x:
                             f"[RSSI] Frequency byte mismatch: got 0x{r_buff[2]:02X}, expected 0x{self.offset_freq:02X}"
                         )
                     
+                    # Enhanced debug logging to diagnose byte loss issues
                     logger.debug(
-                        f"[RSSI] Extracted: len={len(r_buff)}, "
+                        f"[RSSI] Extracted: raw_len={len(r_buff)}, "
                         f"header=[0x{r_buff[0]:02X}, 0x{r_buff[1]:02X}], "
-                        f"freq=0x{r_buff[2]:02X}, payload_len={len(msg)}, rssi={rssi_dbm}dBm"
+                        f"freq=0x{r_buff[2]:02X}, "
+                        f"rssi_byte=0x{rssi_byte:02X}, rssi_dbm={rssi_dbm}dBm, "
+                        f"payload_len={len(msg)}, "
+                        f"payload_start=[{', '.join(f'0x{b:02X}' for b in msg[:min(8, len(msg))])}]"
                     )
+                    
+                    # Additional validation: check if payload length matches expected
+                    # For heartbeat messages, encrypted payload should be 128 bytes
+                    # Total message with header should be 135 bytes (7 header + 128 encrypted)
+                    if len(msg) == 135:
+                        # This is likely a heartbeat message (7 byte header + 128 byte encrypted)
+                        logger.debug(f"[RSSI] Payload length 135 bytes - likely includes message header")
+                    elif len(msg) == 128:
+                        # This is likely just the encrypted payload
+                        logger.debug(f"[RSSI] Payload length 128 bytes - encrypted data only")
 
                     return (msg, rssi_dbm)
                 else:
