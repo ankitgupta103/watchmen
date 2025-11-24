@@ -15,7 +15,7 @@ except ImportError:
 
 
 SAVE_LOG = True
-LOG_LEVEL = "INFO"
+LOG_LEVEL = "DEBUG"
 
 # Initialize RTC if available
 _rtc = None
