@@ -2,228 +2,219 @@ INFO - SD card available
 INFO - Singleton Logger class Initiated, __new__
 INFO - /sdcard/logs directory already exists
 INFO - Log file opened: /sdcard/logs/main.log
-00:24:52,417 - INFO - [FS] SD card available
-00:24:52,420 - INFO - [FS] Using FS_ROOT : /sdcard
-00:24:52,425 - INFO - [FS] /sdcard/netimages already exists
-00:24:52,430 - INFO - [FS] /sdcard/myimages already exists
-00:24:52,432 - INFO - [INIT] MyAddr = 219
-00:24:52,437 - INFO - Loading public key from file 219.pub
-00:24:52,487 - INFO - [INIT] Running on device : e076465dd7194025
-00:24:55,689 - INFO - [INIT] Started device 219
-00:24:55,696 - INFO - [LORA] Initializing LoRa SX126X module... my lora addr = 219
-00:24:55,698 - INFO - Initializing with UART 1, M0=P6, M1=P7
-00:24:55,701 - INFO - GPIO pins initialized successfully
-00:24:55,704 - INFO - UART 1 initialized at 9600 baud
-00:24:56,306 - INFO - ===> CONFIGURATION TO BE SENT <===
-00:24:56,310 - INFO -   Configuration Header : Volatile (0xC2)
-00:24:56,312 - INFO -   Node Address         : 219 (0x00DB)
-00:24:56,315 - INFO -   Network ID           : 0
-00:24:56,317 - INFO -   Frequency            : 868.125 MHz
-00:24:56,320 - INFO -   UART Baud Rate       : 115200 bps
-00:24:56,322 - INFO -   Air Data Rate        : 19200 bps
-00:24:56,327 - INFO -   TX Power             : 22 dBm
-00:24:56,330 - INFO -   Buffer Size          : 240 bytes
-00:24:56,332 - INFO -   Operating Mode       : Fixed Point
-00:24:56,336 - INFO -   Encryption Key       : 0 (0x0000)
-00:24:56,338 - INFO -   Packet RSSI          : Enabled
-00:24:56,341 - INFO -   Noise RSSI           : Enabled
-00:24:56,344 - INFO -   Raw Bytes            : ['0xc2', '0x0', '0x9', '0x0', '0xdb', '0x0', '0xe5', '0x20', '0x12', '0xc3', '0x0', '0x0']
+00:47:03,933 - INFO - [FS] SD card available
+00:47:03,936 - INFO - [FS] Using FS_ROOT : /sdcard
+00:47:03,941 - INFO - [FS] /sdcard/netimages already exists
+00:47:03,947 - INFO - [FS] /sdcard/myimages already exists
+00:47:03,949 - INFO - [INIT] MyAddr = 219
+00:47:03,953 - INFO - Loading public key from file 219.pub
+00:47:03,003 - INFO - [INIT] Running on device : e076465dd7194025
+00:47:06,206 - INFO - [INIT] Started device 219
+00:47:06,214 - INFO - [LORA] Initializing LoRa SX126X module... my lora addr = 219
+00:47:06,217 - INFO - Initializing with UART 1, M0=P6, M1=P7
+00:47:06,219 - INFO - GPIO pins initialized successfully
+00:47:06,222 - INFO - UART 1 initialized at 9600 baud
+00:47:07,825 - INFO - ===> CONFIGURATION TO BE SENT <===
+00:47:07,827 - INFO -   Configuration Header : Volatile (0xC2)
+00:47:07,830 - INFO -   Node Address         : 219 (0x00DB)
+00:47:07,832 - INFO -   Network ID           : 0
+00:47:07,834 - INFO -   Frequency            : 868.125 MHz
+00:47:07,837 - INFO -   UART Baud Rate       : 115200 bps
+00:47:07,840 - INFO -   Air Data Rate        : 19200 bps
+00:47:07,842 - INFO -   TX Power             : 22 dBm
+00:47:07,844 - INFO -   Buffer Size          : 240 bytes
+00:47:07,847 - INFO -   Operating Mode       : Fixed Point
+00:47:07,849 - INFO -   Encryption Key       : 0 (0x0000)
+00:47:07,852 - INFO -   Packet RSSI          : Enabled
+00:47:07,854 - INFO -   Noise RSSI           : Enabled
+00:47:07,857 - INFO -   Raw Bytes            : ['0xc2', '0x0', '0x9', '0x0', '0xdb', '0x0', '0xe5', '0x20', '0x12', '0xc3', '0x0', '0x0']
 
-00:24:56,346 - INFO - Configuration attempt 1...
-00:24:58,851 - INFO - ===> CONFIGURATION RECEIVED (CONFIRMED) <===
-00:24:58,854 - INFO -   Configuration Header : Volatile (0xC2)
-00:24:58,857 - INFO -   Node Address         : 219 (0x00DB)
-00:24:58,860 - INFO -   Network ID           : 0
-00:24:58,863 - INFO -   Frequency            : 868.125 MHz
-00:24:58,865 - INFO -   UART Baud Rate       : 115200 bps
-00:24:58,868 - INFO -   Air Data Rate        : 19200 bps
-00:24:58,870 - INFO -   TX Power             : 22 dBm
-00:24:58,873 - INFO -   Buffer Size          : 240 bytes
-00:24:58,875 - INFO -   Operating Mode       : Fixed Point
-00:24:58,878 - INFO -   Encryption Key       : 0 (0x0000)
-00:24:58,881 - INFO -   Packet RSSI          : Enabled
-00:24:58,884 - INFO -   Noise RSSI           : Enabled
-00:24:58,887 - INFO -   Raw Bytes            : ['0xc1', '0x0', '0x9', '0x0', '0xdb', '0x0', '0xe5', '0x20', '0x12', '0xc3', '0x0', '0x0']
+00:47:07,860 - INFO - Configuration attempt 1...
+00:47:10,365 - INFO - ===> CONFIGURATION RECEIVED (CONFIRMED) <===
+00:47:10,368 - INFO -   Configuration Header : Volatile (0xC2)
+00:47:10,371 - INFO -   Node Address         : 219 (0x00DB)
+00:47:10,375 - INFO -   Network ID           : 0
+00:47:10,378 - INFO -   Frequency            : 868.125 MHz
+00:47:10,380 - INFO -   UART Baud Rate       : 115200 bps
+00:47:10,384 - INFO -   Air Data Rate        : 19200 bps
+00:47:10,386 - INFO -   TX Power             : 22 dBm
+00:47:10,389 - INFO -   Buffer Size          : 240 bytes
+00:47:10,391 - INFO -   Operating Mode       : Fixed Point
+00:47:10,394 - INFO -   Encryption Key       : 0 (0x0000)
+00:47:10,396 - INFO -   Packet RSSI          : Enabled
+00:47:10,399 - INFO -   Noise RSSI           : Enabled
+00:47:10,402 - INFO -   Raw Bytes            : ['0xc1', '0x0', '0x9', '0x0', '0xdb', '0x0', '0xe5', '0x20', '0x12', '0xc3', '0x0', '0x0']
 
-00:24:58,890 - INFO - ===> CONFIGURATION SUCCESSFUL, all parameters matched! <===
+00:47:10,405 - INFO - ===> CONFIGURATION SUCCESSFUL, all parameters matched! <===
 
-00:24:59,961 - INFO - [MEM] Memory management tasks started (free: 8188.8KB)
+00:47:11,477 - INFO - [MEM] Memory management tasks started (free: 8187.8KB)
 
-00:24:59,966 - INFO - [INIT] ===> Starting command center node <===
-00:24:59,968 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
-00:25:00,427 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
-00:25:00,436 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
-00:25:00,439 - INFO - ===> Readio Read, LoRa receive loop started... <===
+00:47:11,480 - INFO - [INIT] ===> Starting command center node <===
+00:47:11,482 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
+00:47:11,940 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
+00:47:11,949 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
+00:47:11,951 - INFO - ===> Readio Read, LoRa receive loop started... <===
 
-00:25:00,442 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+00:47:11,955 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
 
-00:25:00,444 - INFO - [NET] Going to validate neighbours : []
-00:25:01,438 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
-00:25:02,441 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
-00:25:03,395 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*LJE;' at 10981
-00:25:03,398 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*LJE;' : (b'N\xdd\xdd*LJE', 'N', 221, 221, -1, b'')
-00:25:03,401 - INFO - [NET] Adding nodeaddr 0 to seen_neighbours
-00:25:03,444 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
-00:25:05,653 - INFO - [WIFI] Connecting... (status: 1, wait: 4s)
-00:25:06,656 - INFO - [WIFI] Connecting... (status: 1, wait: 5s)
-00:25:07,504 - INFO - [RECV : 135 bytes, rssi : -83] b'H\xdd\xdd\xdbDBI;\x12#\t+\xf2\xb9^g\xa5\x13?D\xc6\xd4t\xd8\x04\xafe\xf5\x04\xf9\x92)\xbe&k\xb7\'\x98\x95\xcf\xf0C\x8a*\xc5\xd6\xe9;*\xa6x\x04\x7f~\x80~\x95\x9cO\x18\x0f\xef\xad\x9e\xe2[\x87\xa8\x05@\xd6\x1c\x8c\x1c\xe30\rB\xe46;\x7f\xb7\xa5\t\xe5\x9aM\xd7\x05\xfa\xb9\x18"\x19\t2\t\xc7=\x9f1\x17%\xda8\x83\x93\xd0 @\xf8-\xcc\x8b\x82d]<%\x11\xab\xcb\x88\xa0\x95o\xe0\x13\xe7\x17\xdb"\xaej' at 15089
-00:25:07,508 - INFO - [HB] HB Counts = {221: 1}
-00:25:07,511 - INFO - [HB] Images saved at cc so far = 0
-00:25:07,514 - INFO - [HB] Sending raw heartbeat data of length 127 bytes
-00:25:09,252 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddKRM;H\xdd\xdd\xdbDBI' at 16838
-00:25:09,255 - INFO - [HB] ERROR: Cellular system not initialized, trying WiFi fallback...
-00:25:09,257 - INFO - [HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)
-00:25:11,411 - INFO - [WIFI] Connecting... (status: 1, wait: 6s)
+00:47:11,958 - INFO - [NET] Going to validate neighbours : []
+00:47:12,951 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
+00:47:13,455 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*UYG;' at 9525
+00:47:13,460 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*UYG;' : (b'N\xdd\xdd*UYG', 'N', 221, 221, -1, b'')
+00:47:13,463 - INFO - [NET] Adding nodeaddr 0 to seen_neighbours
+00:47:15,767 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
+00:47:16,769 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
+00:47:17,667 - INFO - [RECV : 135 bytes, rssi : -27] b"H\xdd\xdd\xdbVHD;'z\xefBYt\xb8U\x1dd[\xa2\x95\xb1@2\x0cqR$\xb85P\x03\x8d\xba\x9eZ\xc0BE\x95S?\x184l\x07_\xa9\xd4\x105\xfa]T\xe1\xe5+/\xbd{\x94R\xbey$9\x15-\x8a\xeb8\x8f\xab\x0f\xde\xc8X\x97\x8fx\x85\xb7\x1aO\xf9\xe9\x93j\x04\xae5F\x93Fr\xf5\xbae\xc1\xe4Zy\xb03\x10\x9a\xda/\x9c\xde\x1c\x87\xe9o|\xdb\x88,\x10|M\x92\xa4?mm{\xc5\x17\xc6\xe0\x0bo$\x1f" at 13736
+00:47:17,671 - WARNING - [HB] Invalid payload length: 127 bytes, expected 128 bytes for encrypted message. MID: b'H\xdd\xdd\xdbVHD', may be corrupted or incomplete.
+00:47:17,673 - INFO - [HB] HB Counts = {221: 1}
+00:47:17,676 - INFO - [HB] Images saved at cc so far = 0
+00:47:17,679 - INFO - [HB] Sending raw heartbeat data of length 127 bytes
+00:47:18,166 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddCGI;H\xdd\xdd\xdbVHD' at 15236
+00:47:18,169 - INFO - [HB] ERROR: Cellular system not initialized, trying WiFi fallback...
+00:47:18,173 - INFO - [HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)
+00:47:18,175 - INFO - [WIFI] Connecting... (status: 1, wait: 4s)
 Task exception wasn't retrieved
-future: <Task> coro= <generator object 'hb_process' at 200162f0>
+future: <Task> coro= <generator object 'hb_process' at 20015750>
 
 Traceback (most recent call last):
   File "asyncio/core.py", line 1, in run_until_complete
-  File "<stdin>", line 882, in hb_process
+  File "<stdin>", line 895, in hb_process
   File "enc.py", line 79, in decrypt_rsa
   File "rsa/pkcs1.py", line 266, in decrypt
 DecryptionError: Decryption failed
-00:25:12,413 - INFO - [WIFI] Connecting... (status: 1, wait: 7s)
-00:25:13,416 - INFO - [WIFI] Connecting... (status: 1, wait: 8s)
-00:25:14,419 - INFO - [WIFI] Connecting... (status: 1, wait: 9s)
-00:25:15,422 - INFO - [WIFI] Connecting... (status: 1, wait: 10s)
-00:25:16,425 - INFO - [WIFI] Connecting... (status: 1, wait: 11s)
-00:25:16,161 - INFO - [RECV : 135 bytes, rssi : -83] b'H\xdd\xdd\xdbDBI;\x12#\t+\xf2\xb9^g\xa5\x13?D\xc6\xd4t\xd8\x04\xafe\xf5\x04\xf9\x92)\xbe&k\xb7\'\x98\x95\xcf\xf0C\x8a*\xc5\xd6\xe9;*\xa6x\x04\x7f~\x80~\x95\x9cO\x18\x0f\xef\xad\x9e\xe2[\x87\xa8\x05@\xd6\x1c\x8c\x1c\xe30\rB\xe46;\x7f\xb7\xa5\t\xe5\x9aM\xd7\x05\xfa\xb9\x18"\x19\t2\t\xc7=\x9f1\x17%\xda8\x83\x93\xd0 @\xf8-\xcc\x8b\x82d]<%\x11\xab\xcb\x88\xa0\x95o\xe0\x13\xe7\x17\xdb"\xaej' at 24747
-00:25:16,166 - INFO - [HB] HB Counts = {221: 2}
-00:25:16,168 - INFO - [HB] Images saved at cc so far = 0
-00:25:16,171 - INFO - [HB] Sending raw heartbeat data of length 127 bytes
-00:25:18,913 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddNHO;H\xdd\xdd\xdbDBI' at 26498
-00:25:18,916 - INFO - [HB] ERROR: Cellular system not initialized, trying WiFi fallback...
-00:25:18,919 - INFO - [HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)
-00:25:20,072 - INFO - [WIFI] Connecting... (status: 1, wait: 12s)
+00:47:21,379 - INFO - [WIFI] Connecting... (status: 1, wait: 5s)
+00:47:22,382 - INFO - [WIFI] Connecting... (status: 1, wait: 6s)
+00:47:23,384 - INFO - [WIFI] Connecting... (status: 1, wait: 7s)
+00:47:24,387 - INFO - [WIFI] Connecting... (status: 1, wait: 8s)
+00:47:25,390 - INFO - [WIFI] Connecting... (status: 1, wait: 9s)
+00:47:26,393 - INFO - [WIFI] Connecting... (status: 1, wait: 10s)
+00:47:26,279 - INFO - [RECV : 135 bytes, rssi : -27] b"H\xdd\xdd\xdbVHD;'z\xefBYt\xb8U\x1dd[\xa2\x95\xb1@2\x0cqR$\xb85P\x03\x8d\xba\x9eZ\xc0BE\x95S?\x184l\x07_\xa9\xd4\x105\xfa]T\xe1\xe5+/\xbd{\x94R\xbey$9\x15-\x8a\xeb8\x8f\xab\x0f\xde\xc8X\x97\x8fx\x85\xb7\x1aO\xf9\xe9\x93j\x04\xae5F\x93Fr\xf5\xbae\xc1\xe4Zy\xb03\x10\x9a\xda/\x9c\xde\x1c\x87\xe9o|\xdb\x88,\x10|M\x92\xa4?mm{\xc5\x17\xc6\xe0\x0bo$\x1f" at 23348
+00:47:26,283 - WARNING - [HB] Invalid payload length: 127 bytes, expected 128 bytes for encrypted message. MID: b'H\xdd\xdd\xdbVHD', may be corrupted or incomplete.
+00:47:26,286 - INFO - [HB] HB Counts = {221: 2}
+00:47:26,288 - INFO - [HB] Images saved at cc so far = 0
+00:47:26,291 - INFO - [HB] Sending raw heartbeat data of length 127 bytes
+00:47:28,542 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddPFR;H\xdd\xdd\xdbVHD' at 24612
+00:47:28,545 - INFO - [HB] ERROR: Cellular system not initialized, trying WiFi fallback...
+00:47:28,549 - INFO - [HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)
+00:47:30,753 - INFO - [WIFI] Connecting... (status: 1, wait: 11s)
 Task exception wasn't retrieved
-future: <Task> coro= <generator object 'hb_process' at 801a5750>
+future: <Task> coro= <generator object 'hb_process' at 801abfc0>
 
 Traceback (most recent call last):
   File "asyncio/core.py", line 1, in run_until_complete
-  File "<stdin>", line 882, in hb_process
+  File "<stdin>", line 895, in hb_process
   File "enc.py", line 79, in decrypt_rsa
   File "rsa/pkcs1.py", line 266, in decrypt
 DecryptionError: Decryption failed
-00:25:21,075 - INFO - [WIFI] Connecting... (status: 1, wait: 13s)
-00:25:22,078 - INFO - [WIFI] Connecting... (status: 1, wait: 14s)
-00:25:23,081 - INFO - [WIFI] Connecting... (status: 1, wait: 15s)
-00:25:24,084 - INFO - [WIFI] Connecting... (status: 1, wait: 16s)
-00:25:25,087 - INFO - [WIFI] Connecting... (status: 1, wait: 17s)
-00:25:26,823 - INFO - [RECV : 135 bytes, rssi : -83] b'H\xdd\xdd\xdbDBI;\x12#\t+\xf2\xb9^g\xa5\x13?D\xc6\xd4t\xd8\x04\xafe\xf5\x04\xf9\x92)\xbe&k\xb7\'\x98\x95\xcf\xf0C\x8a*\xc5\xd6\xe9;*\xa6x\x04\x7f~\x80~\x95\x9cO\x18\x0f\xef\xad\x9e\xe2[\x87\xa8\x05@\xd6\x1c\x8c\x1c\xe30\rB\xe46;\x7f\xb7\xa5\t\xe5\x9aM\xd7\x05\xfa\xb9\x18"\x19\t2\t\xc7=\x9f1\x17%\xda8\x83\x93\xd0 @\xf8-\xcc\x8b\x82d]<%\x11\xab\xcb\x88\xa0\x95o\xe0\x13\xe7\x17\xdb"\xaej' at 34409
-00:25:26,827 - INFO - [HB] HB Counts = {221: 3}
-00:25:26,830 - INFO - [HB] Images saved at cc so far = 0
-00:25:26,833 - INFO - [HB] Sending raw heartbeat data of length 127 bytes
-00:25:27,174 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddJIB;H\xdd\xdd\xdbDBI' at 35760
-00:25:27,178 - INFO - [HB] ERROR: Cellular system not initialized, trying WiFi fallback...
-00:25:27,180 - INFO - [HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)
-00:25:30,333 - INFO - [WIFI] Connecting... (status: 1, wait: 18s)
+00:47:31,755 - INFO - [WIFI] Connecting... (status: 1, wait: 12s)
+00:47:32,757 - INFO - [WIFI] Connecting... (status: 1, wait: 13s)
+00:47:33,760 - INFO - [WIFI] Connecting... (status: 1, wait: 14s)
+00:47:34,762 - INFO - [WIFI] Connecting... (status: 1, wait: 15s)
+00:47:35,765 - INFO - [WIFI] Connecting... (status: 1, wait: 16s)
+00:47:36,653 - INFO - [RECV : 135 bytes, rssi : -27] b"H\xdd\xdd\xdbVHD;'z\xefBYt\xb8U\x1dd[\xa2\x95\xb1@2\x0cqR$\xb85P\x03\x8d\xba\x9eZ\xc0BE\x95S?\x184l\x07_\xa9\xd4\x105\xfa]T\xe1\xe5+/\xbd{\x94R\xbey$9\x15-\x8a\xeb8\x8f\xab\x0f\xde\xc8X\x97\x8fx\x85\xb7\x1aO\xf9\xe9\x93j\x04\xae5F\x93Fr\xf5\xbae\xc1\xe4Zy\xb03\x10\x9a\xda/\x9c\xde\x1c\x87\xe9o|\xdb\x88,\x10|M\x92\xa4?mm{\xc5\x17\xc6\xe0\x0bo$\x1f" at 32722
+00:47:36,656 - WARNING - [HB] Invalid payload length: 127 bytes, expected 128 bytes for encrypted message. MID: b'H\xdd\xdd\xdbVHD', may be corrupted or incomplete.
+00:47:36,660 - INFO - [HB] HB Counts = {221: 3}
+00:47:36,663 - INFO - [HB] Images saved at cc so far = 0
+00:47:36,665 - INFO - [HB] Sending raw heartbeat data of length 127 bytes
+00:47:37,568 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddSKG;H\xdd\xdd\xdbVHD' at 33638
+00:47:37,571 - INFO - [HB] ERROR: Cellular system not initialized, trying WiFi fallback...
+00:47:37,574 - INFO - [HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)
+00:47:39,778 - INFO - [WIFI] Connecting... (status: 1, wait: 17s)
 Task exception wasn't retrieved
-future: <Task> coro= <generator object 'hb_process' at 803498f0>
+future: <Task> coro= <generator object 'hb_process' at 8034ec50>
 
 Traceback (most recent call last):
   File "asyncio/core.py", line 1, in run_until_complete
-  File "<stdin>", line 882, in hb_process
+  File "<stdin>", line 895, in hb_process
   File "enc.py", line 79, in decrypt_rsa
   File "rsa/pkcs1.py", line 266, in decrypt
 DecryptionError: Decryption failed
-00:25:30,488 - INFO - [STATUS] Sent : 3 Recd : 4 Unacked : 0 LoRa inits: 1, Free: 8186.8KB
-00:25:30,491 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:25:31,337 - INFO - [WIFI] Connecting... (status: 1, wait: 19s)
-00:25:32,340 - INFO - [WIFI] Connection timeout after 20 seconds
-00:25:32,494 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*FBZ;\xdb' at 40079
-00:25:34,343 - INFO - [NET] Sending shortest path to 0
-00:25:34,497 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*VTI;219' at 42082
-00:25:34,151 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*MGC;' at 42737
-00:25:34,154 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*MGC;' : (b'N\xdd\xdd*MGC', 'N', 221, 221, -1, b'')
-00:25:37,501 - INFO - [HB] Will send HB to [0]
-00:25:37,508 - INFO - HBSTR = 219:45:0:0::-1:[0]:[]
-00:25:37,563 - INFO - H : Len msg = 21, len msgbytes = 128
-00:25:37,566 - INFO - [HB] Sending raw heartbeat data of length 128 bytes
-00:25:37,568 - INFO - [HB] ERROR: Cellular system not initialized, trying WiFi fallback...
-00:25:37,572 - INFO - [HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)
-00:25:37,574 - INFO - [ERROR]: consecutive heartbeat failures = 1
-00:25:39,699 - INFO - Saving image to /sdcard/myimages/raw_OPT.jpg : imbytesize = 1843200...
-00:25:39,015 - INFO - Saved image: /sdcard/myimages/raw_OPT.jpg
-00:26:00,538 - INFO - [STATUS] Sent : 5 Recd : 5 Unacked : 0 LoRa inits: 1, Free: 8185.8KB
-00:26:00,541 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
-00:26:02,596 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 5, Received messages = {221: 5}
-00:26:02,750 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*XWW;\xdb' at 70335
-00:26:04,600 - INFO - [NET] Sending shortest path to 0
-00:26:04,754 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*HCN;219' at 72340
-00:26:05,407 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*GZC;' at 72993
-00:26:05,410 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*GZC;' : (b'N\xdd\xdd*GZC', 'N', 221, 221, -1, b'')
-00:26:30,589 - INFO - [STATUS] Sent : 7 Recd : 6 Unacked : 0 LoRa inits: 1, Free: 8185.5KB
-00:26:30,592 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
-00:26:32,852 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 7, Received messages = {221: 6}
-00:26:32,006 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*KKU;\xdb' at 100591
-00:26:34,857 - INFO - [NET] Sending shortest path to 0
-00:26:34,012 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*MUF;219' at 102597
-00:26:35,766 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*FYE;' at 103351
-00:26:35,769 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*FYE;' : (b'N\xdd\xdd*FYE', 'N', 221, 221, -1, b'')
-00:27:00,638 - INFO - [STATUS] Sent : 9 Recd : 7 Unacked : 0 LoRa inits: 1, Free: 8185.2KB
-00:27:00,641 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
-00:27:02,108 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 9, Received messages = {221: 7}
-00:27:03,262 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*UIR;\xdb' at 130848
-00:27:04,114 - INFO - [NET] Sending shortest path to 0
-00:27:05,267 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*NJD;219' at 132853
-00:27:05,020 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*PRF;' at 133606
-00:27:05,023 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*PRF;' : (b'N\xdd\xdd*PRF', 'N', 221, 221, -1, b'')
-00:27:30,690 - INFO - [STATUS] Sent : 11 Recd : 8 Unacked : 0 LoRa inits: 1, Free: 8184.9KB
-00:27:30,693 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
-00:27:33,365 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 11, Received messages = {221: 8}
-00:27:33,519 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*ZNK;\xdb' at 161104
-00:27:35,370 - INFO - [NET] Sending shortest path to 0
-00:27:35,524 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*YWO;219' at 163110
-00:27:36,278 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*GZF;' at 163864
-00:27:36,281 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*GZF;' : (b'N\xdd\xdd*GZF', 'N', 221, 221, -1, b'')
-00:28:00,739 - INFO - [STATUS] Sent : 13 Recd : 9 Unacked : 0 LoRa inits: 1, Free: 8184.6KB
-00:28:00,742 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
-00:28:03,621 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 13, Received messages = {221: 9}
-00:28:03,775 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*DBR;\xdb' at 191361
-00:28:05,628 - INFO - [NET] Sending shortest path to 0
-00:28:05,781 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*UXE;219' at 193367
-00:28:06,535 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*MUN;' at 194120
-00:28:06,538 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*MUN;' : (b'N\xdd\xdd*MUN', 'N', 221, 221, -1, b'')
-00:28:30,789 - INFO - [STATUS] Sent : 15 Recd : 10 Unacked : 0 LoRa inits: 1, Free: 8184.3KB
-00:28:30,797 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
-00:28:33,878 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 15, Received messages = {221: 10}
-00:28:33,032 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*YTF;\xdb' at 221617
-00:28:35,884 - INFO - [NET] Sending shortest path to 0
-00:28:35,037 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*ZSN;219' at 223623
-00:28:36,790 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*MQQ;' at 224376
-00:28:36,794 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*MQQ;' : (b'N\xdd\xdd*MQQ', 'N', 221, 221, -1, b'')
-00:29:00,844 - INFO - [STATUS] Sent : 17 Recd : 11 Unacked : 0 LoRa inits: 1, Free: 8184.0KB
-00:29:00,847 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
-00:29:03,134 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 17, Received messages = {221: 11}
-00:29:04,288 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*OCV;\xdb' at 251873
-00:29:05,140 - INFO - [NET] Sending shortest path to 0
-00:29:06,294 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*PBT;219' at 253880
-00:29:06,047 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*XZC;' at 254633
-00:29:06,050 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*XZC;' : (b'N\xdd\xdd*XZC', 'N', 221, 221, -1, b'')
-00:29:26,353 - INFO - [RECV : 16 bytes, rssi : -204] b'B\xdd\xdd\xdbBEC;P:XUL:18' at 273939
-00:29:26,357 - INFO - [IMG] Acquiring Image Lock
-00:29:26,511 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddWTS;B\xdd\xdd\xdbBEC' at 274097
-00:29:30,850 - INFO - [STATUS] Skipping print summary because image in progress
-00:29:34,391 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 20, Received messages = {221: 13}
-00:29:34,394 - INFO - [NET] Skipping scan send because image in progress
-00:29:35,814 - INFO - [RECV : 16 bytes, rssi : -204] b'B\xdd\xdd\xdbBEC;P:XUL:18' at 283400
-00:29:35,817 - INFO - [IMG] Acquiring Image Lock
-00:29:35,971 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddDTS;B\xdd\xdd\xdbBEC' at 283557
-00:29:37,125 - INFO - [NET] Skipping spath send because image in progress
-00:29:45,276 - INFO - [RECV : 16 bytes, rssi : -204] b'B\xdd\xdd\xdbBEC;P:XUL:18' at 292861
-00:29:45,279 - INFO - [IMG] Acquiring Image Lock
-00:29:45,432 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddDYK;B\xdd\xdd\xdbBEC' at 293018
-00:29:52,501 - INFO - [IMG] Processing: /sdcard/myimages/raw_OPT.jpg
-00:29:52,043 - INFO - P : Len msg = 31145, len msgbytes = 31408
-00:29:52,047 - INFO - [IMG] Uploading encrypted image (size: 31408 bytes)
-00:29:52,049 - INFO - [IMG] Image upload failed (cellular and WiFi both unavailable or failed)
-00:29:52,052 - INFO - [IMG] Upload failed, image re-queued: /sdcard/myimages/raw_OPT.jpg
-00:30:00,491 - INFO - [MEM] Starting memory cleanup (free: 8152.1KB)
-00:30:00,558 - INFO - [MEM] Cleanup complete (free: 8152.0KB, freed: -0.1KB)
-00:30:00,561 - INFO - [MEM] Buffers - sent:22, recd:15, unacked:0, chunks:1
-00:30:04,398 - INFO - [NET] Skipping scan send because image in progress
-00:30:23,669 - INFO - Stopped.
+00:47:40,783 - INFO - [WIFI] Connecting... (status: 1, wait: 18s)
+00:47:41,786 - INFO - [WIFI] Connecting... (status: 1, wait: 19s)
+00:47:41,001 - INFO - [STATUS] Sent : 3 Recd : 4 Unacked : 0 LoRa inits: 1, Free: 8185.5KB
+00:47:41,004 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:47:42,789 - INFO - [WIFI] Connection timeout after 20 seconds
+00:47:42,944 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*SBO;\xdb' at 39013
+00:47:44,793 - INFO - [NET] Sending shortest path to 0
+00:47:44,947 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*FDM;219' at 41016
+00:47:45,751 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*TID;' at 41820
+00:47:45,754 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*TID;' : (b'N\xdd\xdd*TID', 'N', 221, 221, -1, b'')
+00:47:47,058 - INFO - [HB] Will send HB to [0]
+00:47:47,064 - INFO - HBSTR = 219:44:0:0::-1:[0]:[]
+00:47:47,123 - INFO - H : Len msg = 21, len msgbytes = 128
+00:47:47,125 - INFO - [HB] Sending raw heartbeat data of length 128 bytes
+00:47:47,128 - INFO - [HB] ERROR: Cellular system not initialized, trying WiFi fallback...
+00:47:47,130 - INFO - [HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)
+00:47:47,132 - INFO - [ERROR]: consecutive heartbeat failures = 1
+00:47:49,147 - INFO - Saving image to /sdcard/myimages/raw_FHL.jpg : imbytesize = 1843200...
+00:47:50,463 - INFO - Saved image: /sdcard/myimages/raw_FHL.jpg
+00:48:11,051 - INFO - [STATUS] Sent : 5 Recd : 5 Unacked : 0 LoRa inits: 1, Free: 8184.5KB
+00:48:11,054 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
+00:48:12,047 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 5, Received messages = {221: 5}
+00:48:12,201 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*FUR;\xdb' at 69271
+00:48:14,050 - INFO - [NET] Sending shortest path to 0
+00:48:14,204 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*UDZ;219' at 71274
+00:48:15,007 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*ZFC;' at 72077
+00:48:15,010 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*ZFC;' : (b'N\xdd\xdd*ZFC', 'N', 221, 221, -1, b'')
+00:48:41,102 - INFO - [STATUS] Sent : 7 Recd : 6 Unacked : 0 LoRa inits: 1, Free: 8184.2KB
+00:48:41,106 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
+00:48:42,304 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 7, Received messages = {221: 6}
+00:48:43,458 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*XHT;\xdb' at 99528
+00:48:44,307 - INFO - [NET] Sending shortest path to 0
+00:48:45,461 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*XVF;219' at 101531
+00:48:45,264 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*CFJ;' at 102334
+00:48:45,267 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*CFJ;' : (b'N\xdd\xdd*CFJ', 'N', 221, 221, -1, b'')
+00:49:11,152 - INFO - [STATUS] Sent : 9 Recd : 7 Unacked : 0 LoRa inits: 1, Free: 8183.9KB
+00:49:11,156 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
+00:49:13,562 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 9, Received messages = {221: 7}
+00:49:13,716 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*XAU;\xdb' at 129785
+00:49:15,564 - INFO - [NET] Sending shortest path to 0
+00:49:15,717 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*JPS;219' at 131787
+00:49:16,522 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*YYY;' at 132591
+00:49:16,525 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*YYY;' : (b'N\xdd\xdd*YYY', 'N', 221, 221, -1, b'')
+00:49:41,203 - INFO - [STATUS] Sent : 11 Recd : 8 Unacked : 0 LoRa inits: 1, Free: 8183.6KB
+00:49:41,208 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
+00:49:43,818 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 11, Received messages = {221: 8}
+00:49:43,972 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*GVS;\xdb' at 160042
+00:49:45,821 - INFO - [NET] Sending shortest path to 0
+00:49:45,974 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*YNK;219' at 162044
+00:49:46,777 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*FQC;' at 162847
+00:49:46,780 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*FQC;' : (b'N\xdd\xdd*FQC', 'N', 221, 221, -1, b'')
+00:50:11,255 - INFO - [STATUS] Sent : 13 Recd : 9 Unacked : 0 LoRa inits: 1, Free: 8183.3KB
+00:50:11,259 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
+00:50:13,075 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 13, Received messages = {221: 9}
+00:50:13,229 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*AKH;\xdb' at 190298
+00:50:15,077 - INFO - [NET] Sending shortest path to 0
+00:50:15,230 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*PYX;219' at 192300
+00:50:16,033 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*OGY;' at 193103
+00:50:16,037 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*OGY;' : (b'N\xdd\xdd*OGY', 'N', 221, 221, -1, b'')
+00:50:41,306 - INFO - [STATUS] Sent : 15 Recd : 10 Unacked : 0 LoRa inits: 1, Free: 8183.0KB
+00:50:41,309 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
+00:50:43,331 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 15, Received messages = {221: 10}
+00:50:44,484 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*KEX;\xdb' at 220554
+00:50:45,333 - INFO - [NET] Sending shortest path to 0
+00:50:46,486 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*YAM;219' at 222556
+00:50:46,290 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*ZWV;' at 223359
+00:50:46,293 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*ZWV;' : (b'N\xdd\xdd*ZWV', 'N', 221, 221, -1, b'')
+00:51:11,356 - INFO - [STATUS] Sent : 17 Recd : 11 Unacked : 0 LoRa inits: 1, Free: 8182.7KB
+00:51:12,361 - INFO - [STATUS] Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 1
+00:51:14,588 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 17, Received messages = {221: 11}
+00:51:14,742 - INFO - [SENT 9 bytes to 65535] b'N\xdb\xdb*PUC;\xdb' at 250812
+00:51:16,589 - INFO - [NET] Sending shortest path to 0
+00:51:16,742 - INFO - [SENT 11 bytes to 0] b'S\xdb\xdb*WME;219' at 252812
+00:51:17,545 - INFO - [RECV : 8 bytes, rssi : -35] b'N\xdd\xdd*AJE;' at 253615
+00:51:17,548 - INFO - [LORA] Processing broadcast message : b'N\xdd\xdd*AJE;' : (b'N\xdd\xdd*AJE', 'N', 221, 221, -1, b'')
+00:51:36,451 - INFO - [RECV : 16 bytes, rssi : -204] b'B\xdd\xdd\xdbGGZ;P:YLO:18' at 272521
+00:51:36,455 - INFO - [IMG] Acquiring Image Lock
+00:51:36,608 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddIAV;B\xdd\xdd\xdbGGZ' at 272678
+00:51:42,364 - INFO - [STATUS] Skipping print summary because image in progress
+00:51:44,845 - INFO - [STATUS] 219 : Seen neighbours = [0], Shortest path = [], Sent messages = 20, Received messages = {221: 13}
+00:51:44,848 - INFO - [NET] Skipping scan send because image in progress
+00:51:45,111 - INFO - [RECV : 16 bytes, rssi : -204] b'B\xdd\xdd\xdbGGZ;P:YLO:18' at 282181
+00:51:45,115 - INFO - [IMG] Acquiring Image Lock
+00:51:45,268 - INFO - [SENT 15 bytes to 221] b'A\xdb\xdb\xddOHF;B\xdd\xdd\xdbGGZ' at 282338
+00:51:48,471 - INFO - [NET] Skipping spath send because image in progress
+00:51:51,846 - INFO - Stopped.
 INFO - Log file closed
 INFO - Logger closed successfully
 OpenMV v4.7.0; MicroPython v1.25.0-r0; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
