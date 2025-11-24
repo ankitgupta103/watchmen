@@ -926,13 +926,22 @@ class sx126x:
         payload (skipping the addressing header).
 
         Message Format (received):
+        Without RSSI:
         [0-1]  Sender address (2 bytes: high, low)
         [2]    Frequency offset
         [3+]   Message payload
-        [last-1] RSSI value (if RSSI enabled, only present if rssi=True)
+        [last] Newline character (0x0A, stripped)
+        
+        With RSSI enabled:
+        [0-1]  Sender address (2 bytes: high, low)
+        [2]    Frequency offset
+        [3]    Duplicate frequency offset (extra byte when RSSI enabled)
+        [4+]   Message payload
+        [last-1] RSSI value (last byte before newline)
         [last] Newline character (0x0A, stripped)
 
-        If RSSI is enabled, the last byte before newline contains RSSI value.
+        If RSSI is enabled, the module includes a duplicate frequency byte
+        and the last byte before newline contains RSSI value.
 
         Returns:
             tuple: (message_payload, rssi_value) where:
@@ -957,35 +966,40 @@ class sx126x:
             if r_buff and len(r_buff) > 0 and r_buff[-1] == 0x0A:
                 r_buff = r_buff[:-1]
 
-            # Without RSSI: sender_addr(2) + freq(1) + payload(1) = 4 bytes minimum
-            # With RSSI: sender_addr(2) + freq(1) + payload(1) + RSSI(1) = 5 bytes minimum
-            if r_buff and len(r_buff) >= 5:
+            # Message format when RSSI is disabled:
+            #   [addr_h(1)][addr_l(1)][freq(1)][payload]
+            # Message format when RSSI is enabled:
+            #   [addr_h(1)][addr_l(1)][freq(1)][freq_dup(1)][payload][RSSI(1)]
+            # The module includes a duplicate frequency byte when RSSI is enabled
+            
+            if r_buff and len(r_buff) >= 4:
                 # Check if RSSI is enabled - if so, the last byte is RSSI
                 if self.rssi:
-                    # RSSI enabled: format is [header(3)][payload][RSSI(1)]
-                    # Minimum length with RSSI: 3 (header) + 1 (payload) + 1 (RSSI) = 5 bytes
+                    # RSSI enabled: format is [header(3)][freq_dup(1)][payload][RSSI(1)]
+                    # Minimum length with RSSI: 3 (header) + 1 (freq_dup) + 1 (payload) + 1 (RSSI) = 6 bytes
+                    if len(r_buff) < 6:
+                        # Message too short for RSSI format
+                        return (None, None)
+                    
                     # Extract RSSI value (last byte)
                     rssi_byte = r_buff[-1]
-                    # Extract message payload (skip first 3 bytes, exclude RSSI)
-                    msg = r_buff[3:-1]
                     # Decode RSSI: actual_RSSI = -(256 - value) dBm
                     rssi_dbm = -(256 - rssi_byte)
-
-                    # Check if message starts with frequency offset byte (indicates extraction issue)
+                    
+                    # Extract message payload: skip first 4 bytes (header + duplicate freq), exclude RSSI
+                    # Format: [addr_h][addr_l][freq][freq_dup][payload][RSSI]
+                    # We skip bytes 0-3 (4 bytes total) and exclude the last byte (RSSI)
+                    msg = r_buff[4:-1]
+                    
+                    # Log if frequency byte doesn't match expected (for debugging)
                     if (
-                        len(msg) > 0
-                        and hasattr(self, "offset_freq")
-                        and msg[0] == self.offset_freq
+                        hasattr(self, "offset_freq")
+                        and len(r_buff) >= 4
+                        and r_buff[3] != self.offset_freq
                     ):
-                        # Message starts with frequency offset - this shouldn't happen
-                        # This suggests an extra byte is being included in the payload
-                        # Try extracting message starting from byte 4 instead of 3 (skip one more byte)
-                        if len(r_buff) >= 6:
-                            # Skip one more byte (the frequency byte that's incorrectly in payload)
-                            msg = r_buff[4:-1]
-                            logger.debug(
-                                f"[RSSI] Adjusted extraction - skipped extra frequency byte"
-                            )
+                        logger.debug(
+                            f"[RSSI] Frequency byte mismatch: got 0x{r_buff[3]:02X}, expected 0x{self.offset_freq:02X}"
+                        )
 
                     return (msg, rssi_dbm)
                 else:
