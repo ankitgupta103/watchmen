@@ -923,148 +923,60 @@ class sx126x:
 
         This method checks if data is available in the UART receive buffer,
         reads a complete line (ending with newline), and extracts the message
-        payload (skipping the addressing header).
+        payload (skipping the addressing header) and RSSI value if enabled.
 
         Message Format (received):
-        Without RSSI:
-        [0-1]  Sender address (2 bytes: high, low)
-        [2]    Frequency offset
-        [3+]   Message payload
-        [last] Newline character (0x0A, stripped)
+        Without RSSI: [0-1] Sender address (2 bytes: high, low)
+                     [2]   Frequency offset
+                     [3+]  Message payload
+                     [last] Newline character (0x0A, stripped)
         
-        With RSSI enabled:
-        [0-1]  Sender address (2 bytes: high, low)
-        [2]    Frequency offset
-        [3+]   Message payload
-        [last-1] RSSI value (last byte before newline)
-        [last] Newline character (0x0A, stripped)
-
-        When RSSI is enabled, the format is identical to without RSSI,
-        except RSSI value is appended as the last byte before newline.
+        With RSSI:   [0-1] Sender address (2 bytes: high, low)
+                     [2]   Frequency offset
+                     [3+]  Message payload
+                     [last-1] RSSI byte (if RSSI enabled)
+                     [last] Newline character (0x0A, stripped)
 
         Returns:
             tuple: (message_payload, rssi_value) where:
-                - message_payload (bytes): Message payload (excluding addressing header and RSSI)
-                - rssi_value (int or None): RSSI in dBm if enabled, None otherwise
+                - message_payload (bytes): Message payload (excluding addressing header and RSSI byte)
+                - rssi_value (int or None): RSSI value in dBm if RSSI is enabled, None otherwise
             Returns (None, None) if no data available
 
         Note:
             - Module must be in normal mode (M0=LOW, M1=LOW)
-            - Minimum message size is 6 bytes (3 header + 3 payload + newline)
-            - If RSSI enabled: minimum is 7 bytes (3 header + 3 payload + 1 RSSI + newline)
+            - Minimum message size is 4 bytes (3 header + 1 payload) without RSSI
+            - Minimum message size is 5 bytes (3 header + 1 payload + 1 RSSI) with RSSI enabled
             - Reads complete line to avoid partial messages
-            - RSSI value is decoded as: rssi_dbm = -(256 - rssi_byte)
+            - RSSI conversion: RSSI_dBm = -(256 - rssi_byte)
         """
         if self.ser.any():
             time.sleep_ms(RX_DELAY_MS)  # Wait for complete message
             r_buff = self.ser.readline()
 
-            # Validate message has minimum required length
             # Handle newline: readline() may or may not strip it depending on MicroPython version
             # Strip newline manually if present (0x0A)
             if r_buff and len(r_buff) > 0 and r_buff[-1] == 0x0A:
                 r_buff = r_buff[:-1]
 
-            # Message format when RSSI is disabled:
-            #   [addr_h(1)][addr_l(1)][freq(1)][payload]
-            # Message format when RSSI is enabled:
-            #   [addr_h(1)][addr_l(1)][freq(1)][payload][RSSI(1)]
-            # When RSSI is enabled, the format is the SAME as without RSSI,
-            # except RSSI byte is appended at the end before newline.
-            
             if r_buff and len(r_buff) >= 4:
-                # Check if RSSI is enabled - if so, the last byte is RSSI
-                if self.rssi:
-                    # RSSI enabled: format is [addr_h][addr_l][freq][payload][RSSI]
-                    # The frequency byte IS included when RSSI is enabled
-                    # Minimum length with RSSI: 3 (header) + 1 (payload) + 1 (RSSI) = 5 bytes
-                    if len(r_buff) < 5:
-                        # Message too short for RSSI format
-                        logger.debug(f"[RSSI] Message too short: {len(r_buff)} bytes, expected at least 5")
-                        return (None, None)
-                    
-                    # Validate that the first bytes look like a valid address header
-                    # Address bytes should be in reasonable range (0-255), but typically 0-250 for node addresses
-                    # If bytes look corrupted (e.g., very high values or unusual patterns), reject early
-                    if len(r_buff) >= 3:
-                        # Check if this might be a corrupted message (missing header bytes)
-                        # Valid messages should have reasonable address values
-                        # If byte[0] or byte[1] are > 250, it might be corrupted
-                        # Also check if byte[2] matches expected frequency (but allow mismatch for now)
-                        addr_h, addr_l = r_buff[0], r_buff[1]
-                        if addr_h > 250 or addr_l > 250:
-                            logger.debug(
-                                f"[RSSI] Suspicious address bytes: [0x{addr_h:02X}, 0x{addr_l:02X}], "
-                                f"raw_len={len(r_buff)}, rejecting as potentially corrupted"
-                            )
-                            return (None, None)
-                    
-                    # Extract RSSI value (last byte)
+                # Check if RSSI is enabled and extract it
+                rssi_value = None
+                if self.rssi and len(r_buff) >= 5:
+                    # RSSI is enabled: last byte before newline is RSSI
+                    # Message format: [addr_h(1)][addr_l(1)][freq(1)][payload][rssi_byte]
                     rssi_byte = r_buff[-1]
-                    # Decode RSSI: actual_RSSI = -(256 - value) dBm
-                    rssi_dbm = -(256 - rssi_byte)
-                    
-                    # Extract message payload: skip first 3 bytes (header + freq), exclude RSSI
-                    # Format: [addr_h][addr_l][freq][payload][RSSI]
-                    # We skip bytes 0-2 (3 bytes total: addr_h, addr_l, freq) and exclude the last byte (RSSI)
+                    # Convert RSSI byte to dBm: RSSI_dBm = -(256 - rssi_byte)
+                    rssi_value = -(256 - rssi_byte)
+                    # Extract message payload (skip first 3 bytes: addr_h, addr_l, freq)
+                    # and exclude the last RSSI byte
                     msg = r_buff[3:-1]
-                    
-                    # Validate that extracted message starts with a valid message type
-                    # Valid message types: N, H, A, B, E, C, I, S, V, P
-                    if len(msg) > 0:
-                        first_byte = msg[0]
-                        valid_msg_types = [ord('N'), ord('H'), ord('A'), ord('B'), ord('E'), ord('C'), ord('I'), ord('S'), ord('V'), ord('P')]
-                        if first_byte not in valid_msg_types:
-                            logger.debug(
-                                f"[RSSI] Invalid message type: 0x{first_byte:02X} ('{chr(first_byte) if 32 <= first_byte < 127 else '?'}'), "
-                                f"raw_len={len(r_buff)}, header=[0x{r_buff[0]:02X}, 0x{r_buff[1]:02X}], "
-                                f"freq=0x{r_buff[2]:02X}, payload_start=[{', '.join(f'0x{b:02X}' for b in msg[:min(5, len(msg))])}], "
-                                f"rssi={rssi_dbm}dBm - rejecting as corrupted"
-                            )
-                            return (None, None)
-                    
-                    # Validate frequency byte matches expected (for debugging)
-                    if (
-                        hasattr(self, "offset_freq")
-                        and len(r_buff) >= 3
-                        and r_buff[2] != self.offset_freq
-                    ):
-                        logger.debug(
-                            f"[RSSI] Frequency byte mismatch: got 0x{r_buff[2]:02X}, expected 0x{self.offset_freq:02X}"
-                        )
-                    
-                    # Enhanced debug logging to diagnose byte loss issues
-                    logger.debug(
-                        f"[RSSI] Extracted: raw_len={len(r_buff)}, "
-                        f"header=[0x{r_buff[0]:02X}, 0x{r_buff[1]:02X}], "
-                        f"freq=0x{r_buff[2]:02X}, "
-                        f"rssi_byte=0x{rssi_byte:02X}, rssi_dbm={rssi_dbm}dBm, "
-                        f"payload_len={len(msg)}, "
-                        f"payload_start=[{', '.join(f'0x{b:02X}' for b in msg[:min(8, len(msg))])}]"
-                    )
-                    
-                    # Additional validation: check if payload length matches expected
-                    # For heartbeat messages, encrypted payload should be 128 bytes
-                    # Total message with header should be 135 bytes (7 header + 128 encrypted)
-                    if len(msg) == 135:
-                        # This is likely a heartbeat message (7 byte header + 128 byte encrypted)
-                        logger.debug(f"[RSSI] Payload length 135 bytes - likely includes message header")
-                    elif len(msg) == 128:
-                        # This is likely just the encrypted payload
-                        logger.debug(f"[RSSI] Payload length 128 bytes - encrypted data only")
-
-                    return (msg, rssi_dbm)
                 else:
-                    # RSSI disabled: format is [header(3)][payload]
-                    # Extract message payload (skip first 3 bytes)
+                    # RSSI not enabled: Message format: [addr_h(1)][addr_l(1)][freq(1)][payload]
+                    # Extract message payload (skip first 3 bytes: addr_h, addr_l, freq)
                     msg = r_buff[3:]
-                    return (msg, None)
-            elif r_buff and len(r_buff) >= 4:
-                # Very short message without RSSI (minimum length: 4 bytes)
-                # Format: [header(3)][payload(1)]
-                if not self.rssi:
-                    msg = r_buff[3:]
-                    return (msg, None)
+                
+                return (msg, rssi_value)
 
         return (None, None)
 
