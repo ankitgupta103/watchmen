@@ -934,13 +934,12 @@ class sx126x:
         
         With RSSI enabled:
         [0-1]  Sender address (2 bytes: high, low)
-        [2]    Frequency offset
-        [3+]   Message payload
+        [2+]   Message payload (frequency byte is OMITTED when RSSI is enabled)
         [last-1] RSSI value (last byte before newline)
         [last] Newline character (0x0A, stripped)
 
-        When RSSI is enabled, the last byte before newline contains RSSI value.
-        The format is the same as without RSSI, except RSSI byte is appended before newline.
+        When RSSI is enabled, the module OMITS the frequency offset byte
+        and appends RSSI value as the last byte before newline.
 
         Returns:
             tuple: (message_payload, rssi_value) where:
@@ -968,18 +967,18 @@ class sx126x:
             # Message format when RSSI is disabled:
             #   [addr_h(1)][addr_l(1)][freq(1)][payload]
             # Message format when RSSI is enabled:
-            #   [addr_h(1)][addr_l(1)][freq(1)][freq_dup(1)][payload][RSSI(1)]
-            # The module includes a duplicate frequency byte when RSSI is enabled
+            #   [addr_h(1)][addr_l(1)][payload][RSSI(1)]
+            # When RSSI is enabled, the module OMITS the frequency byte!
             
             if r_buff and len(r_buff) >= 4:
                 # Check if RSSI is enabled - if so, the last byte is RSSI
                 if self.rssi:
-                    # RSSI enabled: The actual format appears to be [addr_h][addr_l][freq][payload][RSSI]
-                    # NOT [addr_h][addr_l][freq][freq_dup][payload][RSSI] as previously assumed
-                    # Minimum length with RSSI: 3 (header) + 1 (payload) + 1 (RSSI) = 5 bytes
-                    if len(r_buff) < 5:
+                    # RSSI enabled: format is [addr_h][addr_l][payload][RSSI]
+                    # The frequency byte is NOT included when RSSI is enabled
+                    # Minimum length with RSSI: 2 (header) + 1 (payload) + 1 (RSSI) = 4 bytes
+                    if len(r_buff) < 4:
                         # Message too short for RSSI format
-                        logger.debug(f"[RSSI] Message too short: {len(r_buff)} bytes, expected at least 5")
+                        logger.debug(f"[RSSI] Message too short: {len(r_buff)} bytes, expected at least 4")
                         return (None, None)
                     
                     # Extract RSSI value (last byte)
@@ -987,20 +986,16 @@ class sx126x:
                     # Decode RSSI: actual_RSSI = -(256 - value) dBm
                     rssi_dbm = -(256 - rssi_byte)
                     
-                    # Extract message payload: skip first 3 bytes (header), exclude RSSI
-                    # Format: [addr_h][addr_l][freq][payload][RSSI]
-                    # We skip bytes 0-2 (3 bytes total) and exclude the last byte (RSSI)
-                    msg = r_buff[3:-1]
+                    # Extract message payload: skip first 2 bytes (header), exclude RSSI
+                    # Format: [addr_h][addr_l][payload][RSSI]
+                    # We skip bytes 0-1 (2 bytes total) and exclude the last byte (RSSI)
+                    msg = r_buff[2:-1]
                     
-                    # Log if frequency byte doesn't match expected (for debugging)
-                    if (
-                        hasattr(self, "offset_freq")
-                        and len(r_buff) >= 3
-                        and r_buff[2] != self.offset_freq
-                    ):
-                        logger.debug(
-                            f"[RSSI] Frequency byte mismatch: got 0x{r_buff[2]:02X}, expected 0x{self.offset_freq:02X}"
-                        )
+                    logger.debug(
+                        f"[RSSI] Extracted: len={len(r_buff)}, "
+                        f"header=[0x{r_buff[0]:02X}, 0x{r_buff[1]:02X}], "
+                        f"payload_len={len(msg)}, rssi={rssi_dbm}dBm"
+                    )
 
                     return (msg, rssi_dbm)
                 else:
