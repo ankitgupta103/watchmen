@@ -1,127 +1,233 @@
+* when rssi is true
+
+
 INFO - SD card available
 INFO - Singleton Logger class Initiated, __new__
 INFO - /sdcard/logs directory already exists
 INFO - Log file opened: /sdcard/logs/main.log
-19:54:42,178 - INFO - [FS] SD card available
-19:54:42,180 - INFO - [FS] Using FS_ROOT : /sdcard
-19:54:42,186 - INFO - [FS] /sdcard/netimages already exists
-19:54:42,190 - INFO - [FS] /sdcard/myimages already exists
-19:54:42,192 - INFO - [INIT] MyAddr = 221
-19:54:42,197 - INFO - Loading public key from file 221.pub
-19:54:42,246 - INFO - [INIT] Running on device : e076465dd7091027
-19:54:45,456 - INFO - [INIT] Started device 221
-19:54:45,468 - INFO - [LORA] Initializing LoRa SX126X module... my lora addr = 221
-19:54:45,471 - INFO - Initializing with UART 1, M0=P6, M1=P7
-19:54:45,473 - INFO - GPIO pins initialized successfully
-19:54:45,479 - INFO - UART 1 initialized at 9600 baud
-19:54:46,081 - INFO - ============================================================
-19:54:46,089 - INFO -   CONFIGURATION TO BE SENT
-19:54:46,091 - INFO - ============================================================
-19:54:46,093 - INFO -   Configuration Header : Volatile (0xC2)
-19:54:46,095 - INFO -   Node Address         : 221 (0x00DD)
-19:54:46,097 - INFO -   Network ID           : 0
-19:54:46,099 - INFO -   Frequency            : 868.125 MHz
-19:54:46,102 - INFO -   UART Baud Rate       : 115200 bps
-19:54:46,104 - INFO -   Air Data Rate        : 19200 bps
-19:54:46,107 - INFO -   TX Power             : 22 dBm
-19:54:46,109 - INFO -   Buffer Size          : 240 bytes
-19:54:46,111 - INFO -   Operating Mode       : Fixed Point
-19:54:46,113 - INFO -   Encryption Key       : 0 (0x0000)
-19:54:46,115 - INFO -   Packet RSSI          : Enabled
-19:54:46,117 - INFO -   Noise RSSI           : Enabled
-19:54:46,120 - INFO -   Raw Bytes            : ['0xc2', '0x0', '0x9', '0x0', '0xdd', '0x0', '0xe5', '0x20', '0x12', '0xc3', '0x0', '0x0']
-19:54:46,123 - INFO - ============================================================
-19:54:46,125 - INFO - Configuration attempt 1
-19:54:48,629 - INFO - ============================================================
-19:54:48,637 - INFO -   CONFIGURATION RECEIVED (CONFIRMED)
-19:54:48,640 - INFO - ============================================================
-19:54:48,642 - INFO -   Configuration Header : Volatile (0xC2)
-19:54:48,645 - INFO -   Node Address         : 221 (0x00DD)
-19:54:48,647 - INFO -   Network ID           : 0
-19:54:48,649 - INFO -   Frequency            : 868.125 MHz
-19:54:48,651 - INFO -   UART Baud Rate       : 115200 bps
-19:54:48,656 - INFO -   Air Data Rate        : 19200 bps
-19:54:48,658 - INFO -   TX Power             : 22 dBm
-19:54:48,660 - INFO -   Buffer Size          : 240 bytes
-19:54:48,662 - INFO -   Operating Mode       : Fixed Point
-19:54:48,664 - INFO -   Encryption Key       : 0 (0x0000)
-19:54:48,667 - INFO -   Packet RSSI          : Enabled
-19:54:48,669 - INFO -   Noise RSSI           : Enabled
-19:54:48,672 - INFO -   Raw Bytes            : ['0xc1', '0x0', '0x9', '0x0', '0xdd', '0x0', '0xe5', '0x20', '0x12', '0xc3', '0x0', '0x0']
-19:54:48,674 - INFO - ============================================================
-19:54:48,676 - INFO - ============================================================
-19:54:48,678 - INFO -   CONFIGURATION SUCCESSFUL
-19:54:48,680 - INFO -   All parameters match sent configuration
-19:54:48,683 - INFO - ============================================================
+19:53:19,562 - INFO - [FS] SD card available
+19:53:19,566 - INFO - [FS] Using FS_ROOT : /sdcard
+19:53:19,571 - INFO - [FS] /sdcard/netimages already exists
+19:53:19,575 - INFO - [FS] /sdcard/myimages already exists
+19:53:19,577 - INFO - [INIT] MyAddr = 221
+19:53:19,581 - INFO - Loading public key from file 221.pub
+19:53:19,631 - INFO - [INIT] Running on device : e076465dd7091027
+19:53:22,841 - INFO - [INIT] Started device 221
+19:53:22,858 - INFO - [LORA] Initializing LoRa SX126X module... my lora addr = 221
+19:53:22,861 - INFO - Initializing with UART 1, M0=P6, M1=P7
+19:53:22,864 - INFO - GPIO pins initialized successfully
+19:53:22,866 - INFO - UART 1 initialized at 9600 baud
+19:53:23,469 - INFO - ===> CONFIGURATION TO BE SENT <===
+19:53:23,477 - INFO -   Configuration Header : Volatile (0xC2)
+19:53:23,479 - INFO -   Node Address         : 221 (0x00DD)
+19:53:23,481 - INFO -   Network ID           : 0
+19:53:23,483 - INFO -   Frequency            : 868.125 MHz
+19:53:23,486 - INFO -   UART Baud Rate       : 115200 bps
+19:53:23,488 - INFO -   Air Data Rate        : 19200 bps
+19:53:23,491 - INFO -   TX Power             : 22 dBm
+19:53:23,493 - INFO -   Buffer Size          : 240 bytes
+19:53:23,495 - INFO -   Operating Mode       : Fixed Point
+19:53:23,497 - INFO -   Encryption Key       : 0 (0x0000)
+19:53:23,499 - INFO -   Packet RSSI          : Enabled
+19:53:23,502 - INFO -   Noise RSSI           : Enabled
+19:53:23,504 - INFO -   Raw Bytes            : ['0xc2', '0x0', '0x9', '0x0', '0xdd', '0x0', '0xe5', '0x20', '0x12', '0xc3', '0x0', '0x0']
 
-19:54:49,754 - INFO - [MEM] Memory management tasks started (free: 8188.8KB)
-19:54:49,762 - INFO - ============================================================
-19:54:49,764 - INFO - [INIT] Starting unit node
-19:54:49,767 - INFO - [NET] Going to validate neighbours : []
-19:54:49,920 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*YUP;\xdd' at 7745
-19:54:53,766 - INFO - [HB] Will send HB to [219]
-19:54:53,778 - INFO - HBSTR = 221:11:0:0::-1:[]:[219]
-19:54:53,835 - INFO - H : Len msg = 23, len msgbytes = 128
-19:54:53,842 - INFO - [HB] Sending HB to 219
-19:54:53,996 - INFO - [SENT 136 bytes to 219] b'H\xdd\xdd\xdbOWH;b\x14\xf5\xcbT\xbd\xc4\xcf\xcf5\xc2\x15\xe1_\xa7\x82\xc1\x91N\xce\xd5K\xdd\x02\x08\xf6\xa8\xc9K\xaf\xc8{(b\x94\x05\x9b\xda;\xbc\x8ay\xb2\xa5%2B\xbe4\xf0\xd8\xba\xf4\xe9\xee\xd1"\xb4\xd7\x866\x17\xf5\xb9\xfb5\xe0\xfe\x95\x1cC\x01\xc4\x03\xackO\xa8\xba@F\x1a\x9c\xae\xbd\t\xe2 \x8c\xd8;N\xdb\xf3!\xa2\xb3?\xa5\x97h\xf2YT{\x10\x83\x1fT\x83\x8e\xeb{?\xc0(\xee\xc7YG1\xc5\xb2Y\x99\xe4\xee\xc8' at 11820
-19:54:54,204 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 0
-19:54:54,412 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 1
-19:54:54,820 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 2
-19:54:55,429 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 3
-19:54:56,237 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 4
-19:54:57,245 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 5
-19:54:57,963 - INFO - Saving image to /sdcard/myimages/raw_CHV.jpg : imbytesize = 1843200...
-19:54:58,139 - INFO - Saved image: /sdcard/myimages/raw_CHV.jpg
-19:54:58,453 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 6
-19:54:59,861 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 7
-19:55:01,468 - INFO - [ACK] Failed to get ack for message b'H\xdd\xdd\xdbOWH' for retry # 0
-19:55:01,626 - INFO - [SENT 136 bytes to 219] b'H\xdd\xdd\xdbOWH;b\x14\xf5\xcbT\xbd\xc4\xcf\xcf5\xc2\x15\xe1_\xa7\x82\xc1\x91N\xce\xd5K\xdd\x02\x08\xf6\xa8\xc9K\xaf\xc8{(b\x94\x05\x9b\xda;\xbc\x8ay\xb2\xa5%2B\xbe4\xf0\xd8\xba\xf4\xe9\xee\xd1"\xb4\xd7\x866\x17\xf5\xb9\xfb5\xe0\xfe\x95\x1cC\x01\xc4\x03\xackO\xa8\xba@F\x1a\x9c\xae\xbd\t\xe2 \x8c\xd8;N\xdb\xf3!\xa2\xb3?\xa5\x97h\xf2YT{\x10\x83\x1fT\x83\x8e\xeb{?\xc0(\xee\xc7YG1\xc5\xb2Y\x99\xe4\xee\xc8' at 19451
-19:55:01,834 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 0
-19:55:02,041 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 1
-19:55:02,449 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 2
-19:55:03,057 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 3
-19:55:03,864 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 4
-19:55:04,871 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 5
-19:55:06,079 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 6
-19:55:07,487 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 7
-19:55:09,095 - INFO - [ACK] Failed to get ack for message b'H\xdd\xdd\xdbOWH' for retry # 1
-19:55:09,253 - INFO - [SENT 136 bytes to 219] b'H\xdd\xdd\xdbOWH;b\x14\xf5\xcbT\xbd\xc4\xcf\xcf5\xc2\x15\xe1_\xa7\x82\xc1\x91N\xce\xd5K\xdd\x02\x08\xf6\xa8\xc9K\xaf\xc8{(b\x94\x05\x9b\xda;\xbc\x8ay\xb2\xa5%2B\xbe4\xf0\xd8\xba\xf4\xe9\xee\xd1"\xb4\xd7\x866\x17\xf5\xb9\xfb5\xe0\xfe\x95\x1cC\x01\xc4\x03\xackO\xa8\xba@F\x1a\x9c\xae\xbd\t\xe2 \x8c\xd8;N\xdb\xf3!\xa2\xb3?\xa5\x97h\xf2YT{\x10\x83\x1fT\x83\x8e\xeb{?\xc0(\xee\xc7YG1\xc5\xb2Y\x99\xe4\xee\xc8' at 27078
-19:55:09,462 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 0
-19:55:09,669 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 1
-19:55:10,077 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 2
-19:55:10,684 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 3
-19:55:11,494 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 4
-19:55:12,502 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 5
-19:55:13,710 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 6
-19:55:15,117 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbOWH' # 7
-19:55:16,724 - INFO - [ACK] Failed to get ack for message b'H\xdd\xdd\xdbOWH' for retry # 2
-19:55:16,731 - INFO - [LORA] Failed to send message b'H\xdd\xdd\xdbOWH'
-19:55:16,734 - INFO - [ERROR]: consecutive heartbeat failures = 1
-19:55:19,805 - INFO - [STATUS] Sent : 1 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.6KB
-19:55:19,812 - INFO - [STATUS] Chunks: 0, Queued images: 1
-19:55:20,028 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 4, Received messages = {}
-19:55:20,187 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*PPU;\xdd' at 38012
-19:55:49,853 - INFO - [STATUS] Sent : 2 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.5KB
-19:55:49,861 - INFO - [STATUS] Chunks: 0, Queued images: 1
-19:55:50,295 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 5, Received messages = {}
-19:55:50,453 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*CIK;\xdd' at 68278
-19:56:19,901 - INFO - [STATUS] Sent : 3 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.4KB
-19:56:19,909 - INFO - [STATUS] Chunks: 0, Queued images: 1
-19:56:20,562 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 6, Received messages = {}
-19:56:20,721 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*ZLM;\xdd' at 98545
-19:56:49,948 - INFO - [STATUS] Sent : 4 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.3KB
-19:56:49,956 - INFO - [STATUS] Chunks: 0, Queued images: 1
-19:56:50,828 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 7, Received messages = {}
-19:56:50,987 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*CMX;\xdd' at 128811
-19:57:19,996 - INFO - [STATUS] Sent : 5 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.2KB
-19:57:19,004 - INFO - [STATUS] Chunks: 0, Queued images: 1
-19:57:21,094 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 8, Received messages = {}
-19:57:21,253 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*QMS;\xdd' at 159078
-19:57:50,044 - INFO - [STATUS] Sent : 6 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.1KB
-19:57:50,052 - INFO - [STATUS] Chunks: 0, Queued images: 1
-19:57:51,363 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 9, Received messages = {}
-19:57:51,522 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*KXY;\xdd' at 189346
-19:58:20,092 - INFO - [STATUS] Sent : 7 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.0KB
-19:58:20,100 - INFO - [STATUS] Chunks: 0, Queued images: 1
-19:58:21,629 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 10, Received messages = {}
-19:58:21,787 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*YWS;\xdd' at 219612
+19:53:23,506 - INFO - Configuration attempt 1...
+19:53:26,012 - INFO - ===> CONFIGURATION RECEIVED (CONFIRMED) <===
+19:53:26,020 - INFO -   Configuration Header : Volatile (0xC2)
+19:53:26,022 - INFO -   Node Address         : 221 (0x00DD)
+19:53:26,024 - INFO -   Network ID           : 0
+19:53:26,026 - INFO -   Frequency            : 868.125 MHz
+19:53:26,028 - INFO -   UART Baud Rate       : 115200 bps
+19:53:26,030 - INFO -   Air Data Rate        : 19200 bps
+19:53:26,034 - INFO -   TX Power             : 22 dBm
+19:53:26,036 - INFO -   Buffer Size          : 240 bytes
+19:53:26,039 - INFO -   Operating Mode       : Fixed Point
+19:53:26,041 - INFO -   Encryption Key       : 0 (0x0000)
+19:53:26,043 - INFO -   Packet RSSI          : Enabled
+19:53:26,045 - INFO -   Noise RSSI           : Enabled
+19:53:26,048 - INFO -   Raw Bytes            : ['0xc1', '0x0', '0x9', '0x0', '0xdd', '0x0', '0xe5', '0x20', '0x12', '0xc3', '0x0', '0x0']
+
+19:53:26,050 - INFO - ===> CONFIGURATION SUCCESSFUL, all parameters matched! <===
+
+19:53:27,121 - INFO - [MEM] Memory management tasks started (free: 8188.6KB)
+
+19:53:27,130 - INFO - [INIT] ===> Starting unit node <===
+19:53:27,132 - INFO - ===> Readio Read, LoRa receive loop started... <===
+
+19:53:27,135 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+
+19:53:27,137 - INFO - [NET] Going to validate neighbours : []
+19:53:27,291 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*GXK;\xdd' at 7730
+19:53:31,132 - INFO - [HB] Will send HB to [219]
+19:53:31,144 - INFO - HBSTR = 221:11:0:0::-1:[]:[219]
+19:53:31,201 - INFO - H : Len msg = 23, len msgbytes = 128
+19:53:31,209 - INFO - [HB] Sending HB to 219
+19:53:31,362 - INFO - [SENT 136 bytes to 219] b'H\xdd\xdd\xdbWRH;o0\x03\xc3\x11\x19\xc3\x91q\xd0\x89\xdd\xea\xc4u\x10\xb5\x1e2\xda\x07\x1e\xba7i\x0f>\x06\xab\xf9\xec\xfc\xc4\xac3\xce\xc2\xa3\x009#+\r\xc9\xd0\xb1ib\xa0\xd7\x99\xa0O\x8f\xb0\xd8~\xe5\x0eW\x85N]\xf7\x00U_;\xcb\\\xd7\xb3\xf0\x131\x1aPA\x04si]*\x0f\x94s\xd2\x80+$vg\x9eq6\x92/\xdf7K!\x1a|\xb4\xdf\x07\xcbL\xdc\\At\x83\xb4\x93\xe9\xb5\xd7\xd6\x98\xfb\x85\xc5\x1et\xbbB\x00' at 11802
+19:53:31,571 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 0
+19:53:31,779 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 1
+19:53:32,186 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 2
+19:53:32,793 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 3
+19:53:33,600 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 4
+19:53:34,607 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 5
+19:53:35,330 - INFO - Saving image to /sdcard/myimages/raw_KCC.jpg : imbytesize = 1843200...
+19:53:35,510 - INFO - Saved image: /sdcard/myimages/raw_KCC.jpg
+19:53:35,815 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 6
+19:53:37,223 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 7
+19:53:38,831 - INFO - [ACK] Failed to get ack for message b'H\xdd\xdd\xdbWRH' for retry # 0
+19:53:38,989 - INFO - [SENT 136 bytes to 219] b'H\xdd\xdd\xdbWRH;o0\x03\xc3\x11\x19\xc3\x91q\xd0\x89\xdd\xea\xc4u\x10\xb5\x1e2\xda\x07\x1e\xba7i\x0f>\x06\xab\xf9\xec\xfc\xc4\xac3\xce\xc2\xa3\x009#+\r\xc9\xd0\xb1ib\xa0\xd7\x99\xa0O\x8f\xb0\xd8~\xe5\x0eW\x85N]\xf7\x00U_;\xcb\\\xd7\xb3\xf0\x131\x1aPA\x04si]*\x0f\x94s\xd2\x80+$vg\x9eq6\x92/\xdf7K!\x1a|\xb4\xdf\x07\xcbL\xdc\\At\x83\xb4\x93\xe9\xb5\xd7\xd6\x98\xfb\x85\xc5\x1et\xbbB\x00' at 19428
+19:53:39,197 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 0
+19:53:39,405 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 1
+19:53:39,813 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 2
+19:53:40,421 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 3
+19:53:41,229 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 4
+19:53:42,237 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 5
+19:53:43,445 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 6
+19:53:44,852 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 7
+19:53:46,459 - INFO - [ACK] Failed to get ack for message b'H\xdd\xdd\xdbWRH' for retry # 1
+19:53:46,618 - INFO - [SENT 136 bytes to 219] b'H\xdd\xdd\xdbWRH;o0\x03\xc3\x11\x19\xc3\x91q\xd0\x89\xdd\xea\xc4u\x10\xb5\x1e2\xda\x07\x1e\xba7i\x0f>\x06\xab\xf9\xec\xfc\xc4\xac3\xce\xc2\xa3\x009#+\r\xc9\xd0\xb1ib\xa0\xd7\x99\xa0O\x8f\xb0\xd8~\xe5\x0eW\x85N]\xf7\x00U_;\xcb\\\xd7\xb3\xf0\x131\x1aPA\x04si]*\x0f\x94s\xd2\x80+$vg\x9eq6\x92/\xdf7K!\x1a|\xb4\xdf\x07\xcbL\xdc\\At\x83\xb4\x93\xe9\xb5\xd7\xd6\x98\xfb\x85\xc5\x1et\xbbB\x00' at 27057
+19:53:46,825 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 0
+19:53:47,033 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 1
+19:53:47,440 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 2
+19:53:48,048 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 3
+19:53:48,855 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 4
+19:53:49,313 - DEBUG - [RSSI] Frequency byte mismatch: got 0x4E, expected 0x12
+19:53:49,321 - INFO - [RECV : 7 bytes, rssi : -37] b'\xdb\xdb*BHR;' at 29761
+19:53:49,324 - INFO - [LORA] ERROR: Failure parsing incoming data : b'\xdb\xdb*BHR;'
+19:53:51,579 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 5
+19:53:52,787 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 6
+19:53:54,194 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbWRH' # 7
+19:53:55,801 - INFO - [ACK] Failed to get ack for message b'H\xdd\xdd\xdbWRH' for retry # 2
+19:53:55,809 - INFO - [LORA] Failed to send message b'H\xdd\xdd\xdbWRH'
+19:53:55,811 - INFO - [ERROR]: consecutive heartbeat failures = 1
+19:53:57,174 - INFO - [STATUS] Sent : 1 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.5KB
+19:53:57,182 - INFO - [STATUS] Chunks: 0, Queued images: 1
+19:53:57,398 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 4, Received messages = {}
+19:53:57,557 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*MBI;\xdd' at 37996
+19:54:19,614 - DEBUG - [RSSI] Frequency byte mismatch: got 0x4E, expected 0x12
+19:54:19,622 - INFO - [RECV : 7 bytes, rssi : -37] b'\xdb\xdb*URW;' at 60062
+19:54:19,625 - INFO - [LORA] ERROR: Failure parsing incoming data : b'\xdb\xdb*URW;'
+19:54:27,222 - INFO - [STATUS] Sent : 2 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.3KB
+19:54:27,229 - INFO - [STATUS] Chunks: 0, Queued images: 1
+19:54:27,664 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 5, Received messages = {}
+19:54:27,822 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*MSL;\xdd' at 68262
+19:54:49,880 - DEBUG - [RSSI] Frequency byte mismatch: got 0x4E, expected 0x12
+19:54:49,889 - INFO - [RECV : 7 bytes, rssi : -37] b'\xdb\xdb*KJS;' at 90328
+19:54:49,891 - INFO - [LORA] ERROR: Failure parsing incoming data : b'\xdb\xdb*KJS;'
+19:54:57,269 - INFO - [STATUS] Sent : 3 Recd : 0 Unacked : 1 LoRa inits: 1, Free: 8187.2KB
+19:54:57,277 - INFO - [STATUS] Chunks: 0, Queued images: 1
+19:54:57,930 - INFO - [STATUS] 221 : Seen neighbours = [], Shortest path = [219], Sent messages = 6, Received messages = {}
+19:54:58,088 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*CAF;\xdd' at 98528
+
+
+* when rssi is false:
+
+INFO - SD card available
+INFO - Singleton Logger class Initiated, __new__
+INFO - /sdcard/logs directory already exists
+INFO - Log file opened: /sdcard/logs/main.log
+19:57:43,112 - INFO - [FS] SD card available
+19:57:43,115 - INFO - [FS] Using FS_ROOT : /sdcard
+19:57:43,121 - INFO - [FS] /sdcard/netimages already exists
+19:57:43,126 - INFO - [FS] /sdcard/myimages already exists
+19:57:43,128 - INFO - [INIT] MyAddr = 221
+19:57:43,132 - INFO - Loading public key from file 221.pub
+19:57:43,183 - INFO - [INIT] Running on device : e076465dd7091027
+19:57:46,393 - INFO - [INIT] Started device 221
+19:57:46,405 - INFO - [LORA] Initializing LoRa SX126X module... my lora addr = 221
+19:57:46,409 - INFO - Initializing with UART 1, M0=P6, M1=P7
+19:57:46,411 - INFO - GPIO pins initialized successfully
+19:57:46,414 - INFO - UART 1 initialized at 9600 baud
+19:57:46,016 - INFO - ===> CONFIGURATION TO BE SENT <===
+19:57:47,024 - INFO -   Configuration Header : Volatile (0xC2)
+19:57:47,026 - INFO -   Node Address         : 221 (0x00DD)
+19:57:47,028 - INFO -   Network ID           : 0
+19:57:47,031 - INFO -   Frequency            : 868.125 MHz
+19:57:47,034 - INFO -   UART Baud Rate       : 115200 bps
+19:57:47,036 - INFO -   Air Data Rate        : 19200 bps
+19:57:47,038 - INFO -   TX Power             : 22 dBm
+19:57:47,040 - INFO -   Buffer Size          : 240 bytes
+19:57:47,042 - INFO -   Operating Mode       : Fixed Point
+19:57:47,044 - INFO -   Encryption Key       : 0 (0x0000)
+19:57:47,046 - INFO -   Packet RSSI          : Disabled
+19:57:47,048 - INFO -   Noise RSSI           : Enabled
+19:57:47,051 - INFO -   Raw Bytes            : ['0xc2', '0x0', '0x9', '0x0', '0xdd', '0x0', '0xe5', '0x20', '0x12', '0x43', '0x0', '0x0']
+
+19:57:47,054 - INFO - Configuration attempt 1...
+19:57:49,559 - INFO - ===> CONFIGURATION RECEIVED (CONFIRMED) <===
+19:57:49,569 - INFO -   Configuration Header : Volatile (0xC2)
+19:57:49,571 - INFO -   Node Address         : 221 (0x00DD)
+19:57:49,573 - INFO -   Network ID           : 0
+19:57:49,575 - INFO -   Frequency            : 868.125 MHz
+19:57:49,578 - INFO -   UART Baud Rate       : 115200 bps
+19:57:49,580 - INFO -   Air Data Rate        : 19200 bps
+19:57:49,583 - INFO -   TX Power             : 22 dBm
+19:57:49,585 - INFO -   Buffer Size          : 240 bytes
+19:57:49,587 - INFO -   Operating Mode       : Fixed Point
+19:57:49,589 - INFO -   Encryption Key       : 0 (0x0000)
+19:57:49,591 - INFO -   Packet RSSI          : Disabled
+19:57:49,593 - INFO -   Noise RSSI           : Enabled
+19:57:49,596 - INFO -   Raw Bytes            : ['0xc1', '0x0', '0x9', '0x0', '0xdd', '0x0', '0xe5', '0x20', '0x12', '0x43', '0x0', '0x0']
+
+19:57:49,599 - INFO - ===> CONFIGURATION SUCCESSFUL, all parameters matched! <===
+
+19:57:50,670 - INFO - [MEM] Memory management tasks started (free: 8188.6KB)
+
+19:57:50,678 - INFO - [INIT] ===> Starting unit node <===
+19:57:50,681 - INFO - ===> Readio Read, LoRa receive loop started... <===
+
+19:57:50,683 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+
+19:57:50,685 - INFO - [NET] Going to validate neighbours : []
+19:57:50,839 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*FDT;\xdd' at 7728
+19:57:54,681 - INFO - [HB] Will send HB to [219]
+19:57:54,693 - INFO - HBSTR = 221:11:0:0::-1:[]:[219]
+19:57:54,749 - INFO - H : Len msg = 23, len msgbytes = 128
+19:57:54,757 - INFO - [HB] Sending HB to 219
+19:57:54,910 - INFO - [SENT 139 bytes to 219] b"H\xdd\xdd\xdbPJQ;7\xa7\xfb\xaa\xbe\xe1W\xef\xc7\x85S\x9f\xe6\xab-\xda9e\xe8\xe9\x02Q\xdd6n'\xb3/]\xe5\x04\xc8\xd7\r\x9a\x0e\x9aY\x92\xc1\xd3@\xc7n|\xa8\x83x\xd9~\xe5\xd3\xd9\xf4Q0\x99\xb1\x02\xd5\x92\xb49\x8e\xe5G\x97\x99SO\x13\xffeQ\xdflx\xa9\x96\xd6vN\xb6W\x90\xe6\xc3\xd2eYn\x82\x83\xa3l\x10\xa8\xd2\x05\xa7f\xb7}\xa7a\xdcpBgGp\x19\xc5\xa2\x97\xb3=\x8d\xb4C\x02{}[]=\xb9GI\xa7~" at 11799
+19:57:55,118 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbPJQ' # 0
+19:57:55,325 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbPJQ' # 1
+19:57:55,734 - INFO - [ACK] Still waiting for ack for b'H\xdd\xdd\xdbPJQ' # 2
+19:57:56,392 - INFO - [RECV : 15 bytes] b'A\xdb\xdb\xddRDH;H\xdd\xdd\xdbPJQ' at 13282
+19:57:56,400 - INFO - [LORA] Unseen messages type A in b'H\xdd\xdd\xdbPJQ'
+19:57:56,403 - INFO - [ACK] Msg b'H\xdd\xdd\xdbPJQ' : was acked in 1640 msecs
+19:57:56,406 - INFO - [HB] Heartbeat sent successfully to 219
+19:57:56,408 - INFO - [HB] HB SUCCESS, shortest path = [219]
+19:57:58,878 - INFO - Saving image to /sdcard/myimages/raw_CKS.jpg : imbytesize = 1843200...
+19:57:59,055 - INFO - Saved image: /sdcard/myimages/raw_CKS.jpg
+19:58:17,919 - INFO - [RECV : 9 bytes] b'N\xdb\xdb*KVW;\xdb' at 34809
+19:58:17,927 - INFO - [LORA] Processing broadcast message : b'N\xdb\xdb*KVW;\xdb' : (b'N\xdb\xdb*KVW', 'N', 219, 219, -1, b'\xdb')
+19:58:17,931 - INFO - [NET] Adding nodeaddr 219 to seen_neighbours
+19:58:19,683 - INFO - [RECV : 11 bytes] b'S\xdb\xdb\xddPDN;219' at 36573
+19:58:20,721 - INFO - [STATUS] Sent : 2 Recd : 3 Unacked : 0 LoRa inits: 1, Free: 8187.2KB
+19:58:20,729 - INFO - [STATUS] Chunks: 0, Queued images: 1
+19:58:20,947 - INFO - [STATUS] 221 : Seen neighbours = [219], Shortest path = [219], Sent messages = 2, Received messages = {219: 3}
+19:58:21,105 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*WUZ;\xdd' at 37995
+19:58:48,164 - INFO - [RECV : 9 bytes] b'N\xdb\xdb*WSB;\xdb' at 65054
+19:58:48,172 - INFO - [LORA] Processing broadcast message : b'N\xdb\xdb*WSB;\xdb' : (b'N\xdb\xdb*WSB', 'N', 219, 219, -1, b'\xdb')
+19:58:49,924 - INFO - [RECV : 11 bytes] b'S\xdb\xdb\xddOTU;219' at 66814
+19:58:50,769 - INFO - [STATUS] Sent : 3 Recd : 5 Unacked : 0 LoRa inits: 1, Free: 8186.8KB
+19:58:50,776 - INFO - [STATUS] Chunks: 0, Queued images: 1
+19:58:51,214 - INFO - [STATUS] 221 : Seen neighbours = [219], Shortest path = [219], Sent messages = 3, Received messages = {219: 5}
+19:58:51,374 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*VSR;\xdd' at 68263
+19:59:18,434 - INFO - [RECV : 9 bytes] b'N\xdb\xdb*RPP;\xdb' at 95323
+19:59:18,442 - INFO - [LORA] Processing broadcast message : b'N\xdb\xdb*RPP;\xdb' : (b'N\xdb\xdb*RPP', 'N', 219, 219, -1, b'\xdb')
+19:59:20,195 - INFO - [RECV : 11 bytes] b'S\xdb\xdb\xddAZZ;219' at 97084
+19:59:20,817 - INFO - [STATUS] Sent : 4 Recd : 7 Unacked : 0 LoRa inits: 1, Free: 8186.5KB
+19:59:20,825 - INFO - [STATUS] Chunks: 0, Queued images: 1
+19:59:21,483 - INFO - [STATUS] 221 : Seen neighbours = [219], Shortest path = [219], Sent messages = 4, Received messages = {219: 7}
+19:59:21,641 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*NNT;\xdd' at 98531
+19:59:48,699 - INFO - [RECV : 9 bytes] b'N\xdb\xdb*FSH;\xdb' at 125589
+19:59:48,707 - INFO - [LORA] Processing broadcast message : b'N\xdb\xdb*FSH;\xdb' : (b'N\xdb\xdb*FSH', 'N', 219, 219, -1, b'\xdb')
+19:59:50,460 - INFO - [RECV : 11 bytes] b'S\xdb\xdb\xddJFZ;219' at 127350
+19:59:50,865 - INFO - [STATUS] Sent : 5 Recd : 9 Unacked : 0 LoRa inits: 1, Free: 8186.2KB
+19:59:50,873 - INFO - [STATUS] Chunks: 0, Queued images: 1
+19:59:51,749 - INFO - [STATUS] 221 : Seen neighbours = [219], Shortest path = [219], Sent messages = 5, Received messages = {219: 9}
+19:59:51,908 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*TPM;\xdd' at 128797
+20:00:18,966 - INFO - [RECV : 9 bytes] b'N\xdb\xdb*ZMK;\xdb' at 155856
+20:00:18,974 - INFO - [LORA] Processing broadcast message : b'N\xdb\xdb*ZMK;\xdb' : (b'N\xdb\xdb*ZMK', 'N', 219, 219, -1, b'\xdb')
+20:00:20,727 - INFO - [RECV : 11 bytes] b'S\xdb\xdb\xddJZZ;219' at 157617
+20:00:20,913 - INFO - [STATUS] Sent : 6 Recd : 11 Unacked : 0 LoRa inits: 1, Free: 8185.9KB
+20:00:20,920 - INFO - [STATUS] Chunks: 0, Queued images: 1
+20:00:21,015 - INFO - [STATUS] 221 : Seen neighbours = [219], Shortest path = [219], Sent messages = 6, Received messages = {219: 11}
+20:00:22,174 - INFO - [SENT 9 bytes to 65535] b'N\xdd\xdd*LTY;\xdd' at 159064
