@@ -941,7 +941,7 @@ class sx126x:
             tuple: (message_payload, rssi_value) where:
                 - message_payload (bytes): Message payload (excluding addressing header and RSSI byte)
                 - rssi_value (int or None): RSSI value in dBm if RSSI is enabled, None otherwise
-            Returns (None, None) if no data available
+            Returns (None, None) if no data available or message is corrupted
 
         Note:
             - Module must be in normal mode (M0=LOW, M1=LOW)
@@ -949,6 +949,7 @@ class sx126x:
             - Minimum message size is 5 bytes (3 header + 1 payload + 1 RSSI) with RSSI enabled
             - Reads complete line to avoid partial messages
             - RSSI conversion: RSSI_dBm = -(256 - rssi_byte)
+            - Validates message format and rejects corrupted messages
         """
         if self.ser.any():
             time.sleep_ms(RX_DELAY_MS)  # Wait for complete message
@@ -975,6 +976,24 @@ class sx126x:
                     # RSSI not enabled: Message format: [addr_h(1)][addr_l(1)][freq(1)][payload]
                     # Extract message payload (skip first 3 bytes: addr_h, addr_l, freq)
                     msg = r_buff[3:]
+                
+                # Validate that extracted message starts with a valid message type
+                # Valid message types: N, H, A, B, E, C, I, S, V, P
+                if len(msg) > 0:
+                    first_byte = msg[0]
+                    valid_msg_types = [
+                        ord('N'), ord('H'), ord('A'), ord('B'), 
+                        ord('E'), ord('C'), ord('I'), ord('S'), 
+                        ord('V'), ord('P')
+                    ]
+                    if first_byte not in valid_msg_types:
+                        logger.debug(
+                            f"[RSSI] Invalid message type: 0x{first_byte:02X} "
+                            f"('{chr(first_byte) if 32 <= first_byte < 127 else '?'}'), "
+                            f"raw_len={len(r_buff)}, payload_len={len(msg)}, "
+                            f"rejecting as corrupted"
+                        )
+                        return (None, None)
                 
                 return (msg, rssi_value)
 

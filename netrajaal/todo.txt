@@ -1,2 +1,3 @@
+* Fix RSSI value parsing 
 * Low power mode  (test/test_script,py)
 * Queued Images takes time to get tranfered from one unit to another unit or centeral, find the root cause and keep that in priority
