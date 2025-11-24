@@ -37,7 +37,7 @@ SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
 PHOTO_TAKING_DELAY = 600
 PHOTO_SENDING_DELAY = 250  # Delay after successful upload (when queue is empty)
-PHOTO_SENDING_INTERVAL = 5  # Delay between uploads when queue has multiple images
+PHOTO_SENDING_INTERVAL = 600  # Delay between uploads when queue has multiple images
 GPS_WAIT_SEC = 5
 
 # Memory Management Constants
