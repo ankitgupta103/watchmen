@@ -316,7 +316,7 @@ async def init_lora():
         freq=868,          # Frequency in MHz
         addr=my_addr,      # Node address
         power=22,          # Transmission power in dBm
-        rssi=True,         # Enable RSSI reporting
+        rssi=True,     # Enable RSSI reporting
         air_speed=AIR_SPEED,# Air data rate
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
@@ -564,13 +564,26 @@ def ack_time(smid):
     # Input: smid: bytes; Output: tuple(timestamp:int, missingids:list or None)
     for (rmid, msgbytes, t) in msgs_recd:
         if chr(rmid[0]) == "A":
-            if smid == msgbytes[:MIDLEN]:
-                missingids = []
-                if chr(msgbytes[0]) == 'E' and len(msgbytes) > (MIDLEN+1):
-                    logger.info(f"[ACK] Checking for missing IDs in {msgbytes[MIDLEN+1:]}")
-                    missingstr = msgbytes[MIDLEN+1:].decode()
-                    missingids = [int(i) for i in missingstr.split(',')]
-                return (t, missingids)
+            # Match ACK: the payload should start with the MID we're waiting for
+            # Handle cases where payload might be exactly MIDLEN bytes or longer
+            if len(msgbytes) >= MIDLEN:
+                if smid == msgbytes[:MIDLEN]:
+                    missingids = []
+                    # For End (E) chunk messages, check for missing chunk IDs
+                    if len(msgbytes) > MIDLEN and msgbytes[MIDLEN:MIDLEN+1] == b':':
+                        # Format: MID:missing_ids or MID:-1
+                        missing_str = msgbytes[MIDLEN+1:].decode()
+                        if missing_str != "-1":
+                            logger.info(f"[ACK] Checking for missing IDs in {missing_str}")
+                            try:
+                                missingids = [int(i) for i in missing_str.split(',') if i]
+                            except ValueError:
+                                logger.warning(f"[ACK] Failed to parse missing IDs: {missing_str}")
+                                missingids = []
+                    logger.debug(f"[ACK] Matched ACK for {smid}, missing chunks: {missingids}")
+                    return (t, missingids)
+            else:
+                logger.debug(f"[ACK] ACK payload too short: {len(msgbytes)} bytes, expected at least {MIDLEN}")
     return (-1, None)
 
 async def log_status():
@@ -1273,6 +1286,15 @@ def process_message(data, rssi=None):
     elif mst == "S":
         asyncio.create_task(spath_process(mid, msg.decode()))
     elif mst == "H":
+        # Validate HB message payload length for encrypted messages
+        if ENCRYPTION_ENABLED:
+            # RSA encrypted payload should be exactly 128 bytes
+            if len(msg) != 128:
+                logger.warning(
+                    f"[HB] Invalid payload length: {len(msg)} bytes, expected 128 bytes for encrypted message. "
+                    f"MID: {mid}, may be corrupted or incomplete."
+                )
+                # Still try to process, but log the issue
         asyncio.create_task(hb_process(mid, msg, sender))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif mst == "C":
@@ -1302,6 +1324,11 @@ def process_message(data, rssi=None):
         else:
             ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+    elif mst == "A":
+        # ACK messages are already added to msgs_recd at line 1267
+        # They are matched by ack_time() function which searches msgs_recd
+        # No additional processing needed for ACK messages
+        logger.debug(f"[ACK] Received ACK message: {mid}, payload: {msg}")
     else:
         logger.info(f"[LORA] Unseen messages type {mst} in {msg}")
     return True
