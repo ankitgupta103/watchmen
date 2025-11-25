@@ -18,21 +18,26 @@ Strategy:
 
 import time
 import machine
-from pyb import LED, Pin, RTC
-import pyb
 
 # ==================== CONFIGURATION ====================
-WAKEUP_PIN = 'P4'  # Change to your GPIO pin
-TRIGGER_EDGE = Pin.IRQ_FALLING  # FALLING = button press to GND
-# Options: Pin.IRQ_RISING, Pin.IRQ_FALLING, or Pin.IRQ_RISING | Pin.IRQ_FALLING
+WAKEUP_PIN = 'P4'                 # Change to your GPIO pin
+TRIGGER_EDGE = machine.Pin.IRQ_FALLING  # FALLING = button press to GND
+# Options: machine.Pin.IRQ_RISING, machine.Pin.IRQ_FALLING, or machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING
 
 # Optional: RTC alarm as backup (None to disable)
 BACKUP_RTC_ALARM_MS = None  # e.g., 3600000 for 1 hour backup wake-up
 
 # ==================== INITIALIZATION ====================
-led_red = LED(1)
-led_green = LED(2)
-led_blue = LED(3)
+# Initialize LEDs using machine.Pin (OpenMV RT1062 uses LED_R, LED_G, LED_B)
+try:
+    led_red = machine.Pin("LED_R", machine.Pin.OUT)
+    led_green = machine.Pin("LED_G", machine.Pin.OUT)
+    led_blue = machine.Pin("LED_B", machine.Pin.OUT)
+except:
+    # Fallback if LED names differ - adjust pin names as needed for your board
+    led_red = machine.Pin("LED_RED", machine.Pin.OUT)
+    led_green = machine.Pin("LED_GREEN", machine.Pin.OUT)
+    led_blue = machine.Pin("LED_BLUE", machine.Pin.OUT)
 
 # Turn off all LEDs immediately
 led_red.off()
@@ -93,12 +98,12 @@ def disable_peripherals():
 def setup_wakeup_sources():
     """Configure all wake-up sources"""
     # External interrupt
-    wakeup_pin = Pin(WAKEUP_PIN, Pin.IN, Pin.PULL_UP)
+    wakeup_pin = machine.Pin(WAKEUP_PIN, machine.Pin.IN, machine.Pin.PULL_UP)
     wakeup_pin.irq(trigger=TRIGGER_EDGE, handler=None)
     
     # Optional RTC alarm backup
     if BACKUP_RTC_ALARM_MS:
-        rtc = RTC()
+        rtc = machine.RTC()
         rtc.wakeup(BACKUP_RTC_ALARM_MS)
         print(f"RTC backup alarm: {BACKUP_RTC_ALARM_MS}ms")
     

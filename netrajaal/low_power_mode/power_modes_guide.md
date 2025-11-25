@@ -104,7 +104,7 @@ Deep Sleep:      < 30µA  (< 0.15mW) ▏ (barely visible!)
 ### State Preservation in Deep Sleep
 Since deep sleep loses RAM:
 - Save critical data to flash memory
-- Use `pyb.Flash()` or file system
+- Use file system (e.g., `/flash/state.txt`) or `machine` module
 - Restore state on wake-up
-- Use RTC to track time across resets
+- Use RTC (`machine.RTC()`) to track time across resets
 

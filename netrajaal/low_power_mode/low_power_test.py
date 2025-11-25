@@ -13,15 +13,21 @@ Features:
 
 import time
 import machine
-from pyb import LED, RTC
 
 # Initialize LED for visual feedback
-led_red = LED(1)  # Red LED
-led_green = LED(2)  # Green LED
-led_blue = LED(3)  # Blue LED
+# OpenMV RT1062 uses LED_R, LED_G, LED_B
+try:
+    led_red = machine.Pin("LED_R", machine.Pin.OUT)  # Red LED
+    led_green = machine.Pin("LED_G", machine.Pin.OUT)  # Green LED
+    led_blue = machine.Pin("LED_B", machine.Pin.OUT)  # Blue LED
+except:
+    # Fallback if LED names differ - adjust pin names as needed for your board
+    led_red = machine.Pin("LED_RED", machine.Pin.OUT)
+    led_green = machine.Pin("LED_GREEN", machine.Pin.OUT)
+    led_blue = machine.Pin("LED_BLUE", machine.Pin.OUT)
 
 # Initialize RTC for wake-up alarm
-rtc = RTC()
+rtc = machine.RTC()
 
 def blink_led(led, times=3, duration=0.1):
     """Blink an LED a specified number of times"""

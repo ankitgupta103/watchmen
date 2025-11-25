@@ -23,18 +23,23 @@ GPIO Pins Available for External Interrupt:
 
 import time
 import machine
-from pyb import LED, Pin, RTC
-import pyb
 
 # Configuration
 WAKEUP_PIN = 'P4'  # GPIO pin for external interrupt (change as needed)
-WAKEUP_EDGE = Pin.IRQ_RISING | Pin.IRQ_FALLING  # Trigger on both edges
-# Alternative: Pin.IRQ_RISING or Pin.IRQ_FALLING for single edge
+WAKEUP_EDGE = machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING  # Trigger on both edges
+# Alternative: machine.Pin.IRQ_RISING or machine.Pin.IRQ_FALLING for single edge
 
 # Initialize LEDs (turn off for power saving)
-led_red = LED(1)
-led_green = LED(2)
-led_blue = LED(3)
+# OpenMV RT1062 uses LED_R, LED_G, LED_B
+try:
+    led_red = machine.Pin("LED_R", machine.Pin.OUT)
+    led_green = machine.Pin("LED_G", machine.Pin.OUT)
+    led_blue = machine.Pin("LED_B", machine.Pin.OUT)
+except:
+    # Fallback if LED names differ - adjust pin names as needed for your board
+    led_red = machine.Pin("LED_RED", machine.Pin.OUT)
+    led_green = machine.Pin("LED_GREEN", machine.Pin.OUT)
+    led_blue = machine.Pin("LED_BLUE", machine.Pin.OUT)
 
 # Turn off all LEDs initially
 led_red.off()
@@ -67,17 +72,17 @@ def setup_external_interrupt(pin_name, edge):
     
     Args:
         pin_name: Pin name (e.g., 'P4')
-        edge: Interrupt edge (Pin.IRQ_RISING, Pin.IRQ_FALLING, or both)
+        edge: Interrupt edge (machine.Pin.IRQ_RISING, machine.Pin.IRQ_FALLING, or both)
     """
-    wakeup_pin = Pin(pin_name, Pin.IN, Pin.PULL_UP)
+    wakeup_pin = machine.Pin(pin_name, machine.Pin.IN, machine.Pin.PULL_UP)
     
     # Configure as wake-up source
     # In deep sleep, the pin state change will wake the module
     wakeup_pin.irq(trigger=edge, handler=None)  # Handler not needed for deep sleep
     
     print(f"External interrupt configured on {pin_name}")
-    print(f"Trigger: {'Rising' if edge & Pin.IRQ_RISING else ''} "
-          f"{'Falling' if edge & Pin.IRQ_FALLING else ''}")
+    print(f"Trigger: {'Rising' if edge & machine.Pin.IRQ_RISING else ''} "
+          f"{'Falling' if edge & machine.Pin.IRQ_FALLING else ''}")
     
     return wakeup_pin
 
@@ -95,7 +100,7 @@ def enter_deep_sleep():
     led_blue.off()
     
     # Optional: Disable camera sensor for additional power savings
-    # sensor = pyb.Sensor()
+    # import sensor
     # sensor.shutdown()
     
     # Save current state before sleep
@@ -173,7 +178,7 @@ def main():
     wakeup_pin = setup_external_interrupt(WAKEUP_PIN, WAKEUP_EDGE)
     
     # Optional: Also set RTC alarm as backup wake-up (uncomment if needed)
-    # rtc = RTC()
+    # rtc = machine.RTC()
     # rtc.wakeup(60000)  # Wake up after 60 seconds if no interrupt
     
     print("\nPreparing to enter deep sleep...")
