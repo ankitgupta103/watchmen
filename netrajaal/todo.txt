@@ -1,3 +1,14 @@
 * Fix RSSI value parsing 
-* Low power mode  (test/test_script,py)
+
+
+
+* Low power mode  (test/test_script,py)   (mix of idle + sleep to halt the CPU and sleep the camera sensor)    [Done]
+    * Create a INA219 setup to measure real power consumption (with PIR)
+    * Previous power consumption and now power consumption on main.py
+
+* Solar panel need to be selected and ordered (deadline: 26 Nov)
+
+
+
 * Queued Images takes time to get tranfered from one unit to another unit or centeral, find the root cause and keep that in priority
+
