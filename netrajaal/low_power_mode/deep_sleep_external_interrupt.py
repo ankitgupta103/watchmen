@@ -16,18 +16,22 @@ Hardware Setup:
 - Connect to GND for falling edge trigger, or use pull-up for rising edge
 - Power via battery connector for lowest power consumption
 
-GPIO Pins Available for External Interrupt:
-- P0-P15 (most GPIO pins support external interrupts)
-- Recommended: P4, P5, P6, P7 (easily accessible)
+GPIO Pins for Deep Sleep Wake-up:
+- ⚠️ ONLY P11 can wake from deep sleep (hardware limitation)
+- P11 wakes on RISING edge (0->1 transition) - hardcoded in firmware
+- Other GPIO pins will NOT wake from deep sleep
+- For other pins, use low-power polling instead of deep sleep
 """
 
 import time
 import machine
 
 # Configuration
-WAKEUP_PIN = 'P4'  # GPIO pin for external interrupt (change as needed)
-WAKEUP_EDGE = machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING  # Trigger on both edges
-# Alternative: machine.Pin.IRQ_RISING or machine.Pin.IRQ_FALLING for single edge
+# ⚠️ IMPORTANT: On OpenMV RT1062, ONLY P11 can wake from deep sleep!
+# If you use any other pin, deep sleep wake-up will NOT work.
+WAKEUP_PIN = 'P11'  # MUST be P11 for deep sleep wake-up (hardware limitation)
+# P11 automatically wakes on RISING edge (hardcoded in firmware)
+WAKEUP_EDGE = machine.Pin.IRQ_RISING  # P11 wakes on RISING edge only
 
 # Initialize LEDs (turn off for power saving)
 # OpenMV RT1062 uses LED_R, LED_G, LED_B
@@ -119,7 +123,13 @@ def enter_deep_sleep():
 def handle_wakeup():
     """Handle wake-up from deep sleep"""
     # Check if we woke from deep sleep
-    if machine.reset_cause() == machine.DEEPSLEEP_RESET:
+    # Define reset cause constant (fallback if not available in machine module)
+    try:
+        DEEPSLEEP_RESET = machine.DEEPSLEEP_RESET
+    except AttributeError:
+        DEEPSLEEP_RESET = 4  # Common value for deep sleep reset in MicroPython
+    
+    if machine.reset_cause() == DEEPSLEEP_RESET:
         print("=" * 60)
         print("WOKE UP FROM DEEP SLEEP!")
         print(f"Wake-up cause: External interrupt on {WAKEUP_PIN}")

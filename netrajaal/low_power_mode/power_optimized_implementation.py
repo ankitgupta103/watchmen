@@ -20,9 +20,11 @@ import time
 import machine
 
 # ==================== CONFIGURATION ====================
-WAKEUP_PIN = 'P4'                 # Change to your GPIO pin
-TRIGGER_EDGE = machine.Pin.IRQ_FALLING  # FALLING = button press to GND
-# Options: machine.Pin.IRQ_RISING, machine.Pin.IRQ_FALLING, or machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING
+# ⚠️ IMPORTANT: On OpenMV RT1062, ONLY P11 can wake from deep sleep!
+# If you use any other pin, deep sleep wake-up will NOT work.
+WAKEUP_PIN = 'P11'               # MUST be P11 for deep sleep wake-up (hardware limitation)
+TRIGGER_EDGE = machine.Pin.IRQ_RISING  # P11 wakes on RISING edge (hardcoded in firmware)
+# Note: P11 automatically wakes on RISING edge, edge setting here is for reference only
 
 # Optional: RTC alarm as backup (None to disable)
 BACKUP_RTC_ALARM_MS = None  # e.g., 3600000 for 1 hour backup wake-up
@@ -142,7 +144,22 @@ def main():
     # Check wake-up reason
     reset_cause = machine.reset_cause()
     
-    if reset_cause == machine.DEEPSLEEP_RESET:
+    # Define reset cause constants (fallback if not available in machine module)
+    # Common MicroPython values: 0=PWRON, 1=HARD, 4=DEEPSLEEP
+    try:
+        DEEPSLEEP_RESET = machine.DEEPSLEEP_RESET
+    except AttributeError:
+        DEEPSLEEP_RESET = 4  # Common value for deep sleep reset
+    
+    try:
+        PWRON_RESET = machine.PWRON_RESET
+    except AttributeError:
+        PWRON_RESET = 0  # Common value for power-on reset
+    
+    # Debug: Print reset cause value (helpful for identifying correct values)
+    print(f"Reset cause value: {reset_cause}")
+    
+    if reset_cause == DEEPSLEEP_RESET:
         # Woke from deep sleep
         wake_source = "External Interrupt"  # Could check pin state for more detail
         
@@ -155,7 +172,7 @@ def main():
         # Process the event
         process_event()
         
-    elif reset_cause == machine.PWRON_RESET:
+    elif reset_cause == PWRON_RESET:
         # Power-on reset (first boot)
         print("\n" + "=" * 60)
         print("FIRST BOOT - Initializing")

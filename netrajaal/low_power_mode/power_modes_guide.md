@@ -36,13 +36,14 @@ The OpenMV RT1062 offers several power modes to optimize energy consumption:
 - **State**: Most components shut down, only RTC and essential circuits active
 - **RAM**: **Lost** (all variables cleared)
 - **Wake-up Sources**:
+  - **P11 pin (RISING edge only)** - ⚠️ **HARDWARE LIMITATION: Only P11 can wake from deep sleep**
   - RTC alarm
-  - External interrupts (GPIO pins)
   - Reset button
 - **Wake-up Time**: Module resets (~100-200ms)
 - **Code Continuity**: Module resets, code starts from beginning
 - **Use Case**: Long-term battery operation, minimal power consumption
 - **Best For**: Very low power applications, external interrupt wake-up
+- **⚠️ CRITICAL**: On OpenMV RT1062, **ONLY P11** can wake from deep sleep. Other GPIO pins will NOT work!
 
 ## Key Differences: Light Sleep vs Deep Sleep
 
@@ -70,23 +71,30 @@ Deep Sleep:      < 30µA  (< 0.15mW) ▏ (barely visible!)
 
 **Why Deep Sleep?**
 1. **Lowest Power**: < 30µA at 5V (< 0.15mW) - 1000x lower than light sleep!
-2. **External Interrupt Support**: GPIO pins can wake the module
+2. **External Interrupt Support**: P11 pin can wake the module
 3. **Battery Life**: Can run for months/years on battery
 4. **Perfect for**: Sensor monitoring, event-triggered applications
 
 ### Implementation Strategy
 
 1. **Power Source**: Use battery connector for lowest power in deep sleep
-2. **External Interrupt**: Configure GPIO pin as wake-up source
+2. **External Interrupt**: ⚠️ **MUST use P11 pin** - Only P11 can wake from deep sleep
 3. **State Management**: Save critical data to flash before sleep
-4. **Wake-up Handling**: Check wake-up reason on boot
+4. **Wake-up Handling**: Check wake-up reason on boot (note: `reset_cause()` may not reliably indicate deep sleep wake-up)
 5. **Re-enter Sleep**: After processing, immediately re-enter deep sleep
 
 ### Wake-up Sources Available
 
-- **External Interrupt (GPIO)**: Pin state change (rising/falling edge)
+- **P11 Pin (RISING edge)**: ⚠️ **ONLY P11 works for deep sleep wake-up** - Hardware limitation
 - **RTC Alarm**: Time-based wake-up
 - **Reset Button**: Manual wake-up
+
+### ⚠️ Important Limitations
+
+- **Only P11 can wake from deep sleep** - This is a hardware limitation, not configurable
+- **P11 wakes on RISING edge** (0->1 transition) - Hardcoded in firmware
+- **Other GPIO pins will NOT wake from deep sleep** - Use low-power polling or connect sensor to P11
+- **`machine.reset_cause()` may not reliably indicate deep sleep wake-up** on RT1062
 
 ## Other Considerations
 
