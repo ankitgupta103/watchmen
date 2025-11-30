@@ -25,7 +25,7 @@ import detect
 
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.3
+CHUNK_SLEEP = 0.05
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -36,8 +36,8 @@ SCAN_WAIT = 30
 SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
 PHOTO_TAKING_DELAY = 600
-PHOTO_SENDING_DELAY = 250  # Delay after successful upload (when queue is empty)
-PHOTO_SENDING_INTERVAL = 600  # Delay between uploads when queue has multiple images
+PHOTO_SENDING_DELAY = 50  # Delay after successful upload (when queue is empty)
+PHOTO_SENDING_INTERVAL = 100  # Delay between uploads when queue has multiple images
 GPS_WAIT_SEC = 5
 
 # Memory Management Constants
@@ -475,7 +475,7 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
     for retry_i in range(3):
         radio_send(dest, databytes)
         await asyncio.sleep(ACK_SLEEP)
-        for i in range(8):
+        for i in range(5):
             at, missing_chunks = ack_time(mid)
             if at > 0:
                 logger.info(f"[ACK] Msg {mid} : was acked in {at - timesent} msecs")
@@ -483,7 +483,7 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
                 return (True, missing_chunks)
             else:
                 logger.info(f"[ACK] Still waiting for ack for {mid} # {i}")
-                await asyncio.sleep(ACK_SLEEP * (i+1)) # progressively more sleep
+                await asyncio.sleep(ACK_SLEEP * min(i+1, 3)) # progressively more sleep, capped at 3x
         logger.info(f"[ACK] Failed to get ack for message {mid} for retry # {retry_i}")
     logger.info(f"[LORA] Failed to send message {mid}")
     return (False, [])
@@ -538,8 +538,11 @@ async def send_msg_internal(msgtype, creator, msgbytes, dest):
         await asyncio.sleep(CHUNK_SLEEP)
         chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
         _ = await send_single_msg("I", creator, chunkbytes, dest)
-    for retry_i in range(50):
-        await asyncio.sleep(CHUNK_SLEEP)
+    for retry_i in range(20):
+        if retry_i == 0:
+            await asyncio.sleep(0.1)  # Faster first check
+        else:
+            await asyncio.sleep(CHUNK_SLEEP)
         succ, missing_chunks = await send_single_msg("E", creator, imid, dest)
         if not succ:
             logger.info(f"[CHUNK] Failed sending chunk end")
