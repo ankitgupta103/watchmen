@@ -25,7 +25,7 @@ import detect
 
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.2
+CHUNK_SLEEP = 0.3  # Increased from 0.2 to 0.3 (300ms) to exceed RX_DELAY_MS (250ms)
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -1354,7 +1354,7 @@ async def radio_read():
         if message:
             message = message.replace(b"{}[]", b"\n")
             process_message(message, rssi)
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.15)  # Increased from 0.1 to 0.15 to give more time between receives
 
 async def validate_and_remove_neighbours():
     # Input: None; Output: None (verifies neighbours via ping and prunes unreachable ones)
