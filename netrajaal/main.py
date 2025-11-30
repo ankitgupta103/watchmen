@@ -316,7 +316,7 @@ async def init_lora():
         freq=868,          # Frequency in MHz
         addr=my_addr,      # Node address
         power=22,          # Transmission power in dBm
-        rssi=True,     # Enable RSSI reporting
+        rssi=False,     # Enable RSSI reporting
         air_speed=AIR_SPEED,# Air data rate
         m0_pin='P6',       # M0 control pin - adjust to your wiring
         m1_pin='P7'        # M1 control pin - adjust to your wiring
@@ -907,7 +907,7 @@ async def hb_process(mid, msgbytes, sender):
         sent_succ = False
         for peer_addr in destlist:
             logger.info(f"[HB] Propogating H to {peer_addr}")
-            sent_succ = await asyncio.create_task(send_msg("H", creator, msgbytes, peer_addr))
+            sent_succ = await send_msg("H", creator, msgbytes, peer_addr)
             if sent_succ:
                 break
         if not sent_succ:
@@ -954,7 +954,7 @@ async def img_process(cid, msg, creator, sender):
         sent_succ = False
         for peer_addr in destlist:
             logger.info(f"[IMG] Propogating Image to {peer_addr}")
-            sent_succ = await asyncio.create_task(send_msg("P", creator, msg, peer_addr))
+            sent_succ = await send_msg("P", creator, msg, peer_addr)
             if sent_succ:
                 break
         if not sent_succ:
