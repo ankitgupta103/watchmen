@@ -547,10 +547,21 @@ async def send_msg_internal(msgtype, creator, msgbytes, dest):
         if not succ:
             logger.info(f"[CHUNK] Failed sending chunk end")
             break
-        if len(missing_chunks) == 1 and missing_chunks[0] == -1:
-            logger.info(f"[CHUNK] Successfully sent all chunks")
+
+        # Treat various ACK forms as success:
+        # - [-1]   : explicit "all done" from receiver
+        # - []/None: truncated or minimal ACK with no missing list (we assume success)
+        if (
+            missing_chunks is None
+            or len(missing_chunks) == 0
+            or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
+        ):
+            logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
             return True
-        logger.info(f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}")
+
+        logger.info(
+            f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
+        )
         for mc in missing_chunks:
             await asyncio.sleep(CHUNK_SLEEP)
             chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
