@@ -1045,7 +1045,35 @@ async def person_detection_loop():
         img = None
         try:
             logger.info(f"[PIR] Motion detected - (interrupt) capturing image...")
-            img = sensor.snapshot()
+            
+            # Wake camera sensor from sleep mode before capturing
+            # sensor.snapshot() auto-wakes, but we need to ensure it's fully awake
+            sensor.sleep(False)
+            # Wait for sensor to stabilize after waking from sleep
+            # This prevents "Frame capture has timed out" errors
+            await asyncio.sleep_ms(200)  # 200ms delay for sensor stabilization
+            
+            # Retry logic for frame capture (in case of timeout)
+            max_retries = 3
+            for retry in range(max_retries):
+                try:
+                    img = sensor.snapshot()
+                    break  # Success, exit retry loop
+                except Exception as e:
+                    if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+                        if retry < max_retries - 1:
+                            logger.info(f"[PIR] Frame capture timeout, retry {retry + 1}/{max_retries}...")
+                            await asyncio.sleep_ms(100)  # Wait before retry
+                            continue
+                        else:
+                            logger.info(f"[PIR] Frame capture failed after {max_retries} retries")
+                            raise
+                    else:
+                        raise  # Re-raise if it's not a timeout error
+            
+            if img is None:
+                raise Exception("Failed to capture image after retries")
+            
             person_image_count += 1
             total_image_count += 1
             # Track center's own captured images separately
