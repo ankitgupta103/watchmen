@@ -1023,12 +1023,8 @@ async def person_detection_loop():
     global person_image_count, total_image_count, center_captured_image_count
     global pir_trigger_event, image_in_progress, led
 
-    # Setup PIR sensor pin for interrupt
-    # Get PIR pin from detect module
-    from detect import PIR_PIN
-    # Configure IRQ on RISING edge (when PIR goes HIGH)
-    PIR_PIN.irq(trigger=Pin.IRQ_RISING, handler=pir_interrupt_handler)
-    logger.info(f"[PIR] Interrupt-driven detection initialized on pin {PIR_PIN}")
+    # NOTE: PIR interrupt is now set up in main() function before idle loop
+    # This ensures interrupt is configured before CPU goes to sleep
 
     while True:
         # Wait for PIR interrupt event (blocks until PIR detects motion)
@@ -1365,20 +1361,24 @@ async def radio_read():
             # Wait for UART RX interrupt event
             await uart_rx_event.wait()
             uart_rx_event.clear()
-        
-        # Process any available messages
-        message, rssi = loranode.receive()
-        if message:
-            message = message.replace(b"{}[]", b"\n")
-            process_message(message, rssi)
-        
-        # Turn LED off after processing UART interrupt (whether message received or not)
-        if led is not None:
-            led.off()
-        
-        if not uart_interrupt_enabled:
-            # Fallback to polling if interrupt not supported
-            await asyncio.sleep(0.15)
+            
+            # Process any available messages
+            try:
+                message, rssi = loranode.receive()
+                if message:
+                    message = message.replace(b"{}[]", b"\n")
+                    process_message(message, rssi)
+            except Exception as e:
+                logger.info(f"[UART] Error receiving message: {e}")
+            
+            # Turn LED off after processing UART interrupt
+            if led is not None:
+                led.off()
+        else:
+            # UART interrupt not supported - radio polling handled in main idle loop
+            # This task just waits to avoid consuming CPU
+            # Radio messages are checked periodically in idle loop wake-up
+            await asyncio.sleep(1.0)  # Long sleep since polling is done in idle loop
 
 async def validate_and_remove_neighbours():
     # Input: None; Output: None (verifies neighbours via ping and prunes unreachable ones)
@@ -1991,10 +1991,26 @@ async def main():
         asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     
+    # Allow async tasks to initialize before entering idle loop
+    await asyncio.sleep(0.5)
+    logger.info(f"[INIT] Async tasks initialized, setting up interrupts...")
+    
+    # Setup PIR interrupt BEFORE entering idle loop
+    # This ensures interrupt is configured before CPU goes to sleep
+    try:
+        from detect import PIR_PIN
+        PIR_PIN.irq(trigger=Pin.IRQ_RISING, handler=pir_interrupt_handler)
+        logger.info(f"[PIR] Interrupt configured on pin {PIR_PIN} before idle loop")
+    except Exception as e:
+        logger.info(f"[PIR] ERROR: Failed to configure PIR interrupt: {e}")
+    
     # Low-power idle mode loop
-    # CPU sleeps in idle mode, wakes only on PIR or UART interrupts
+    # CPU sleeps in idle mode, wakes on PIR interrupts or periodic radio polling
     logger.info(f"[LOW_POWER] Entering idle mode loop - CPU will sleep until interrupts fire")
-    logger.info(f"[LOW_POWER] Wake-up sources: PIR interrupt (P13) and UART RX interrupt (UART1)")
+    logger.info(f"[LOW_POWER] Wake-up sources: PIR interrupt (P13) and periodic radio polling")
+    
+    idle_count = 0  # Counter for periodic radio wake-up
+    RADIO_POLL_INTERVAL = 4  # Check radio every 4 idle cycles (~200ms)
     
     while True:
         # Check if any events are pending (set by interrupt handlers)
@@ -2009,6 +2025,28 @@ async def main():
             for _ in range(50):
                 machine.idle()
             time.sleep_ms(50)
+            
+            # Periodic wake-up to check radio (since UART interrupt not supported)
+            # This allows radio messages to be received even in idle mode
+            idle_count += 1
+            if idle_count >= RADIO_POLL_INTERVAL:
+                idle_count = 0
+                # CPU is awake now - check for radio messages
+                try:
+                    if loranode is not None:
+                        message, rssi = loranode.receive()
+                        if message:
+                            # Turn LED on to indicate radio message received
+                            if led is not None:
+                                led.on()
+                            message = message.replace(b"{}[]", b"\n")
+                            process_message(message, rssi)
+                            # Turn LED off after processing
+                            if led is not None:
+                                led.off()
+                except Exception as e:
+                    # Silently handle radio errors during polling
+                    pass
         else:
             # Event pending - allow async tasks to process it
             # Small delay to allow event processing
