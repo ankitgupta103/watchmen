@@ -23,6 +23,18 @@ import gps_driver
 from cellular_driver import Cellular
 import detect
 
+# LED for interrupt indication
+try:
+    from pyb import LED
+    led = LED("LED_BLUE")
+except ImportError:
+    # Fallback if pyb not available
+    try:
+        from machine import LED
+        led = LED("LED_BLUE")
+    except:
+        led = None
+
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.3  # Increased from 0.2 to 0.3 (300ms) to exceed RX_DELAY_MS (250ms)
@@ -994,19 +1006,22 @@ PIR_DEBOUNCE_MS = 2000  # 2 seconds debounce to prevent multiple triggers from s
 
 def pir_interrupt_handler(pin):
     """IRQ handler for PIR sensor - triggers on RISING edge (HIGH signal)"""
-    global pir_last_trigger_time, pir_trigger_event
+    global pir_last_trigger_time, pir_trigger_event, led
     current_time = utime.ticks_ms()
     # Debounce: ignore triggers within PIR_DEBOUNCE_MS of last trigger
     if utime.ticks_diff(current_time, pir_last_trigger_time) > PIR_DEBOUNCE_MS:
         pir_last_trigger_time = current_time
         # Set event to wake up person_detection_loop
         pir_trigger_event.set()
+        # Turn LED on to indicate PIR interrupt
+        if led is not None:
+            led.on()
         # logger.info(f"[PIR] Motion detected (interrupt)")
 
 async def person_detection_loop():
     # Input: None; Output: None (runs on PIR interrupt, updates counters and queue)
     global person_image_count, total_image_count, center_captured_image_count
-    global pir_trigger_event, image_in_progress
+    global pir_trigger_event, image_in_progress, led
 
     # Setup PIR sensor pin for interrupt
     # Get PIR pin from detect module
@@ -1025,6 +1040,9 @@ async def person_detection_loop():
         # Check if image processing is in progress
         if image_in_progress:
             logger.info(f"[PIR] Skipping detection - image already in progress")
+            # Turn LED off even when skipping
+            if led is not None:
+                led.off()
             continue
 
         # Motion detected - capture image
@@ -1058,6 +1076,9 @@ async def person_detection_loop():
         except Exception as e:
             logger.info(f"[PIR] ERROR: Unexpected error in image taking and saving: {e}")
         finally:
+            # Turn LED off after processing PIR interrupt
+            if led is not None:
+                led.off()
             # Explicitly clean up image object
             if img is not None:
                 del img
@@ -1313,7 +1334,11 @@ uart_rx_event = asyncio.Event()
 
 def uart_interrupt_handler(uart):
     """IRQ handler for UART RX - triggers when data available"""
+    global led
     uart_rx_event.set()
+    # Turn LED on to indicate UART interrupt
+    if led is not None:
+        led.on()
 
 async def radio_read():
     logger.info(f"===> Radio Read, LoRa receive loop started (interrupt-driven)... <===\n")
@@ -1346,6 +1371,10 @@ async def radio_read():
         if message:
             message = message.replace(b"{}[]", b"\n")
             process_message(message, rssi)
+        
+        # Turn LED off after processing UART interrupt (whether message received or not)
+        if led is not None:
+            led.off()
         
         if not uart_interrupt_enabled:
             # Fallback to polling if interrupt not supported
