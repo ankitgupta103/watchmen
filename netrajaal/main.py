@@ -80,7 +80,7 @@ lora_init_count = 0
 
 image_in_progress = False
 
-COMMAN_CENTER_ADDRS = [219, 223]
+COMMAN_CENTER_ADDRS = [219]
 my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
@@ -104,7 +104,7 @@ elif uid == b'e076465dd7091843':
     shortest_path_to_cc = [223, 221, 219]
 
 else:
-    print("Error: Unknown device ID for " + omv.board_id())
+    logger.error("error in main.py: Unknown device ID for " + omv.board_id())
     sys.exit()
 clock_start = utime.ticks_ms() # get millisecond counter
 
@@ -132,7 +132,7 @@ def get_fs_root_for_storage():
     has_sdcard = True
     try:
         os.listdir('/sdcard')
-        logger.info("[FS] SD card available")
+        logger.debug("[FS] SD card available")
     except OSError:
         logger.error("[FS] SD card not found!")
         has_sdcard = False
@@ -159,17 +159,15 @@ def create_dir_if_not_exists(dir_path):
             os.mkdir(dir_path)
             logger.info(f"[FS] Created {dir_path}")
         else:
-            logger.info(f"[FS] {dir_path} already exists")
+            logger.debug(f"[FS] {dir_path} directory already exists")
     except OSError as e:
         logger.error(f"[FS] Failed to create/access {dir_path}: {e}")
 
 create_dir_if_not_exists(NET_IMAGE_DIR)
 create_dir_if_not_exists(MY_IMAGE_DIR)
 
-logger.info(f"[INIT] MyAddr = {my_addr}")
 encnode = enc.EncNode(my_addr)
-
-logger.info("[INIT] Running on device : " + uid.decode())
+logger.info(f"[INIT] ===> MyAddr = {my_addr}, uid={uid.decode()} <===\n")
 
 def time_msec():
     # Input: None; Output: int milliseconds since clock_start
@@ -191,9 +189,11 @@ def get_rand():
 def encode_node_id(node_id):
     # Input: node_id: int; Output: single-byte representation
     if not isinstance(node_id, int):
-        raise TypeError(f"Node id must be int, got {type(node_id)}")
+        logger.error(f"[LORA] node id must be int, got {type(node_id)}")
+        raise TypeError(f"node id must be int, got {type(node_id)}")
     if not 0 <= node_id <= 255:
-        raise ValueError(f"Node id {node_id} out of range (0-255)")
+        logger.error(f"[LORA] node id {node_id} out of range (0-255)")
+        raise ValueError(f"node id {node_id} out of range (0-255)")
     return bytes((node_id,))
 
 def encode_dest(dest):
@@ -226,7 +226,7 @@ def parse_header(data):
     try:
         mid = data[:MIDLEN]
     except Exception as e:
-        logger.error(f"[LORA] PARSING {data[:MIDLEN]}  :  Error : {e}")
+        logger.error(f"[LORA] error parsing {data[:MIDLEN]} : {e}")
         return
     mst = chr(mid[0])
     creator = int(mid[1])
@@ -271,18 +271,19 @@ URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 async def acquire_image_lock():
     # Input: None; Output: None (sets image_in_progress flag with auto release after timeout)
     global image_in_progress
-    logger.info(f"[IMG] Acquiring Image Lock")
     image_in_progress = True
     await asyncio.sleep(120)
+    logger.info(f"[IMG] @@@@@> TRANSFER MODE started <@@@@@")
     if image_in_progress:
-        logger.info(f"[IMG] Releasing image lock after 120 seconds, current lock state = {image_in_progress}")
-    image_in_progress = False
+        logger.info(f"[IMG] @@@@@> TRANSFER MODE ended, curr_state = {image_in_progress} <@@@@@")
+        image_in_progress = False
 
 def release_image_lock():
     # Input: None; Output: None (clears image_in_progress flag)
-    logger.info(f"[IMG] Releasing Image Lock")
     global image_in_progress
-    image_in_progress = False
+    if image_in_progress:
+        logger.info(f"[IMG] @@@@@> TRANSFER MODE ended, curr_state2 = {image_in_progress} <@@@@@")
+        image_in_progress = False
 
 # ---------------------------------------------------------------------------
 # Network Topology Helpers
@@ -423,7 +424,7 @@ async def periodic_memory_cleanup():
             logger.info(f"[MEM] Buffers - sent:{len(msgs_sent)}, recd:{len(msgs_recd)}, unacked:{len(msgs_unacked)}, chunks:{len(chunk_map)}")
 
         except Exception as e:
-            logger.info(f"[MEM] Error in memory cleanup: {e}")
+            logger.error(f"[MEM] error in memory cleanup: {e}")
 
 async def periodic_gc():
     """Run garbage collection more frequently for aggressive cleanup"""
@@ -432,21 +433,23 @@ async def periodic_gc():
             await asyncio.sleep(GC_COLLECT_INTERVAL_SEC)
             gc.collect()
         except Exception as e:
-            logger.info(f"[MEM] Error in periodic GC: {e}")
+            logger.error(f"[MEM] error in periodic GC: {e}")
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
-def radio_send(dest, data):
+def radio_send(dest, data, mid):
     # Input: dest: int, data: bytes; Output: None (sends bytes via LoRa, logs send)
     global sent_count
     sent_count = sent_count + 1
     lendata = len(data)
     if len(data) > 254:
-        logger.info(f"[LORA] ERROR: msg too large : {len(data)}")
+        logger.error(f"[LORA] msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
     loranode.send(dest, data)
-    logger.info(f"[SENT {len(data)} bytes to {dest}] {data} at {time_msec()}")
+    # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
+    data_masked_log = min(10, max(1, (len(data) + 20) // 21))
+    logger.info(f"[SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_ID = {mid}")
 
 def pop_and_get(mid):
     # Input: mid: bytes; Output: tuple(mid, msgbytes, timestamp) removed from msgs_unacked or None
@@ -469,12 +472,14 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
     else:
         msgs_sent.append((mid, msgbytes, timesent))
     if not ackneeded:
-        radio_send(dest, databytes)
+        radio_send(dest, databytes, mid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-    for retry_i in range(3):
-        radio_send(dest, databytes)
+    send_retry = 3
+    for retry_i in range(send_retry):
+        radio_send(dest, databytes, mid)
         await asyncio.sleep(ACK_SLEEP)
+        first_log_flag = True
         for i in range(5):
             at, missing_chunks = ack_time(mid)
             if at > 0:
@@ -482,10 +487,17 @@ async def send_single_msg(msgtype, creator, msgbytes, dest):
                 msgs_sent.append(pop_and_get(mid))
                 return (True, missing_chunks)
             else:
-                logger.info(f"[ACK] Still waiting for ack for {mid} # {i}")
-                await asyncio.sleep(ACK_SLEEP * min(i+1, 3)) # progressively more sleep, capped at 3x
-        logger.info(f"[ACK] Failed to get ack for message {mid} for retry # {retry_i}")
-    logger.info(f"[LORA] Failed to send message {mid}")
+                if first_log_flag:
+                    logger.info(f"[ACK] Still waiting for ack, MSG_ID =  {mid} # {i}")
+                    first_log_flag = False
+                else:
+                    logger.debug(f"[ACK] Still waiting for ack, MSG_ID = {mid} # {i}")
+                await asyncio.sleep(
+                    ACK_SLEEP * min(i + 1, 3)
+                )  # progressively more sleep, capped at 3x
+        newline = "\n" if (retry_i + 1) == send_retry else ""
+        logger.info(f"[ACK] Failed to get ack, MSG_ID = {mid}, retry # {retry_i+1}/{send_retry}{newline}")
+    logger.info(f"[LORA] Failed to send message, MSG_ID = {mid}")
     return (False, [])
 
 def make_chunks(msg):
@@ -531,8 +543,8 @@ async def send_msg_internal(msgtype, creator, msgbytes, dest):
     if not succ:
         logger.info(f"[CHUNK] Failed sending chunk begin")
         return False
+    asyncio.create_task(acquire_image_lock()) # TODO test as moved outside loop
     for i in range(len(chunks)):
-        asyncio.create_task(acquire_image_lock())
         if i % 10 == 0:
             logger.info(f"[CHUNK] Sending chunk {i}")
         await asyncio.sleep(CHUNK_SLEEP)
@@ -562,10 +574,10 @@ async def send_msg_internal(msgtype, creator, msgbytes, dest):
         logger.info(
             f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
         )
+        asyncio.create_task(acquire_image_lock()) # TODO test as moved outside loop
         for mc in missing_chunks:
             await asyncio.sleep(CHUNK_SLEEP)
             chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
-            asyncio.create_task(acquire_image_lock())
             _ = await send_single_msg("I", creator, chunkbytes, dest)
     return False
 
@@ -606,30 +618,6 @@ def ack_time(smid):
                 logger.debug(f"[ACK] ACK payload too short: {len(msgbytes)} bytes, expected at least {MIDLEN-1}")
     return (-1, None)
 
-async def log_status():
-    # Input: None; Output: None (logs transmission statistics)
-    await asyncio.sleep(1)
-    logger.info("[STATUS] $$$$ %%%%% ###### Printing status ###### $$$$$$ %%%%%%%%")
-    logger.info(f"[STATUS] So far sent {len(msgs_sent)} messages and received {len(msgs_recd)} messages")
-    ackts = []
-    msgs_not_acked = []
-    for mid, msg, t in msgs_sent:
-        if mid[0] == b"A":
-            continue
-        #logger.info("Getting ackt for " + s + "which was sent at " + str(t))
-        ackt, _ = ack_time(mid)
-        if ackt > 0:
-            time_to_ack = ackt - t
-            ackts.append(time_to_ack)
-        else:
-            msgs_not_acked.append(mid)
-    if ackts:
-        ackts.sort()
-        mid = ackts[len(ackts)//2]
-        p90 = ackts[int(len(ackts) * 0.9)]
-        logger.info(f"[ACK Times] 50% = {mid:.2f}s, 90% = {p90:.2f}s")
-        logger.info(f"[STATUS] So far {len(msgs_not_acked)} messsages havent been acked")
-        logger.info(f"[STATUS] {msgs_not_acked}")
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 
@@ -641,7 +629,7 @@ def begin_chunk(msg):
     # Input: msg: str formatted as "<type>:<chunk_id>:<num_chunks>"; Output: None (initializes chunk tracking)
     parts = msg.split(":")
     if len(parts) != 3:
-        logger.info(f"[CHUNK] ERROR: begin message unparsable {msg}")
+        logger.error(f"[CHUNK] begin message unparsable {msg}")
         return
     mst = parts[0]
     cid = parts[1]
@@ -663,7 +651,7 @@ def get_missing_chunks(cid):
 def add_chunk(msgbytes):
     # Input: msgbytes: bytes containing chunk id + index + payload; Output: None (stores chunk data)
     if len(msgbytes) < 5:
-        logger.info(f"[CHUNK] ERROR: Not enough bytes {len(msgbytes)} : {msgbytes}")
+        logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
         return
     asyncio.create_task(acquire_image_lock())
     cid = msgbytes[0:3].decode()
@@ -671,7 +659,7 @@ def add_chunk(msgbytes):
     #logger.info(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
     if cid not in chunk_map:
-        logger.info(f"[CHUNK] ERROR: no entry yet for {cid}")
+        logger.error(f"[CHUNK] no entry yet for {cid}")
         return
     chunk_map[cid][2].append((citer, cdata))
     _, expected_chunks, _ = chunk_map[cid]
@@ -711,7 +699,7 @@ def clear_chunkid(cid):
         del entry
         gc.collect()  # Help GC reclaim memory immediately
     else:
-        logger.info(f"[CHUNK] Couldnt find {cid} in {chunk_map}")
+        logger.warning(f"[CHUNK] couldn't find {cid} in {chunk_map}")
 
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
@@ -808,7 +796,7 @@ async def sim_send_image(creator, encimb):
         return False
 
     except Exception as e:
-        logger.info(f"[CELL] ERROR: in sim_send_image: {e}")
+        logger.error(f"[CELL] error in sim_send_image: {e}")
         return False
 
 async def sim_upload_hb(heartbeat_data):
@@ -826,13 +814,13 @@ async def sim_upload_hb(heartbeat_data):
             logger.info(f"[HB] Heartbeat from node {node_id} sent to cloud successfully")
             return True
         else:
-            logger.info("[HB] ERROR: Failed to send heartbeat to cloud via cellular")
+            logger.error("[HB] failed to send heartbeat to cloud via cellular")
             if result:
                 logger.info(f"[HB] HTTP Status: {result.get('status_code', 'Unknown')}")
             return False
 
     except Exception as e:
-        logger.info(f"[HB] ERROR: sending cellular heartbeat: {e}")
+        logger.error(f"[HB] error sending cellular heartbeat: {e}")
         return False
 
 async def upload_image(creator, encimb):
@@ -842,14 +830,14 @@ async def upload_image(creator, encimb):
         result = await sim_send_image(creator, encimb)
         if result:
             return True
-        logger.info("[IMG] Cellular upload failed, trying WiFi fallback...")
+        logger.warning("[IMG] cellular upload failed, trying WiFi fallback...")
 
     if wifi_nic and wifi_nic.isconnected():
         result = await wifi_send_image(creator, encimb)
         if result:
             return True
 
-    logger.info("[IMG] Image upload failed (cellular and WiFi both unavailable or failed)")
+    logger.error("[IMG] image upload failed (cellular and WiFi both unavailable or failed)")
     return False
 
 async def upload_heartbeat(heartbeat_data):
@@ -862,17 +850,17 @@ async def upload_heartbeat(heartbeat_data):
         result = await sim_upload_hb(heartbeat_data)
         if result:
             return True
-        logger.info("[HB] ERROR: Cellular heartbeat upload failed, trying WiFi fallback...")
+        logger.warning("[HB] cellular heartbeat upload failed, trying WiFi fallback...")
     else:
-        logger.info("[HB] ERROR: Cellular system not initialized, trying WiFi fallback...")
+        logger.warning("[HB] cellular system not initialized, trying WiFi fallback...")
 
     if wifi_nic and wifi_nic.isconnected():
         result = await wifi_upload_hb(heartbeat_data)
         if result:
             return True
-        logger.info("[HB] ERROR: WiFi heartbeat upload failed, skipping heartbeat...")
+        logger.warning("[HB] wifi heartbeat upload failed, skipping heartbeat...")
     else:
-        logger.info("[HB] ERROR: WiFi not connected, heartbeat upload failed (cellular and WiFi both unavailable)")
+        logger.error("[HB] wifi not connected, heartbeat upload failed (cellular and WiFi both unavailable)")
 
     return False
 
@@ -925,9 +913,9 @@ async def hb_process(mid, msgbytes, sender):
             if sent_succ:
                 break
         if not sent_succ:
-            logger.info(f"[HB] ERROR: forwarding HB to possible_paths : {destlist}")
+            logger.error(f"[HB] forwarding HB to possible_paths : {destlist}")
     else:
-        logger.info(f"[HB] Can't forward HB because I dont have Spath yet")
+        logger.error(f"[HB] can't forward HB because I dont have Spath yet")
 
 images_saved_at_cc = []
 
@@ -987,141 +975,78 @@ detector = detect.Detector()
 # This implementation uses hardware interrupts - more efficient and responsive
 # The task blocks waiting for PIR interrupt, only wakes when motion detected
 
-# # PIR Sensor Interrupt-driven Setup
-# pir_trigger_event = asyncio.Event()
-# pir_last_trigger_time = 0
-# PIR_DEBOUNCE_MS = 2000  # 2 seconds debounce to prevent multiple triggers from single motion
+# PIR Sensor Interrupt-driven Setup
+pir_trigger_event = asyncio.Event()
+pir_last_trigger_time = 0
+PIR_DEBOUNCE_MS = 2000  # 2 seconds debounce to prevent multiple triggers from single motion
 
-# def pir_interrupt_handler(pin):
-#     """IRQ handler for PIR sensor - triggers on RISING edge (HIGH signal)"""
-#     global pir_last_trigger_time, pir_trigger_event
-#     current_time = utime.ticks_ms()
-#     # Debounce: ignore triggers within PIR_DEBOUNCE_MS of last trigger
-#     if utime.ticks_diff(current_time, pir_last_trigger_time) > PIR_DEBOUNCE_MS:
-#         pir_last_trigger_time = current_time
-#         # Set event to wake up person_detection_loop
-#         pir_trigger_event.set()
-#         # logger.info(f"[PIR] Motion detected (interrupt)")
-
-# async def person_detection_loop():
-#     # Input: None; Output: None (runs on PIR interrupt, updates counters and queue)
-#     global person_image_count, total_image_count, center_captured_image_count
-#     global pir_trigger_event, image_in_progress
-
-#     # Setup PIR sensor pin for interrupt
-#     # Get PIR pin from detect module
-#     from detect import PIR_PIN
-#     # Configure IRQ on RISING edge (when PIR goes HIGH)
-#     PIR_PIN.irq(trigger=Pin.IRQ_RISING, handler=pir_interrupt_handler)
-#     logger.info(f"[PIR] Interrupt-driven detection initialized on pin {PIR_PIN}")
-
-#     while True:
-#         # Wait for PIR interrupt event (blocks until PIR detects motion)
-#         # Task is suspended here - uses minimal CPU until interrupt fires
-#         await pir_trigger_event.wait()
-#         # Clear the event for next trigger
-#         pir_trigger_event.clear()
-
-#         # Check if image processing is in progress
-#         if image_in_progress:
-#             logger.info(f"[PIR] Skipping detection - image already in progress")
-#             continue
-
-#         # Motion detected - capture image
-#         img = None
-#         try:
-#             logger.info(f"[PIR] Motion detected - (interrupt) capturing image...")
-#             img = sensor.snapshot()
-#             person_image_count += 1
-#             total_image_count += 1
-#             # Track center's own captured images separately
-#             if running_as_cc():
-#                 center_captured_image_count += 1
-#             raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
-#             logger.info(f"[PIR] Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
-#             img.save(raw_path)
-
-#             # Limit queue size to prevent memory overflow
-#             if len(images_to_send) >= MAX_IMAGES_TO_SEND:
-#                 # Remove oldest entry
-#                 oldest = images_to_send.pop(0)
-#                 logger.info(f"[PIR] Queue full, removing oldest image: {oldest}")
-#             images_to_send.append(raw_path)
-#             # logger.info(f"Saved image: {raw_path}")
-#             # logger.info(f"Person detected Image count: {person_image_count}")
-#             # if running_as_cc():
-#             #     logger.info(f"Center captured images: {center_captured_image_count}")
-#         except Exception as e:
-#             logger.info(f"[PIR] ERROR: Unexpected error in image taking and saving: {e}")
-#         finally:
-#             # Explicitly clean up image object
-#             if img is not None:
-#                 del img
-#                 gc.collect()  # Help GC reclaim memory immediately
-
-
-# ============================================================================
-# PIR SENSOR DETECTION: POLLING-BASED
-# ============================================================================
-# This is the previous implementation using software polling
-#
-# ADVANTAGES of polling:
-#   - Simpler code (no interrupt handlers)
-#   - Good for slow-changing signals
-#
-# DISADVANTAGES of polling:
-#   - Wastes CPU cycles (wakes every 5 seconds even with no motion)
-#   - Delayed response (up to 5 seconds delay)
-#   - Higher power consumption (constant wake-ups)
-#   - Can miss brief motions between polls
+def pir_interrupt_handler(pin):
+    """IRQ handler for PIR sensor - triggers on RISING edge (HIGH signal)"""
+    global pir_last_trigger_time, pir_trigger_event
+    current_time = utime.ticks_ms()
+    # Debounce: ignore triggers within PIR_DEBOUNCE_MS of last trigger
+    if utime.ticks_diff(current_time, pir_last_trigger_time) > PIR_DEBOUNCE_MS:
+        pir_last_trigger_time = current_time
+        # Set event to wake up person_detection_loop
+        pir_trigger_event.set()
+        # logger.info(f"[PIR] Motion detected (interrupt)")
 
 async def person_detection_loop():
-    """Previous polling-based implementation"""
-    # Input: None; Output: None (runs continuous detection, updates counters and queue)
-    global person_image_count, total_image_count
+    # Input: None; Output: None (runs on PIR interrupt, updates counters and queue)
+    global person_image_count, total_image_count, center_captured_image_count
+    global pir_trigger_event, image_in_progress
+
+    # Setup PIR sensor pin for interrupt
+    # Get PIR pin from detect module
+    from detect import PIR_PIN
+    # Configure IRQ on RISING edge (when PIR goes HIGH)
+    PIR_PIN.irq(trigger=Pin.IRQ_RISING, handler=pir_interrupt_handler)
+    logger.info(f"[PIR] Interrupt-driven detection initialized on pin {PIR_PIN}")
 
     while True:
-        # Poll every 5 seconds - wastes CPU even when no motion
-        await asyncio.sleep(5)
+        # Wait for PIR interrupt event (blocks until PIR detects motion)
+        # Task is suspended here - uses minimal CPU until interrupt fires
+        await pir_trigger_event.wait()
+        # Clear the event for next trigger
+        pir_trigger_event.clear()
 
-        global image_in_progress
+        # Check if image processing is in progress
         if image_in_progress:
-            logger.info(f"Skipping DETECTION because image in progress")
-            await asyncio.sleep(20)
+            logger.info(f"[PIR] Skipping detection - image already in progress")
             continue
 
-        # Software polling: Read PIR pin value (inefficient)
-        # This actively checks the pin every 5 seconds
-        # person_detected = detector.check_person()  # Calls PIR_PIN.value()
+        # Motion detected - capture image
+        img = None
+        try:
+            logger.info(f"[PIR] Motion detected - (interrupt) capturing image...")
+            img = sensor.snapshot()
+            person_image_count += 1
+            total_image_count += 1
+            # Track center's own captured images separately
+            if running_as_cc():
+                center_captured_image_count += 1
+            raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
+            logger.info(f"[PIR] Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
+            img.save(raw_path)
 
-        # For testing without actual PIR: use if True instead
-        # if True:
-        if True:
-            img = None
-            try:
-                img = sensor.snapshot()
-                person_image_count += 1
-                total_image_count += 1
-                raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
-                logger.info(f"Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
-                img.save(raw_path)
-                # Limit queue size to prevent memory overflow
-                if len(images_to_send) >= MAX_IMAGES_TO_SEND:
-                    # Remove oldest entry
-                    oldest = images_to_send.pop(0)
-                    logger.info(f"Queue full, removing oldest image: {oldest}")
-                images_to_send.append(raw_path)
-                logger.info(f"Saved image: {raw_path}")
-            except Exception as e:
-                logger.info(f"ERROR: Unexpected error in image taking and saving: {e}")
-            finally:
-                # Explicitly clean up image object
-                if img is not None:
-                    del img
-                    gc.collect()  # Help GC reclaim memory immediately
+            # Limit queue size to prevent memory overflow
+            if len(images_to_send) >= MAX_IMAGES_TO_SEND:
+                # Remove oldest entry
+                oldest = images_to_send.pop(0)
+                logger.info(f"[PIR] Queue full, removing oldest image: {oldest}")
+            images_to_send.append(raw_path)
+            # logger.info(f"Saved image: {raw_path}")
+            # logger.info(f"Person detected Image count: {person_image_count}")
+            # if running_as_cc():
+            #     logger.info(f"Center captured images: {center_captured_image_count}")
+        except Exception as e:
+            logger.error(f"[PIR] unexpected error in image taking and saving: {e}")
+        finally:
+            # Explicitly clean up image object
+            if img is not None:
+                del img
+                gc.collect()  # Help GC reclaim memory immediately
 
-        await asyncio.sleep(PHOTO_TAKING_DELAY)
-        logger.info(f"Person detected Image count: {person_image_count}")
 
 async def send_image_to_mesh(imgbytes):
     # Input: imgbytes: bytes raw image; Output: bool indicating if image was forwarded successfully
@@ -1147,9 +1072,12 @@ async def image_sending_loop():
     global images_to_send
     while True:
         await asyncio.sleep(4)
+        if len(images_to_send) == 0:
+            logger.debug("[NET] No images to send, skipping sending...")
+            continue
         destlist = possible_paths(None)
         if not running_as_cc() and len(destlist) == 0:
-            logger.info("[NET] No shortest path yet so cant send")
+            logger.warning("[NET] No shortest path yet so cant send")
             continue
 
         # Process all queued images one by one until queue is empty
@@ -1196,7 +1124,7 @@ async def image_sending_loop():
                     logger.info(f"[IMG] Queue empty, all images uploaded")
 
             except Exception as e:
-                logger.info(f"[IMG] ERROR: Unexpected error processing image {imagefile}: {e}")
+                logger.error(f"[IMG] unexpected error processing image {imagefile}: {e}")
                 import sys
                 sys.print_exception(e)
                 # Re-queue image on error
@@ -1282,18 +1210,19 @@ def process_message(data, rssi=None):
         logger.info(f"[RECV : {len(data)} bytes] {data} at {time_msec()}")
     parsed = parse_header(data)
     if not parsed:
-        logger.info(f"[LORA] ERROR: Failure parsing incoming data : {data}")
+        logger.error(f"[LORA] failure parsing incoming data : {data}")
         return False
     if random.randint(1,100) <= FLAKINESS:
-        logger.info(f"[LORA] Flakiness dropping {data}")
+        logger.warning(f"[LORA] flakiness dropping {data}")
         return True
+    
     mid, mst, creator, sender, receiver, msg = parsed
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
     recv_msg_count[sender] += 1
     if receiver != -1 and my_addr != receiver:
         logger.info(f"[LORA] Strange that {my_addr} is not as {receiver}")
-        logger.info(f"[LORA] Skipping message as it is not for me but for {receiver} : {mid}")
+        logger.warning(f"[LORA] skipping message as it is not for me but for {receiver} : {mid}")
         return
     if receiver == -1 :
         logger.info(f"[LORA] Processing broadcast message : {data} : {parsed}")
@@ -1325,7 +1254,7 @@ def process_message(data, rssi=None):
         try:
             begin_chunk(msg.decode())
         except Exception as e:
-            logger.info(f"[CHUNK] ERROR: decoding unicode {e} : {msg}")
+            logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
     elif mst == "I":
         add_chunk(msg)
     elif mst == "E":
@@ -1340,7 +1269,7 @@ def process_message(data, rssi=None):
             if recompiled:
                 asyncio.create_task(img_process(cid, recompiled, creator, sender))
             else:
-                logger.info(f"[CHUNK] No recompiled, so not sending")
+                logger.warning(f"[CHUNK] no recompiled, so not sending")
         else:
             ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
@@ -1486,14 +1415,14 @@ async def keep_sending_heartbeat():
         sent_succ = await asyncio.create_task(send_heartbeat())
         if not sent_succ:
             consecutive_hb_failures += 1
-            logger.info(f"[ERROR]: consecutive heartbeat failures = {consecutive_hb_failures}")
+            logger.warning(f"consecutive heartbeat failures = {consecutive_hb_failures}")
             if consecutive_hb_failures > 1:
-                logger.info(f"[ERROR]: Too many consecutive heartbeat failures, reinitializing LoRa...")
+                logger.error(f"Too many consecutive heartbeat failures, reinitializing LoRa...")
                 try:
                     await init_lora()
                     consecutive_hb_failures = 0
                 except Exception as e:
-                    logger.info(f"[LORA] ERROR: reinitializing LoRa: {e}")
+                    logger.error(f"reinitializing LoRa: {e}")
         else:
             logger.info(f"[HB] HB SUCCESS, shortest path = {shortest_path_to_cc}")
         i += 1
@@ -1564,22 +1493,15 @@ def execute_command(command):
         logger.info(f"Resetting maching")
         machine.reset()
 
-def fake_listen_http():
-    # Input: None; Output: tuple(command: str, dest: int, cpath: list[int]) for simulated commands
-    command = "SENDHB"
-    dest = 222
-    cpath = [219,222]
-    return (command, dest, cpath)
-
 async def command_process(mid, msg):
     # Input: mid: bytes, msg: bytes command payload; Output: None (executes or forwards command)
     try:
         msgstr = msg.decode()
     except Exception as e:
-        logger.info(f"[CMD] Could not decode {msg} : {e}")
+        logger.error(f"[CMD] could not decode {msg} : {e}")
     parts = msgstr.split(";")
     if len(parts) != 3:
-        logger.info(f"[CMD] ERROR: parsing msgstr")
+        logger.error(f"[CMD] error in parsing msgstr, got {len(parts)} parts")
     dest = int(parts[0])
     cpath = parts[1].split(",")
     command = parts[2]
@@ -1593,32 +1515,6 @@ async def command_process(mid, msg):
     else:
         logger.info(f"[CMD] Next dest seems None for {msg}")
 
-# Randomly sends, with 10% probability every 20 seconds.
-async def listen_commands_from_cloud():
-    # Input: None; Output: None (simulates random command reception and routing)
-    while True:
-        await asyncio.sleep(20)
-        if random.randint(1, 100) >= 10:
-            continue
-        command, dest, cpath = fake_listen_http()
-        global image_in_progress
-        if image_in_progress:
-            logger.info(f"[STATUS] Skipping print summary because image in progress")
-            await asyncio.sleep(200)
-            continue
-        logger.info(f"[CMD] Randomly sending a command {command} to {dest}, via {cpath}")
-        if dest == my_addr:
-            execute_command(command)
-            continue
-        next_dest = get_next_on_path(cpath)
-        if next_dest is not None:
-            logger.info(f"[CMD] Propogating command to {next_dest}")
-            cpathstr = ",".join(str(x) for x in cpath)
-            command = f"{dest};{cpathstr};{command}"
-            await send_msg("C", my_addr, command.encode(), next_dest)
-        else:
-            logger.info(f"[CMD] Next dest seems to be None")
-
 # ---------------------------------------------------------------------------
 # Monitoring and Logging
 # ---------------------------------------------------------------------------
@@ -1629,7 +1525,7 @@ async def print_summary_and_flush_logs():
         await asyncio.sleep(30)
         global image_in_progress
         if image_in_progress:
-            logger.info(f"[STATUS] Skipping print summary because image in progress")
+            logger.debug(f"TRANSFER MODE ongoing...")
             await asyncio.sleep(200)
             continue
         free_mem = get_free_memory()
@@ -1718,11 +1614,11 @@ async def keep_updating_gps():
                     await asyncio.sleep(2)
                     last_successful_read = read_count
                 except Exception as e:
-                    logger.info(f"[GPS] GPS reinit failed: {e}")
+                    logger.error(f"[GPS] error in GPS reinit: {e}")
                     await asyncio.sleep(10)
 
         except Exception as e:
-            logger.info(f"[GPS] GPS read error: {e}")
+            logger.error(f"[GPS] error in GPS read: {e}")
             await asyncio.sleep(2)
 
         # Shorter sleep to prevent buffer overflow
@@ -1795,7 +1691,7 @@ async def init_wifi():
         return False
 
     except Exception as e:
-        logger.info(f"[WIFI] Initialization error: {e}")
+        logger.error(f"[WIFI] error in initialization: {e}")
         if wifi_nic:
             try:
                 wifi_nic.active(False)
@@ -1836,7 +1732,7 @@ def get_wifi_status():
                 "status": wifi_nic.status()
             }
     except Exception as e:
-        logger.info(f"[WIFI] ERROR: getting WiFi status: {e}")
+        logger.error(f"[WIFI] error in getting WiFi status: {e}")
         return {"enabled": True, "connected": False, "error": str(e)}
 
 async def wifi_send_image(creator, encimb):
@@ -1844,7 +1740,7 @@ async def wifi_send_image(creator, encimb):
     """Send image via WiFi"""
     global wifi_nic
     if not wifi_nic or not wifi_nic.isconnected():
-        logger.info("[WIFI] WiFi not connected")
+        logger.warning("[WIFI] WiFi not connected")
         return False
 
     try:
@@ -1889,7 +1785,7 @@ async def wifi_send_image(creator, encimb):
             return False
 
     except Exception as e:
-        logger.info(f"[WIFI] ERROR: in wifi_send_image: {e}")
+        logger.error(f"[WIFI] error in wifi_send_image: {e}")
         return False
 
 async def wifi_upload_hb(heartbeat_data):
@@ -1932,7 +1828,7 @@ async def wifi_upload_hb(heartbeat_data):
             return False
 
     except Exception as e:
-        logger.info(f"[HB] ERROR: in wifi_upload_hb: {e}")
+        logger.error(f"[HB] error in wifi_upload_hb: {e}")
         return False
 
 # ---------------------------------------------------------------------------
@@ -1941,8 +1837,6 @@ async def wifi_upload_hb(heartbeat_data):
 
 async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
-    logger.info(f"[INIT] Started device {my_addr}")
-
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
@@ -1981,13 +1875,13 @@ async def main():
 try:
     asyncio.run(main())
 except KeyboardInterrupt:
-    logger.info("Stopped.")
+    logger.info("stopped by user via keyboard interrupt")
 except Exception as e:
-    logger.info(f"Error: {e}")
+    logger.error(f"error in main.py: {e}")
 finally:
     try:
         if 'logger' in globals():
             logger.close()
-            print("INFO - Logger closed successfully")
+            logger.info("logger closed successfully")
     except Exception as e:
-        print(f"WARNING - Error closing logger: {e}")
+        logger.error(f"error in main.py: {e}")

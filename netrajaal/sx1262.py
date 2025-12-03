@@ -21,15 +21,16 @@ Features:
 
 Author: Watchmen Project
 """
+from logger import logger
 
 try:
     from machine import Pin, UART
 except ImportError:
-    print("ERROR: machine module not found. not running on openmv OpenMV.")
+    logger.error("error in sx1262.py: machine module not found. not running on openmv OpenMV.")
     raise
 
 import time
-from logger import logger
+
 
 # =============================================================================
 # Configuration Constants
@@ -561,8 +562,9 @@ class sx126x:
                                 else:
                                     logger.warning(f"    - {mismatch}")
                     else:
-                        logger.info(f"===> CONFIGURATION SUCCESSFUL <===")
-                        logger.info(f"  Module acknowledged configuration\n")
+                        logger.info(
+                            f"===> CONFIGURATION SUCCESSFUL, Module acknowledged configuration! <==="
+                        )
 
                     self.config_success = True
                     break

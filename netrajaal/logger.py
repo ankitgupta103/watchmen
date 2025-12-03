@@ -13,9 +13,9 @@ except ImportError:
     except ImportError:
         pass
 
+DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_SAVE_LOG = True
 
-SAVE_LOG = True
-LOG_LEVEL = "DEBUG"
 
 # Initialize RTC if available
 _rtc = None
@@ -120,8 +120,8 @@ class SimpleLogger:
         self,
         name=None,
         show_terminal=False,
-        log_level=None,
-        save_to_file=False,
+        log_level=DEFAULT_LOG_LEVEL,
+        save_log=DEFAULT_SAVE_LOG,
         log_dir=None,
         log_file_name=None,
     ):
@@ -133,7 +133,8 @@ class SimpleLogger:
         # First initialization
         self.name = name or ""
         self.show_terminal = show_terminal
-        self.log_level = log_level or "INFO"
+        self.log_level = log_level or DEFAULT_LOG_LEVEL
+        self.save_log = save_log or DEFAULT_SAVE_LOG
         # Handle both string and numeric log levels
         if isinstance(self.log_level, str):
             self.log_level_value = LOG_LEVELS.get(
@@ -145,7 +146,7 @@ class SimpleLogger:
 
         # File logging setup - open file once at initialization
         self.log_file = None
-        if save_to_file and log_dir and log_file_name:
+        if self.save_log and log_dir and log_file_name:
             self._open_log_file(log_dir, log_file_name)
 
         SimpleLogger._initialized = True
@@ -195,7 +196,7 @@ class SimpleLogger:
             # Open file in append mode and keep it open
             self.log_file = open(log_file_path, "a")
             self.log_file.flush()
-            print(f"INFO - Log file opened: {log_file_path}")
+            print(f"DEBUG - Log file opened: {log_file_path}")
         except Exception as e:
             print(f"WARNING - Failed to open log file: {e}")
             self.log_file = None
@@ -298,8 +299,8 @@ def log_level_type(log_level):
 def setup_logger(
     name=None,
     show_terminal=False,
-    log_level=None,
-    save_to_file=False,
+    log_level=DEFAULT_LOG_LEVEL,
+    save_log=DEFAULT_SAVE_LOG,
     log_dir=LOG_DIR,
     log_file_name=LOG_FILE_NAME,
 ):
@@ -311,9 +312,9 @@ def setup_logger(
         name: Logger name (None for root logger)
         show_terminal: If True, log to terminal/console
         log_level: Logging level (string like "INFO", "DEBUG", etc. or logging constant, or may be int value)
-        save_to_file: If True, save logs to file (default: False)
-        log_dir: Directory to save log file (only used if save_to_file=True)
-        log_file_name: Name of log file (only used if save_to_file=True)
+        save_log: If True, save logs to file (default: False)
+        log_dir: Directory to save log file (only used if save_log=True)
+        log_file_name: Name of log file (only used if save_log=True)
 
     Returns:
         logging.Logger or SimpleLogger: Configured logger instance
@@ -322,15 +323,15 @@ def setup_logger(
         name=name,
         show_terminal=show_terminal,
         log_level=log_level,
-        save_to_file=save_to_file,
+        save_log=save_log,
         log_dir=log_dir,
         log_file_name=log_file_name,
     )
 
 # Initialize the singleton instance
-logger = setup_logger(show_terminal=True, log_level=LOG_LEVEL, save_to_file=SAVE_LOG)
+logger = setup_logger(show_terminal=True, log_level=DEFAULT_LOG_LEVEL, save_log=DEFAULT_SAVE_LOG)
 
 # can be used like
-# logger = setup_logger(show_terminal=True, log_level="INFO", save_to_file=False)
-# logger = setup_logger(name=__name__, show_terminal=True, log_level="DEBUG", save_to_file=True)
-# logger = setup_logger(show_terminal=True, log_level="INFO", save_to_file=True, log_dir="/sdcard", log_file_name="mainlog.txt")
+# logger = setup_logger(show_terminal=True, log_level="INFO", save_log=False)
+# logger = setup_logger(name=__name__, show_terminal=True, log_level="DEBUG", save_log=True)
+# logger = setup_logger(show_terminal=True, log_level="INFO", save_log=True, log_dir="/sdcard", log_file_name="mainlog.txt")

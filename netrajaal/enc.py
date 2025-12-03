@@ -25,10 +25,14 @@ class EncNode:
         self.my_addr = my_addr
         e_pub = 65537
         pub_filename = f"{my_addr}.pub"
-        pub_file = open(pub_filename, "r")
-        n_pub_from_file = int(pub_file.readline().strip())
+        try:
+            logger.debug(f"Loading public key from file {pub_filename}")
+            with open(pub_filename, "r") as pub_file:
+                n_pub_from_file = int(pub_file.readline().strip())
+        except OSError as e:
+            logger.error(f"could not open '{pub_filename}' ({e}).")
+            raise
         self.pubkey = PublicKey(n_pub_from_file, e_pub)
-        logger.info(f"Loading public key from file {pub_filename}")
         self.rsa_priv = enc_priv.PrivKeyRepo() # TODO REMOVE
 
     def get_pub_key(self):
