@@ -1213,10 +1213,12 @@ async def spath_process(msg_id, msg):
 
 def process_message(data, rssi=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
+    data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     if rssi is not None:
-        logger.info(f"[RECV : {len(data)} bytes, rssi : {rssi}] {data} at {time_msec()}")
+        logger.info(f"[RECV, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes")
     else:
-        logger.info(f"[RECV : {len(data)} bytes] {data} at {time_msec()}")
+        logger.info(f"[RECV] [{'*' * data_masked_log}] {len(data)} bytes")
+        
     parsed = parse_header(data)
     if not parsed:
         logger.error(f"[LORA] failure parsing incoming data : {data}")
