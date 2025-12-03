@@ -531,55 +531,55 @@ def encrypt_if_needed(msg_typ, msg):
 # === Send Function ===
 async def send_msg_internal(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
-    if msg_typ == "P":
-        logger.info(f"[LORA] Sending photo of length {len(msgbytes)}")
     if len(msgbytes) < FRAME_SIZE:
+        logger.info(f"[LORA] Sending msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet")
         succ, _ = await send_single_msg(msg_typ, creator, msgbytes, dest)
         return succ
-    imid = get_rand()
-    chunks = make_chunks(msgbytes)
-    logger.info(f"[CHUNK] Chunking {len(msgbytes)} long message with id {imid} into {len(chunks)} chunks")
-    succ, _ = await send_single_msg("B", creator, f"{msg_typ}:{imid}:{len(chunks)}", dest)
-    if not succ:
-        logger.info(f"[CHUNK] Failed sending chunk begin")
-        return False
-    asyncio.create_task(acquire_image_lock()) # TODO test as moved outside loop
-    for i in range(len(chunks)):
-        if i % 10 == 0:
-            logger.info(f"[CHUNK] Sending chunk {i}")
-        await asyncio.sleep(CHUNK_SLEEP)
-        chunkbytes = imid.encode() + i.to_bytes(2) + chunks[i]
-        _ = await send_single_msg("I", creator, chunkbytes, dest)
-    for retry_i in range(20):
-        if retry_i == 0:
-            await asyncio.sleep(0.1)  # Faster first check
-        else:
-            await asyncio.sleep(CHUNK_SLEEP)
-        succ, missing_chunks = await send_single_msg("E", creator, imid, dest)
+    else:
+        img_id = get_rand()
+        chunks = make_chunks(msgbytes)
+        logger.info(f"[CHUNK] chunking msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id} into {len(chunks)} chunks")
+        succ, _ = await send_single_msg("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
         if not succ:
-            logger.info(f"[CHUNK] Failed sending chunk end")
-            break
-
-        # Treat various ACK forms as success:
-        # - [-1]   : explicit "all done" from receiver
-        # - []/None: truncated or minimal ACK with no missing list (we assume success)
-        if (
-            missing_chunks is None
-            or len(missing_chunks) == 0
-            or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
-        ):
-            logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
-            return True
-
-        logger.info(
-            f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
-        )
+            logger.info(f"[CHUNK] Failed sending chunk begin")
+            return False
         asyncio.create_task(acquire_image_lock()) # TODO test as moved outside loop
-        for mc in missing_chunks:
+        for i in range(len(chunks)):
+            if i % 10 == 0:
+                logger.info(f"[CHUNK] Sending chunk {i}")
             await asyncio.sleep(CHUNK_SLEEP)
-            chunkbytes = imid.encode() + mc.to_bytes(2) + chunks[mc]
+            chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
             _ = await send_single_msg("I", creator, chunkbytes, dest)
-    return False
+        for retry_i in range(20):
+            if retry_i == 0:
+                await asyncio.sleep(0.1)  # Faster first check
+            else:
+                await asyncio.sleep(CHUNK_SLEEP)
+            succ, missing_chunks = await send_single_msg("E", creator, img_id, dest)
+            if not succ:
+                logger.info(f"[CHUNK] Failed sending chunk end")
+                break
+
+            # Treat various ACK forms as success:
+            # - [-1]   : explicit "all done" from receiver
+            # - []/None: truncated or minimal ACK with no missing list (we assume success)
+            if (
+                missing_chunks is None
+                or len(missing_chunks) == 0
+                or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
+            ):
+                logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
+                return True
+
+            logger.info(
+                f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
+            )
+            asyncio.create_task(acquire_image_lock()) # TODO test as moved outside loop
+            for mis_chunk in missing_chunks:
+                await asyncio.sleep(CHUNK_SLEEP)
+                chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
+                _ = await send_single_msg("I", creator, chunkbytes, dest)
+        return False
 
 async def send_msg(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
