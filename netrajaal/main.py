@@ -77,6 +77,7 @@ gps_last_time = -1
 
 consecutive_hb_failures = 0
 lora_init_count = 0
+lora_init_in_progress = False
 
 image_in_progress = False
 
@@ -309,24 +310,26 @@ loranode = None
 
 async def init_lora():
     # Input: None; Output: None (initializes global loranode, updates lora_reinit_count)
-    global loranode, lora_init_count
-    lora_init_count += 1
-    logger.info(f"[LORA] Initializing LoRa SX126X module... my lora addr = {my_addr}")
-    loranode = sx1262.sx126x(
-        uart_num=1,        # UART port number - adjust as needed
-        freq=868,          # Frequency in MHz
-        addr=my_addr,      # Node address
-        power=22,          # Transmission power in dBm
-        rssi=False,     # Enable RSSI reporting
-        air_speed=AIR_SPEED,# Air data rate
-        m0_pin='P6',       # M0 control pin - adjust to your wiring
-        m1_pin='P7'        # M1 control pin - adjust to your wiring
-    )
-
-    # logger.info(f"LoRa module (Total Initializations: {lora_init_count})")
-    # logger.info(f"Node address: {loranode.addr}")
-    # logger.info(f"Frequency: {loranode.start_freq + loranode.offset_freq}.125MHz")
-    # logger.info(f"===> LoRa module initialized successfully! <===\n")
+    global loranode, lora_init_count, lora_init_in_progress
+    if lora_init_in_progress:
+        logger.info(f"[LORA] Initialization already in progress, skipping duplicate call")
+        return
+    lora_init_in_progress = True
+    try:
+        lora_init_count += 1
+        logger.info(f"[LORA] Initializing LoRa SX126X module... my lora addr = {my_addr}")
+        loranode = sx1262.sx126x(
+            uart_num=1,        # UART port number - adjust as needed
+            freq=868,          # Frequency in MHz
+            addr=my_addr,      # Node address
+            power=22,          # Transmission power in dBm
+            rssi=False,     # Enable RSSI reporting
+            air_speed=AIR_SPEED,# Air data rate
+            m0_pin='P6',       # M0 control pin - adjust to your wiring
+            m1_pin='P7'        # M1 control pin - adjust to your wiring
+        )
+    finally:
+        lora_init_in_progress = False
 
 msgs_sent = []
 msgs_unacked = []
@@ -464,10 +467,8 @@ async def send_single_msg(msg_typ, creator, msgbytes, dest):
     msg_id = get_msg_id(msg_typ, creator, dest)
     databytes = msg_id + b";" + msgbytes
     ackneeded = ack_needed(msg_typ)
-    unackedid = 0
     timesent = time_msec()
     if ackneeded:
-        unackedid = len(msgs_unacked)
         msgs_unacked.append((msg_id, msgbytes, timesent))
     else:
         msgs_sent.append((msg_id, msgbytes, timesent))
@@ -583,6 +584,14 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
 
 async def send_msg(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
+    global lora_init_in_progress
+    if loranode is None or loranode.is_connected is False:
+        if not lora_init_in_progress:
+            logger.error(f"[LORA] Not connected to network, init started in background.., msg marked as failed")
+            asyncio.create_task(init_lora())
+        else:
+            logger.error(f"[LORA] Not connected to network, init already in progress, msg marked as failed")
+        return False
     retval = await send_msg_internal(msg_typ, creator, msgbytes, dest)
     return retval
 

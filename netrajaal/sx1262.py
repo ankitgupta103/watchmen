@@ -117,7 +117,7 @@ class sx126x:
         freq (int): Operating frequency in MHz
         power (int): TX power in dBm (10, 13, 17, or 22)
         rssi (bool): Enable RSSI reporting
-        config_success (bool): Configuration status flag
+        is_connected (bool): True if module configuration succeeded
         target_baud (int): Target UART baud rate (default: 115200)
     """
 
@@ -224,7 +224,7 @@ class sx126x:
         self.freq = freq
         self.uart_num = uart_num
         self.power = power
-        self.config_success = False
+        self.is_connected = False
         self.target_baud = UART_NORMAL_BAUD
 
         # Calculate frequency offset based on module type
@@ -566,7 +566,7 @@ class sx126x:
                             f"===> CONFIGURATION SUCCESSFUL, Module acknowledged configuration! <==="
                         )
 
-                    self.config_success = True
+                    self.is_connected = True
                     break
                 else:
                     logger.warning(
@@ -591,7 +591,7 @@ class sx126x:
                 logger.error(f"    - Verify M0/M1 pin connections")
                 logger.error(f"    - Ensure power supply is 3.3V and stable")
                 logger.error(f"    - Check baud rate compatibility\n")
-                self.config_success = False
+                self.is_connected = False
 
         # Exit configuration mode: return to normal operation
         self.M0.value(0)  # LOW
@@ -892,7 +892,7 @@ class sx126x:
             - Messages exceeding buffer_size will be truncated
         """
         # Warn if module wasn't properly configured
-        if not hasattr(self, "config_success") or not self.config_success:
+        if not hasattr(self, "is_connected") or not self.is_connected:
             logger.warning(f"Module not properly configured, send may fail")
 
         # Calculate frequency offset for target
