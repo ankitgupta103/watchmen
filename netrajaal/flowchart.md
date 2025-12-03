@@ -184,7 +184,7 @@ decrypt_hybrid(msg, private_key)
 #### Message Encryption (`encrypt_if_needed()`)
 
 ```
-encrypt_if_needed(mst, msg)
+encrypt_if_needed(msg_typ, msg)
   ├─> IF ENCRYPTION_ENABLED is False:
   │   └─> Return msg as-is
   │
@@ -290,13 +290,13 @@ parse_header(data)
   ├─> Parse receiver (fourth byte, '*' = -1)
   ├─> Verify separator ';'
   ├─> Extract payload (after separator)
-  └─> Return (mid, mst, creator, sender, receiver, msg)
+  └─> Return (msg_id, msg_typ, creator, sender, receiver, msg)
 ```
 
 #### Message Sending (`send_msg()`)
 
 ```
-send_msg(msgtype, creator, msgbytes, dest)
+send_msg(msg_typ, creator, msgbytes, dest)
   │
   ├─> IF len(msgbytes) < FRAME_SIZE (195 bytes):
   │   └─> send_single_msg() - Send directly
@@ -321,10 +321,10 @@ send_msg(msgtype, creator, msgbytes, dest)
 #### Single Message Send (`send_single_msg()`)
 
 ```
-send_single_msg(msgtype, creator, msgbytes, dest)
+send_single_msg(msg_typ, creator, msgbytes, dest)
   ├─> Generate message ID
-  ├─> Build message: mid + ";" + msgbytes
-  ├─> IF ack_needed(msgtype):
+  ├─> Build message: msg_id + ";" + msgbytes
+  ├─> IF ack_needed(msg_typ):
   │   ├─> Add to msgs_unacked queue
   │   ├─> FOR retry in range(3):
   │   │   ├─> radio_send()
@@ -436,7 +436,7 @@ send_spath()
 #### Shortest Path Processing (`spath_process()`)
 
 ```
-spath_process(mid, msg)
+spath_process(msg_id, msg)
   ├─> IF running_as_cc():
   │   └─> Return (ignore)
   │
@@ -518,7 +518,7 @@ send_heartbeat()
 #### Heartbeat Processing (`hb_process()`)
 
 ```
-hb_process(mid, msgbytes, sender)
+hb_process(msg_id, msgbytes, sender)
   ├─> Get possible_paths(sender)
   ├─> Extract creator from message ID
   │
@@ -604,8 +604,8 @@ img_process(cid, msg, creator, sender)
 
 ```
 begin_chunk(msg)
-  ├─> Parse: "msgtype:chunkid:numchunks"
-  └─> Initialize chunk_map[chunkid] = (msgtype, numchunks, [])
+  ├─> Parse: "msg_typ:chunkid:numchunks"
+  └─> Initialize chunk_map[chunkid] = (msg_typ, numchunks, [])
 
 add_chunk(msgbytes)
   ├─> Extract chunk ID (first 3 bytes)
@@ -628,7 +628,7 @@ recompile_msg(cid)
   │   └─> Concatenate chunk data
   └─> Return complete message
 
-end_chunk(mid, msg)
+end_chunk(msg_id, msg)
   ├─> Extract chunk ID
   ├─> Get missing chunks
   ├─> IF missing chunks exist:
@@ -855,7 +855,7 @@ execute_command(command)
 #### Command Processing (`command_process()`)
 
 ```
-command_process(mid, msg)
+command_process(msg_id, msg)
   ├─> Decode message string
   ├─> Parse: "dest;path;command"
   │

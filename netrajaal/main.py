@@ -202,11 +202,11 @@ def encode_dest(dest):
         return b'*'
     return encode_node_id(dest)
 
-def get_msg_id(msgtype, creator, dest):
-    # Input: msgtype: str, creator: int, dest: int; Output: bytes message identifier
+def get_msg_id(msg_typ, creator, dest):
+    # Input: msg_typ: str, creator: int, dest: int; Output: bytes message identifier
     rrr = get_rand()
     msg_id = (
-        msgtype.encode()
+        msg_typ.encode()
         + encode_node_id(creator)
         + encode_node_id(my_addr)
         + encode_dest(dest)
@@ -246,11 +246,11 @@ def ellepsis(msg):
         return msg[:100] + "......." + msg[-100:]
     return msg
 
-def ack_needed(msgtype):
-    # Input: msgtype: str; Output: bool indicating if acknowledgement required
-    if msgtype == "A":
+def ack_needed(msg_typ):
+    # Input: msg_typ: str; Output: bool indicating if acknowledgement required
+    if msg_typ == "A":
         return False
-    if msgtype in ["H", "B", "E", "V"]:
+    if msg_typ in ["H", "B", "E", "V"]:
         return True
     return False
 
@@ -459,11 +459,11 @@ def pop_and_get(msg_id):
             return msgs_unacked.pop(i)
     return None
 
-async def send_single_msg(msgtype, creator, msgbytes, dest):
-    # Input: msgtype: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
-    msg_id = get_msg_id(msgtype, creator, dest)
+async def send_single_msg(msg_typ, creator, msgbytes, dest):
+    # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
+    msg_id = get_msg_id(msg_typ, creator, dest)
     databytes = msg_id + b";" + msgbytes
-    ackneeded = ack_needed(msgtype)
+    ackneeded = ack_needed(msg_typ)
     unackedid = 0
     timesent = time_msec()
     if ackneeded:
@@ -529,17 +529,17 @@ def encrypt_if_needed(msg_typ, msg):
     return msg
 
 # === Send Function ===
-async def send_msg_internal(msgtype, creator, msgbytes, dest):
-    # Input: msgtype: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
-    if msgtype == "P":
+async def send_msg_internal(msg_typ, creator, msgbytes, dest):
+    # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
+    if msg_typ == "P":
         logger.info(f"[LORA] Sending photo of length {len(msgbytes)}")
     if len(msgbytes) < FRAME_SIZE:
-        succ, _ = await send_single_msg(msgtype, creator, msgbytes, dest)
+        succ, _ = await send_single_msg(msg_typ, creator, msgbytes, dest)
         return succ
     imid = get_rand()
     chunks = make_chunks(msgbytes)
     logger.info(f"[CHUNK] Chunking {len(msgbytes)} long message with id {imid} into {len(chunks)} chunks")
-    succ, _ = await send_single_msg("B", creator, f"{msgtype}:{imid}:{len(chunks)}", dest)
+    succ, _ = await send_single_msg("B", creator, f"{msg_typ}:{imid}:{len(chunks)}", dest)
     if not succ:
         logger.info(f"[CHUNK] Failed sending chunk begin")
         return False
@@ -581,9 +581,9 @@ async def send_msg_internal(msgtype, creator, msgbytes, dest):
             _ = await send_single_msg("I", creator, chunkbytes, dest)
     return False
 
-async def send_msg(msgtype, creator, msgbytes, dest):
-    # Input: msgtype: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
-    retval = await send_msg_internal(msgtype, creator, msgbytes, dest)
+async def send_msg(msg_typ, creator, msgbytes, dest):
+    # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
+    retval = await send_msg_internal(msg_typ, creator, msgbytes, dest)
     return retval
 
 def ack_time(smid):

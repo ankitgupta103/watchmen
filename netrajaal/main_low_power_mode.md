@@ -264,8 +264,8 @@ process_message(data, rssi)
   │       │   └─> IF Drop: Return True
   │       │
   │       ├─> Extract Fields:
-  │       │   ├─> mid (Message ID)
-  │       │   ├─> mst (Message Type)
+  │       │   ├─> msg_id (Message ID)
+  │       │   ├─> msg_typ (Message Type)
   │       │   ├─> creator (Creator Node)
   │       │   ├─> sender (Sender Node)
   │       │   ├─> receiver (Receiver Node)
@@ -277,7 +277,7 @@ process_message(data, rssi)
   │       │
   │       └─> Add to msgs_recd buffer
   │
-  └─> Route by Message Type (mst):
+  └─> Route by Message Type (msg_typ):
       │
       ├─> "N" (Scan):
       │   └─> scan_process() - Update seen_neighbours
@@ -462,11 +462,11 @@ Heartbeat Trigger
 Receive Chunked Message
   │
   ├─> Receive "B" Message (Begin Chunk)
-  │   ├─> Parse: "msgtype:chunk_id:num_chunks"
+  │   ├─> Parse: "msg_typ:chunk_id:num_chunks"
   │   │   Example: "P:ABC:10"
   │   │
   │   └─> Initialize chunk_map:
-  │       └─> chunk_map[cid] = (mst, numchunks, [])
+  │       └─> chunk_map[cid] = (msg_typ, numchunks, [])
   │           Example: chunk_map["ABC"] = ("P", 10, [])
   │
   ├─> Wait for Chunks (Loop)
