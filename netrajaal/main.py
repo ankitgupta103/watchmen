@@ -205,18 +205,18 @@ def encode_dest(dest):
 def get_msg_id(msgtype, creator, dest):
     # Input: msgtype: str, creator: int, dest: int; Output: bytes message identifier
     rrr = get_rand()
-    mid = (
+    msg_id = (
         msgtype.encode()
         + encode_node_id(creator)
         + encode_node_id(my_addr)
         + encode_dest(dest)
         + rrr.encode()
     )
-    return mid
+    return msg_id
 
 def parse_header(data):
-    # Input: data: bytes; Output: tuple(mid, mst, creator, sender, receiver, msg) or None
-    mid = b""
+    # Input: data: bytes; Output: tuple(msg_id, msg_typ, creator, sender, receiver, msg) or None
+    msg_id = b""
     if data == None:
         logger.warning(f"[LORA] Weird that data is none")
         return None
@@ -224,21 +224,21 @@ def parse_header(data):
     if len(data) < MIDLEN + 1:
         return None
     try:
-        mid = data[:MIDLEN]
+        msg_id = data[:MIDLEN]
     except Exception as e:
         logger.error(f"[LORA] error parsing {data[:MIDLEN]} : {e}")
         return
-    mst = chr(mid[0])
-    creator = int(mid[1])
-    sender = int(mid[2])
-    if mid[3] == 42 or mid == b"*":
+    msg_typ = chr(msg_id[0])
+    creator = int(msg_id[1])
+    sender = int(msg_id[2])
+    if msg_id[3] == 42 or msg_id == b"*":
         receiver = -1
     else:
-        receiver=int(mid[3])
+        receiver=int(msg_id[3])
     if chr(data[MIDLEN]) != ';':
         return None
     msg = data[MIDLEN+1:]
-    return (mid, mst, creator, sender, receiver, msg)
+    return (msg_id, msg_typ, creator, sender, receiver, msg)
 
 def ellepsis(msg):
     # Input: msg: str; Output: str truncated with ellipsis if necessary
@@ -340,7 +340,7 @@ def cleanup_old_messages():
     age_threshold_ms = MAX_OLD_MSG_AGE_SEC * 1000
 
     # Clean msgs_sent - remove messages older than threshold
-    msgs_sent = [(mid, msg, t) for mid, msg, t in msgs_sent
+    msgs_sent = [(msg_id, msg, t) for msg_id, msg, t in msgs_sent
                  if (current_time - t) < age_threshold_ms]
     # Also limit by size
     if len(msgs_sent) > MAX_MSGS_SENT:
@@ -348,7 +348,7 @@ def cleanup_old_messages():
         logger.info(f"[MEM] Trimmed msgs_sent to {MAX_MSGS_SENT} entries")
 
     # Clean msgs_recd - remove messages older than threshold
-    msgs_recd = [(mid, msg, t) for mid, msg, t in msgs_recd
+    msgs_recd = [(msg_id, msg, t) for msg_id, msg, t in msgs_recd
                  if (current_time - t) < age_threshold_ms]
     # Also limit by size
     if len(msgs_recd) > MAX_MSGS_RECD:
@@ -358,12 +358,12 @@ def cleanup_old_messages():
     # Clean msgs_unacked - remove very old unacked messages (they likely failed)
     old_unacked = []
     new_unacked = []
-    for mid, msg, t in msgs_unacked:
+    for msg_id, msg, t in msgs_unacked:
         age = current_time - t
         if age > age_threshold_ms * 2:  # Double threshold for unacked (more lenient)
-            old_unacked.append(mid)
+            old_unacked.append(msg_id)
         else:
-            new_unacked.append((mid, msg, t))
+            new_unacked.append((msg_id, msg, t))
     msgs_unacked = new_unacked
 
     if len(old_unacked) > 0:
@@ -437,7 +437,7 @@ async def periodic_gc():
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
-def radio_send(dest, data, mid):
+def radio_send(dest, data, msg_id):
     # Input: dest: int, data: bytes; Output: None (sends bytes via LoRa, logs send)
     global sent_count
     sent_count = sent_count + 1
@@ -449,55 +449,55 @@ def radio_send(dest, data, mid):
     loranode.send(dest, data)
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    logger.info(f"[SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_ID = {mid}")
+    logger.info(f"[SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_ID = {msg_id}")
 
-def pop_and_get(mid):
-    # Input: mid: bytes; Output: tuple(mid, msgbytes, timestamp) removed from msgs_unacked or None
+def pop_and_get(msg_id):
+    # Input: msg_id: bytes; Output: tuple(msg_id, msgbytes, timestamp) removed from msgs_unacked or None
     for i in range(len(msgs_unacked)):
         m, d, t = msgs_unacked[i]
-        if m == mid:
+        if m == msg_id:
             return msgs_unacked.pop(i)
     return None
 
 async def send_single_msg(msgtype, creator, msgbytes, dest):
     # Input: msgtype: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
-    mid = get_msg_id(msgtype, creator, dest)
-    databytes = mid + b";" + msgbytes
+    msg_id = get_msg_id(msgtype, creator, dest)
+    databytes = msg_id + b";" + msgbytes
     ackneeded = ack_needed(msgtype)
     unackedid = 0
     timesent = time_msec()
     if ackneeded:
         unackedid = len(msgs_unacked)
-        msgs_unacked.append((mid, msgbytes, timesent))
+        msgs_unacked.append((msg_id, msgbytes, timesent))
     else:
-        msgs_sent.append((mid, msgbytes, timesent))
+        msgs_sent.append((msg_id, msgbytes, timesent))
     if not ackneeded:
-        radio_send(dest, databytes, mid)
+        radio_send(dest, databytes, msg_id)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     send_retry = 3
     for retry_i in range(send_retry):
-        radio_send(dest, databytes, mid)
+        radio_send(dest, databytes, msg_id)
         await asyncio.sleep(ACK_SLEEP)
         first_log_flag = True
         for i in range(5):
-            at, missing_chunks = ack_time(mid)
+            at, missing_chunks = ack_time(msg_id)
             if at > 0:
-                logger.info(f"[ACK] Msg {mid} : was acked in {at - timesent} msecs")
-                msgs_sent.append(pop_and_get(mid))
+                logger.info(f"[ACK] Msg {msg_id} : was acked in {at - timesent} msecs")
+                msgs_sent.append(pop_and_get(msg_id))
                 return (True, missing_chunks)
             else:
                 if first_log_flag:
-                    logger.info(f"[ACK] Still waiting for ack, MSG_ID =  {mid} # {i}")
+                    logger.info(f"[ACK] Still waiting for ack, MSG_ID =  {msg_id} # {i}")
                     first_log_flag = False
                 else:
-                    logger.debug(f"[ACK] Still waiting for ack, MSG_ID = {mid} # {i}")
+                    logger.debug(f"[ACK] Still waiting for ack, MSG_ID = {msg_id} # {i}")
                 await asyncio.sleep(
                     ACK_SLEEP * min(i + 1, 3)
                 )  # progressively more sleep, capped at 3x
         newline = "\n" if (retry_i + 1) == send_retry else ""
-        logger.info(f"[ACK] Failed to get ack, MSG_ID = {mid}, retry # {retry_i+1}/{send_retry}{newline}")
-    logger.info(f"[LORA] Failed to send message, MSG_ID = {mid}")
+        logger.warning(f"[ACK] Failed to get ack, MSG_ID = {msg_id}, retry # {retry_i+1}/{send_retry}{newline}")
+    logger.error(f"[LORA] Failed to send message, MSG_ID = {msg_id}")
     return (False, [])
 
 def make_chunks(msg):
@@ -510,21 +510,21 @@ def make_chunks(msg):
         chunks.append(msg)
     return chunks
 
-def encrypt_if_needed(mst, msg):
-    # Input: mst: str message type, msg: bytes; Output: bytes (possibly encrypted message)
+def encrypt_if_needed(msg_typ, msg):
+    # Input: msg_typ: str message type, msg: bytes; Output: bytes (possibly encrypted message)
     if not ENCRYPTION_ENABLED:
         return msg
-    if mst in ["H"]:
+    if msg_typ in ["H"]:
         # Must be less than 117 bytes
         if len(msg) > 117:
             logger.info(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
             return msg
         msgbytes = enc.encrypt_rsa(msg, encnode.get_pub_key())
-        logger.info(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        logger.info(f"{msg_typ} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
-    if mst == "P":
+    if msg_typ == "P":
         msgbytes = enc.encrypt_hybrid(msg, encnode.get_pub_key())
-        logger.info(f"{mst} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        logger.info(f"{msg_typ} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
     return msg
 
@@ -631,17 +631,17 @@ def begin_chunk(msg):
     if len(parts) != 3:
         logger.error(f"[CHUNK] begin message unparsable {msg}")
         return
-    mst = parts[0]
+    msg_typ = parts[0]
     cid = parts[1]
     numchunks = int(parts[2])
-    chunk_map[cid] = (mst, numchunks, [])
+    chunk_map[cid] = (msg_typ, numchunks, [])
 
 def get_missing_chunks(cid):
     # Input: cid: str chunk identifier; Output: list of int missing chunk indices
     if cid not in chunk_map:
         #logger.info(f"Should never happen, have no entry in chunk_map for {cid}")
         return []
-    mst, expected_chunks, list_chunks = chunk_map[cid]
+    msg_typ, expected_chunks, list_chunks = chunk_map[cid]
     missing_chunks = []
     for i in range(expected_chunks):
         if not get_data_for_iter(list_chunks, i):
@@ -681,7 +681,7 @@ def recompile_msg(cid):
     if cid not in chunk_map:
         #logger.info(f"Should never happen, have no entry in chunk_map for {cid}")
         return []
-    mst, expected_chunks, list_chunks = chunk_map[cid]
+    msg_typ, expected_chunks, list_chunks = chunk_map[cid]
     recompiled = b""
     for i in range(expected_chunks):
         recompiled += get_data_for_iter(list_chunks, i)
@@ -703,10 +703,10 @@ def clear_chunkid(cid):
 
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
-def end_chunk(mid, msg):
-    # Input: mid: bytes message id, msg: str chunk identifier; Output: tuple(status:bool, missing:str|None, cid:str|None, data:bytes|None, creator:int|None)
+def end_chunk(msg_id, msg):
+    # Input: msg_id: bytes message id, msg: str chunk identifier; Output: tuple(status:bool, missing:str|None, cid:str|None, data:bytes|None, creator:int|None)
     cid = msg
-    creator = int(mid[1])
+    creator = int(msg_id[1])
     missing = get_missing_chunks(cid)
     logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
     if len(missing) > 0:
@@ -870,10 +870,10 @@ async def upload_heartbeat(heartbeat_data):
 
 hb_map = {}
 
-async def hb_process(mid, msgbytes, sender):
-    # Input: mid: bytes, msgbytes: bytes, sender: int; Output: None (routes or logs heartbeat data)
+async def hb_process(msg_id, msgbytes, sender):
+    # Input: msg_id: bytes, msgbytes: bytes, sender: int; Output: None (routes or logs heartbeat data)
     destlist = possible_paths(sender)
-    creator = int(mid[1])
+    creator = int(msg_id[1])
     if running_as_cc():
         if creator not in hb_map:
             hb_map[creator] = 0
@@ -1173,15 +1173,15 @@ async def image_sending_loop():
             await asyncio.sleep(PHOTO_SENDING_INTERVAL)
 
 # If N messages seen in the last M minutes.
-def scan_process(mid, msg):
-    # Input: mid: bytes, msg: bytes containing node address; Output: None (updates seen neighbours)
+def scan_process(msg_id, msg):
+    # Input: msg_id: bytes, msg: bytes containing node address; Output: None (updates seen neighbours)
     nodeaddr = int.from_bytes(msg)
     if nodeaddr not in seen_neighbours:
         logger.info(f"[NET] Adding nodeaddr {nodeaddr} to seen_neighbours")
         seen_neighbours.append(nodeaddr)
 
-async def spath_process(mid, msg):
-    # Input: mid: bytes, msg: str shortest-path data; Output: None (updates shortest_path_to_cc and propagates)
+async def spath_process(msg_id, msg):
+    # Input: msg_id: bytes, msg: str shortest-path data; Output: None (updates shortest_path_to_cc and propagates)
     global shortest_path_to_cc
     if running_as_cc():
         # logger.info(f"Ignoring shortest path since I am cc")
@@ -1200,7 +1200,7 @@ async def spath_process(mid, msg):
             nsp = [my_addr] + spath
             nmsg = ",".join([str(x) for x in nsp])
             logger.info(f"[NET] Propogating spath from {spath} to {nmsg}")
-            asyncio.create_task(send_msg("S", int(mid[1]), nmsg.encode(), n))
+            asyncio.create_task(send_msg("S", int(msg_id[1]), nmsg.encode(), n))
 
 def process_message(data, rssi=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
@@ -1216,49 +1216,49 @@ def process_message(data, rssi=None):
         logger.warning(f"[LORA] flakiness dropping {data}")
         return True
     
-    mid, mst, creator, sender, receiver, msg = parsed
+    msg_id, msg_typ, creator, sender, receiver, msg = parsed
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
     recv_msg_count[sender] += 1
     if receiver != -1 and my_addr != receiver:
         logger.info(f"[LORA] Strange that {my_addr} is not as {receiver}")
-        logger.warning(f"[LORA] skipping message as it is not for me but for {receiver} : {mid}")
+        logger.warning(f"[LORA] skipping message as it is not for me but for {receiver} : {msg_id}")
         return
     if receiver == -1 :
         logger.info(f"[LORA] Processing broadcast message : {data} : {parsed}")
-    msgs_recd.append((mid, msg, time_msec()))
-    ackmessage = mid
-    if mst == "N":
-        scan_process(mid, msg)
-    elif mst == "V":
+    msgs_recd.append((msg_id, msg, time_msec()))
+    ackmessage = msg_id
+    if msg_typ == "N":
+        scan_process(msg_id, msg)
+    elif msg_typ == "V":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-    elif mst == "S":
-        asyncio.create_task(spath_process(mid, msg.decode()))
-    elif mst == "H":
+    elif msg_typ == "S":
+        asyncio.create_task(spath_process(msg_id, msg.decode()))
+    elif msg_typ == "H":
         # Validate HB message payload length for encrypted messages
         if ENCRYPTION_ENABLED:
             # RSA encrypted payload should be exactly 128 bytes
             if len(msg) != 128:
                 logger.warning(
                     f"[HB] Invalid payload length: {len(msg)} bytes, expected 128 bytes for encrypted message. "
-                    f"MID: {mid}, may be corrupted or incomplete."
+                    f"MID: {msg_id}, may be corrupted or incomplete."
                 )
                 # Still try to process, but log the issue
-        asyncio.create_task(hb_process(mid, msg, sender))
+        asyncio.create_task(hb_process(msg_id, msg, sender))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-    elif mst == "C":
-        asyncio.create_task(command_process(mid, msg))
-    elif mst == "B":
+    elif msg_typ == "C":
+        asyncio.create_task(command_process(msg_id, msg))
+    elif msg_typ == "B":
         asyncio.create_task(acquire_image_lock())
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
         try:
             begin_chunk(msg.decode())
         except Exception as e:
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
-    elif mst == "I":
+    elif msg_typ == "I":
         add_chunk(msg)
-    elif mst == "E":
-        alldone, missing_str, cid, recompiled, creator = end_chunk(mid, msg.decode())
+    elif msg_typ == "E":
+        alldone, missing_str, cid, recompiled, creator = end_chunk(msg_id, msg.decode())
         if alldone:
             release_image_lock()
             global image_in_progress
@@ -1273,13 +1273,13 @@ def process_message(data, rssi=None):
         else:
             ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-    elif mst == "A":
+    elif msg_typ == "A":
         # ACK messages are already added to msgs_recd at line 1267
         # They are matched by ack_time() function which searches msgs_recd
         # No additional processing needed for ACK messages
-        logger.debug(f"[ACK] Received ACK message: {mid}, payload: {msg}")
+        logger.debug(f"[ACK] Received ACK message: {msg_id}, payload: {msg}")
     else:
-        logger.info(f"[LORA] Unseen messages type {mst} in {msg}")
+        logger.info(f"[LORA] Unseen messages type {msg_typ} in {msg}")
     return True
 
 # ---------------------------------------------------------------------------
@@ -1493,8 +1493,8 @@ def execute_command(command):
         logger.info(f"Resetting maching")
         machine.reset()
 
-async def command_process(mid, msg):
-    # Input: mid: bytes, msg: bytes command payload; Output: None (executes or forwards command)
+async def command_process(msg_id, msg):
+    # Input: msg_id: bytes, msg: bytes command payload; Output: None (executes or forwards command)
     try:
         msgstr = msg.decode()
     except Exception as e:
