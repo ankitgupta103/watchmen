@@ -273,6 +273,7 @@ URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 # ---------------------------------------------------------------------------
 # TRANSFER MODE Lock
 # ---------------------------------------------------------------------------
+TRANSMODE_LOCK_TIME = 180
 def get_transmode_lock(): # check and just lock for image
     global image_in_progress
     if image_in_progress == True: # TRANS MODE already in use
@@ -285,7 +286,7 @@ async def keep_transmode_lock():
     global image_in_progress
     image_in_progress = True
     logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE started <@@@@@@@@@@")
-    await asyncio.sleep(120)
+    await asyncio.sleep(TRANSMODE_LOCK_TIME)
     if image_in_progress: # TODO, these has to handled using someuniqueness
         logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended <@@@@@@@@@@")
         image_in_progress = False
