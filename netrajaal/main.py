@@ -90,18 +90,17 @@ shortest_path_to_cc = []
 seen_neighbours = []
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
-# COMMAND CENTERS
+# COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7194025':
     my_addr = 219
-elif uid == b'e076465dd7090d1c':
-    my_addr = 225
     shortest_path_to_cc = []
-
-# OTHER NODES
-# e076465dd7193a09
-elif uid ==  b'e076465dd7194211':
-    my_addr = 221
+elif uid == b'e076465dd7193a09':
+    my_addr = 225
     shortest_path_to_cc = [219]
+elif uid ==  b'e076465dd7090d1c':
+    my_addr = 221
+    shortest_path_to_cc = [225, 219]
+
 elif uid == b'e076465dd7091027':
     my_addr = 222
     shortest_path_to_cc = []
