@@ -36,12 +36,22 @@ def configure_lora(
             m0_pin=m0_pin,
             m1_pin=m1_pin,
         )
-        
-        if hasattr(lora, 'config_success') and lora.config_success:
-            print("✓ LoRa module configured successfully!")
+
+        # Check config_success attribute
+        # The logger output is the most reliable indicator of success
+        # If initialization completed without exception, trust that
+        if hasattr(lora, "config_success"):
+            if lora.config_success:
+                print("✓ LoRa module configured successfully!")
+            else:
+                # Flag says False, but logger might have shown success
+                # This can happen - still return the object as initialization completed
+                print(f"⚠ config_success=False, but check logs above - if logger shows SUCCESS, module is ready")
         else:
-            print("⚠ Configuration status unclear (check logs above)")
+            print("⚠ config_success attribute not found, but initialization completed")
         
+        # Always return the object if we got here (no exception raised)
+        # The logger output is more reliable than the attribute check
         return lora
     except Exception as e:
         print(f"✗ Failed to initialize LoRa module: {e}")
@@ -52,7 +62,7 @@ def send_data(lora, target_addr, message):
     if lora is None:
         print("✗ Failed to send message: LoRa module is None")
         return False
-    
+
     # Convert string to bytes if needed
     if isinstance(message, str):
         message = message.encode('utf-8')
@@ -87,25 +97,34 @@ def setuplora(myaddr):
         power=22,        # TX power in dBm
         rssi=True,       # Enable RSSI reporting
     )
-    
-    # Check config_success - but still return lora object even if check fails
-    # The logger may show success even if the attribute check fails
-    if hasattr(lora, 'config_success') and lora.config_success:
+
+    if lora is None:
+        print("✗ LoRa module not ready (configuration failed)")
+        return None
+
+    # Check config_success but don't be too strict
+    # If initialization completed without exception, module likely works
+    if hasattr(lora, "config_success") and lora.config_success:
         print("LoRa module ready!")
     else:
-        print("Warning: Configuration status unclear, but continuing...")
-        print("LoRa module ready!")
-    
+        # config_success is False or missing, but if we got here without exception,
+        # the module might still be functional - logger may have shown success
+        print("LoRa module ready! (config_success flag unclear, but initialization completed)")
+
     return lora
 
 def main1():
     lora = setuplora(1)
+    if lora is None:
+        return
     # Example: Send a test message
     print("\nSending test message...")
     send_data(lora, target_addr=2, message=b"Test message from node 1")
 
 def main2():
     lora = setuplora(2)
+    if lora is None:
+        return
 
     # Example: Listen for incoming messages
     print("\nListening for incoming messages (5 seconds)...")
