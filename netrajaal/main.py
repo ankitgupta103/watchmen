@@ -10,6 +10,7 @@ import os                   # file system access
 import time
 import binascii
 import machine
+from machine import LED
 import sys
 import random
 import ubinascii
@@ -22,6 +23,8 @@ import sx1262
 import gps_driver
 from cellular_driver import Cellular
 import detect
+
+led = LED("LED_BLUE")
 
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
@@ -94,7 +97,7 @@ elif uid == b'e076465dd7090d1c':
     my_addr = 223
 
 # OTHER NODES
-elif uid == b'e076465dd7091027':
+elif uid == b'e076465dd7193a09':
     my_addr = 221
     shortest_path_to_cc = [219]
 elif uid ==  b'e076465dd7194211':
@@ -1027,6 +1030,7 @@ async def person_detection_loop():
         # Motion detected - capture image
         img = None
         try:
+            led.on()
             logger.info(f"[PIR] Motion detected - (interrupt) capturing image...")
             img = sensor.snapshot()
             person_image_count += 1
@@ -1037,6 +1041,7 @@ async def person_detection_loop():
             raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
             logger.info(f"[PIR] Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
             img.save(raw_path)
+            led.off()
 
             # Limit queue size to prevent memory overflow
             if len(images_to_send) >= MAX_IMAGES_TO_SEND:
@@ -1226,7 +1231,7 @@ def process_message(data, rssi=None):
     if random.randint(1,100) <= FLAKINESS:
         logger.warning(f"[LORA] flakiness dropping {data}")
         return True
-    
+
     msg_id, msg_typ, creator, sender, receiver, msg = parsed
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
