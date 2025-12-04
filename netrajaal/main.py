@@ -312,7 +312,7 @@ def delete_transmode_lock():
 # ---------------------------------------------------------------------------
 # Network Topology Helpers
 # ---------------------------------------------------------------------------
-def possible_paths(sender=None):
+def possible_paths(sender=None): # TODO, can be deleted later, reachble_nodes_of_path is new fun
     # Input: sender: int or None; Output: list of int possible next-hop addresses
     possible_paths = []
     sp0 = None
@@ -323,6 +323,14 @@ def possible_paths(sender=None):
         if x != my_addr and x != sender and x != sp0:
             possible_paths.append(x)
     return possible_paths
+
+def reachble_nodes_of_path(sender=None):
+    reachble_nodes = []
+    for x in shortest_path_to_cc:
+        if x != my_addr and x != sender and x in seen_neighbours:
+            reachble_nodes.append(x)
+            break # TODO remove this, for shortest paths usage
+    return reachble_nodes
 
 loranode = None
 
@@ -916,7 +924,6 @@ hb_map = {}
 
 async def hb_process(msg_id, msgbytes, sender):
     # Input: msg_id: bytes, msgbytes: bytes, sender: int; Output: None (routes or logs heartbeat data)
-    destlist = possible_paths(sender)
     creator = int(msg_id[1])
     if running_as_cc():
         if creator not in hb_map:
@@ -949,17 +956,19 @@ async def hb_process(msg_id, msgbytes, sender):
             logger.info(f"[HB] Only for debugging : HB msg = {msgbytes.decode()}")
         # asyncio.create_task(sim_upload_hb(msgbytes))
         return
-    elif len(destlist) > 0:
-        sent_succ = False
-        for peer_addr in destlist:
-            logger.info(f"[HB] Propogating H to {peer_addr}")
-            sent_succ = await send_msg("H", creator, msgbytes, peer_addr)
-            if sent_succ:
-                break
-        if not sent_succ:
-            logger.error(f"[HB] forwarding HB to possible_paths : {destlist}")
     else:
-        logger.error(f"[HB] can't forward HB because I dont have Spath yet")
+        destlist = reachble_nodes_of_path(sender)
+        if len(destlist) > 0:
+            sent_succ = False
+            for peer_addr in destlist:
+                logger.info(f"[HB] Propogating H to {peer_addr}")
+                sent_succ = await send_msg("H", creator, msgbytes, peer_addr)
+                if sent_succ: # Return as soon as sent to one of paths
+                    break
+            if not sent_succ:
+                logger.error(f"[HB] forwarding HB to possible_paths : {destlist}")
+        else:
+            logger.error(f"[HB] can't forward HB because I dont have Spath yet")
 
 images_saved_at_cc = []
 
@@ -996,15 +1005,15 @@ async def img_process(cid, msg, creator, sender):
             # Help GC reclaim memory
             gc.collect()
     else:
-        destlist = possible_paths(sender)
+        destlist = reachble_nodes_of_path(sender)
         sent_succ = False
         for peer_addr in destlist:
             logger.info(f"[IMG] Propogating Image to {peer_addr}")
             sent_succ = await send_msg("P", creator, msg, peer_addr)
-            if sent_succ:
+            if sent_succ: # Return as soon as sent to any node of path
                 break
         if not sent_succ:
-            logger.info(f"[IMG] Failed propagating image to possible_paths : {possible_paths}")
+            logger.info(f"[IMG] Failed propagating image to destlist : {destlist}")
 
 # ---------------------------------------------------------------------------
 # Sensor Capture and Image Transmission
@@ -1094,17 +1103,17 @@ async def person_detection_loop():
                 gc.collect()  # Help GC reclaim memory immediately
 
 
-async def send_image_to_mesh(imgbytes):
+async def send_image_to_mesh(imgbytes): # trying to send any one of possible path
     # Input: imgbytes: bytes raw image; Output: bool indicating if image was forwarded successfully
     logger.info(f"[IMG] Sending {len(imgbytes)} bytes to the network")
     msgbytes = encrypt_if_needed("P", imgbytes)
     sent_succ = False
-    destlist = possible_paths(None)
+    destlist = reachble_nodes_of_path(None)
     for peer_addr in destlist:
         # asyncio.create_task(keep_transmode_lock()) # TODO, lock not needed here
         sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
         # delete_transmode_lock() # TODO, lock not needed here
-        if sent_succ:
+        if sent_succ: # Return as soon as sent to one
             return True
     return False
 
@@ -1121,7 +1130,7 @@ async def image_sending_loop():
         if len(images_to_send) == 0:
             logger.debug("[NET] No images to send, skipping sending...")
             continue
-        destlist = possible_paths(None)
+        destlist = reachble_nodes_of_path(None)
         if not running_as_cc() and len(destlist) == 0:
             logger.warning("[NET] No shortest path yet so cant send")
             continue
@@ -1229,14 +1238,14 @@ def scan_process(msg_id, msg):
         logger.info(f"[NET] Adding nodeaddr {nodeaddr} to seen_neighbours")
         seen_neighbours.append(nodeaddr)
 
-async def spath_process(msg_id, msg):
+async def sync_and_transfer_spath(msg_id, msg):
     # Input: msg_id: bytes, msg: str shortest-path data; Output: None (updates shortest_path_to_cc and propagates)
     global shortest_path_to_cc
     if running_as_cc():
         # logger.info(f"Ignoring shortest path since I am cc")
         return
     if len(msg) == 0:
-        logger.info(f"[NET] Empty spath")
+        logger.error(f"[NET] Empty spath message received")
         return
     spath = [int(x) for x in msg.split(",")]
     if my_addr in spath:
@@ -1244,9 +1253,9 @@ async def spath_process(msg_id, msg):
         return
     if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
         logger.info(f"[NET] Updating spath to {spath}")
-        shortest_path_to_cc = spath
+        # shortest_path_to_cc = spath # TODO we made fixed shortest path
         for n in seen_neighbours:
-            nsp = [my_addr] + spath
+            nsp = [my_addr] + shortest_path_to_cc
             nmsg = ",".join([str(x) for x in nsp])
             logger.info(f"[NET] Propogating spath from {spath} to {nmsg}")
             asyncio.create_task(send_msg("S", int(msg_id[1]), nmsg.encode(), n))
@@ -1284,7 +1293,7 @@ def process_message(data, rssi=None):
     elif msg_typ == "V":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "S":
-        asyncio.create_task(spath_process(msg_id, msg.decode()))
+        asyncio.create_task(sync_and_transfer_spath(msg_id, msg.decode()))
     elif msg_typ == "H":
         # Validate HB message payload length for encrypted messages
         if ENCRYPTION_ENABLED:
@@ -1440,7 +1449,6 @@ async def send_heartbeat():
             logger.info(f"[HB] Sending HB to {peer_addr}")
             sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
             if sent_succ:
-                consecutive_hb_failures = 0
                 logger.info(f"[HB] Heartbeat sent successfully to {peer_addr}")
                 return True
     return False
@@ -1487,7 +1495,7 @@ async def keep_sending_heartbeat():
         else:
             await asyncio.sleep(HB_WAIT_2 + random.randint(1, 120))
 
-async def send_scan():
+async def neighbour_scan():
     # Input: None; Output: None (broadcasts discovery messages periodically)
     global seen_neighbours
     i = 1
@@ -1507,7 +1515,7 @@ async def send_scan():
         logger.info(f"[STATUS] {my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
-async def send_spath():
+async def initiate_spath_pings():
     # Input: None; Output: None (periodically shares shortest-path information with neighbours)
     i = 1
     while True:
@@ -1911,16 +1919,16 @@ async def main():
             await init_wifi()
 
         # await init_sim()
-        asyncio.create_task(send_scan())
+        asyncio.create_task(neighbour_scan())
         await asyncio.sleep(2)
-        asyncio.create_task(send_spath())
+        asyncio.create_task(initiate_spath_pings()) # TODO enable for dynamic path
         #asyncio.create_task(listen_commands_from_cloud())
         asyncio.create_task(keep_sending_heartbeat())
         # asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     else:
         logger.info(f"[INIT] ===> Starting unit node <===")
-        asyncio.create_task(send_scan())
+        asyncio.create_task(neighbour_scan())
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
