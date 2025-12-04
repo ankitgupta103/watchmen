@@ -78,10 +78,9 @@ def read_data(lora, timeout_ms=1000):
     return (None, None)
 
 
-def main():
-
+def setuplora(myaddr):
     lora = configure_lora(
-        addr=1,          # This node's address
+        addr=myaddr,          # This node's address
         freq=868,        # Frequency in MHz
         power=22,        # TX power in dBm
         rssi=True,       # Enable RSSI reporting
@@ -92,13 +91,17 @@ def main():
         return
     
     print("LoRa module ready!")
+    return lora
 
-
-    
+def main1():
+    lora = setuplora(1)
     # Example: Send a test message
     print("\nSending test message...")
     send_data(lora, target_addr=2, message=b"Test message from node 1")
-    
+
+def main2():
+    lora = setuplora(2)
+
     # Example: Listen for incoming messages
     print("\nListening for incoming messages (5 seconds)...")
     msg, rssi = read_data(lora, timeout_ms=5000)
