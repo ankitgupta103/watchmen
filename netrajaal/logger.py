@@ -14,7 +14,7 @@ except ImportError:
         pass
 
 DEFAULT_LOG_LEVEL = "INFO"
-DEFAULT_SAVE_LOG = True
+DEFAULT_SAVE_LOG = False # TODO, enable to save it to file
 
 
 # Initialize RTC if available

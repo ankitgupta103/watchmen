@@ -610,9 +610,7 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
                 logger.info(
                     f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
                 )
-                if check_transmode_lock(): # check old logs is still in progress or not
-                    asyncio.create_task(keep_transmode_lock())
-                else:
+                if not check_transmode_lock(): # check old logs is still in progress or not
                     logger.warning(f"TRANS MODE ended, marking data send as failed, timeout error")
                     return False
                 for mis_chunk in missing_chunks:
@@ -761,8 +759,8 @@ def end_chunk(msg_id, msg):
     cid = msg
     creator = int(msg_id[1])
     missing = get_missing_chunks(cid)
-    logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
     if len(missing) > 0:
+        logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
         missing_str = str(missing[0])
         for i in range(1, len(missing)):
             if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < FRAME_SIZE:
