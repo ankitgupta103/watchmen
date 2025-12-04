@@ -270,49 +270,49 @@ recv_msg_count = {}
 
 URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 
-# ---------------------------------------------------------------------------
-# Image Lock Coordination
-# ---------------------------------------------------------------------------
 
-def get_image_lock(): # check and just lock for image
+# ---------------------------------------------------------------------------
+# TRANSFER MODE Lock
+# ---------------------------------------------------------------------------
+def get_transmode_lock(): # check and just lock for image
     global image_in_progress
-    if image_in_progress == True: # TRANSFER MODE already in use
+    if image_in_progress == True: # TRANS MODE already in use
         return False
     image_in_progress = True
     return True
     
-async def keep_image_lock():
+async def keep_transmode_lock():
     # Input: None; Output: None (sets image_in_progress flag with auto release after timeout)
     global image_in_progress
     image_in_progress = True
-    logger.info(f"[IMG] @@@@@@@@@@> TRANSFER MODE started <@@@@@@@@@@")
+    logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE started <@@@@@@@@@@")
     await asyncio.sleep(120)
-    if image_in_progress:
-        logger.info(f"[IMG] @@@@@@@@@@> TRANSFER MODE ended <@@@@@@@@@@")
+    if image_in_progress: # TODO, these has to handled using someuniqueness
+        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended <@@@@@@@@@@")
         image_in_progress = False
     else:
-        logger.warning(f"[IMG] @@@@@@@@@@> TRANSFER MODE already ended, ??? <@@@@@@@@@@")
+        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, ??? <@@@@@@@@@@")
 
-def check_image_lock(): # check if transfer lock is active or not
+def check_transmode_lock(): # check if transfer lock is active or not
     global image_in_progress
     if image_in_progress:
         return True
     else:
         return False
 
-def delete_image_lock():
+def delete_transmode_lock():
     # Input: None; Output: None (clears image_in_progress flag)
     global image_in_progress
-    if image_in_progress:
-        logger.info(f"[IMG] @@@@@@@@@@> TRANSFER MODE ended, curr_state2 = {image_in_progress} <@@@@@@@@@@")
+    if image_in_progress:  # TODO, these has to handled using someuniqueness
+        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended, curr_state2 = {image_in_progress} <@@@@@@@@@@")
         image_in_progress = False
     else:
-        logger.warning(f"[IMG] @@@@@@@@@@> TRANSFER MODE already ended, check why called <@@@@@@@@@@")
+        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, ???? <@@@@@@@@@@")
+
 
 # ---------------------------------------------------------------------------
 # Network Topology Helpers
 # ---------------------------------------------------------------------------
-
 def possible_paths(sender=None):
     # Input: sender: int or None; Output: list of int possible next-hop addresses
     possible_paths = []
@@ -563,12 +563,12 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
         img_id = get_rand()
         chunks = make_chunks(msgbytes)
         logger.info(f"[CHUNK] chunking msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, for dest={dest}, img_id:{img_id} into {len(chunks)} chunks")
-        if get_image_lock():
-            asyncio.create_task(keep_image_lock()) # TODO test as moved outside loop
+        if get_transmode_lock():
+            asyncio.create_task(keep_transmode_lock()) # TODO test as moved outside loop
             big_succ, _ = await send_single_msg("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
             if not big_succ:
                 logger.info(f"[CHUNK] Failed sending chunk begin")
-                delete_image_lock()
+                delete_transmode_lock()
                 return False
             
             for i in range(len(chunks)):
@@ -596,25 +596,25 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
                     or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
                 ):
                     logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
-                    delete_image_lock()
+                    delete_transmode_lock()
                     return True
 
                 logger.info(
                     f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
                 )
-                if check_image_lock(): # check old logs is still in progress or not
-                    asyncio.create_task(keep_image_lock())
+                if check_transmode_lock(): # check old logs is still in progress or not
+                    asyncio.create_task(keep_transmode_lock())
                 else:
-                    logger.warning(f"TRANSFER MODE ended, marking data send as failed, timeout error")
+                    logger.warning(f"TRANS MODE ended, marking data send as failed, timeout error")
                     return False
                 for mis_chunk in missing_chunks:
                     await asyncio.sleep(CHUNK_SLEEP)
                     chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
                     _ = await send_single_msg("I", creator, chunkbytes, dest)
-            delete_image_lock()
+            delete_transmode_lock()
             return False
         else: 
-            logger.warning(f"TRANSFER MODE already in use, could not get lock...")
+            logger.warning(f"TRANS MODE already in use, could not get lock...")
             return False
         
 
@@ -698,7 +698,7 @@ def add_chunk(msgbytes):
     if len(msgbytes) < 5:
         logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
         return
-    # asyncio.create_task(keep_image_lock()) # TODO not needed here
+    # asyncio.create_task(keep_transmode_lock()) # TODO not needed here
     cid = msgbytes[0:3].decode()
     citer = int.from_bytes(msgbytes[3:5])
     #logger.info(f"Got chunk id {citer}")
@@ -1102,9 +1102,9 @@ async def send_image_to_mesh(imgbytes):
     sent_succ = False
     destlist = possible_paths(None)
     for peer_addr in destlist:
-        # asyncio.create_task(keep_image_lock()) # TODO, lock not needed here
+        # asyncio.create_task(keep_transmode_lock()) # TODO, lock not needed here
         sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
-        # delete_image_lock() # TODO, lock not needed here
+        # delete_transmode_lock() # TODO, lock not needed here
         if sent_succ:
             return True
     return False
@@ -1301,26 +1301,26 @@ def process_message(data, rssi=None):
     elif msg_typ == "C":
         asyncio.create_task(command_process(msg_id, msg))
     elif msg_typ == "B":
-        if get_image_lock():
-            asyncio.create_task(keep_image_lock())
+        if get_transmode_lock():
+            asyncio.create_task(keep_transmode_lock())
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             try:
                 begin_chunk(msg.decode())
             except Exception as e:
                 logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
         else:
-            logger.warning(f"TRANSFER MODE already in use, could not get lock...")
+            logger.warning(f"TRANS MODE already in use, could not get lock...")
             return False
     elif msg_typ == "I":
-        if check_image_lock():
+        if check_transmode_lock():
             add_chunk(msg)
         else:
-            logger.warning(f"TRANSFER MODE already ended, ignoring chunk...")
+            logger.warning(f"TRANS MODE already ended, ignoring chunk...")
             return False
     elif msg_typ == "E":
         alldone, missing_str, cid, recompiled, creator = end_chunk(msg_id, msg.decode())
         if alldone:
-            delete_image_lock()
+            delete_transmode_lock()
             # Also when it fails
             ackmessage += b":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
@@ -1582,7 +1582,7 @@ async def print_summary_and_flush_logs():
         await asyncio.sleep(30)
         global image_in_progress
         if image_in_progress:
-            logger.debug(f"TRANSFER MODE ongoing...")
+            logger.debug(f"TRANS MODE ongoing...")
             await asyncio.sleep(200)
             continue
         free_mem = get_free_memory()
