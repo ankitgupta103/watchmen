@@ -59,6 +59,17 @@ def configure_lora(
 
 
 def send_data(lora, target_addr, message):
+    """
+    Send raw data to a target address.
+    
+    Args:
+        lora (sx126x): LoRa module object
+        target_addr (int): Destination node address (0-65535, 65535=broadcast)
+        message (bytes or str): Raw message to send (will be converted to bytes if string)
+    
+    Returns:
+        bool: True if message was sent, False otherwise
+    """
     if lora is None:
         print("✗ Failed to send message: LoRa module is None")
         return False
@@ -78,7 +89,16 @@ def send_data(lora, target_addr, message):
 
 
 def read_data(lora, timeout_ms=1000):
-
+    """
+    Read/receive raw data from the LoRa module.
+    
+    Args:
+        lora (sx126x): LoRa module object
+        timeout_ms (int): Timeout in milliseconds (default: 1000)
+    
+    Returns:
+        tuple: (message_bytes, rssi_value) or (None, None) if no data
+    """
     start_time = time.ticks_ms()
     
     while time.ticks_diff(time.ticks_ms(), start_time) < timeout_ms:
@@ -117,7 +137,7 @@ def main1():
     lora = setuplora(1)
     if lora is None:
         return
-    # Example: Send a test message
+    # Example: Send a test message (raw data, no prefix)
     print("\nSending test message...")
     send_data(lora, target_addr=2, message=b"Test message from node 1")
 
