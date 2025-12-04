@@ -94,18 +94,20 @@ uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for 
 if uid == b'e076465dd7194025':
     my_addr = 219
 elif uid == b'e076465dd7090d1c':
-    my_addr = 223
+    my_addr = 225
+    shortest_path_to_cc = []
 
 # OTHER NODES
-elif uid == b'e076465dd7193a09':
+# e076465dd7193a09
+elif uid ==  b'e076465dd7194211':
     my_addr = 221
     shortest_path_to_cc = [219]
-elif uid ==  b'e076465dd7194211':
+elif uid == b'e076465dd7091027':
     my_addr = 222
-    shortest_path_to_cc = [223]
+    shortest_path_to_cc = []
 elif uid == b'e076465dd7091843':
-    my_addr = 225
-    shortest_path_to_cc = [223, 221, 219]
+    my_addr = 223
+    shortest_path_to_cc = [222]
 
 else:
     logger.error("error in main.py: Unknown device ID for " + omv.board_id())
@@ -272,22 +274,40 @@ URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 # Image Lock Coordination
 # ---------------------------------------------------------------------------
 
-async def acquire_image_lock():
+def get_image_lock(): # check and just lock for image
+    global image_in_progress
+    if image_in_progress == True: # TRANSFER MODE already in use
+        return False
+    image_in_progress = True
+    return True
+    
+async def keep_image_lock():
     # Input: None; Output: None (sets image_in_progress flag with auto release after timeout)
     global image_in_progress
     image_in_progress = True
+    logger.info(f"[IMG] @@@@@@@@@@> TRANSFER MODE started <@@@@@@@@@@")
     await asyncio.sleep(120)
-    logger.info(f"[IMG] @@@@@> TRANSFER MODE started <@@@@@")
     if image_in_progress:
-        logger.info(f"[IMG] @@@@@> TRANSFER MODE ended, curr_state = {image_in_progress} <@@@@@")
+        logger.info(f"[IMG] @@@@@@@@@@> TRANSFER MODE ended <@@@@@@@@@@")
         image_in_progress = False
+    else:
+        logger.warning(f"[IMG] @@@@@@@@@@> TRANSFER MODE already ended, ??? <@@@@@@@@@@")
 
-def release_image_lock():
+def check_image_lock(): # check if transfer lock is active or not
+    global image_in_progress
+    if image_in_progress:
+        return True
+    else:
+        return False
+
+def delete_image_lock():
     # Input: None; Output: None (clears image_in_progress flag)
     global image_in_progress
     if image_in_progress:
-        logger.info(f"[IMG] @@@@@> TRANSFER MODE ended, curr_state2 = {image_in_progress} <@@@@@")
+        logger.info(f"[IMG] @@@@@@@@@@> TRANSFER MODE ended, curr_state2 = {image_in_progress} <@@@@@@@@@@")
         image_in_progress = False
+    else:
+        logger.warning(f"[IMG] @@@@@@@@@@> TRANSFER MODE already ended, check why called <@@@@@@@@@@")
 
 # ---------------------------------------------------------------------------
 # Network Topology Helpers
@@ -536,54 +556,67 @@ def encrypt_if_needed(msg_typ, msg):
 async def send_msg_internal(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
     if len(msgbytes) < FRAME_SIZE:
-        logger.info(f"[LORA] Sending msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet")
+        logger.info(f"[LORA] Sending msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, dest={dest}, single packet")
         succ, _ = await send_single_msg(msg_typ, creator, msgbytes, dest)
         return succ
     else:
         img_id = get_rand()
         chunks = make_chunks(msgbytes)
-        logger.info(f"[CHUNK] chunking msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id} into {len(chunks)} chunks")
-        succ, _ = await send_single_msg("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
-        if not succ:
-            logger.info(f"[CHUNK] Failed sending chunk begin")
-            return False
-        asyncio.create_task(acquire_image_lock()) # TODO test as moved outside loop
-        for i in range(len(chunks)):
-            if i % 10 == 0:
-                logger.info(f"[CHUNK] Sending chunk {i}")
-            await asyncio.sleep(CHUNK_SLEEP)
-            chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
-            _ = await send_single_msg("I", creator, chunkbytes, dest)
-        for retry_i in range(20):
-            if retry_i == 0:
-                await asyncio.sleep(0.1)  # Faster first check
-            else:
+        logger.info(f"[CHUNK] chunking msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, for dest={dest}, img_id:{img_id} into {len(chunks)} chunks")
+        if get_image_lock():
+            asyncio.create_task(keep_image_lock()) # TODO test as moved outside loop
+            big_succ, _ = await send_single_msg("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
+            if not big_succ:
+                logger.info(f"[CHUNK] Failed sending chunk begin")
+                delete_image_lock()
+                return False
+            
+            for i in range(len(chunks)):
+                if i % 10 == 0:
+                    logger.info(f"[CHUNK] Sending chunk {i}")
                 await asyncio.sleep(CHUNK_SLEEP)
-            succ, missing_chunks = await send_single_msg("E", creator, img_id, dest)
-            if not succ:
-                logger.info(f"[CHUNK] Failed sending chunk end")
-                break
-
-            # Treat various ACK forms as success:
-            # - [-1]   : explicit "all done" from receiver
-            # - []/None: truncated or minimal ACK with no missing list (we assume success)
-            if (
-                missing_chunks is None
-                or len(missing_chunks) == 0
-                or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
-            ):
-                logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
-                return True
-
-            logger.info(
-                f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
-            )
-            asyncio.create_task(acquire_image_lock()) # TODO test as moved outside loop
-            for mis_chunk in missing_chunks:
-                await asyncio.sleep(CHUNK_SLEEP)
-                chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
+                chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
                 _ = await send_single_msg("I", creator, chunkbytes, dest)
-        return False
+            for retry_i in range(20):
+                if retry_i == 0:
+                    await asyncio.sleep(0.1)  # Faster first check
+                else:
+                    await asyncio.sleep(CHUNK_SLEEP)
+                succ, missing_chunks = await send_single_msg("E", creator, img_id, dest)
+                if not succ:
+                    logger.error(f"[CHUNK] Failed sending chunk end")
+                    break
+
+                # Treat various ACK forms as success:
+                # - [-1]   : explicit "all done" from receiver
+                # - []/None: truncated or minimal ACK with no missing list (we assume success)
+                if (
+                    missing_chunks is None
+                    or len(missing_chunks) == 0
+                    or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
+                ):
+                    logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
+                    delete_image_lock()
+                    return True
+
+                logger.info(
+                    f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
+                )
+                if check_image_lock(): # check old logs is still in progress or not
+                    asyncio.create_task(keep_image_lock())
+                else:
+                    logger.warning(f"TRANSFER MODE ended, marking data send as failed, timeout error")
+                    return False
+                for mis_chunk in missing_chunks:
+                    await asyncio.sleep(CHUNK_SLEEP)
+                    chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
+                    _ = await send_single_msg("I", creator, chunkbytes, dest)
+            delete_image_lock()
+            return False
+        else: 
+            logger.warning(f"TRANSFER MODE already in use, could not get lock...")
+            return False
+        
 
 async def send_msg(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
@@ -665,7 +698,7 @@ def add_chunk(msgbytes):
     if len(msgbytes) < 5:
         logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
         return
-    asyncio.create_task(acquire_image_lock())
+    # asyncio.create_task(keep_image_lock()) # TODO not needed here
     cid = msgbytes[0:3].decode()
     citer = int.from_bytes(msgbytes[3:5])
     #logger.info(f"Got chunk id {citer}")
@@ -1069,9 +1102,9 @@ async def send_image_to_mesh(imgbytes):
     sent_succ = False
     destlist = possible_paths(None)
     for peer_addr in destlist:
-        asyncio.create_task(acquire_image_lock())
+        # asyncio.create_task(keep_image_lock()) # TODO, lock not needed here
         sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
-        release_image_lock()
+        # delete_image_lock() # TODO, lock not needed here
         if sent_succ:
             return True
     return False
@@ -1117,13 +1150,16 @@ async def image_sending_loop():
                     encimgbytes = encrypt_if_needed("P", imgbytes)
                     logger.info(f"[IMG] Uploading encrypted image (size: {len(encimgbytes)} bytes)")
                     sent_succ = await upload_image(my_addr, encimgbytes)
+                    if not sent_succ:
+                        images_to_send.append(imagefile) # pushed to back of queue
+                        logger.info(f"[IMG] upload_image failed, image re-queued: {imagefile}")
+                        break
                 else:
                     sent_succ = await send_image_to_mesh(imgbytes)
-                if not sent_succ:
-                    images_to_send.append(imagefile) # pushed to back of queue
-                    logger.info(f"[IMG] Upload failed, image re-queued: {imagefile}")
-                    # If upload failed, wait longer before retrying
-                    break
+                    if not sent_succ:
+                        images_to_send.append(imagefile) # pushed to back of queue
+                        logger.info(f"[IMG] send_image_to_mesh failed, image re-queued: {imagefile}")
+                        break
 
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
@@ -1265,20 +1301,26 @@ def process_message(data, rssi=None):
     elif msg_typ == "C":
         asyncio.create_task(command_process(msg_id, msg))
     elif msg_typ == "B":
-        asyncio.create_task(acquire_image_lock())
-        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-        try:
-            begin_chunk(msg.decode())
-        except Exception as e:
-            logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
+        if get_image_lock():
+            asyncio.create_task(keep_image_lock())
+            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+            try:
+                begin_chunk(msg.decode())
+            except Exception as e:
+                logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
+        else:
+            logger.warning(f"TRANSFER MODE already in use, could not get lock...")
+            return False
     elif msg_typ == "I":
-        add_chunk(msg)
+        if check_image_lock():
+            add_chunk(msg)
+        else:
+            logger.warning(f"TRANSFER MODE already ended, ignoring chunk...")
+            return False
     elif msg_typ == "E":
         alldone, missing_str, cid, recompiled, creator = end_chunk(msg_id, msg.decode())
         if alldone:
-            release_image_lock()
-            global image_in_progress
-            image_in_progress = False
+            delete_image_lock()
             # Also when it fails
             ackmessage += b":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
@@ -1370,18 +1412,16 @@ def read_gps_from_file():
 async def send_heartbeat():
     # Input: None; Output: bool indicating whether heartbeat was successfully sent to a neighbour
     destlist = possible_paths(None)
-    logger.info(f"[HB] Will send HB to {destlist}")
-
     gps_coords = read_gps_from_file()
     gps_staleness = get_gps_file_staleness()
 
     # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
     hbmsgstr = f"{my_addr}:{time_sec()}:{total_image_count}:{person_image_count}:{gps_coords}:{gps_staleness}:{seen_neighbours}:{shortest_path_to_cc}"
-    logger.info(f"HBSTR = {hbmsgstr}")
     hbmsg = hbmsgstr.encode()
     msgbytes = encrypt_if_needed("H", hbmsg)
     sent_succ = False
     if running_as_cc():
+        
         # Convert bytes to base64 for JSON transmission, same as hb_process()
         if isinstance(msgbytes, bytes):
             hb_data = ubinascii.b2a_base64(msgbytes)
@@ -1392,10 +1432,11 @@ async def send_heartbeat():
                 "message_type": "heartbeat",
                 "heartbeat_data": hb_data,
             }
-        logger.info(f"[HB] Sending raw heartbeat data of length {len(msgbytes)} bytes")
+        logger.info(f"[HB] sending raw HB to cloud, len={len(msgbytes)}, msg:{hbmsgstr}")
         sent_succ = await upload_heartbeat(heartbeat_payload)
         return sent_succ
     else:
+        logger.info(f"[HB] sending HB to {destlist}, msg:{hbmsgstr}")
         for peer_addr in destlist:
             logger.info(f"[HB] Sending HB to {peer_addr}")
             sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
@@ -1853,6 +1894,9 @@ async def wifi_upload_hb(heartbeat_data):
 
 async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
+    global image_in_progress
+    image_in_progress = False
+    
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
@@ -1873,7 +1917,7 @@ async def main():
         asyncio.create_task(send_spath())
         #asyncio.create_task(listen_commands_from_cloud())
         asyncio.create_task(keep_sending_heartbeat())
-        asyncio.create_task(person_detection_loop())
+        # asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     else:
         logger.info(f"[INIT] ===> Starting unit node <===")
