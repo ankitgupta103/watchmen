@@ -54,19 +54,19 @@ def configure_lora(
         if configure:
             if hasattr(lora, "config_success"):
                 if lora.config_success:
-                    print("✓ LoRa module configured successfully!")
+                    print("  LoRa module configured successfully!")
                 else:
-                    print(f"⚠ config_success=False, but check logs above - if logger shows SUCCESS, module is ready")
+                    print(f"  config_success=False, but check logs above - if logger shows SUCCESS, module is ready")
             else:
-                print("⚠ config_success attribute not found, but initialization completed")
+                print("  config_success attribute not found, but initialization completed")
         else:
-            print("✓ LoRa module initialized (using saved configuration)")
+            print("  LoRa module initialized (using saved configuration)")
         
         # Always return the object if we got here (no exception raised)
         # The logger output is more reliable than the attribute check
         return lora
     except Exception as e:
-        print(f"✗ Failed to initialize LoRa module: {e}")
+        print(f"  Failed to initialize LoRa module: {e}")
         raise
 
 
@@ -83,7 +83,7 @@ def send_data(lora, target_addr, message):
         bool: True if message was sent, False otherwise
     """
     if lora is None:
-        print("✗ Failed to send message: LoRa module is None")
+        print("  Failed to send message: LoRa module is None")
         return False
 
     # Convert string to bytes if needed
@@ -93,10 +93,10 @@ def send_data(lora, target_addr, message):
     try:
         print(f"Sending to address {target_addr}: {message}")
         lora.send(target_addr, message)
-        print("✓ Message sent successfully")
+        print("  Message sent successfully")
         return True
     except Exception as e:
-        print(f"✗ Failed to send message: {e}")
+        print(f"  Failed to send message: {e}")
         return False
 
 
@@ -144,7 +144,7 @@ def setuplora(myaddr, configure=False):
     )
 
     if lora is None:
-        print("✗ LoRa module not ready (configuration failed)")
+        print("  LoRa module not ready (configuration failed)")
         return None
 
     # Check config_success but don't be too strict
@@ -177,9 +177,9 @@ def main2():
     if msg:
         try:
             msg_str = msg.decode('utf-8')
-            print(f"✓ Received message: {msg_str}")
+            print(f"  Received message: {msg_str}")
         except:
-            print(f"✓ Received message (bytes): {msg}")
+            print(f"  Received message (bytes): {msg}")
         if rssi is not None:
             print(f"  RSSI: {rssi} dBm")
     else:
