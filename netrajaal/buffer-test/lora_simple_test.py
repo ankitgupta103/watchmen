@@ -14,13 +14,23 @@ def configure_lora(
     crypt=0,
     m0_pin="P6",
     m1_pin="P7",
+    configure=True,
 ):
-
-    print(f"Configuring LoRa module...")
-    print(f"  Address: {addr}")
-    print(f"  Frequency: {freq} MHz")
-    print(f"  Power: {power} dBm")
-    print(f"  RSSI: {rssi}")
+    """
+    Configure and initialize the LoRa module.
+    
+    Args:
+        configure (bool): If True, configure the module (save to EEPROM permanently).
+                         If False, skip configuration and assume module is already configured.
+    """
+    if configure:
+        print(f"Configuring LoRa module...")
+        print(f"  Address: {addr}")
+        print(f"  Frequency: {freq} MHz")
+        print(f"  Power: {power} dBm")
+        print(f"  RSSI: {rssi}")
+    else:
+        print(f"Initializing LoRa module (skipping configuration - using saved settings)...")
     
     try:
         lora = sx126x(
@@ -35,20 +45,22 @@ def configure_lora(
             crypt=crypt,
             m0_pin=m0_pin,
             m1_pin=m1_pin,
+            skip_config=not configure,
         )
 
         # Check config_success attribute
         # The logger output is the most reliable indicator of success
         # If initialization completed without exception, trust that
-        if hasattr(lora, "config_success"):
-            if lora.config_success:
-                print("✓ LoRa module configured successfully!")
+        if configure:
+            if hasattr(lora, "config_success"):
+                if lora.config_success:
+                    print("✓ LoRa module configured successfully!")
+                else:
+                    print(f"⚠ config_success=False, but check logs above - if logger shows SUCCESS, module is ready")
             else:
-                # Flag says False, but logger might have shown success
-                # This can happen - still return the object as initialization completed
-                print(f"⚠ config_success=False, but check logs above - if logger shows SUCCESS, module is ready")
+                print("⚠ config_success attribute not found, but initialization completed")
         else:
-            print("⚠ config_success attribute not found, but initialization completed")
+            print("✓ LoRa module initialized (using saved configuration)")
         
         # Always return the object if we got here (no exception raised)
         # The logger output is more reliable than the attribute check
@@ -110,12 +122,25 @@ def read_data(lora, timeout_ms=1000):
     return (None, None)
 
 
-def setuplora(myaddr):
+def setuplora(myaddr, configure=False):
+    """
+    Setup LoRa module.
+    
+    Args:
+        myaddr (int): Node address
+        configure (bool): If True, configure module (save to EEPROM permanently).
+                         If False, skip configuration and use saved settings (faster startup).
+                         
+    Note:
+        Set configure=True the first time or when you need to change settings.
+        Set configure=False for faster startup after initial configuration.
+    """
     lora = configure_lora(
         addr=myaddr,          # This node's address
         freq=868,        # Frequency in MHz
         power=22,        # TX power in dBm
         rssi=True,       # Enable RSSI reporting
+        configure=configure,  # Configure flag: True = configure, False = skip
     )
 
     if lora is None:

@@ -42,8 +42,8 @@ import time
 CFG_HEADER_PERSISTENT = 0xC0
 CFG_HEADER_VOLATILE = 0xC2
 
-# Default configuration header (volatile - resets on power cycle)
-DEFAULT_CFG_HEADER = CFG_HEADER_VOLATILE
+# Default configuration header (persistent - saved to EEPROM, survives power cycle)
+DEFAULT_CFG_HEADER = CFG_HEADER_PERSISTENT
 
 # Response headers
 RESPONSE_SUCCESS = 0xC1
@@ -185,6 +185,7 @@ class sx126x:
         wor=False,
         m0_pin="P6",
         m1_pin="P7",
+        skip_config=False,
     ):
         """
         Initialize SX126x LoRa module.
@@ -214,6 +215,8 @@ class sx126x:
             wor (bool): Enable Wake On Radio (default: False)
             m0_pin (str): GPIO pin name for M0 (default: 'P6')
             m1_pin (str): GPIO pin name for M1 (default: 'P7')
+            skip_config (bool): If True, skip configuration and assume module is already
+                               configured. Goes directly to normal mode at target baud rate.
 
         Raises:
             Exception: If GPIO or UART initialization fails
@@ -224,7 +227,7 @@ class sx126x:
         self.freq = freq
         self.uart_num = uart_num
         self.power = power
-        self.config_success = False
+        self.config_success = True if skip_config else False
         self.target_baud = UART_NORMAL_BAUD
 
         # Calculate frequency offset based on module type
@@ -250,90 +253,113 @@ class sx126x:
             logger.error(f"GPIO initialization failed: {e}")
             raise
 
-        # Enter configuration mode: M0=LOW, M1=HIGH
-        # In configuration mode, module accepts AT commands over UART
-        self.M0.value(0)  # LOW
-        self.M1.value(1)  # HIGH
-        # log(f"M0=LOW, M1=HIGH (configuration mode)")
+        if skip_config:
+            # Skip configuration - assume module is already configured
+            # Set mode to normal operation directly
+            self.M0.value(0)  # LOW
+            self.M1.value(0)  # LOW
+            logger.info(f"Skipping configuration - using saved settings")
+            time.sleep_ms(MODE_SWITCH_DELAY_MS)
+            
+            # Initialize UART at target baud rate (115200)
+            try:
+                self.ser = UART(uart_num, self.target_baud, timeout=UART_TIMEOUT_MS)
+                logger.info(f"UART {uart_num} initialized at {self.target_baud} baud (skip config)")
+            except Exception as e:
+                logger.error(f"UART initialization failed: {e}")
+                raise
+            
+            # Clear any stale data from input buffer
+            while self.ser.any():
+                self.ser.read()
+            
+            time.sleep_ms(UART_STABILIZE_DELAY_MS)
+        else:
+            # Normal configuration flow
+            # Enter configuration mode: M0=LOW, M1=HIGH
+            # In configuration mode, module accepts AT commands over UART
+            self.M0.value(0)  # LOW
+            self.M1.value(1)  # HIGH
+            # log(f"M0=LOW, M1=HIGH (configuration mode)")
 
-        # Initialize UART at configuration baud rate (9600)
-        # Configuration must be done at 9600 baud initially
-        try:
-            self.ser = UART(uart_num, UART_CONFIG_BAUD, timeout=UART_TIMEOUT_MS)
-            logger.info(f"UART {uart_num} initialized at {UART_CONFIG_BAUD} baud")
-        except Exception as e:
-            logger.error(f"UART initialization failed: {e}")
-            raise
+            # Initialize UART at configuration baud rate (9600)
+            # Configuration must be done at 9600 baud initially
+            try:
+                self.ser = UART(uart_num, UART_CONFIG_BAUD, timeout=UART_TIMEOUT_MS)
+                logger.info(f"UART {uart_num} initialized at {UART_CONFIG_BAUD} baud")
+            except Exception as e:
+                logger.error(f"UART initialization failed: {e}")
+                raise
 
-        # Give module time to stabilize after UART initialization
-        time.sleep_ms(UART_INIT_DELAY_MS)
+            # Give module time to stabilize after UART initialization
+            time.sleep_ms(UART_INIT_DELAY_MS)
 
-        # Initialize configuration register array
-        # Format: [Header, Len_H, Len_L, Addr_H, Addr_L, NetID, UART+Air, Buffer+Power, Freq, Mode+RSSI, Crypt_H, Crypt_L]
-        self.cfg_reg = [
-            DEFAULT_CFG_HEADER,
-            0x00,
-            0x09,
-            0x00,
-            0x00,
-            0x00,
-            0x62,
-            0x00,
-            0x12,
-            0x43,
-            0x00,
-            0x00,
-        ]
+            # Initialize configuration register array
+            # Format: [Header, Len_H, Len_L, Addr_H, Addr_L, NetID, UART+Air, Buffer+Power, Freq, Mode+RSSI, Crypt_H, Crypt_L]
+            self.cfg_reg = [
+                DEFAULT_CFG_HEADER,
+                0x00,
+                0x09,
+                0x00,
+                0x00,
+                0x00,
+                0x62,
+                0x00,
+                0x12,
+                0x43,
+                0x00,
+                0x00,
+            ]
 
-        # Configure module with specified parameters
-        self.set(
-            freq,
-            addr,
-            power,
-            rssi,
-            air_speed,
-            net_id,
-            buffer_size,
-            crypt,
-            relay,
-            lbt,
-            wor,
-        )
+            # Configure module with specified parameters
+            self.set(
+                freq,
+                addr,
+                power,
+                rssi,
+                air_speed,
+                net_id,
+                buffer_size,
+                crypt,
+                relay,
+                lbt,
+                wor,
+            )
 
-        # Reopen UART at target baud rate (115200)
-        # log(f"[INFO] Reopening UART with target baud rate")
-        self.ser.deinit()  # Close current UART
-        time.sleep_ms(300)  # Wait for UART to close properly
+            # Reopen UART at target baud rate (115200)
+            # log(f"[INFO] Reopening UART with target baud rate")
+            self.ser.deinit()  # Close current UART
+            time.sleep_ms(300)  # Wait for UART to close properly
 
-        # Critical: Module must be back in configuration mode for baud rate verification
-        self.M0.value(0)  # LOW
-        self.M1.value(1)  # HIGH
-        # log(f"M0=LOW, M1=HIGH (configuration mode)")
-        time.sleep_ms(UART_INIT_DELAY_MS)
+            # Critical: Module must be back in configuration mode for baud rate verification
+            self.M0.value(0)  # LOW
+            self.M1.value(1)  # HIGH
+            # log(f"M0=LOW, M1=HIGH (configuration mode)")
+            time.sleep_ms(UART_INIT_DELAY_MS)
 
-        # Reinitialize UART at target baud rate
-        try:
-            self.ser = UART(uart_num, self.target_baud, timeout=UART_TIMEOUT_MS)
-            # logger.debug(f"UART {uart_num} reopened at {self.target_baud} baud")
-        except Exception as e:
-            logger.error(f"UART reinitialization failed: {e}")
-            raise
+            # Reinitialize UART at target baud rate
+            try:
+                self.ser = UART(uart_num, self.target_baud, timeout=UART_TIMEOUT_MS)
+                # logger.debug(f"UART {uart_num} reopened at {self.target_baud} baud")
+            except Exception as e:
+                logger.error(f"UART reinitialization failed: {e}")
+                raise
 
-        # Clear any stale data from input buffer
-        while self.ser.any():
-            self.ser.read()
+            # Clear any stale data from input buffer
+            while self.ser.any():
+                self.ser.read()
 
-        time.sleep_ms(UART_STABILIZE_DELAY_MS)  # Allow UART to stabilize
+            time.sleep_ms(UART_STABILIZE_DELAY_MS)  # Allow UART to stabilize
 
-        # Note: get_settings() can be called here to verify configuration,
-        # but currently disabled due to potential issues with baud rate switching
-        # self.get_settings()
+            # Note: get_settings() can be called here to verify configuration,
+            # but currently disabled due to potential issues with baud rate switching
+            # self.get_settings()
 
-        # Exit configuration mode: M0=LOW, M1=LOW (normal operation mode)
-        self.M0.value(0)  # LOW
-        self.M1.value(0)  # LOW
-        # log(f"M0=LOW, M1=LOW (normal mode)")
-        time.sleep_ms(MODE_SWITCH_DELAY_MS)  # Allow time for mode switch
+            # Exit configuration mode: M0=LOW, M1=LOW (normal operation mode)
+            self.M0.value(0)  # LOW
+            self.M1.value(0)  # LOW
+            # log(f"M0=LOW, M1=LOW (normal mode)")
+            time.sleep_ms(MODE_SWITCH_DELAY_MS)  # Allow time for mode switch
 
     def set(
         self,
@@ -1113,8 +1139,8 @@ import time
 CFG_HEADER_PERSISTENT = 0xC0
 CFG_HEADER_VOLATILE = 0xC2
 
-# Default configuration header (volatile - resets on power cycle)
-DEFAULT_CFG_HEADER = CFG_HEADER_VOLATILE
+# Default configuration header (persistent - saved to EEPROM, survives power cycle)
+DEFAULT_CFG_HEADER = CFG_HEADER_PERSISTENT
 
 # Response headers
 RESPONSE_SUCCESS = 0xC1
@@ -1286,6 +1312,8 @@ class sx126x:
             wor (bool): Enable Wake On Radio (default: False)
             m0_pin (str): GPIO pin name for M0 (default: 'P6')
             m1_pin (str): GPIO pin name for M1 (default: 'P7')
+            skip_config (bool): If True, skip configuration and assume module is already
+                               configured. Goes directly to normal mode at target baud rate.
 
         Raises:
             Exception: If GPIO or UART initialization fails
@@ -1296,7 +1324,7 @@ class sx126x:
         self.freq = freq
         self.uart_num = uart_num
         self.power = power
-        self.config_success = False
+        self.config_success = True if skip_config else False
         self.target_baud = UART_NORMAL_BAUD
 
         # Calculate frequency offset based on module type
@@ -1322,90 +1350,113 @@ class sx126x:
             logger.error(f"GPIO initialization failed: {e}")
             raise
 
-        # Enter configuration mode: M0=LOW, M1=HIGH
-        # In configuration mode, module accepts AT commands over UART
-        self.M0.value(0)  # LOW
-        self.M1.value(1)  # HIGH
-        # log(f"M0=LOW, M1=HIGH (configuration mode)")
+        if skip_config:
+            # Skip configuration - assume module is already configured
+            # Set mode to normal operation directly
+            self.M0.value(0)  # LOW
+            self.M1.value(0)  # LOW
+            logger.info(f"Skipping configuration - using saved settings")
+            time.sleep_ms(MODE_SWITCH_DELAY_MS)
+            
+            # Initialize UART at target baud rate (115200)
+            try:
+                self.ser = UART(uart_num, self.target_baud, timeout=UART_TIMEOUT_MS)
+                logger.info(f"UART {uart_num} initialized at {self.target_baud} baud (skip config)")
+            except Exception as e:
+                logger.error(f"UART initialization failed: {e}")
+                raise
+            
+            # Clear any stale data from input buffer
+            while self.ser.any():
+                self.ser.read()
+            
+            time.sleep_ms(UART_STABILIZE_DELAY_MS)
+        else:
+            # Normal configuration flow
+            # Enter configuration mode: M0=LOW, M1=HIGH
+            # In configuration mode, module accepts AT commands over UART
+            self.M0.value(0)  # LOW
+            self.M1.value(1)  # HIGH
+            # log(f"M0=LOW, M1=HIGH (configuration mode)")
 
-        # Initialize UART at configuration baud rate (9600)
-        # Configuration must be done at 9600 baud initially
-        try:
-            self.ser = UART(uart_num, UART_CONFIG_BAUD, timeout=UART_TIMEOUT_MS)
-            logger.info(f"UART {uart_num} initialized at {UART_CONFIG_BAUD} baud")
-        except Exception as e:
-            logger.error(f"UART initialization failed: {e}")
-            raise
+            # Initialize UART at configuration baud rate (9600)
+            # Configuration must be done at 9600 baud initially
+            try:
+                self.ser = UART(uart_num, UART_CONFIG_BAUD, timeout=UART_TIMEOUT_MS)
+                logger.info(f"UART {uart_num} initialized at {UART_CONFIG_BAUD} baud")
+            except Exception as e:
+                logger.error(f"UART initialization failed: {e}")
+                raise
 
-        # Give module time to stabilize after UART initialization
-        time.sleep_ms(UART_INIT_DELAY_MS)
+            # Give module time to stabilize after UART initialization
+            time.sleep_ms(UART_INIT_DELAY_MS)
 
-        # Initialize configuration register array
-        # Format: [Header, Len_H, Len_L, Addr_H, Addr_L, NetID, UART+Air, Buffer+Power, Freq, Mode+RSSI, Crypt_H, Crypt_L]
-        self.cfg_reg = [
-            DEFAULT_CFG_HEADER,
-            0x00,
-            0x09,
-            0x00,
-            0x00,
-            0x00,
-            0x62,
-            0x00,
-            0x12,
-            0x43,
-            0x00,
-            0x00,
-        ]
+            # Initialize configuration register array
+            # Format: [Header, Len_H, Len_L, Addr_H, Addr_L, NetID, UART+Air, Buffer+Power, Freq, Mode+RSSI, Crypt_H, Crypt_L]
+            self.cfg_reg = [
+                DEFAULT_CFG_HEADER,
+                0x00,
+                0x09,
+                0x00,
+                0x00,
+                0x00,
+                0x62,
+                0x00,
+                0x12,
+                0x43,
+                0x00,
+                0x00,
+            ]
 
-        # Configure module with specified parameters
-        self.set(
-            freq,
-            addr,
-            power,
-            rssi,
-            air_speed,
-            net_id,
-            buffer_size,
-            crypt,
-            relay,
-            lbt,
-            wor,
-        )
+            # Configure module with specified parameters
+            self.set(
+                freq,
+                addr,
+                power,
+                rssi,
+                air_speed,
+                net_id,
+                buffer_size,
+                crypt,
+                relay,
+                lbt,
+                wor,
+            )
 
-        # Reopen UART at target baud rate (115200)
-        # log(f"[INFO] Reopening UART with target baud rate")
-        self.ser.deinit()  # Close current UART
-        time.sleep_ms(300)  # Wait for UART to close properly
+            # Reopen UART at target baud rate (115200)
+            # log(f"[INFO] Reopening UART with target baud rate")
+            self.ser.deinit()  # Close current UART
+            time.sleep_ms(300)  # Wait for UART to close properly
 
-        # Critical: Module must be back in configuration mode for baud rate verification
-        self.M0.value(0)  # LOW
-        self.M1.value(1)  # HIGH
-        # log(f"M0=LOW, M1=HIGH (configuration mode)")
-        time.sleep_ms(UART_INIT_DELAY_MS)
+            # Critical: Module must be back in configuration mode for baud rate verification
+            self.M0.value(0)  # LOW
+            self.M1.value(1)  # HIGH
+            # log(f"M0=LOW, M1=HIGH (configuration mode)")
+            time.sleep_ms(UART_INIT_DELAY_MS)
 
-        # Reinitialize UART at target baud rate
-        try:
-            self.ser = UART(uart_num, self.target_baud, timeout=UART_TIMEOUT_MS)
-            # logger.debug(f"UART {uart_num} reopened at {self.target_baud} baud")
-        except Exception as e:
-            logger.error(f"UART reinitialization failed: {e}")
-            raise
+            # Reinitialize UART at target baud rate
+            try:
+                self.ser = UART(uart_num, self.target_baud, timeout=UART_TIMEOUT_MS)
+                # logger.debug(f"UART {uart_num} reopened at {self.target_baud} baud")
+            except Exception as e:
+                logger.error(f"UART reinitialization failed: {e}")
+                raise
 
-        # Clear any stale data from input buffer
-        while self.ser.any():
-            self.ser.read()
+            # Clear any stale data from input buffer
+            while self.ser.any():
+                self.ser.read()
 
-        time.sleep_ms(UART_STABILIZE_DELAY_MS)  # Allow UART to stabilize
+            time.sleep_ms(UART_STABILIZE_DELAY_MS)  # Allow UART to stabilize
 
-        # Note: get_settings() can be called here to verify configuration,
-        # but currently disabled due to potential issues with baud rate switching
-        # self.get_settings()
+            # Note: get_settings() can be called here to verify configuration,
+            # but currently disabled due to potential issues with baud rate switching
+            # self.get_settings()
 
-        # Exit configuration mode: M0=LOW, M1=LOW (normal operation mode)
-        self.M0.value(0)  # LOW
-        self.M1.value(0)  # LOW
-        # log(f"M0=LOW, M1=LOW (normal mode)")
-        time.sleep_ms(MODE_SWITCH_DELAY_MS)  # Allow time for mode switch
+            # Exit configuration mode: M0=LOW, M1=LOW (normal operation mode)
+            self.M0.value(0)  # LOW
+            self.M1.value(0)  # LOW
+            # log(f"M0=LOW, M1=LOW (normal mode)")
+            time.sleep_ms(MODE_SWITCH_DELAY_MS)  # Allow time for mode switch
 
     def set(
         self,
