@@ -1283,6 +1283,7 @@ class sx126x:
         wor=False,
         m0_pin="P6",
         m1_pin="P7",
+        skip_config=False,
     ):
         """
         Initialize SX126x LoRa module.
