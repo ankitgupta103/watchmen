@@ -36,7 +36,7 @@ my_addr = 0
 my_freq = 868
 offset_freq = 0
 
-def configure_lora(uart_num=1, freq=868, addr=0, power=22, air_speed=2400, net_id=0, buffer_size=240, crypt=0, permanent=True, m0_pin="P6", m1_pin="P7"):
+def configure_lora(uart_num=1, freq=868, addr=0, power=22, air_speed=2400, net_id=0, buffer_size=240, crypt=0, permanent=True, skip_config=False, m0_pin="P6", m1_pin="P7"):
     global ser, M0, M1, my_addr, my_freq, offset_freq
     
     my_addr = addr
@@ -44,6 +44,40 @@ def configure_lora(uart_num=1, freq=868, addr=0, power=22, air_speed=2400, net_i
     
     M0 = Pin(m0_pin, Pin.OUT)
     M1 = Pin(m1_pin, Pin.OUT)
+    
+    if skip_config or permanent:
+        M0.value(0)
+        M1.value(0)
+        time.sleep_ms(MODE_SWITCH_DELAY_MS)
+        
+        ser = UART(uart_num, UART_NORMAL_BAUD, timeout=UART_TIMEOUT_MS)
+        time.sleep_ms(500)
+        
+        if freq > FREQ_RANGE_900MHZ_START:
+            offset_freq = freq - FREQ_RANGE_900MHZ_START
+        elif freq > FREQ_RANGE_400MHZ_START:
+            offset_freq = freq - FREQ_RANGE_400MHZ_START
+        
+        pending = []
+        for _ in range(50):
+            if ser.any():
+                time.sleep_ms(100)
+                r_buff = ser.readline()
+                if r_buff and len(r_buff) > 0:
+                    if r_buff[-1] == 0x0A:
+                        r_buff = r_buff[:-1]
+                    if len(r_buff) >= 4:
+                        pending.append(r_buff[3:])
+            else:
+                time.sleep_ms(50)
+                if _ > 10:
+                    break
+        
+        print(f"LoRa initialized (using saved config): addr={addr}, freq={freq}")
+        if pending:
+            print(f"Found {len(pending)} pending message(s) in buffer")
+            return pending
+        return []
     
     M0.value(0)
     M1.value(1)
@@ -98,21 +132,6 @@ def configure_lora(uart_num=1, freq=868, addr=0, power=22, air_speed=2400, net_i
     time.sleep_ms(UART_INIT_DELAY_MS)
     
     ser = UART(uart_num, UART_NORMAL_BAUD, timeout=UART_TIMEOUT_MS)
-    time.sleep_ms(200)
-    
-    pending = []
-    for _ in range(20):
-        if ser.any():
-            time.sleep_ms(50)
-            r_buff = ser.readline()
-            if r_buff and len(r_buff) > 0:
-                if r_buff[-1] == 0x0A:
-                    r_buff = r_buff[:-1]
-                if len(r_buff) >= 4:
-                    pending.append(r_buff[3:])
-        else:
-            break
-    
     time.sleep_ms(UART_STABILIZE_DELAY_MS)
     
     M0.value(0)
@@ -120,9 +139,6 @@ def configure_lora(uart_num=1, freq=868, addr=0, power=22, air_speed=2400, net_i
     time.sleep_ms(MODE_SWITCH_DELAY_MS)
     
     print(f"LoRa configured: addr={addr}, freq={freq}, permanent={permanent}")
-    if pending:
-        print(f"Found {len(pending)} pending message(s) in buffer")
-        return pending
     return []
 
 def send_message(target_addr, message):
@@ -160,7 +176,7 @@ def main1():
     TARGET_ADDR = 2
     PERMANENT = True
     
-    configure_lora(addr=ADDR, permanent=PERMANENT)
+    configure_lora(addr=ADDR, permanent=PERMANENT, skip_config=True)
     
     print("Starting send loop...")
     counter = 0
@@ -174,7 +190,7 @@ def main2():
     ADDR = 2
     PERMANENT = True
     
-    pending = configure_lora(addr=ADDR, permanent=PERMANENT)
+    pending = configure_lora(addr=ADDR, permanent=PERMANENT, skip_config=True)
     
     if pending:
         print("Reading pending messages from buffer:")
