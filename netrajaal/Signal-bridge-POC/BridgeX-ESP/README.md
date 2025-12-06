@@ -1,239 +1,291 @@
-# BridgeX-ESP - ESP32 Light Sleep Mode Test
+# BridgeX-ESP - Two-Node LoRa Communication
 
-This project demonstrates and tests the light sleep mode functionality on ESP32 using ESP-IDF framework.
+ESP32 project with SX1262 LoRa driver for bidirectional communication between two ESP32 boards.
 
-## Project Overview
+## Hardware Connections
 
-The project includes a comprehensive test for ESP32 light sleep mode, which allows the CPU to be paused while keeping peripherals active. This is useful for power-sensitive applications where you need to reduce power consumption while maintaining the ability to wake up quickly.
+```
+ESP32          SX1262 Module
+------         -------------
+GPIO17  -----> TX (UART TX)
+GPIO16  <----- RX (UART RX)
+GPIO4   -----> M0 (Mode control)
+GPIO5   -----> M1 (Mode control)
+3.3V    -----> VCC
+GND     -----> GND
+```
 
-## Features
+## How to Test on Both Devices
 
-- Light sleep mode implementation with timer wake-up
-- LED indicator for visual feedback
-- System information logging
-- Sleep duration measurement
-- Multiple sleep cycles for testing
+### Step 1: Flash Node 1 (First ESP32)
 
-## Building and Flashing
-
-### Prerequisites
-
-- ESP-IDF v4.4 or later
-- Python 3.6 or later
-- CMake 3.5 or later
-
-### Build Steps
-
-1. Set up ESP-IDF environment:
-   ```bash
-   . $HOME/esp/esp-idf/export.sh
+1. **Set NODE_ID to 1** in `main/main.c`:
+   ```c
+   #define NODE_ID 1
    ```
 
-2. Navigate to project directory:
+2. **Put ESP32 in boot mode** (IMPORTANT - Do this FIRST):
+   - **Disconnect** USB cable
+   - **Press and HOLD** the **BOOT** button
+   - **Connect** USB cable (while holding BOOT)
+   - **Press and release** the **RESET** button (still holding BOOT)
+   - **Release** the **BOOT** button
+   - Device should now be in download mode
+
+3. **Build and flash** (run immediately after boot mode):
    ```bash
-   cd BridgeX-ESP
+   source $HOME/esp/esp-idf/export.sh
+   idf.py build
+   idf.py -p /dev/ttyACM0 flash
    ```
 
-3. Configure the project (optional):
+   **If flashing fails**, try:
    ```bash
-   idf.py menuconfig
+   # Try lower baud rate
+   idf.py -p /dev/ttyACM0 flash --baud 115200
+   
+   # Or even lower
+   idf.py -p /dev/ttyACM0 flash --baud 9600
    ```
 
-4. Build the project:
+### Step 2: Flash Node 2 (Second ESP32)
+
+1. **Set NODE_ID to 2** in `main/main.c`:
+   ```c
+   #define NODE_ID 2
+   ```
+
+2. **Put ESP32 in boot mode** (same as Step 1 above)
+
+3. **Build and flash**:
    ```bash
    idf.py build
+   idf.py -p /dev/ttyACM1 flash
+   ```
+   
+   **If flashing fails**, try lower baud rate:
+   ```bash
+   idf.py -p /dev/ttyACM1 flash --baud 115200
    ```
 
-5. Flash to ESP32:
+### Step 3: Monitor Both Devices
+
+**Terminal 1 - Monitor Node 1**:
+```bash
+idf.py -p /dev/ttyACM0 monitor
+```
+
+**Terminal 2 - Monitor Node 2**:
+```bash
+idf.py -p /dev/ttyACM1 monitor
+```
+
+## Expected Output
+
+### Node 1 (Address 0x0001)
+```
+I (xxxx) LORA_COMM: Node-1 - LoRa Communication
+I (xxxx) LORA_COMM: My Address: 0x0001
+I (xxxx) LORA_COMM: Target Address: 0x0002
+I (xxxx) LORA_COMM: SX1262 initialized successfully!
+I (xxxx) LORA_COMM: >>> [SEND] To 0x0002: Hello from Node-1! Message #1
+I (xxxx) LORA_COMM:     ✓ Message sent successfully
+I (xxxx) LORA_COMM: <<< [RECEIVE] 25 bytes:
+I (xxxx) LORA_COMM:     Message: Hello from Node-2! Message #1
+I (xxxx) LORA_COMM:     RSSI: -85 dBm
+```
+
+### Node 2 (Address 0x0002)
+```
+I (xxxx) LORA_COMM: Node-2 - LoRa Communication
+I (xxxx) LORA_COMM: My Address: 0x0002
+I (xxxx) LORA_COMM: Target Address: 0x0001
+I (xxxx) LORA_COMM: SX1262 initialized successfully!
+I (xxxx) LORA_COMM: >>> [SEND] To 0x0001: Hello from Node-2! Message #1
+I (xxxx) LORA_COMM:     ✓ Message sent successfully
+I (xxxx) LORA_COMM: <<< [RECEIVE] 25 bytes:
+I (xxxx) LORA_COMM:     Message: Hello from Node-1! Message #1
+I (xxxx) LORA_COMM:     RSSI: -82 dBm
+```
+
+## Configuration
+
+Both nodes must have:
+- Same frequency: 868 MHz (default)
+- Same network ID: 0 (default)
+- Same air speed: 2400 bps (default)
+- Different addresses: 0x0001 (Node 1) and 0x0002 (Node 2)
+
+## Troubleshooting
+
+### Flashing Fails with "serial TX path seems to be down"
+
+**This error means: Device is detected and in download mode, but the TX wire (ESP32 TX → Computer RX) is not working.**
+
+#### Quick Diagnostic Test
+
+Run this to verify the connection:
+```bash
+# Test if you can READ from device (RX path works)
+timeout 3 cat /dev/ttyACM0 | strings
+# If you see "waiting for download" or boot messages, RX path works ✓
+
+# Test if you can WRITE to device (TX path)
+python3 -c "import serial; s=serial.Serial('/dev/ttyACM0', 115200); s.write(b'test'); s.close(); print('Write test completed')"
+# If this works without error, TX path should work ✓
+```
+
+#### Solutions (in order of likelihood):
+
+1. **Check TX Wire Connection** (Most Common Issue):
+   - **ESP32 TX pin → USB-to-Serial RX pin** (this is the broken path!)
+   - Verify the wire is properly connected and not loose
+   - Check for broken wire (use multimeter continuity test)
+   - Ensure good contact (no oxidation on pins)
+
+2. **Manual Boot Mode Entry** (Critical Timing):
+   - **Disconnect** USB cable completely
+   - **Press and HOLD** the **BOOT** button
+   - **Connect** USB cable (while holding BOOT)
+   - **Press and release** the **RESET** button (still holding BOOT)
+   - **Release** the **BOOT** button
+   - **Within 5 seconds**, run flash command:
+     ```bash
+     idf.py -p /dev/ttyACM0 flash --baud 115200
+     ```
+
+3. **Try Different Baud Rates** (Lower = More Reliable):
    ```bash
-   idf.py -p /dev/ttyUSB0 flash
+   # Try 115200 first
+   idf.py -p /dev/ttyACM0 flash --baud 115200
+   
+   # If fails, try 9600 (very slow but more reliable)
+   idf.py -p /dev/ttyACM0 flash --baud 9600
+   
+   # If fails, try 230400 (faster, sometimes works)
+   idf.py -p /dev/ttyACM0 flash --baud 230400
    ```
 
-6. Monitor serial output:
+4. **Check USB-to-Serial Adapter**:
+   - If using external USB-to-Serial adapter (CP2102, CH340, FT232):
+     - Verify adapter is working (test with another device)
+     - Check if drivers are installed correctly
+     - Try a different adapter if available
+   - If using ESP32's built-in USB (ESP32-S2/S3):
+     - Try different USB cable (must be data-capable)
+     - Try different USB port on computer
+     - Check if USB port provides enough power
+
+5. **Verify Pin Connections**:
+   - **ESP32 Development Board**: Usually has auto-reset circuit
+     - Check if BOOT button is working (should put device in download mode)
+     - Some boards need EN pin pulled low during boot
+   - **Bare ESP32 Module**: Requires manual connections
+     - TX: GPIO1 (UART0_TX) → USB-to-Serial RX
+     - RX: GPIO3 (UART0_RX) → USB-to-Serial TX
+     - GND: Common ground
+     - 3.3V: Power supply
+
+6. **Hardware Reset Before Flash**:
    ```bash
-   idf.py -p /dev/ttyUSB0 monitor
+   # Manually reset device, then immediately flash
+   python3 -c "import serial; s=serial.Serial('/dev/ttyACM0', 115200); s.setDTR(False); s.setRTS(True); import time; time.sleep(0.1); s.setDTR(True); s.setRTS(False); s.close()"
+   idf.py -p /dev/ttyACM0 flash --baud 115200
    ```
+
+7. **Use esptool Directly** (Bypass idf.py):
+   ```bash
+   source $HOME/esp/esp-idf/export.sh
+   python3 $HOME/.espressif/python_env/idf5.1_py3.10_env/bin/esptool.py \
+     --chip esp32 --port /dev/ttyACM0 --baud 115200 \
+     --before default_reset --after hard_reset \
+     write_flash --flash_mode dio --flash_freq 40m --flash_size 2MB \
+     0x1000 build/bootloader/bootloader.bin \
+     0x8000 build/partition_table/partition-table.bin \
+     0x10000 build/BridgeX-ESP.bin
+   ```
+
+#### Still Not Working?
+
+If all above fail, the issue is likely:
+- **Broken TX wire** (most common) - replace the wire
+- **Faulty USB-to-Serial adapter** - try different adapter
+- **Damaged ESP32 UART TX pin** - try different ESP32 board
+- **USB port power issue** - try powered USB hub or different port
+
+### No Messages Received
+- Verify both nodes have same frequency, network ID, and air speed
+- Check antennas are connected
+- Ensure modules are within range (< 10 meters for initial test)
+- Verify power supply is stable (3.3V)
+
+### Flashing Success Indicators
+
+When flashing works correctly, you'll see:
+```
+Connecting...
+Detecting chip type... ESP32
+Writing at 0x00001000... (bootloader)
+Writing at 0x00010000... (application)
+Writing at 0x00008000... (partition table)
+Hash of data verified.
+Leaving...
+Hard resetting via RTS pin...
+```
+
+If you see "Hash of data verified" and "Leaving...", the flash was successful!
+
+### Port Permission Issues
+
+If you get "Permission denied" errors:
+```bash
+# Add user to dialout group (one-time setup)
+sudo usermod -a -G dialout $USER
+# Log out and log back in for changes to take effect
+
+# Or temporarily fix permissions
+sudo chmod 666 /dev/ttyACM0
+```
+
+### Check for Other Processes Using Port
+
+If port is busy:
+```bash
+# Check what's using the port
+lsof /dev/ttyACM0
+
+# Kill processes using the port
+sudo fuser -k /dev/ttyACM0
+```
 
 ## Project Structure
 
 ```
-├── CMakeLists.txt          # Main CMake configuration
-├── main
-│   ├── CMakeLists.txt     # Component CMake configuration
-│   └── main.c             # Main application code with light sleep test
-└── README.md              # This file
+BridgeX-ESP/
+├── main/
+│   ├── main.c          # Main application (two-node communication)
+│   ├── sx1262.h        # SX1262 driver header
+│   ├── sx1262.c        # SX1262 driver implementation
+│   └── CMakeLists.txt  # Build configuration
+├── CMakeLists.txt      # Project build configuration
+├── sdkconfig          # ESP-IDF configuration
+└── README.md          # This file
 ```
 
-## How the Light Sleep Test Works
+## Quick Reference
 
-The test performs the following operations:
-
-1. **Initialization**: Sets up GPIO for LED control and prints system information
-2. **Active Period**: Blinks LED 3 times to indicate active state
-3. **Light Sleep**: Enters light sleep mode for 5 seconds using timer wake-up
-4. **Wake-up**: Automatically wakes up after the timer expires
-5. **Cycle**: Repeats the process for 10 cycles
-
-### Key Functions
-
-- `enter_light_sleep()`: Configures timer wake-up and enters light sleep mode
-- `print_system_info()`: Displays CPU frequency, heap memory, and other system stats
-- `toggle_led()`: Controls LED for visual feedback
-
-## ESP32 Power Consumption by Mode
-
-The following power consumption values are typical for ESP32 modules. Actual values may vary based on:
-- ESP32 variant (ESP32, ESP32-S2, ESP32-S3, ESP32-C3, etc.)
-- CPU frequency
-- Enabled peripherals
-- External components
-- Operating temperature
-
-### ESP32 (Classic) Power Consumption
-
-| Mode | CPU | WiFi | Bluetooth | Typical Current | Notes |
-|------|-----|------|-----------|-----------------|-------|
-| **Active (Normal)** | ON | ON | ON | 80-240 mA | Depends on CPU frequency and radio activity |
-| **Active (WiFi TX)** | ON | TX | OFF | 170-240 mA | Transmitting at max power |
-| **Active (WiFi RX)** | ON | RX | OFF | 80-100 mA | Receiving data |
-| **Active (WiFi OFF)** | ON | OFF | OFF | 20-50 mA | CPU running, no radio |
-| **Modem Sleep** | ON | OFF | OFF | 20-50 mA | WiFi/Bluetooth disabled, CPU active |
-| **Light Sleep** | OFF | OFF | OFF | **0.8-1.2 mA** | CPU paused, RTC running, peripherals can wake |
-| **Deep Sleep** | OFF | OFF | OFF | **10-150 μA** | Only RTC running, most peripherals off |
-| **Hibernation** | OFF | OFF | OFF | **2.5-5 μA** | Ultra-low power, RTC slow clock only |
-
-### ESP32-S2 Power Consumption
-
-| Mode | CPU | WiFi | Typical Current | Notes |
-|------|-----|------|-----------------|-------|
-| **Active (Normal)** | ON | ON | 80-200 mA | Depends on CPU frequency |
-| **Active (WiFi TX)** | ON | TX | 160-220 mA | Transmitting at max power |
-| **Active (WiFi RX)** | ON | RX | 80-100 mA | Receiving data |
-| **Active (WiFi OFF)** | ON | OFF | 15-40 mA | CPU running, no radio |
-| **Light Sleep** | OFF | OFF | **0.8-1.0 mA** | CPU paused, RTC running |
-| **Deep Sleep** | OFF | OFF | **10-150 μA** | Only RTC running |
-
-### ESP32-S3 Power Consumption
-
-| Mode | CPU | WiFi | Bluetooth | Typical Current | Notes |
-|------|-----|------|-----------|-----------------|-------|
-| **Active (Normal)** | ON | ON | ON | 80-240 mA | Dual-core, higher performance |
-| **Active (WiFi OFF)** | ON | OFF | OFF | 20-50 mA | CPU running, no radio |
-| **Light Sleep** | OFF | OFF | OFF | **0.8-1.2 mA** | CPU paused, RTC running |
-| **Deep Sleep** | OFF | OFF | OFF | **10-150 μA** | Only RTC running |
-
-### ESP32-C3 Power Consumption
-
-| Mode | CPU | WiFi | Bluetooth | Typical Current | Notes |
-|------|-----|------|-----------|-----------------|-------|
-| **Active (Normal)** | ON | ON | ON | 50-160 mA | RISC-V architecture |
-| **Active (WiFi OFF)** | ON | OFF | OFF | 15-35 mA | CPU running, no radio |
-| **Light Sleep** | OFF | OFF | OFF | **0.7-1.0 mA** | CPU paused, RTC running |
-| **Deep Sleep** | OFF | OFF | OFF | **5-100 μA** | Only RTC running |
-
-## Light Sleep Mode Details
-
-### Characteristics
-
-- **Wake-up Time**: ~1-2 ms (very fast)
-- **State Retention**: 
-  - CPU state is lost (program continues from wake-up point)
-  - RTC memory is retained
-  - GPIO states are retained
-  - Peripheral registers are retained
-- **Wake-up Sources**:
-  - Timer (RTC timer)
-  - GPIO (external interrupt)
-  - UART (data received)
-  - Touch sensor
-  - SDIO slave
-  - WiFi/Bluetooth (if enabled)
-
-### Advantages
-
-- Very low power consumption (0.8-1.2 mA)
-- Fast wake-up time (~1-2 ms)
-- Peripherals can remain active
-- GPIO states preserved
-- Can wake on multiple sources
-
-### Use Cases
-
-- Battery-powered applications
-- IoT sensors that need periodic wake-up
-- Applications requiring fast response to external events
-- Systems that need to reduce power while maintaining peripheral functionality
-
-## Deep Sleep vs Light Sleep
-
-| Feature | Light Sleep | Deep Sleep |
-|---------|-------------|------------|
-| **Current Consumption** | 0.8-1.2 mA | 10-150 μA |
-| **Wake-up Time** | ~1-2 ms | ~100-200 ms |
-| **CPU State** | Lost | Lost |
-| **RTC Memory** | Retained | Retained |
-| **GPIO States** | Retained | Lost (except RTC GPIO) |
-| **Peripheral Registers** | Retained | Lost |
-| **WiFi/Bluetooth** | Can wake | Cannot wake |
-| **UART** | Can wake | Cannot wake |
-
-## Monitoring Power Consumption
-
-To accurately measure power consumption:
-
-1. Use a precision current meter (e.g., Joulescope, Nordic Power Profiler)
-2. Disconnect all unnecessary peripherals
-3. Use a clean power supply
-4. Measure over multiple sleep/wake cycles
-5. Account for external components (LEDs, regulators, etc.)
-
-## Configuration
-
-### Adjusting Sleep Duration
-
-Edit `SLEEP_DURATION_US` in `main/main.c`:
-```c
-#define SLEEP_DURATION_US (5 * 1000000ULL)  // 5 seconds
+### Build Commands
+```bash
+source $HOME/esp/esp-idf/export.sh
+idf.py build                    # Build project
+idf.py -p /dev/ttyACM0 flash    # Flash to device
+idf.py -p /dev/ttyACM0 monitor  # Monitor serial output
+idf.py fullclean                # Clean build
 ```
 
-### Changing LED GPIO
-
-Edit `LED_GPIO` in `main/main.c`:
-```c
-#define LED_GPIO GPIO_NUM_2  // Change to your board's LED pin
-```
-
-### Adjusting Number of Cycles
-
-Edit `max_cycles` in `app_main()`:
-```c
-const int max_cycles = 10;  // Change to desired number
-```
-
-## Troubleshooting
-
-### Issue: System doesn't wake up
-- Check that wake-up source is properly configured
-- Verify timer duration is not too long
-- Check serial monitor for error messages
-
-### Issue: High power consumption
-- Disable unnecessary peripherals
-- Check for external components drawing power
-- Verify WiFi/Bluetooth are disabled during sleep
-- Use `idf.py menuconfig` to optimize power settings
-
-### Issue: LED not working
-- Verify GPIO pin number matches your board
-- Check if LED requires external pull-up/down resistor
-- Some boards have built-in LEDs on specific pins
-
-## References
-
-- [ESP-IDF Power Management](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/sleep_modes.html)
-- [ESP32 Light Sleep Documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/sleep_modes.html#light-sleep)
-- [ESP-IDF API Reference](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/index.html)
-
-## License
-
-This project is provided as-is for testing and educational purposes.
+### Configuration
+- **Node ID**: Set `NODE_ID` in `main/main.c` (1 or 2)
+- **Frequency**: 868 MHz (default, can be changed in code)
+- **Network ID**: 0 (default, must match on both nodes)
+- **Air Speed**: 2400 bps (default, must match on both nodes)
+- **Addresses**: 0x0001 (Node 1), 0x0002 (Node 2)

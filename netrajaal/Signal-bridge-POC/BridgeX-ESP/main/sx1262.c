@@ -366,12 +366,19 @@ esp_err_t sx1262_receive(sx1262_handle_t *handle, uint8_t *buffer, size_t buffer
         return ESP_ERR_NOT_FOUND;
     }
     
+    // Wait a bit for complete message to arrive
     vTaskDelay(pdMS_TO_TICKS(SX1262_RX_DELAY_MS));
+    
+    // Recheck available data after delay
+    uart_get_buffered_data_len(handle->uart_num, &available);
+    if (available == 0) {
+        return ESP_ERR_NOT_FOUND;
+    }
     
     // Read data (try to read a line ending with \n)
     uint8_t temp_buffer[256];
     int len = uart_read_bytes(handle->uart_num, temp_buffer, sizeof(temp_buffer) - 1, 
-                              pdMS_TO_TICKS(100));
+                              pdMS_TO_TICKS(200));  // Increased timeout for longer messages
     
     if (len <= 0) {
         return ESP_ERR_NOT_FOUND;
