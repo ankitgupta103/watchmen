@@ -494,9 +494,9 @@ def pop_and_get(msg_uid):
             return msgs_unacked.pop(i)
     return None
 
-async def send_single_msg(msg_typ, creator, msgbytes, dest):
+async def send_single_packet(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
-    msg_uid = get_msg_uid(msg_typ, creator, dest)
+    msg_uid = get_msg_uid(msg_typ, creator, dest) # TODO, msg_uid used anywhere except logging
     databytes = msg_uid + b";" + msgbytes
     ackneeded = ack_needed(msg_typ)
     timesent = time_msec()
@@ -566,7 +566,7 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
     if len(msgbytes) < FRAME_SIZE:
         logger.info(f"[LORA] Sending msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, dest={dest}, single packet")
-        succ, _ = await send_single_msg(msg_typ, creator, msgbytes, dest)
+        succ, _ = await send_single_packet(msg_typ, creator, msgbytes, dest)
         return succ
     else:
         img_id = get_rand()
@@ -574,7 +574,7 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
         logger.info(f"[CHUNK] chunking msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, for dest={dest}, img_id:{img_id} into {len(chunks)} chunks")
         if get_transmode_lock():
             asyncio.create_task(keep_transmode_lock()) # TODO test as moved outside loop
-            big_succ, _ = await send_single_msg("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
+            big_succ, _ = await send_single_packet("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
             if not big_succ:
                 logger.info(f"[CHUNK] Failed sending chunk begin")
                 delete_transmode_lock()
@@ -585,13 +585,13 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
                     logger.info(f"[CHUNK] Sending chunk {i}")
                 await asyncio.sleep(CHUNK_SLEEP)
                 chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
-                _ = await send_single_msg("I", creator, chunkbytes, dest)
+                _ = await send_single_packet("I", creator, chunkbytes, dest)
             for retry_i in range(20):
                 if retry_i == 0:
                     await asyncio.sleep(0.1)  # Faster first check
                 else:
                     await asyncio.sleep(CHUNK_SLEEP)
-                succ, missing_chunks = await send_single_msg("E", creator, img_id, dest)
+                succ, missing_chunks = await send_single_packet("E", creator, img_id, dest)
                 if not succ:
                     logger.error(f"[CHUNK] Failed sending chunk end")
                     break
@@ -617,7 +617,7 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
                 for mis_chunk in missing_chunks:
                     await asyncio.sleep(CHUNK_SLEEP)
                     chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
-                    _ = await send_single_msg("I", creator, chunkbytes, dest)
+                    _ = await send_single_packet("I", creator, chunkbytes, dest)
             delete_transmode_lock()
             return False
         else: 
