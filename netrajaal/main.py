@@ -275,40 +275,45 @@ URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 # TRANSFER MODE Lock
 # ---------------------------------------------------------------------------
 TRANSMODE_LOCK_TIME = 180
-def get_transmode_lock(): # check and just lock for image
-    global image_in_progress
+def get_transmode_lock(device_id, img_id): # check and just lock for image
+    global image_in_progress, paired_device, data_id
     if image_in_progress == True: # TRANS MODE already in use
         return False
     image_in_progress = True
+    paired_device = device_id
+    data_id = img_id
+    logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE started, device:{device_id}, img_id:{img_id} <@@@@@@@@@@")
     return True
     
-async def keep_transmode_lock():
+async def keep_transmode_lock(device_id, img_id):
     # Input: None; Output: None (sets image_in_progress flag with auto release after timeout)
-    global image_in_progress
-    image_in_progress = True
-    logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE started <@@@@@@@@@@")
-    await asyncio.sleep(TRANSMODE_LOCK_TIME)
-    if image_in_progress: # TODO, these has to handled using someuniqueness
-        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended <@@@@@@@@@@")
+    global image_in_progress, paired_device, data_id
+    await asyncio.sleep(TRANSMODE_LOCK_TIME) # At this point this process might complete, also other might start
+    if image_in_progress and paired_device == device_id and data_id == img_id: # TODO, test this
+        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended, device:{device_id}, img_id:{img_id} <@@@@@@@@@@")
         image_in_progress = False
+        paired_device = None
+        data_id = None
     else:
-        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, ??? <@@@@@@@@@@")
+        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, device:{device_id}, img_id:{img_id} <@@@@@@@@@@") # todo, will move it to debug later
 
-def check_transmode_lock(): # check if transfer lock is active or not
-    global image_in_progress
-    if image_in_progress:
+def check_transmode_lock(device_id, img_id): # check if transfer lock is active or not
+    global image_in_progress, paired_device, data_id
+    if image_in_progress and paired_device == device_id and data_id == img_id:
         return True
     else:
         return False
 
-def delete_transmode_lock():
+def delete_transmode_lock(device_id, img_id):
     # Input: None; Output: None (clears image_in_progress flag)
-    global image_in_progress
-    if image_in_progress:  # TODO, these has to handled using someuniqueness
-        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended, curr_state2 = {image_in_progress} <@@@@@@@@@@")
+    global image_in_progress, paired_device, data_id
+    if image_in_progress and paired_device == device_id and data_id == img_id:  # TODO, these has to handled using someuniqueness
+        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended for device:{device_id}, img_id:{img_id} <@@@@@@@@@@")
         image_in_progress = False
+        paired_device = None
+        data_id = None
     else:
-        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, ???? <@@@@@@@@@@")
+        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, for device {device_id} and img_id {img_id} <@@@@@@@@@@") # will move it to debug later
 
 
 # ---------------------------------------------------------------------------
@@ -572,12 +577,12 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
         img_id = get_rand()
         chunks = make_chunks(msgbytes)
         logger.info(f"[CHUNK] chunking msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, for dest={dest}, img_id:{img_id} into {len(chunks)} chunks")
-        if get_transmode_lock():
-            asyncio.create_task(keep_transmode_lock()) # TODO test as moved outside loop
+        if get_transmode_lock(dest, img_id):
+            asyncio.create_task(keep_transmode_lock(dest, img_id))
             big_succ, _ = await send_single_packet("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
             if not big_succ:
                 logger.info(f"[CHUNK] Failed sending chunk begin")
-                delete_transmode_lock()
+                delete_transmode_lock(dest, img_id)
                 return False
             
             for i in range(len(chunks)):
@@ -605,20 +610,20 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
                     or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
                 ):
                     logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
-                    delete_transmode_lock()
+                    delete_transmode_lock(dest, img_id)
                     return True
 
                 logger.info(
                     f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
                 )
-                if not check_transmode_lock(): # check old logs is still in progress or not
-                    logger.warning(f"TRANS MODE ended, marking data send as failed, timeout error")
+                if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
+                    logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
                     return False
                 for mis_chunk in missing_chunks:
                     await asyncio.sleep(CHUNK_SLEEP)
                     chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
                     _ = await send_single_packet("I", creator, chunkbytes, dest)
-            delete_transmode_lock()
+            delete_transmode_lock(dest, img_id)
             return False
         else: 
             logger.warning(f"TRANS MODE already in use, could not get lock...")
@@ -638,16 +643,16 @@ async def send_msg(msg_typ, creator, msgbytes, dest):
     retval = await send_msg_internal(msg_typ, creator, msgbytes, dest)
     return retval
 
-def ack_time(smid):
-    # Input: smid: bytes; Output: tuple(timestamp:int, missingids:list or None)
-    for (rmid, msgbytes, t) in msgs_recd:
-        if chr(rmid[0]) == "A":
+def ack_time(msg_uid):
+    # Input: msg_uid: bytes; Output: tuple(timestamp:int, missingids:list or None)
+    for (recd_msg_uid, msgbytes, t) in msgs_recd:
+        if chr(recd_msg_uid[0]) == "A":
             # Match ACK: the payload should start with the MID we're waiting for
             # Handle cases where payload might be exactly MIDLEN bytes or longer
             # Also handle cases where last byte might be missing (truncation issue)
             if len(msgbytes) >= MIDLEN - 1:  # Allow 1 byte shorter due to truncation
                 # Try exact match first
-                if len(msgbytes) >= MIDLEN and smid == msgbytes[:MIDLEN]:
+                if len(msgbytes) >= MIDLEN and msg_uid == msgbytes[:MIDLEN]:
                     missingids = []
                     # For End (E) chunk messages, check for missing chunk IDs
                     if len(msgbytes) > MIDLEN and msgbytes[MIDLEN:MIDLEN+1] == b':':
@@ -660,11 +665,11 @@ def ack_time(smid):
                             except ValueError:
                                 logger.warning(f"[ACK] Failed to parse missing IDs: {missing_str}")
                                 missingids = []
-                    logger.debug(f"[ACK] Matched ACK for {smid}, missing chunks: {missingids}")
+                    logger.debug(f"[ACK] Matched ACK for {msg_uid}, missing chunks: {missingids}")
                     return (t, missingids)
                 # Try match with missing last byte (workaround for truncation issue)
-                elif len(msgbytes) == MIDLEN - 1 and smid[:MIDLEN-1] == msgbytes:
-                    logger.debug(f"[ACK] Matched ACK for {smid} with truncated payload (missing last byte)")
+                elif len(msgbytes) == MIDLEN - 1 and msg_uid[:MIDLEN-1] == msgbytes:
+                    logger.debug(f"[ACK] Matched ACK for {msg_uid} with truncated payload (missing last byte)")
                     return (t, [])
             else:
                 logger.debug(f"[ACK] ACK payload too short: {len(msgbytes)} bytes, expected at least {MIDLEN-1}")
@@ -684,16 +689,18 @@ def begin_chunk(msg):
         logger.error(f"[CHUNK] begin message unparsable {msg}")
         return
     msg_typ = parts[0]
-    cid = parts[1]
+    img_id = parts[1]
     numchunks = int(parts[2])
-    chunk_map[cid] = (msg_typ, numchunks, [])
+    chunk_map[img_id] = (msg_typ, numchunks, [])
+    return (msg_typ, img_id, numchunks)
+    
 
-def get_missing_chunks(cid):
-    # Input: cid: str chunk identifier; Output: list of int missing chunk indices
-    if cid not in chunk_map:
-        #logger.info(f"Should never happen, have no entry in chunk_map for {cid}")
+def get_missing_chunks(img_id):
+    # Input: img_id: str chunk identifier; Output: list of int missing chunk indices
+    if img_id not in chunk_map:
+        #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
         return []
-    msg_typ, expected_chunks, list_chunks = chunk_map[cid]
+    msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
     missing_chunks = []
     for i in range(expected_chunks):
         if not get_data_for_iter(list_chunks, i):
@@ -705,17 +712,16 @@ def add_chunk(msgbytes):
     if len(msgbytes) < 5:
         logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
         return
-    # asyncio.create_task(keep_transmode_lock()) # TODO not needed here
-    cid = msgbytes[0:3].decode()
+    img_id = msgbytes[0:3].decode()
     citer = int.from_bytes(msgbytes[3:5])
     #logger.info(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
-    if cid not in chunk_map:
-        logger.error(f"[CHUNK] no entry yet for {cid}")
+    if img_id not in chunk_map:
+        logger.error(f"[CHUNK] no entry yet for {img_id}")
         return
-    chunk_map[cid][2].append((citer, cdata))
-    _, expected_chunks, _ = chunk_map[cid]
-    missing = get_missing_chunks(cid)
+    chunk_map[img_id][2].append((citer, cdata))
+    _, expected_chunks, _ = chunk_map[img_id]
+    missing = get_missing_chunks(img_id)
     received = expected_chunks - len(missing)
     #logger.info(f" ===== Got {received} / {expected_chunks} chunks ====")
 
@@ -726,24 +732,24 @@ def get_data_for_iter(list_chunks, chunkiter):
             return chunk_data
     return None
 
-def recompile_msg(cid):
-    # Input: cid: str chunk identifier; Output: bytes reconstructed message or None if incomplete
-    if len(get_missing_chunks(cid)) > 0:
+def recompile_msg(img_id):
+    # Input: img_id: str chunk identifier; Output: bytes reconstructed message or None if incomplete
+    if len(get_missing_chunks(img_id)) > 0:
         return None
-    if cid not in chunk_map:
-        #logger.info(f"Should never happen, have no entry in chunk_map for {cid}")
+    if img_id not in chunk_map:
+        #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
         return []
-    msg_typ, expected_chunks, list_chunks = chunk_map[cid]
+    msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
     recompiled = b""
     for i in range(expected_chunks):
         recompiled += get_data_for_iter(list_chunks, i)
     # Ignoring message type for now
     return recompiled
 
-def clear_chunkid(cid):
-    # Input: cid: str chunk identifier; Output: None (removes chunk tracking entry)
-    if cid in chunk_map:
-        entry = chunk_map.pop(cid)
+def clear_chunkid(img_id):
+    # Input: img_id: str chunk identifier; Output: None (removes chunk tracking entry)
+    if img_id in chunk_map:
+        entry = chunk_map.pop(img_id)
         # Explicitly delete chunk data to free memory
         if len(entry) > 2 and isinstance(entry[2], list):
             for _, chunk_data in entry[2]:
@@ -751,28 +757,28 @@ def clear_chunkid(cid):
         del entry
         gc.collect()  # Help GC reclaim memory immediately
     else:
-        logger.warning(f"[CHUNK] couldn't find {cid} in {chunk_map}")
+        logger.warning(f"[CHUNK] couldn't find {img_id} in {chunk_map}")
 
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
 def end_chunk(msg_uid, msg):
-    # Input: msg_uid: bytes message id, msg: str chunk identifier; Output: tuple(status:bool, missing:str|None, cid:str|None, data:bytes|None, creator:int|None)
-    cid = msg
+    # Input: msg_uid: bytes message id, msg: str chunk identifier; Output: tuple(status:bool, missing:str|None, img_id:str|None, data:bytes|None, creator:int|None)
+    img_id = msg
     creator = int(msg_uid[1])
-    missing = get_missing_chunks(cid)
+    missing = get_missing_chunks(img_id)
     if len(missing) > 0:
         logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
         missing_str = str(missing[0])
         for i in range(1, len(missing)):
             if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < FRAME_SIZE:
                 missing_str += "," + str(missing[i])
-        return (False, missing_str, None, None, None)
+        return (False, missing_str, img_id, None, None)
     else:
-        if cid not in chunk_map:
+        if img_id not in chunk_map:
             logger.info(f"[CHUNK] Ignoring this because we dont have an entry for this chunkid, likely because we have already processed this.")
-            return (True, None, None, None, None)
-        recompiled = recompile_msg(cid)
-        return (True, None, cid, recompiled, creator)
+            return (True, None, img_id, None, None)
+        recompiled = recompile_msg(img_id)
+        return (True, None, img_id, recompiled, creator)
 
 # ---------------------------------------------------------------------------
 # Command Center Integration
@@ -972,9 +978,9 @@ async def hb_process(msg_uid, msgbytes, sender):
 
 images_saved_at_cc = []
 
-async def img_process(cid, msg, creator, sender):
-    # Input: cid: str, msg: bytes (possibly encrypted image), creator: int, sender: int; Output: None (stores or forwards image)
-    clear_chunkid(cid)
+async def img_process(img_id, msg, creator, sender):
+    # Input: img_id: str, msg: bytes (possibly encrypted image), creator: int, sender: int; Output: None (stores or forwards image)
+    clear_chunkid(img_id)
     if running_as_cc():
         logger.info(f"[IMG] Received image of size {len(msg)}")
         # ----- TODO REMOVE THIS IS FOR DEBUGGING ONLY -------
@@ -987,7 +993,7 @@ async def img_process(cid, msg, creator, sender):
                 img_bytes = msg
             img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
             logger.info(f"[IMG] Image size: {len(img_bytes)} bytes")
-            fname = f"{NET_IMAGE_DIR}/cc_{creator}_{cid}.jpg"
+            fname = f"{NET_IMAGE_DIR}/cc_{creator}_{img_id}.jpg"
             logger.info(f"[IMG] Saving to file {fname}")
             images_saved_at_cc.append(fname)
             # Limit list size
@@ -1110,9 +1116,7 @@ async def send_image_to_mesh(imgbytes): # trying to send any one of possible pat
     sent_succ = False
     destlist = reachble_nodes_of_path(None)
     for peer_addr in destlist:
-        # asyncio.create_task(keep_transmode_lock()) # TODO, lock not needed here
         sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
-        # delete_transmode_lock() # TODO, lock not needed here
         if sent_succ: # Return as soon as sent to one
             return True
     return False
@@ -1277,6 +1281,7 @@ def process_message(data, rssi=None):
         return True
 
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
+    logger.info(f"[PARSED HEADER] msg_uid:{msg_uid}, msg_typ:{msg_typ}, creator:{creator}, sender:{sender}, receiver:{receiver}, len-msg:{len(msg)}")
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
     recv_msg_count[sender] += 1
@@ -1288,7 +1293,7 @@ def process_message(data, rssi=None):
         logger.info(f"[LORA] Processing broadcast message : {data} : {parsed}")
     msgs_recd.append((msg_uid, msg, time_msec()))
     ackmessage = msg_uid
-    if msg_typ == "N":
+    if msg_typ == "N": # N type msg from neighbours
         scan_process(msg_uid, msg)
     elif msg_typ == "V":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
@@ -1308,32 +1313,29 @@ def process_message(data, rssi=None):
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "C":
         asyncio.create_task(command_process(msg_uid, msg))
-    elif msg_typ == "B":
-        if get_transmode_lock():
-            asyncio.create_task(keep_transmode_lock())
-            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-            try:
-                begin_chunk(msg.decode())
-            except Exception as e:
-                logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
-        else:
-            logger.warning(f"TRANS MODE already in use, could not get lock...")
+    elif msg_typ == "B": # TODO need img_id here
+        try:
+            msg_typ, img_id, _ = begin_chunk(msg.decode())
+            if get_transmode_lock(sender, img_id):
+                asyncio.create_task(keep_transmode_lock(sender, img_id))
+                asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+            else:
+                logger.warning(f"TRANS MODE already in use, could not get lock...")
+                return False
+        except Exception as e:
+            logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
-        if check_transmode_lock():
-            add_chunk(msg)
-        else:
-            logger.warning(f"TRANS MODE already ended, ignoring chunk...")
-            return False
-    elif msg_typ == "E":
-        alldone, missing_str, cid, recompiled, creator = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
+        add_chunk(msg)  # optional to check check_transmode_lock
+    elif msg_typ == "E": # TODO need img_id here
+        alldone, missing_str, img_id, recompiled, creator = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
         if alldone:
-            delete_transmode_lock()
+            delete_transmode_lock(sender, img_id)
             # Also when it fails
             ackmessage += b":-1"
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             if recompiled:
-                asyncio.create_task(img_process(cid, recompiled, creator, sender))
+                asyncio.create_task(img_process(img_id, recompiled, creator, sender))
             else:
                 logger.warning(f"[CHUNK] no recompiled, so not sending")
         else:
