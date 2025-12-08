@@ -9,10 +9,18 @@ ESP32          SX1262 Module
 ------         -------------
 GPIO17  -----> TX (UART TX)
 GPIO16  <----- RX (UART RX)
-GPIO4   -----> M0 (Mode control)
-GPIO5   -----> M1 (Mode control)
+GPIO21  -----> M0 (Mode control)
+GPIO22  -----> M1 (Mode control)
 3.3V    -----> VCC
 GND     -----> GND
+
+⚠ IMPORTANT - External Pull-Up Resistors REQUIRED:
+M0 (GPIO21) → [4.7kΩ or 10kΩ] → 3.3V
+M1 (GPIO22) → [4.7kΩ or 10kΩ] → 3.3V
+
+The LoRa module has internal pull-down resistors on M0/M1 that prevent
+ESP32 from driving these pins HIGH without external pull-up resistors.
+This is a hardware requirement - the code will not work without them!
 ```
 
 ## How to Test on Both Devices
@@ -37,6 +45,11 @@ GND     -----> GND
    source $HOME/esp/esp-idf/export.sh
    idf.py build
    idf.py -p /dev/ttyACM0 flash
+   ```
+
+   **Alternative: Use automated flashing script** (handles boot mode timing):
+   ```bash
+   ./flash_device.sh /dev/ttyACM0 115200
    ```
 
    **If flashing fails**, try:
@@ -120,7 +133,13 @@ Both nodes must have:
 
 ### Flashing Fails with "serial TX path seems to be down"
 
-**This error means: Device is detected and in download mode, but the TX wire (ESP32 TX → Computer RX) is not working.**
+**Root Cause**: This error occurs when esptool cannot complete the sync handshake with the ESP32. The device is detected and in download mode, but esptool cannot send commands to it.
+
+**Most Common Causes**:
+1. **TX wire broken or disconnected** (ESP32 TX → USB-to-Serial RX)
+2. **Timing issue** - Device exits boot mode before esptool connects
+3. **USB-to-Serial adapter issue** - Faulty adapter or driver problem
+4. **USB cable issue** - Charge-only cable (not data-capable)
 
 #### Quick Diagnostic Test
 

@@ -51,12 +51,12 @@ extern "C" {
 #define SX1262_FREQ_900MHZ_START    850
 #define SX1262_FREQ_900MHZ_END      930
 
-// Timing constants (milliseconds)
-#define SX1262_MODE_SWITCH_DELAY_MS     100
-#define SX1262_UART_INIT_DELAY_MS       500
-#define SX1262_CFG_WRITE_DELAY_MS       300
-#define SX1262_CFG_RESPONSE_WAIT_MS     200
-#define SX1262_CFG_RETRY_DELAY_MS       500
+// Timing constants (milliseconds) - Matched to working STM32 driver
+#define SX1262_MODE_SWITCH_DELAY_MS     5    // Delay when switching M0/M1 modes (STM32: HAL_Delay(5))
+#define SX1262_UART_INIT_DELAY_MS       1000 // Delay after UART init before config (STM32: HAL_Delay(1000))
+#define SX1262_CFG_WRITE_DELAY_MS       500  // Delay after config write (STM32: HAL_Delay(500))
+#define SX1262_CFG_RESPONSE_WAIT_MS     200   // Delay if data available (Python: CFG_RESPONSE_WAIT_MS)
+#define SX1262_CFG_RETRY_DELAY_MS       500   // Delay between retries (Python: CFG_RETRY_DELAY_MS)
 #define SX1262_TX_DELAY_MS              150
 #define SX1262_RX_DELAY_MS              250
 #define SX1262_RSSI_WAIT_MS             500

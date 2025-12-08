@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
+#include <inttypes.h>
 
 static const char *TAG = "SX1262";
 
@@ -22,13 +23,37 @@ static const char *TAG = "SX1262";
  *   - Normal: M0=LOW, M1=LOW
  *   - Wake-up: M0=HIGH, M1=LOW
  *   - Power Save: M0=LOW, M1=HIGH
- *   - Configuration: M0=HIGH, M1=HIGH
+ *   - Configuration: M0=LOW, M1=HIGH
  */
 static void sx1262_set_mode(gpio_num_t m0_pin, gpio_num_t m1_pin, bool m0, bool m1)
 {
+    // Simple mode setting - match STM32 driver
+    // STM32: M0_RESET()/M0_SET(), M1_RESET()/M1_SET(), HAL_Delay(5)
     gpio_set_level(m0_pin, m0 ? 1 : 0);
     gpio_set_level(m1_pin, m1 ? 1 : 0);
+    
+    // Wait for module to recognize mode change (match STM32: HAL_Delay(5))
     vTaskDelay(pdMS_TO_TICKS(SX1262_MODE_SWITCH_DELAY_MS));
+    
+    // Verify pins are actually at the expected levels
+    int m0_level = gpio_get_level(m0_pin);
+    int m1_level = gpio_get_level(m1_pin);
+    int expected_m0 = m0 ? 1 : 0;
+    int expected_m1 = m1 ? 1 : 0;
+    
+    ESP_LOGI(TAG, "GPIO pin verification:");
+    ESP_LOGI(TAG, "  M0 (GPIO%d): Set to %d, Read back: %d %s", 
+             m0_pin, expected_m0, m0_level, (m0_level == expected_m0) ? "✓" : "✗ MISMATCH!");
+    ESP_LOGI(TAG, "  M1 (GPIO%d): Set to %d, Read back: %d %s", 
+             m1_pin, expected_m1, m1_level, (m1_level == expected_m1) ? "✓" : "✗ MISMATCH!");
+    
+    if (m0_level != expected_m0 || m1_level != expected_m1) {
+        ESP_LOGE(TAG, "⚠ WARNING: GPIO pins not at expected levels!");
+        ESP_LOGE(TAG, "  This may indicate:");
+        ESP_LOGE(TAG, "    - Pins not connected to module");
+        ESP_LOGE(TAG, "    - Module pulling pins to different level");
+        ESP_LOGE(TAG, "    - GPIO pin conflict with another peripheral");
+    }
 }
 
 /**
@@ -36,7 +61,7 @@ static void sx1262_set_mode(gpio_num_t m0_pin, gpio_num_t m1_pin, bool m0, bool 
  */
 static void sx1262_enter_config_mode(gpio_num_t m0_pin, gpio_num_t m1_pin)
 {
-    sx1262_set_mode(m0_pin, m1_pin, true, true);  // M0=HIGH, M1=HIGH
+    sx1262_set_mode(m0_pin, m1_pin, false, true);  // M0=LOW, M1=HIGH
 }
 
 /**
@@ -143,36 +168,110 @@ static void sx1262_build_config_reg(const sx1262_config_t *config, uint8_t *cfg_
 
 /**
  * @brief Send configuration to module and verify
+ * 
+ * Matches Waveshare SX1262 868M LoRa HAT timing:
+ * - Sends config twice (for i in range(2))
+ * - Waits 200ms after write
+ * - Waits 100ms if data available before reading
  */
 static esp_err_t sx1262_send_config(uart_port_t uart_num, gpio_num_t m0_pin, gpio_num_t m1_pin, const uint8_t *cfg_reg)
 {
     uint8_t response[12];
-    int len;
+    int len = 0;
+    size_t available = 0;
     
-    // Clear UART buffer
-    uart_flush(uart_num);
+    // Clear input buffer (match Python: self.ser.flushInput())
+    do {
+        uart_get_buffered_data_len(uart_num, &available);
+        if (available > 0) {
+            uint8_t dummy[256];
+            int read_len = uart_read_bytes(uart_num, dummy, 
+                                          available > sizeof(dummy) ? sizeof(dummy) : available, 0);
+            ESP_LOGI(TAG, "Cleared %d bytes from buffer", read_len);
+        }
+    } while (available > 0);
     
-    // Send configuration (12 bytes)
-    int written = uart_write_bytes(uart_num, cfg_reg, 12);
-    if (written != 12) {
-        ESP_LOGE(TAG, "Failed to write configuration");
-        return ESP_FAIL;
+    // Debug: Print configuration bytes being sent
+    ESP_LOGI(TAG, "Sending configuration (12 bytes):");
+    char hex_str[50] = {0};
+    for (int i = 0; i < 12; i++) {
+        char temp[5];
+        snprintf(temp, sizeof(temp), "%02X ", cfg_reg[i]);
+        strncat(hex_str, temp, sizeof(hex_str) - strlen(hex_str) - 1);
+    }
+    ESP_LOGI(TAG, "  Bytes: %s", hex_str);
+    ESP_LOGI(TAG, "  Header: 0x%02X (0xC2=volatile, 0xC0=persistent)", cfg_reg[0]);
+    
+    // Send configuration with retry logic (match Python: for attempt in range(CFG_RETRY_ATTEMPTS))
+    for (int attempt = 0; attempt < SX1262_CFG_RETRY_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+            ESP_LOGI(TAG, "Configuration attempt %d/%d...", attempt + 1, SX1262_CFG_RETRY_ATTEMPTS);
+        }
+        
+        // Send 12-byte configuration register (match Python: self.ser.write(bytes(self.cfg_reg)))
+        ESP_LOGI(TAG, "Writing configuration bytes to UART...");
+        int written = uart_write_bytes(uart_num, cfg_reg, 12);
+        if (written != 12) {
+            ESP_LOGE(TAG, "Failed to write all configuration bytes! Written: %d", written);
+            continue;  // Try again
+        }
+        ESP_LOGI(TAG, "  ✓ Written %d bytes to UART", written);
+        
+        // Wait for module to process (match STM32: HAL_Delay(500))
+        vTaskDelay(pdMS_TO_TICKS(SX1262_CFG_WRITE_DELAY_MS));
+        
+        // Check for response (match STM32: check buffer[0] == CFG_RETURN after delay)
+        uart_get_buffered_data_len(uart_num, &available);
+        ESP_LOGI(TAG, "Checking for response... Available bytes: %d", available);
+        
+        if (available > 0) {
+            // Read response (match STM32: HAL_UART_Receive_IT, then check buffer[0])
+            len = uart_read_bytes(uart_num, response, sizeof(response), pdMS_TO_TICKS(100));
+            ESP_LOGI(TAG, "Read %d bytes from module", len);
+            
+            if (len > 0 && response[0] == SX1262_RESPONSE_SUCCESS) {
+                // Success! (match Waveshare: if r_buff[0] == 0xC1)
+                ESP_LOGI(TAG, "Response received (%d bytes):", len);
+                char resp_hex[50] = {0};
+                for (int i = 0; i < len && i < 12; i++) {
+                    char temp[5];
+                    snprintf(temp, sizeof(temp), "%02X ", response[i]);
+                    strncat(resp_hex, temp, sizeof(resp_hex) - strlen(resp_hex) - 1);
+                }
+                ESP_LOGI(TAG, "  Bytes: %s", resp_hex);
+                ESP_LOGI(TAG, "✓ Configuration successful! Module confirmed with 0x%02X", response[0]);
+                return ESP_OK;
+            } else if (len > 0) {
+                ESP_LOGW(TAG, "Unexpected response: 0x%02X (expected 0xC1)", len > 0 ? response[0] : 0);
+            }
+        } else {
+            ESP_LOGW(TAG, "No data available in buffer");
+        }
+        
+        // Clear input buffer before retry (match Python: while self.ser.any(): self.ser.read())
+        do {
+            uart_get_buffered_data_len(uart_num, &available);
+            if (available > 0) {
+                uint8_t dummy[256];
+                uart_read_bytes(uart_num, dummy, 
+                              available > sizeof(dummy) ? sizeof(dummy) : available, 0);
+            }
+        } while (available > 0);
+        
+        // Wait before retry (match Python: time.sleep_ms(CFG_RETRY_DELAY_MS))
+        if (attempt < SX1262_CFG_RETRY_ATTEMPTS - 1) {
+            vTaskDelay(pdMS_TO_TICKS(SX1262_CFG_RETRY_DELAY_MS));
+        }
     }
     
-    vTaskDelay(pdMS_TO_TICKS(SX1262_CFG_WRITE_DELAY_MS));
-    
-    // Wait for response
-    vTaskDelay(pdMS_TO_TICKS(SX1262_CFG_RESPONSE_WAIT_MS));
-    
-    len = uart_read_bytes(uart_num, response, sizeof(response), pdMS_TO_TICKS(SX1262_CFG_RESPONSE_WAIT_MS));
-    
-    if (len > 0 && response[0] == SX1262_RESPONSE_SUCCESS) {
-        ESP_LOGI(TAG, "Configuration successful");
-        return ESP_OK;
-    } else {
-        ESP_LOGW(TAG, "Configuration failed or no response");
-        return ESP_FAIL;
-    }
+    // All attempts failed (match Python error message)
+    ESP_LOGE(TAG, "✗ Configuration failed after %d attempts", SX1262_CFG_RETRY_ATTEMPTS);
+    ESP_LOGE(TAG, "  Check:");
+    ESP_LOGE(TAG, "    - M0/M1 pins are set correctly (M0=LOW, M1=HIGH for config mode)");
+    ESP_LOGE(TAG, "    - UART TX/RX connections (GPIO17/GPIO16)");
+    ESP_LOGE(TAG, "    - Module power supply (3.3V, stable)");
+    ESP_LOGE(TAG, "    - Module is responding (may need power cycle)");
+    return ESP_FAIL;
 }
 
 // ============================================================================
@@ -192,27 +291,59 @@ esp_err_t sx1262_init(const sx1262_config_t *config, sx1262_handle_t *handle)
         return ESP_ERR_INVALID_ARG;
     }
     
-    // Initialize GPIO pins
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << config->m0_pin) | (1ULL << config->m1_pin),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&io_conf);
-    
     ESP_LOGI(TAG, "Initializing SX1262 module...");
     ESP_LOGI(TAG, "  UART: %d, M0: GPIO%d, M1: GPIO%d", config->uart_num, config->m0_pin, config->m1_pin);
     ESP_LOGI(TAG, "  Address: %d, Frequency: %d MHz, Power: %d dBm", 
              config->addr, config->freq, config->power);
     
-    // Enter configuration mode
-    sx1262_enter_config_mode(config->m0_pin, config->m1_pin);
+    // Initialize GPIO pins for mode control (M0, M1) - PUSH-PULL mode
+    // Push-pull: ESP32 actively drives HIGH (1) or LOW (0)
+    // IMPORTANT: External 4.7kΩ-10kΩ pull-up resistors are REQUIRED on M0/M1 to 3.3V
+    // The LoRa module has internal pull-down resistors that prevent ESP32 from
+    // driving pins HIGH reliably without external pull-ups.
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << config->m0_pin) | (1ULL << config->m1_pin),
+        .mode = GPIO_MODE_OUTPUT,  // Push-pull mode - ESP32 drives both HIGH and LOW
+        .pull_up_en = GPIO_PULLUP_DISABLE,  // Use external pull-ups (required)
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
     
-    // Configure UART at 9600 baud for initial configuration
+    // Set maximum drive strength (40mA) to help overcome module's pull-down
+    // Note: Even with max drive, external pull-ups are still required
+    // ESP32 drive capability: 0=weakest, 3=strongest (40mA)
+    ESP_ERROR_CHECK(gpio_set_drive_capability(config->m0_pin, GPIO_DRIVE_CAP_3));
+    ESP_ERROR_CHECK(gpio_set_drive_capability(config->m1_pin, GPIO_DRIVE_CAP_3));
+    ESP_LOGI(TAG, "GPIO pins configured in PUSH-PULL mode with maximum drive strength (40mA)");
+    ESP_LOGI(TAG, "  M0: GPIO%d, M1: GPIO%d", config->m0_pin, config->m1_pin);
+    ESP_LOGI(TAG, "  ESP32 will actively drive pins HIGH or LOW");
+    ESP_LOGI(TAG, "  ⚠ HARDWARE: External 4.7kΩ-10kΩ pull-ups required on M0/M1 to 3.3V");
+    
+    // Set pins HIGH initially - ESP32 actively drives HIGH
+    gpio_set_level(config->m0_pin, 1);  // ESP32 actively drives HIGH
+    gpio_set_level(config->m1_pin, 1);  // ESP32 actively drives HIGH
+    
+    // Verify pins can be set HIGH before proceeding
+    vTaskDelay(pdMS_TO_TICKS(10));  // Small delay for pin to settle
+    int m0_init = gpio_get_level(config->m0_pin);
+    int m1_init = gpio_get_level(config->m1_pin);
+    ESP_LOGI(TAG, "GPIO pins initialized: M0=GPIO%d (%s), M1=GPIO%d (%s)", 
+             config->m0_pin, m0_init ? "HIGH✓" : "LOW✗", 
+             config->m1_pin, m1_init ? "HIGH✓" : "LOW✗");
+    
+    if (!m0_init || !m1_init) {
+        ESP_LOGE(TAG, "⚠ ERROR: ESP32 cannot drive pins HIGH!");
+        ESP_LOGE(TAG, "  SOLUTION: Add external pull-up resistors:");
+        ESP_LOGE(TAG, "    M0 (GPIO%d) → [4.7kΩ or 10kΩ] → 3.3V", config->m0_pin);
+        ESP_LOGE(TAG, "    M1 (GPIO%d) → [4.7kΩ or 10kΩ] → 3.3V", config->m1_pin);
+        ESP_LOGE(TAG, "  This is REQUIRED because the module has internal pull-downs");
+        ESP_LOGE(TAG, "  Without external pull-ups, ESP32 cannot drive pins HIGH");
+    }
+    
+    // Configure UART at 9600 baud for configuration (match STM32: 9600 baud)
     uart_config_t uart_config = {
-        .baud_rate = SX1262_UART_CONFIG_BAUD,
+        .baud_rate = SX1262_UART_CONFIG_BAUD,  // 9600 baud for config
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -222,27 +353,51 @@ esp_err_t sx1262_init(const sx1262_config_t *config, sx1262_handle_t *handle)
     
     ESP_ERROR_CHECK(uart_driver_install(config->uart_num, SX1262_UART_BUF_SIZE * 2, 0, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(config->uart_num, &uart_config));
-    
-    // Set UART pins (adjust these based on your ESP32 board)
-    // Default: TX=GPIO17, RX=GPIO16 for UART_NUM_1
     ESP_ERROR_CHECK(uart_set_pin(config->uart_num, GPIO_NUM_17, GPIO_NUM_16, 
                                   UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     
+    ESP_LOGI(TAG, "UART initialized at %d baud for configuration", SX1262_UART_CONFIG_BAUD);
+    
+    // STM32: HAL_Delay(1000); //dont delete wait for lora reset
+    ESP_LOGI(TAG, "Waiting 1000ms for module to reset and stabilize (match STM32)...");
     vTaskDelay(pdMS_TO_TICKS(SX1262_UART_INIT_DELAY_MS));
     
-    // Build and send configuration
+    // Enter configuration mode: M0=LOW, M1=HIGH (match STM32: cfg_sx126x_io(CFG_REGISTER))
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Entering configuration mode (M0=LOW, M1=HIGH)...");
+    sx1262_enter_config_mode(config->m0_pin, config->m1_pin);
+    ESP_LOGI(TAG, "");
+    
+    // Build configuration register (match Python driver)
     uint8_t cfg_reg[12];
     sx1262_build_config_reg(config, cfg_reg);
     
     // Retry configuration up to 3 times
     esp_err_t ret = ESP_FAIL;
     for (int i = 0; i < SX1262_CFG_RETRY_ATTEMPTS; i++) {
+        ESP_LOGI(TAG, "");
+        ESP_LOGI(TAG, "========================================");
         ESP_LOGI(TAG, "Configuration attempt %d/%d", i + 1, SX1262_CFG_RETRY_ATTEMPTS);
+        ESP_LOGI(TAG, "========================================");
+        
+        // Re-enter config mode before each attempt (match Python: ensure config mode)
+        if (i > 0) {
+            ESP_LOGI(TAG, "Re-entering config mode before retry...");
+            sx1262_enter_config_mode(config->m0_pin, config->m1_pin);
+            vTaskDelay(pdMS_TO_TICKS(SX1262_MODE_SWITCH_DELAY_MS));
+        }
+        
         ret = sx1262_send_config(config->uart_num, config->m0_pin, config->m1_pin, cfg_reg);
         if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "✓ Configuration successful on attempt %d!", i + 1);
             break;
+        } else {
+            ESP_LOGW(TAG, "✗ Configuration attempt %d failed", i + 1);
+            if (i < SX1262_CFG_RETRY_ATTEMPTS - 1) {
+                ESP_LOGI(TAG, "Waiting %d ms before retry...", SX1262_CFG_RETRY_DELAY_MS);
+                vTaskDelay(pdMS_TO_TICKS(SX1262_CFG_RETRY_DELAY_MS));
+            }
         }
-        vTaskDelay(pdMS_TO_TICKS(SX1262_CFG_RETRY_DELAY_MS));
     }
     
     if (ret != ESP_OK) {
@@ -251,24 +406,33 @@ esp_err_t sx1262_init(const sx1262_config_t *config, sx1262_handle_t *handle)
         return ESP_FAIL;
     }
     
-    // Reconfigure UART at target baud rate (115200)
+    // Reopen UART at target baud rate (115200) - match Python driver exactly
+    // Python: self.ser.deinit(), time.sleep_ms(300), then reopen at target_baud
     uart_driver_delete(config->uart_num);
-    vTaskDelay(pdMS_TO_TICKS(300));
+    vTaskDelay(pdMS_TO_TICKS(300));  // Match Python: time.sleep_ms(300)
     
-    // Re-enter config mode for baud rate change
+    // Critical: Module must be back in configuration mode for baud rate change
+    // Python: self.M0.value(0), self.M1.value(1), time.sleep_ms(UART_INIT_DELAY_MS)
     sx1262_enter_config_mode(config->m0_pin, config->m1_pin);
     vTaskDelay(pdMS_TO_TICKS(SX1262_UART_INIT_DELAY_MS));
     
+    // Reinitialize UART at target baud rate
+    // Note: Keep the same pin configuration that worked during config
     uart_config.baud_rate = SX1262_UART_NORMAL_BAUD;
     ESP_ERROR_CHECK(uart_driver_install(config->uart_num, SX1262_UART_BUF_SIZE * 2, 0, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(config->uart_num, &uart_config));
+    // Use the same pin config that was tested (might be swapped)
     ESP_ERROR_CHECK(uart_set_pin(config->uart_num, GPIO_NUM_17, GPIO_NUM_16, 
                                   UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     
+    // Clear any stale data from input buffer (match STM32: simple flush)
+    size_t available = 0;
     uart_flush(config->uart_num);
-    vTaskDelay(pdMS_TO_TICKS(30));
     
-    // Exit to normal operation mode
+    vTaskDelay(pdMS_TO_TICKS(30));  // Match Python: UART_STABILIZE_DELAY_MS = 30ms
+    
+    // Exit configuration mode: M0=LOW, M1=LOW (normal operation mode)
+    // Python: self.M0.value(0), self.M1.value(0), time.sleep_ms(MODE_SWITCH_DELAY_MS)
     sx1262_exit_config_mode(config->m0_pin, config->m1_pin);
     
     // Calculate frequency offset for handle
