@@ -2,6 +2,10 @@
 
 ESP32 project with SX1262 LoRa driver for bidirectional communication between two ESP32 boards.
 
+## Documentation
+
+- **[ESP32 Power Consumption Specifications](ESP32_Power_Consumption.md)** - Detailed power consumption, voltage, and current specifications for ESP32 in different operating modes.
+
 ## Hardware Connections
 
 ```
