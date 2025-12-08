@@ -183,12 +183,6 @@ def time_sec():
     # Input: None; Output: int seconds since clock_start
     return int(utime.ticks_diff(utime.ticks_ms(), clock_start) / 1000) # compute time difference
 
-def get_rand():
-    # Input: None; Output: str random 3-letter uppercase identifier
-    rstr = ""
-    for i in range(3):
-        rstr += chr(65+random.randint(0,25))
-    return rstr
 
 # TypeSourceDestRRRandom
 def encode_node_id(node_id):
@@ -207,21 +201,28 @@ def encode_dest(dest):
         return b'*'
     return encode_node_id(dest)
 
-def get_msg_id(msg_typ, creator, dest):
+def get_rand():
+    # Input: None; Output: str random 3-letter uppercase identifier
+    rstr = ""
+    for i in range(3):
+        rstr += chr(65+random.randint(0,25))
+    return rstr
+
+def get_msg_uid(msg_typ, creator, dest):
     # Input: msg_typ: str, creator: int, dest: int; Output: bytes message identifier
     rrr = get_rand()
-    msg_id = (
+    msg_uid = (
         msg_typ.encode()
         + encode_node_id(creator)
         + encode_node_id(my_addr)
         + encode_dest(dest)
         + rrr.encode()
     )
-    return msg_id
+    return msg_uid
 
 def parse_header(data):
-    # Input: data: bytes; Output: tuple(msg_id, msg_typ, creator, sender, receiver, msg) or None
-    msg_id = b""
+    # Input: data: bytes; Output: tuple(msg_uid, msg_typ, creator, sender, receiver, msg) or None
+    msg_uid = b""
     if data == None:
         logger.warning(f"[LORA] Weird that data is none")
         return None
@@ -229,21 +230,21 @@ def parse_header(data):
     if len(data) < MIDLEN + 1:
         return None
     try:
-        msg_id = data[:MIDLEN]
+        msg_uid = data[:MIDLEN]
     except Exception as e:
         logger.error(f"[LORA] error parsing {data[:MIDLEN]} : {e}")
         return
-    msg_typ = chr(msg_id[0])
-    creator = int(msg_id[1])
-    sender = int(msg_id[2])
-    if msg_id[3] == 42 or msg_id == b"*":
+    msg_typ = chr(msg_uid[0])
+    creator = int(msg_uid[1])
+    sender = int(msg_uid[2])
+    if msg_uid[3] == 42 or msg_uid == b"*":
         receiver = -1
     else:
-        receiver=int(msg_id[3])
+        receiver=int(msg_uid[3])
     if chr(data[MIDLEN]) != ';':
         return None
     msg = data[MIDLEN+1:]
-    return (msg_id, msg_typ, creator, sender, receiver, msg)
+    return (msg_uid, msg_typ, creator, sender, receiver, msg)
 
 def ellepsis(msg):
     # Input: msg: str; Output: str truncated with ellipsis if necessary
@@ -257,7 +258,7 @@ def ack_needed(msg_typ):
         return False
     if msg_typ in ["H", "B", "E", "V"]:
         return True
-    return False
+    return False # "P"
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
@@ -374,7 +375,7 @@ def cleanup_old_messages():
     age_threshold_ms = MAX_OLD_MSG_AGE_SEC * 1000
 
     # Clean msgs_sent - remove messages older than threshold
-    msgs_sent = [(msg_id, msg, t) for msg_id, msg, t in msgs_sent
+    msgs_sent = [(msg_uid, msg, t) for msg_uid, msg, t in msgs_sent
                  if (current_time - t) < age_threshold_ms]
     # Also limit by size
     if len(msgs_sent) > MAX_MSGS_SENT:
@@ -382,7 +383,7 @@ def cleanup_old_messages():
         logger.info(f"[MEM] Trimmed msgs_sent to {MAX_MSGS_SENT} entries")
 
     # Clean msgs_recd - remove messages older than threshold
-    msgs_recd = [(msg_id, msg, t) for msg_id, msg, t in msgs_recd
+    msgs_recd = [(msg_uid, msg, t) for msg_uid, msg, t in msgs_recd
                  if (current_time - t) < age_threshold_ms]
     # Also limit by size
     if len(msgs_recd) > MAX_MSGS_RECD:
@@ -392,12 +393,12 @@ def cleanup_old_messages():
     # Clean msgs_unacked - remove very old unacked messages (they likely failed)
     old_unacked = []
     new_unacked = []
-    for msg_id, msg, t in msgs_unacked:
+    for msg_uid, msg, t in msgs_unacked:
         age = current_time - t
         if age > age_threshold_ms * 2:  # Double threshold for unacked (more lenient)
-            old_unacked.append(msg_id)
+            old_unacked.append(msg_uid)
         else:
-            new_unacked.append((msg_id, msg, t))
+            new_unacked.append((msg_uid, msg, t))
     msgs_unacked = new_unacked
 
     if len(old_unacked) > 0:
@@ -471,7 +472,7 @@ async def periodic_gc():
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
-def radio_send(dest, data, msg_id):
+def radio_send(dest, data, msg_uid):
     # Input: dest: int, data: bytes; Output: None (sends bytes via LoRa, logs send)
     global sent_count
     sent_count = sent_count + 1
@@ -483,53 +484,53 @@ def radio_send(dest, data, msg_id):
     loranode.send(dest, data)
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    logger.info(f"[SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_ID = {msg_id}")
+    logger.info(f"[SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_ID = {msg_uid}")
 
-def pop_and_get(msg_id):
-    # Input: msg_id: bytes; Output: tuple(msg_id, msgbytes, timestamp) removed from msgs_unacked or None
+def pop_and_get(msg_uid):
+    # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
     for i in range(len(msgs_unacked)):
         m, d, t = msgs_unacked[i]
-        if m == msg_id:
+        if m == msg_uid:
             return msgs_unacked.pop(i)
     return None
 
 async def send_single_msg(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
-    msg_id = get_msg_id(msg_typ, creator, dest)
-    databytes = msg_id + b";" + msgbytes
+    msg_uid = get_msg_uid(msg_typ, creator, dest)
+    databytes = msg_uid + b";" + msgbytes
     ackneeded = ack_needed(msg_typ)
     timesent = time_msec()
     if ackneeded:
-        msgs_unacked.append((msg_id, msgbytes, timesent))
+        msgs_unacked.append((msg_uid, msgbytes, timesent))
     else:
-        msgs_sent.append((msg_id, msgbytes, timesent))
+        msgs_sent.append((msg_uid, msgbytes, timesent))
     if not ackneeded:
-        radio_send(dest, databytes, msg_id)
+        radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     send_retry = 3
     for retry_i in range(send_retry):
-        radio_send(dest, databytes, msg_id)
+        radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(ACK_SLEEP)
         first_log_flag = True
         for i in range(5):
-            at, missing_chunks = ack_time(msg_id)
+            at, missing_chunks = ack_time(msg_uid)
             if at > 0:
-                logger.info(f"[ACK] Msg {msg_id} : was acked in {at - timesent} msecs")
-                msgs_sent.append(pop_and_get(msg_id))
+                logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
+                msgs_sent.append(pop_and_get(msg_uid))
                 return (True, missing_chunks)
             else:
                 if first_log_flag:
-                    logger.info(f"[ACK] Still waiting for ack, MSG_ID =  {msg_id} # {i}")
+                    logger.info(f"[ACK] Still waiting for ack, MSG_ID =  {msg_uid} # {i}")
                     first_log_flag = False
                 else:
-                    logger.debug(f"[ACK] Still waiting for ack, MSG_ID = {msg_id} # {i}")
+                    logger.debug(f"[ACK] Still waiting for ack, MSG_ID = {msg_uid} # {i}")
                 await asyncio.sleep(
                     ACK_SLEEP * min(i + 1, 3)
                 )  # progressively more sleep, capped at 3x
         newline = "\n" if (retry_i + 1) == send_retry else ""
-        logger.warning(f"[ACK] Failed to get ack, MSG_ID = {msg_id}, retry # {retry_i+1}/{send_retry}{newline}")
-    logger.error(f"[LORA] Failed to send message, MSG_ID = {msg_id}")
+        logger.warning(f"[ACK] Failed to get ack, MSG_ID = {msg_uid}, retry # {retry_i+1}/{send_retry}{newline}")
+    logger.error(f"[LORA] Failed to send message, MSG_ID = {msg_uid}")
     return (False, [])
 
 def make_chunks(msg):
@@ -754,10 +755,10 @@ def clear_chunkid(cid):
 
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
-def end_chunk(msg_id, msg):
-    # Input: msg_id: bytes message id, msg: str chunk identifier; Output: tuple(status:bool, missing:str|None, cid:str|None, data:bytes|None, creator:int|None)
+def end_chunk(msg_uid, msg):
+    # Input: msg_uid: bytes message id, msg: str chunk identifier; Output: tuple(status:bool, missing:str|None, cid:str|None, data:bytes|None, creator:int|None)
     cid = msg
-    creator = int(msg_id[1])
+    creator = int(msg_uid[1])
     missing = get_missing_chunks(cid)
     if len(missing) > 0:
         logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
@@ -921,9 +922,9 @@ async def upload_heartbeat(heartbeat_data):
 
 hb_map = {}
 
-async def hb_process(msg_id, msgbytes, sender):
-    # Input: msg_id: bytes, msgbytes: bytes, sender: int; Output: None (routes or logs heartbeat data)
-    creator = int(msg_id[1])
+async def hb_process(msg_uid, msgbytes, sender):
+    # Input: msg_uid: bytes, msgbytes: bytes, sender: int; Output: None (routes or logs heartbeat data)
+    creator = int(msg_uid[1])
     if running_as_cc():
         if creator not in hb_map:
             hb_map[creator] = 0
@@ -1230,15 +1231,15 @@ async def image_sending_loop():
             await asyncio.sleep(PHOTO_SENDING_INTERVAL)
 
 # If N messages seen in the last M minutes.
-def scan_process(msg_id, msg):
-    # Input: msg_id: bytes, msg: bytes containing node address; Output: None (updates seen neighbours)
+def scan_process(msg_uid, msg):
+    # Input: msg_uid: bytes, msg: bytes containing node address; Output: None (updates seen neighbours)
     nodeaddr = int.from_bytes(msg)
     if nodeaddr not in seen_neighbours:
         logger.info(f"[NET] Adding nodeaddr {nodeaddr} to seen_neighbours")
         seen_neighbours.append(nodeaddr)
 
-async def sync_and_transfer_spath(msg_id, msg):
-    # Input: msg_id: bytes, msg: str shortest-path data; Output: None (updates shortest_path_to_cc and propagates)
+async def sync_and_transfer_spath(msg_uid, msg):
+    # Input: msg_uid: bytes, msg: str shortest-path data; Output: None (updates shortest_path_to_cc and propagates)
     global shortest_path_to_cc
     if running_as_cc():
         # logger.info(f"Ignoring shortest path since I am cc")
@@ -1257,7 +1258,7 @@ async def sync_and_transfer_spath(msg_id, msg):
             nsp = [my_addr] + shortest_path_to_cc
             nmsg = ",".join([str(x) for x in nsp])
             logger.info(f"[NET] Propogating spath from {spath} to {nmsg}")
-            asyncio.create_task(send_msg("S", int(msg_id[1]), nmsg.encode(), n))
+            asyncio.create_task(send_msg("S", int(msg_uid[1]), nmsg.encode(), n))
 
 def process_message(data, rssi=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
@@ -1275,24 +1276,24 @@ def process_message(data, rssi=None):
         logger.warning(f"[LORA] flakiness dropping {data}")
         return True
 
-    msg_id, msg_typ, creator, sender, receiver, msg = parsed
+    msg_uid, msg_typ, creator, sender, receiver, msg = parsed
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
     recv_msg_count[sender] += 1
     if receiver != -1 and my_addr != receiver:
         logger.info(f"[LORA] Strange that {my_addr} is not as {receiver}")
-        logger.warning(f"[LORA] skipping message as it is not for me but for {receiver} : {msg_id}")
+        logger.warning(f"[LORA] skipping message as it is not for me but for {receiver} : {msg_uid}")
         return
     if receiver == -1 :
         logger.info(f"[LORA] Processing broadcast message : {data} : {parsed}")
-    msgs_recd.append((msg_id, msg, time_msec()))
-    ackmessage = msg_id
+    msgs_recd.append((msg_uid, msg, time_msec()))
+    ackmessage = msg_uid
     if msg_typ == "N":
-        scan_process(msg_id, msg)
+        scan_process(msg_uid, msg)
     elif msg_typ == "V":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "S":
-        asyncio.create_task(sync_and_transfer_spath(msg_id, msg.decode()))
+        asyncio.create_task(sync_and_transfer_spath(msg_uid, msg.decode()))
     elif msg_typ == "H":
         # Validate HB message payload length for encrypted messages
         if ENCRYPTION_ENABLED:
@@ -1300,13 +1301,13 @@ def process_message(data, rssi=None):
             if len(msg) != 128:
                 logger.warning(
                     f"[HB] Invalid payload length: {len(msg)} bytes, expected 128 bytes for encrypted message. "
-                    f"MID: {msg_id}, may be corrupted or incomplete."
+                    f"MID: {msg_uid}, may be corrupted or incomplete."
                 )
                 # Still try to process, but log the issue
-        asyncio.create_task(hb_process(msg_id, msg, sender))
+        asyncio.create_task(hb_process(msg_uid, msg, sender))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "C":
-        asyncio.create_task(command_process(msg_id, msg))
+        asyncio.create_task(command_process(msg_uid, msg))
     elif msg_typ == "B":
         if get_transmode_lock():
             asyncio.create_task(keep_transmode_lock())
@@ -1325,7 +1326,7 @@ def process_message(data, rssi=None):
             logger.warning(f"TRANS MODE already ended, ignoring chunk...")
             return False
     elif msg_typ == "E":
-        alldone, missing_str, cid, recompiled, creator = end_chunk(msg_id, msg.decode())
+        alldone, missing_str, cid, recompiled, creator = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
         if alldone:
             delete_transmode_lock()
             # Also when it fails
@@ -1342,7 +1343,7 @@ def process_message(data, rssi=None):
         # ACK messages are already added to msgs_recd at line 1267
         # They are matched by ack_time() function which searches msgs_recd
         # No additional processing needed for ACK messages
-        logger.debug(f"[ACK] Received ACK message: {msg_id}, payload: {msg}")
+        logger.debug(f"[ACK] Received ACK message: {msg_uid}, payload: {msg}")
     else:
         logger.info(f"[LORA] Unseen messages type {msg_typ} in {msg}")
     return True
@@ -1360,28 +1361,6 @@ async def radio_read():
             message = message.replace(b"{}[]", b"\n")
             process_message(message, rssi)
         await asyncio.sleep(0.15)  # Increased from 0.1 to 0.15 to give more time between receives
-
-async def validate_and_remove_neighbours():
-    # Input: None; Output: None (verifies neighbours via ping and prunes unreachable ones)
-    global shortest_path_to_cc
-    logger.info(f"===> Validate/Remove, Neighbour validation loop started... <===\n")
-    while True:
-        logger.info(f"[NET] Going to validate neighbours : {seen_neighbours}")
-        to_be_removed = []
-        for n in seen_neighbours:
-            msgbytes = b"Nothing"
-            success = await send_msg("V", my_addr, msgbytes, n)
-            if success:
-                logger.info(f"[NET] Neighbour {n} is still within reach")
-            else:
-                logger.info(f"[NET] Dropping neighbour : {n}")
-                to_be_removed.append(n)
-                if n in shortest_path_to_cc:
-                    logger.info(f"[NET] Clearing shortest path to CC (neighbour dropped)")
-                    shortest_path_to_cc = []
-        for x in to_be_removed:
-            seen_neighbours.remove(x)
-        await asyncio.sleep(VALIDATE_WAIT_SEC)
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
@@ -1514,6 +1493,28 @@ async def neighbour_scan():
         logger.info(f"[STATUS] {my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
+async def validate_and_remove_neighbours():
+    # Input: None; Output: None (verifies neighbours via ping and prunes unreachable ones)
+    global shortest_path_to_cc
+    logger.info(f"===> Validate/Remove, Neighbour validation loop started... <===\n")
+    while True:
+        logger.info(f"[NET] Going to validate neighbours : {seen_neighbours}")
+        to_be_removed = []
+        for n in seen_neighbours:
+            msgbytes = b"Nothing"
+            success = await send_msg("V", my_addr, msgbytes, n)
+            if success:
+                logger.info(f"[NET] Neighbour {n} is still within reach")
+            else:
+                logger.info(f"[NET] Dropping neighbour : {n}")
+                to_be_removed.append(n)
+                if n in shortest_path_to_cc:
+                    logger.info(f"[NET] Clearing shortest path to CC (neighbour dropped)")
+                    shortest_path_to_cc = []
+        for x in to_be_removed:
+            seen_neighbours.remove(x)
+        await asyncio.sleep(VALIDATE_WAIT_SEC)
+
 async def initiate_spath_pings():
     # Input: None; Output: None (periodically shares shortest-path information with neighbours)
     i = 1
@@ -1556,8 +1557,8 @@ def execute_command(command):
         logger.info(f"Resetting maching")
         machine.reset()
 
-async def command_process(msg_id, msg):
-    # Input: msg_id: bytes, msg: bytes command payload; Output: None (executes or forwards command)
+async def command_process(msg_uid, msg):
+    # Input: msg_uid: bytes, msg: bytes command payload; Output: None (executes or forwards command)
     try:
         msgstr = msg.decode()
     except Exception as e:
@@ -1921,7 +1922,7 @@ async def main():
         asyncio.create_task(neighbour_scan())
         await asyncio.sleep(2)
         asyncio.create_task(initiate_spath_pings()) # TODO enable for dynamic path
-        #asyncio.create_task(listen_commands_from_cloud())
+        await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         # asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
@@ -1932,7 +1933,7 @@ async def main():
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
         #asyncio.create_task(keep_updating_gps())
-        asyncio.create_task(person_detection_loop())
+        # asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
         await asyncio.sleep(3600)
