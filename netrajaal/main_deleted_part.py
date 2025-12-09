@@ -143,3 +143,61 @@ async def person_detection_loop():
         
         
 # asyncio.create_task(listen_commands_from_cloud())
+
+
+    
+
+# # ---------------------------------------------------------------------------
+# # Command Execution and Routing
+# # ---------------------------------------------------------------------------
+
+# def get_next_on_path(cpath):
+#     # Input: cpath: list of str/int path nodes; Output: int or None next hop for this device
+#     for i in range(len(cpath) - 1):
+#         n = cpath[i]
+#         if n == my_addr:
+#             return cpath[i+1]
+#     return None
+
+# def execute_command(command):
+#     # Input: command: str command identifier; Output: None (performs device-specific action)
+#     logger.info(f"[CMD] Gonna execute_command {command} on {my_addr}")
+#     if command == "SENDHB":
+#         asyncio.create_task(send_heartbeat())
+#     elif command == "SENDIMG":
+#         take_image_and_send_now()
+#     elif command == "RESET":
+#         logger.info(f"Resetting maching")
+#         machine.reset()
+
+# async def command_process(msg_uid, msg):
+#     # Input: msg_uid: bytes, msg: bytes command payload; Output: None (executes or forwards command)
+#     try:
+#         msgstr = msg.decode()
+#     except Exception as e:
+#         logger.error(f"[CMD] could not decode {msg} : {e}")
+#     parts = msgstr.split(";")
+#     if len(parts) != 3:
+#         logger.error(f"[CMD] error in parsing msgstr, got {len(parts)} parts")
+#     dest = int(parts[0])
+#     cpath = parts[1].split(",")
+#     command = parts[2]
+#     if dest == my_addr:
+#         execute_command(command)
+#         return
+#     next_dest = get_next_on_path(cpath)
+#     if next_dest is not None:
+#         logger.info(f"[CMD] Propogating command to {next_dest}")
+#         await send_msg("C", my_addr, msgstr.encode(), next_dest)
+#     else:
+#         logger.info(f"[CMD] Next dest seems None for {msg}")
+
+
+# def take_image_and_send_now():
+#     # Input: None; Output: None (captures immediate snapshot and schedules send)
+#     img = sensor.snapshot()
+#     asyncio.create_task(send_img_to_nxt_dst(img.to_jpeg().bytearray()))
+    
+
+# elif msg_typ == "C":
+#     asyncio.create_task(command_process(msg_uid, msg))
