@@ -58,7 +58,7 @@ image_in_progress = False
 
 COMMAN_CENTER_ADDR = 219
 my_addr = None
-shortest_path_to_cc = []
+shortest_path_to_cc = [219]
 seen_neighbours = []
 
 rtc = RTC()
@@ -297,7 +297,8 @@ async def person_detection_loop():
         total_image_count += 1
         img = sensor.snapshot()
         person_detected = detector.check_person(img)
-        if person_detected:
+        if True: # TODO remove
+        #if person_detected:
             person_image_count += 1
             r = get_rand()
             raw_path = f"{IMAGE_DIR}/raw_{r}.jpg"

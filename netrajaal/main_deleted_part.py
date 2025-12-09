@@ -140,3 +140,6 @@ async def person_detection_loop():
 
         await asyncio.sleep(PHOTO_TAKING_DELAY)
         logger.info(f"Person detected Image count: {person_image_count}")
+        
+        
+# asyncio.create_task(listen_commands_from_cloud())
