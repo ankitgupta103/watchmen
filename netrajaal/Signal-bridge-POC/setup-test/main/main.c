@@ -175,26 +175,56 @@ static void read_mode(void)
 {
     ESP_LOGI(TAG, "Read mode");
     gpio_init_mode();
-    set_mode(0, 0);
+    set_mode(0, 0);  // Normal mode
     uart_setup(UART_BAUD_DATA);
+    
+    // Flush any stale data and let UART stabilize
+    uart_flush_input(UART_PORT);
+    uart_flush(UART_PORT);
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    
+    ESP_LOGI(TAG, "UART initialized, starting to read from buffer...");
 
     uint8_t line[256];
-    int waited = 0;
-    while (waited < 10000) {
-        int available = uart_read_bytes(UART_PORT, line, sizeof(line) - 1, 10 / portTICK_PERIOD_MS);
+    while (1) {
+        // Check if data is available in UART buffer
+        size_t buffered_len = 0;
+        uart_get_buffered_data_len(UART_PORT, &buffered_len);
+        
+        if (buffered_len > 0) {
+            ESP_LOGI(TAG, "Data available in buffer: %d bytes", buffered_len);
+            // Read available data
+            int available = uart_read_bytes(UART_PORT, line, sizeof(line) - 1, 100 / portTICK_PERIOD_MS);
+            if (available > 0) {
+                line[available] = 0;
+                ESP_LOGI(TAG, "Raw data (%d bytes):", available);
+                for (int i = 0; i < available; i++) {
+                    ESP_LOGI(TAG, "  [%d]=0x%02X", i, line[i]);
+                }
+                if (available >= 3) {
+                    ESP_LOGI(TAG, "Message: %s", (char *)&line[3]);
+                }
+                // Continue reading in case there's more data
+                continue;
+            }
+        }
+        
+        // Also try direct read in case buffered_len doesn't catch it
+        int available = uart_read_bytes(UART_PORT, line, sizeof(line) - 1, 50 / portTICK_PERIOD_MS);
         if (available > 0) {
             line[available] = 0;
             ESP_LOGI(TAG, "Raw data (%d bytes):", available);
-            for (int i = 0; i < available; i++) ESP_LOGI(TAG, "  [%d]=0x%02X", i, line[i]);
+            for (int i = 0; i < available; i++) {
+                ESP_LOGI(TAG, "  [%d]=0x%02X", i, line[i]);
+            }
             if (available >= 3) {
                 ESP_LOGI(TAG, "Message: %s", (char *)&line[3]);
             }
-            return;
+            // Continue reading in case there's more data
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-        waited += 10;
+        
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
-    ESP_LOGW(TAG, "No data (timeout)");
 }
 
 static void write_mode(void) __attribute__((unused));
