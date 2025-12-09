@@ -1495,9 +1495,9 @@ def process_message(data, rssi=None):
     
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     if rssi is not None:
-        logger.info(f"[RECV, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+        logger.info(f"[RECV from {sender}, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     else:
-        logger.info(f"[RECV] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+        logger.info(f"[RECV from {sender}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     
     # logger.info(f"[PARSED HEADER] msg_uid:{msg_uid}, msg_typ:{msg_typ}, creator:{creator}, sender:{sender}, receiver:{receiver}, len-msg:{len(msg)}")
     if sender not in recv_msg_count:
@@ -1660,8 +1660,8 @@ async def send_event_text(epoch_ms):
     gps_coords = read_gps_from_file()
     gps_staleness = get_gps_file_staleness()
 
-    # my_addr : uptime (seconds) : photos taken : events seen : gpslat,gpslong : gps_staleness(seconds) : neighbours([221,222]) : shortest_path([221,9])
-    event_msgstr = f"{my_addr}:{epoch_ms}:{gps_coords}:{gps_staleness}"
+    # event_msgstr = f"{my_addr}:{epoch_ms}:{gps_coords}:{gps_staleness}"
+    event_msgstr = f"{my_addr}:{epoch_ms}"
     event_msg = event_msgstr.encode()
     msgbytes = encrypt_if_needed("T", event_msg)
     sent_succ = False
