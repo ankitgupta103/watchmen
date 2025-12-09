@@ -578,7 +578,7 @@ def radio_send(dest, data, msg_uid):
     loranode.send(dest, data)
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    logger.info(f"[SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_ID = {msg_uid}")
+    logger.info(f"[SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
 
 def pop_and_get(msg_uid):
     # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
@@ -615,16 +615,16 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest):
                 return (True, missing_chunks)
             else:
                 if first_log_flag:
-                    logger.info(f"[ACK] Still waiting for ack, MSG_ID =  {msg_uid} # {i}")
+                    logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
                     first_log_flag = False
                 else:
-                    logger.debug(f"[ACK] Still waiting for ack, MSG_ID = {msg_uid} # {i}")
+                    logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
                 await asyncio.sleep(
                     ACK_SLEEP * min(i + 1, 3)
                 )  # progressively more sleep, capped at 3x
         newline = "\n" if (retry_i + 1) == send_retry else ""
-        logger.warning(f"[ACK] Failed to get ack, MSG_ID = {msg_uid}, retry # {retry_i+1}/{send_retry}{newline}")
-    logger.error(f"[LORA] Failed to send message, MSG_ID = {msg_uid}")
+        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{send_retry}{newline}")
+    logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
 
 def make_chunks(msg):
@@ -1482,11 +1482,6 @@ async def sync_and_transfer_spath(msg_uid, msg):
 
 def process_message(data, rssi=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
-    data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    if rssi is not None:
-        logger.info(f"[RECV, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes")
-    else:
-        logger.info(f"[RECV] [{'*' * data_masked_log}] {len(data)} bytes")
         
     parsed = parse_header(data)
     if not parsed:
@@ -1497,6 +1492,13 @@ def process_message(data, rssi=None):
         return True
 
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
+    
+    data_masked_log = min(10, max(1, (len(data) + 20) // 21))
+    if rssi is not None:
+        logger.info(f"[RECV, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+    else:
+        logger.info(f"[RECV] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+    
     # logger.info(f"[PARSED HEADER] msg_uid:{msg_uid}, msg_typ:{msg_typ}, creator:{creator}, sender:{sender}, receiver:{receiver}, len-msg:{len(msg)}")
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
