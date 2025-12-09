@@ -647,7 +647,7 @@ def encrypt_if_needed(msg_typ, msg):
             logger.error(f"Message {msg} is lnger than 117 bytes, cant encrypt via RSA")
             return msg
         msgbytes = enc.encrypt_rsa(msg, encnode.get_pub_key())
-        logger.debug(f"{msg_typ} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
+        logger.info(f"{msg_typ} : Len msg = {len(msg)}, len msgbytes = {len(msgbytes)}")
         return msgbytes
     if msg_typ == "P":
         msgbytes = enc.encrypt_hybrid(msg, encnode.get_pub_key())
@@ -1660,8 +1660,8 @@ async def send_event_text(epoch_ms):
     gps_coords = read_gps_from_file()
     gps_staleness = get_gps_file_staleness()
 
-    # event_msgstr = f"{my_addr}:{epoch_ms}:{gps_coords}:{gps_staleness}"
-    event_msgstr = f"{my_addr}:{epoch_ms}"
+    event_msgstr = f"{my_addr}:{epoch_ms}:{gps_coords}:{gps_staleness}"
+    # event_msgstr = f"{my_addr}:{epoch_ms}"
     event_msg = event_msgstr.encode()
     msgbytes = encrypt_if_needed("T", event_msg)
     sent_succ = False
@@ -1680,15 +1680,15 @@ async def send_event_text(epoch_ms):
         logger.info(f"[TXT] sending raw event text to cloud, len={len(msgbytes)}, msg:{event_msgstr}")
         sent_succ = await upload_payload_to_server(event_payload, "event_text", my_addr)
         return sent_succ
-    else:
+    else:        
         next_dst = next_device_in_spath()
         if next_dst:
             sent_succ = await send_msg("T", my_addr, msgbytes, next_dst)
             if sent_succ:
-                logger.info(f"[HB] Heartbeat sent successfully to {next_dst}")
+                logger.info(f"[TXT] Event text sent successfully to {next_dst}")
                 return True
         else:
-            logger.error(f"[HB] can't send HB because I dont have next device in spath yet")
+            logger.error(f"[TXT] can't send event text because I dont have next device in spath yet")
             return False
     return False
 
