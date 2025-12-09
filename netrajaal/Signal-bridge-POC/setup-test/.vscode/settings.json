@@ -1,0 +1,20 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.espIdfPath": "/home/anand/esp/esp-idf",
+  "idf.pythonInstallPath": "/usr/bin/python3",
+  "idf.openOcdConfigs": [
+    "interface/ftdi/esp32_devkitj_v1.cfg",
+    "target/esp32.cfg"
+  ],
+  "idf.port": "/dev/ttyACM0",
+  "idf.toolsPath": "/home/anand/.espressif",
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32"
+  },
+  "clangd.path": "/home/anand/.espressif/tools/esp-clang/15.0.0-23786128ae/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=/home/anand/.espressif/tools/xtensa-esp32-elf/esp-12.2.0_20230208/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc",
+    "--compile-commands-dir=${workspaceFolder}/build"
+  ]
+}
