@@ -24,6 +24,16 @@ import gps_driver
 from cellular_driver import Cellular
 import detect
 
+# -----------------------------------▼▼▼▼▼-----------------------------------
+# TESTING VARIABLES
+DYNAMIC_SPATH = True
+# -----------------------------------▲▲▲▲▲-----------------------------------
+
+
+
+
+# -----------------------------------▼▼▼▼▼-----------------------------------
+# FIXED VARIABLES
 led = LED("LED_BLUE")
 
 MIN_SLEEP = 0.1
@@ -69,7 +79,13 @@ WIFI_ENABLED = True
 
 cellular_system = None
 wifi_nic = None
+# -----------------------------------▲▲▲▲▲-----------------------------------
 
+
+
+
+# -----------------------------------▼▼▼▼▼-----------------------------------
+# STATE VARIABLES
 # -------- Start FPS clock -----------
 #clock = time.clock()            # measure frame/sec
 person_image_count = 0                 # Counter to keep tranck of saved images
@@ -83,11 +99,16 @@ lora_init_count = 0
 lora_init_in_progress = False
 
 image_in_progress = False
+busy_devices = [] # device those are busy in sending/receiving images
 
 COMMAN_CENTER_ADDRS = [219]
 my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
+# -----------------------------------▲▲▲▲▲-----------------------------------
+
+
+
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 # COMMAND CENTERS, OTHER NODES
@@ -252,13 +273,13 @@ def ellepsis(msg):
         return msg[:100] + "......." + msg[-100:]
     return msg
 
-def ack_needed(msg_typ):
+def ack_needed(msg_typ): # msg_type P is devided in (B,I,E)
     # Input: msg_typ: str; Output: bool indicating if acknowledgement required
-    if msg_typ == "A":
+    if msg_typ in ("A", "I", "S", "W"):
         return False
     if msg_typ in ["H", "B", "E", "V"]:
         return True
-    return False # "P"
+    return False
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
@@ -271,9 +292,8 @@ recv_msg_count = {}
 URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
 
 
-# ---------------------------------------------------------------------------
+# -----------------------------------▼▼▼▼▼-----------------------------------
 # TRANSFER MODE Lock
-# ---------------------------------------------------------------------------
 TRANSMODE_LOCK_TIME = 180
 def get_transmode_lock(device_id, img_id): # check and just lock for image
     global image_in_progress, paired_device, data_id
@@ -314,12 +334,43 @@ def delete_transmode_lock(device_id, img_id):
         data_id = None
     else:
         logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, for device {device_id} and img_id {img_id} <@@@@@@@@@@") # will move it to debug later
+# -----------------------------------▲▲▲▲▲-----------------------------------
 
 
-# ---------------------------------------------------------------------------
+
+# -----------------------------------▼▼▼▼▼-----------------------------------
+# STORE for BUSY DEVICES
+BUSY_WAIT_TIME = 20
+WAIT_MESSAGE = f"{20}"
+def is_device_free(device_id):
+    global busy_devices
+    # return not device_id in busy_devices
+    if device_id in busy_devices:
+        return False
+    return True
+    
+def is_device_busy(device_id):
+    global busy_devices
+    # return device_id in busy_devices
+    if device_id in busy_devices:
+        return True
+    return False
+    
+async def device_busy_life(device_id): # device_busy_cycle
+    # Input: device_id: int; Output: None (sets image_in_progress flag with auto release after timeout)
+    global busy_devices
+    busy_devices.append(device_id)
+    logger.info(f"Device marked busy, device:{device_id}")
+    await asyncio.sleep(BUSY_WAIT_TIME) # At this point this process might complete, also other might start
+    busy_devices.remove(device_id)
+    logger.info(f"Device marked free, device:{device_id}")
+# -----------------------------------▲▲▲▲▲-----------------------------------
+
+
+
+# -----------------------------------▼▼▼▼▼-----------------------------------
 # Network Topology Helpers
-# ---------------------------------------------------------------------------
-def possible_paths(sender=None): # TODO, can be deleted later, reachble_nodes_of_path is new fun
+def possible_paths(sender=None): # Not in use, next_device_in_spath is new fun
     # Input: sender: int or None; Output: list of int possible next-hop addresses
     possible_paths = []
     sp0 = None
@@ -331,20 +382,26 @@ def possible_paths(sender=None): # TODO, can be deleted later, reachble_nodes_of
             possible_paths.append(x)
     return possible_paths
 
-def reachble_nodes_of_path(sender=None):
-    reachble_nodes = []
+def next_device_in_spath():
     for x in shortest_path_to_cc:
-        if x != my_addr and x != sender and x in seen_neighbours:
-            reachble_nodes.append(x)
-            break # TODO remove this, for shortest paths usage
-    return reachble_nodes
+        if DYNAMIC_SPATH: # return first node of spath
+            return x
+        else: # we will check if this is in seen_neighbours
+            if x in seen_neighbours:
+                return x
+            else:
+                logger.warning(f"Next node:{x} of fixed shortest_path_to_cc is not in seen_neighbours")
+                return None
+    # empty shortest_path_to_cc []
+    return None
+# -----------------------------------▲▲▲▲▲-----------------------------------
 
-loranode = None
 
-# ---------------------------------------------------------------------------
+
+# -----------------------------------▼▼▼▼▼-----------------------------------
 # LoRa Setup and Transmission
 # ---------------------------------------------------------------------------
-
+loranode = None
 async def init_lora():
     # Input: None; Output: None (initializes global loranode, updates lora_reinit_count)
     global loranode, lora_init_count, lora_init_in_progress
@@ -367,6 +424,22 @@ async def init_lora():
         )
     finally:
         lora_init_in_progress = False
+
+def is_lora_ready():
+    # Input: None; Output: bool indicating if LoRa is ready to send
+    # Returns True if connected, False if not (and starts initialization if needed)
+    global lora_init_in_progress, loranode
+    if loranode is None or loranode.is_connected is False:
+        if not lora_init_in_progress:
+            logger.error(f"[LORA] Not connected to network, init started in background.., msg marked as failed")
+            asyncio.create_task(init_lora())
+        else:
+            logger.debug(f"[LORA] Not connected to network, init already in progress, msg marked as failed")
+        return False
+    return True
+# -----------------------------------▲▲▲▲▲-----------------------------------
+
+
 
 msgs_sent = []
 msgs_unacked = []
@@ -567,6 +640,7 @@ def encrypt_if_needed(msg_typ, msg):
     return msg
 
 # === Send Function ===
+
 async def send_msg_internal(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
     if len(msgbytes) < FRAME_SIZE:
@@ -632,16 +706,9 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
 
 async def send_msg(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
-    global lora_init_in_progress
-    if loranode is None or loranode.is_connected is False:
-        if not lora_init_in_progress:
-            logger.error(f"[LORA] Not connected to network, init started in background.., msg marked as failed")
-            asyncio.create_task(init_lora())
-        else:
-            logger.error(f"[LORA] Not connected to network, init already in progress, msg marked as failed")
+    if not is_lora_ready():
         return False
-    retval = await send_msg_internal(msg_typ, creator, msgbytes, dest)
-    return retval
+    return await send_msg_internal(msg_typ, creator, msgbytes, dest)
 
 def ack_time(msg_uid):
     # Input: msg_uid: bytes; Output: tuple(timestamp:int, missingids:list or None)
@@ -963,18 +1030,15 @@ async def hb_process(msg_uid, msgbytes, sender):
         # asyncio.create_task(sim_upload_hb(msgbytes))
         return
     else:
-        destlist = reachble_nodes_of_path(sender)
-        if len(destlist) > 0:
+        next_dst = next_device_in_spath()
+        if next_dst:
             sent_succ = False
-            for peer_addr in destlist:
-                logger.info(f"[HB] Propogating H to {peer_addr}")
-                sent_succ = await send_msg("H", creator, msgbytes, peer_addr)
-                if sent_succ: # Return as soon as sent to one of paths
-                    break
+            logger.info(f"[HB] Propogating H to {next_dst}")
+            sent_succ = await send_msg("H", creator, msgbytes, next_dst)
             if not sent_succ:
-                logger.error(f"[HB] forwarding HB to possible_paths : {destlist}")
+                logger.error(f"[HB] forwarding HB to {next_dst} failed")
         else:
-            logger.error(f"[HB] can't forward HB because I dont have Spath yet")
+            logger.error(f"[HB] can't forward HB because I dont have next device in spath yet")
 
 images_saved_at_cc = []
 
@@ -1011,15 +1075,17 @@ async def img_process(img_id, msg, creator, sender):
             # Help GC reclaim memory
             gc.collect()
     else:
-        destlist = reachble_nodes_of_path(sender)
-        sent_succ = False
-        for peer_addr in destlist:
-            logger.info(f"[IMG] Propogating Image to {peer_addr}")
-            sent_succ = await send_msg("P", creator, msg, peer_addr)
-            if sent_succ: # Return as soon as sent to any node of path
-                break
-        if not sent_succ:
-            logger.info(f"[IMG] Failed propagating image to destlist : {destlist}")
+        next_dst = next_device_in_spath()
+        if next_dst:
+            if is_device_busy(next_dst):
+                logger.warning(f"[IMG] Device {next_dst} is busy, skipping send")
+                return
+            logger.info(f"[IMG] Propogating Image to {next_dst}")
+            sent_succ = await send_msg("P", creator, msg, next_dst)
+            if not sent_succ:
+                logger.error(f"[IMG] forwarding image to {next_dst} failed")
+        else:
+            logger.error(f"[IMG] can't forward image because I dont have next device in spath yet")
 
 # ---------------------------------------------------------------------------
 # Sensor Capture and Image Transmission
@@ -1109,22 +1175,29 @@ async def person_detection_loop():
                 gc.collect()  # Help GC reclaim memory immediately
 
 
-async def send_image_to_mesh(imgbytes): # trying to send any one of possible path
-    # Input: imgbytes: bytes raw image; Output: bool indicating if image was forwarded successfully
+async def send_img_to_nxt_dst(imgbytes):
+    # Input: imgbytes: bytes raw image; 
+    # Output: bool indicating if image was forwarded successfully to next_node of spath
     logger.info(f"[IMG] Sending {len(imgbytes)} bytes to the network")
     msgbytes = encrypt_if_needed("P", imgbytes)
-    sent_succ = False
-    destlist = reachble_nodes_of_path(None)
-    for peer_addr in destlist:
-        sent_succ = await send_msg("P", my_addr, msgbytes, peer_addr)
-        if sent_succ: # Return as soon as sent to one
-            return True
+    next_dst = next_device_in_spath()
+    if next_dst:
+        if is_device_busy(next_dst):
+            logger.warning(f"[IMG] Device {next_dst} is busy, skipping send")
+            return False
+        sent_succ = await send_msg("P", my_addr, msgbytes, next_dst)
+        if not sent_succ:
+            logger.error(f"[IMG] forwarding image to {next_dst} failed")
+            return False
+    else:
+        logger.error(f"[IMG] can't forward image because I dont have next device in spath yet")
+        return False
     return False
 
 def take_image_and_send_now():
     # Input: None; Output: None (captures immediate snapshot and schedules send)
     img = sensor.snapshot()
-    asyncio.create_task(send_image_to_mesh(img.to_jpeg().bytearray()))
+    asyncio.create_task(send_img_to_nxt_dst(img.to_jpeg().bytearray()))
 
 async def image_sending_loop():
     # Input: None; Output: None (periodically sends queued images across mesh)
@@ -1134,9 +1207,13 @@ async def image_sending_loop():
         if len(images_to_send) == 0:
             logger.debug("[NET] No images to send, skipping sending...")
             continue
-        destlist = reachble_nodes_of_path(None)
-        if not running_as_cc() and len(destlist) == 0:
+        next_dst = next_device_in_spath()
+        if not running_as_cc() and not next_dst:
             logger.warning("[NET] No shortest path yet so cant send")
+            continue
+        
+        if is_device_busy(next_dst):
+            logger.debug(f"[NET] Device {next_dst} is busy, skipping sending...")
             continue
 
         # Process all queued images one by one until queue is empty
@@ -1167,10 +1244,10 @@ async def image_sending_loop():
                         logger.info(f"[IMG] upload_image failed, image re-queued: {imagefile}")
                         break
                 else:
-                    sent_succ = await send_image_to_mesh(imgbytes)
+                    sent_succ = await send_img_to_nxt_dst(imgbytes)
                     if not sent_succ:
                         images_to_send.append(imagefile) # pushed to back of queue
-                        logger.info(f"[IMG] send_image_to_mesh failed, image re-queued: {imagefile}")
+                        logger.info(f"[IMG] sending failed, image re-queued: {imagefile}")
                         break
 
                 transmission_end = time_msec()
@@ -1257,7 +1334,8 @@ async def sync_and_transfer_spath(msg_uid, msg):
         return
     if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
         logger.info(f"[NET] Updating spath to {spath}")
-        # shortest_path_to_cc = spath # TODO we made fixed shortest path
+        if DYNAMIC_SPATH:
+            shortest_path_to_cc = spath
         for n in seen_neighbours:
             nsp = [my_addr] + shortest_path_to_cc
             nmsg = ",".join([str(x) for x in nsp])
@@ -1313,6 +1391,8 @@ def process_message(data, rssi=None):
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "C":
         asyncio.create_task(command_process(msg_uid, msg))
+    elif msg_typ == "W": # wait message
+        asyncio.create_task(device_busy_life(sender))
     elif msg_typ == "B": # TODO need img_id here
         try:
             msg_typ, img_id, _ = begin_chunk(msg.decode())
@@ -1321,6 +1401,7 @@ def process_message(data, rssi=None):
                 asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             else:
                 logger.warning(f"TRANS MODE already in use, could not get lock...")
+                asyncio.create_task(send_msg("W", my_addr, WAIT_MESSAGE, sender))
                 return False
         except Exception as e:
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
@@ -1399,7 +1480,6 @@ def read_gps_from_file():
 
 async def send_heartbeat():
     # Input: None; Output: bool indicating whether heartbeat was successfully sent to a neighbour
-    destlist = possible_paths(None)
     gps_coords = read_gps_from_file()
     gps_staleness = get_gps_file_staleness()
 
@@ -1424,13 +1504,15 @@ async def send_heartbeat():
         sent_succ = await upload_heartbeat(heartbeat_payload)
         return sent_succ
     else:
-        logger.info(f"[HB] sending HB to {destlist}, msg:{hbmsgstr}")
-        for peer_addr in destlist:
-            logger.info(f"[HB] Sending HB to {peer_addr}")
-            sent_succ = await send_msg("H", my_addr, msgbytes, peer_addr)
+        next_dst = next_device_in_spath()
+        if next_dst:
+            sent_succ = await send_msg("H", my_addr, msgbytes, next_dst)
             if sent_succ:
-                logger.info(f"[HB] Heartbeat sent successfully to {peer_addr}")
+                logger.info(f"[HB] Heartbeat sent successfully to {next_dst}")
                 return True
+        else:
+            logger.error(f"[HB] can't send HB because I dont have next device in spath yet")
+            return False
     return False
 
 async def keep_sending_heartbeat():
@@ -1487,7 +1569,7 @@ async def neighbour_scan():
             continue
         scanmsg = encode_node_id(my_addr)
         # 65535 is for Broadcast
-        await send_msg_internal("N", my_addr, scanmsg, 65535)
+        sent_succ = await send_msg("N", my_addr, scanmsg, 65535)
         if i < DISCOVERY_COUNT:
             await asyncio.sleep(SCAN_WAIT)
         else:
@@ -1935,7 +2017,7 @@ async def main():
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
         #asyncio.create_task(keep_updating_gps())
-        # asyncio.create_task(person_detection_loop())
+        asyncio.create_task(person_detection_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
         await asyncio.sleep(3600)
