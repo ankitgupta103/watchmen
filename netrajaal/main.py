@@ -406,7 +406,7 @@ def next_device_in_spath():
             if x in seen_neighbours:
                 return x
             else:
-                logger.warning(f"Next node:{x} of fixed shortest_path_to_cc is not in seen_neighbours")
+                logger.debug(f"Next node:{x} of fixed shortest_path_to_cc is not in seen_neighbours")
                 return None
     # empty shortest_path_to_cc []
     return None
@@ -578,7 +578,7 @@ def radio_send(dest, data, msg_uid):
     loranode.send(dest, data)
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    logger.info(f"[SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+    logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}") # →⮕➡
 
 def pop_and_get(msg_uid):
     # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
@@ -660,7 +660,7 @@ def encrypt_if_needed(msg_typ, msg):
 async def send_msg_internal(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
     if len(msgbytes) < FRAME_SIZE:
-        logger.info(f"[SENDing....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet")
+        logger.info(f"[⇒ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet") # ⇒⇨➪➩⇒➟➠➞➜⇛⇉⇢⇒⇨⟶⟵⟷⟹⟺⟻⟼⟽⟾⟿, ⮕
         succ, _ = await send_single_packet(msg_typ, creator, msgbytes, dest)
         return succ
     else:
@@ -1292,15 +1292,15 @@ async def image_sending_loop():
     while True:
         await asyncio.sleep(PHOTO_SENDING_EMPTY_DELAY)
         if len(images_to_send) == 0:
-            logger.debug("[NET] No images to send, skipping sending...")
+            logger.debug("[IMG] No images to send, skipping sending...")
             continue
         next_dst = next_device_in_spath()
         if not running_as_cc() and not next_dst:
-            logger.warning("[NET] No shortest path yet so cant send")
+            logger.warning("[IMG] No shortest path yet so cant send")
             continue
         
         if is_device_busy(next_dst):
-            logger.debug(f"[NET] Device {next_dst} is busy, skipping sending...")
+            logger.debug(f"[IMG] Device {next_dst} is busy, skipping sending...")
             continue
 
         # Process all queued images one by one until queue is empty
@@ -1454,7 +1454,7 @@ def scan_process(msg_uid, msg):
     # Input: msg_uid: bytes, msg: bytes containing node address; Output: None (updates seen neighbours)
     nodeaddr = int.from_bytes(msg)
     if nodeaddr not in seen_neighbours:
-        logger.info(f"[NET] Adding nodeaddr {nodeaddr} to seen_neighbours")
+        logger.info(f"adding nodeaddr {nodeaddr} to seen_neighbours")
         seen_neighbours.append(nodeaddr)
 
 async def sync_and_transfer_spath(msg_uid, msg):
@@ -1464,20 +1464,20 @@ async def sync_and_transfer_spath(msg_uid, msg):
         # logger.info(f"Ignoring shortest path since I am cc")
         return
     if len(msg) == 0:
-        logger.error(f"[NET] Empty spath message received")
+        logger.error(f"empty spath message received")
         return
     spath = [int(x) for x in msg.split(",")]
     if my_addr in spath:
-        logger.info(f"[NET] Cyclic, ignoring {my_addr} already in {spath}")
+        logger.debug(f"[cyclic, ignoring {my_addr} already in {spath}")
         return
     if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
-        logger.info(f"[NET] Updating and forwarding new spath:{spath}")
+        logger.debug(f"updating and forwarding new spath:{spath}")
         if DYNAMIC_SPATH:
             shortest_path_to_cc = spath
         for n in seen_neighbours:
             new_spath = [my_addr] + shortest_path_to_cc
             new_spath_msg = ",".join([str(x) for x in new_spath])
-            logger.debug(f"[NET] Propogating new_spath:{new_spath_msg}, to dst:{n}")
+            logger.debug(f"propogating new_spath:{new_spath_msg}, to dst:{n}")
             asyncio.create_task(send_msg("S", int(msg_uid[1]), new_spath_msg.encode(), n))
 
 def process_message(data, rssi=None):
@@ -1492,12 +1492,17 @@ def process_message(data, rssi=None):
         return True
 
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
-    
+    recv_log = ""
+    if receiver == -1:
+        recv_log = "⬅ BCAST" # ↙⬋⬅
+    else:
+        recv_log = "⬅ RECV"
+        
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     if rssi is not None:
-        logger.info(f"[RECV from {sender}, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+        logger.info(f"[{recv_log} from {sender}, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     else:
-        logger.info(f"[RECV from {sender}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+        logger.info(f"[{recv_log} from {sender}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     
     # logger.info(f"[PARSED HEADER] msg_uid:{msg_uid}, msg_typ:{msg_typ}, creator:{creator}, sender:{sender}, receiver:{receiver}, len-msg:{len(msg)}")
     if sender not in recv_msg_count:
@@ -1506,8 +1511,6 @@ def process_message(data, rssi=None):
     if receiver != -1 and my_addr != receiver:
         logger.warning(f"[LORA] skipping message as it is for dst:{receiver}, not for me (my_addr:{my_addr}), msg_uid:{msg_uid}")
         return
-    if receiver == -1 :
-        logger.info(f"[LORA] Processing broadcast message : {data} : {parsed}")
     msgs_recd.append((msg_uid, msg, time_msec()))
     ackmessage = msg_uid
     if msg_typ == "N": # N type msg from neighbours
@@ -1741,7 +1744,7 @@ async def neighbour_scan():
     while True:
         global image_in_progress
         if image_in_progress:
-            logger.debug(f"[NET] Skipping neighbour scan because image in progress")
+            logger.debug(f"skipping neighbour scan because image in progress")
             await asyncio.sleep(SCAN_WAIT)
             continue
         scanmsg = encode_node_id(my_addr)
@@ -1751,7 +1754,7 @@ async def neighbour_scan():
             await asyncio.sleep(SCAN_WAIT)
         else:
             await asyncio.sleep(SCAN_WAIT_2 + random.randint(1,120))
-        logger.info(f"[STATUS] {my_addr} : Seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
+        logger.info(f"seen neighbours = {seen_neighbours}, Shortest path = {shortest_path_to_cc}, Sent messages = {sent_count}, Received messages = {recv_msg_count}")
         i = i + 1
 
 async def validate_and_remove_neighbours():
@@ -1761,11 +1764,11 @@ async def validate_and_remove_neighbours():
     while True:
         global image_in_progress
         if image_in_progress:
-            logger.debug(f"[NET] Skipping neighbour validation because image in progress")
+            logger.debug(f"skipping neighbour validation because image in progress")
             await asyncio.sleep(200)
             continue
 
-        logger.info(f"[NET] Going to validate neighbours : {seen_neighbours}")
+        logger.debug(f"starting neighbours validation: {seen_neighbours}")
         to_be_removed = []
         for n in seen_neighbours:
             global image_in_progress
@@ -1773,22 +1776,23 @@ async def validate_and_remove_neighbours():
             while image_in_progress:
                 waiting_retry -= 1
                 if waiting_retry <= 0:
-                    logger.warning(f"[NET] image in progress, aborting neighbours validation loop")
+                    logger.warning(f"image in progress, aborting neighbours validation loop")
                     break
                 await asyncio.sleep(10)
                 
             msgbytes = b"Nothing"
             success = await send_msg("V", my_addr, msgbytes, n)
             if success:
-                logger.info(f"[NET] Neighbour {n} is still within reach")
+                logger.debug(f"neighbour {n} is still within reach")
             else:
-                logger.info(f"[NET] Dropping neighbour : {n}")
                 to_be_removed.append(n)
-                if n in shortest_path_to_cc:
-                    logger.info(f"[NET] Clearing shortest path to CC (neighbour dropped)")
+                if DYNAMIC_SPATH and len(shortest_path_to_cc) and n == shortest_path_to_cc[0]: # first node not reachable
+                    logger.warning(f"clearing shortest path to CC (unreachable neighbour {n})")
                     shortest_path_to_cc = []
-        for x in to_be_removed:
-            seen_neighbours.remove(x)
+        if len(to_be_removed):
+            logger.warning(f"removing {len(to_be_removed)} unreachable neighbours: {to_be_removed}")
+            for x in to_be_removed:
+                seen_neighbours.remove(x)
         await asyncio.sleep(VALIDATE_WAIT_SEC)
 
 async def initiate_spath_pings():
@@ -1825,11 +1829,11 @@ async def print_summary_and_flush_logs():
             continue
         free_mem = get_free_memory()
         mem_str = f", Free: {free_mem/1024:.1f}KB" if free_mem > 0 else ""
-        logger.info(f"[STATUS] Sent : {len(msgs_sent)} Recd : {len(msgs_recd)} Unacked : {len(msgs_unacked)} LoRa inits: {lora_init_count}{mem_str}")
+        log_str = f"sent: {len(msgs_sent)} Recd: {len(msgs_recd)} Unacked: {len(msgs_unacked)}{mem_str}"
         if running_as_cc():
-            logger.info(f"[STATUS] Chunks: {len(chunk_map)}, Images at CC (received): {len(images_saved_at_cc)}, Center captured: {center_captured_image_count}, Queued: {len(images_to_send)}")
+            logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Images at CC (received): {len(images_saved_at_cc)}, Center captured: {center_captured_image_count}, Queued: {len(images_to_send)}")
         else:
-            logger.info(f"[STATUS] Chunks: {len(chunk_map)}, Queued images: {len(images_to_send)}")
+            logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Queued images: {len(images_to_send)}")
         #logger.info(msgs_sent)
         #logger.info(msgs_recd)
         #logger.info(msgs_unacked)
