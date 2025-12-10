@@ -579,7 +579,7 @@ def radio_send(dest, data, msg_uid):
     loranode.send(dest, data)
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}") # →⮕➡
+    logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
 
 def pop_and_get(msg_uid):
     # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
@@ -661,7 +661,7 @@ def encrypt_if_needed(msg_typ, msg):
 async def send_msg_internal(msg_typ, creator, msgbytes, dest):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
     if len(msgbytes) < FRAME_SIZE:
-        logger.info(f"[⇒ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet") # ⇒⇨➪➩⇒➟➠➞➜⇛⇉⇢⇒⇨⟶⟵⟷⟹⟺⟻⟼⟽⟾⟿, ⮕
+        logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet")
         succ, _ = await send_single_packet(msg_typ, creator, msgbytes, dest)
         return succ
     else:
@@ -1495,9 +1495,9 @@ def process_message(data, rssi=None):
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
     recv_log = ""
     if receiver == -1:
-        recv_log = "⬅ BCAST" # ↙⬋⬅
+        recv_log = "⬇ BCAST"
     else:
-        recv_log = "⬅ RECV"
+        recv_log = "⬇ RECV"
         
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     if rssi is not None:
