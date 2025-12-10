@@ -920,6 +920,20 @@ class sx126x:
         time.sleep_ms(TX_DELAY_MS)  # Allow module time to process transmission
 
     def receive(self):
+        if self.ser.any():
+            time.sleep_ms(150)
+            r_buff = self.ser.readline()
+            if r_buff and len(r_buff) >= 6:
+                # sender_addr = (r_buff[0] << 8) + r_buff[1]
+                # frequency = r_buff[2] + self.start_freq
+                # print(f"Received message from node address {sender_addr} at {frequency}.125MHz")
+                # Extract message payload (skip first 3 bytes for address and freq)
+                msg = r_buff[3:-1]
+                # msg = msg.replace(b'{}{}', b'\n')
+                return msg, None
+        return None, None
+    
+    def old_receive(self):
         """
         Receive a message from the LoRa module.
 
