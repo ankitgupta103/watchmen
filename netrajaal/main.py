@@ -403,11 +403,12 @@ def next_device_in_spath():
         if DYNAMIC_SPATH: # return first node of spath
             return x
         else: # we will check if this is in seen_neighbours
-            if x in seen_neighbours:
-                return x
-            else:
-                logger.debug(f"Next node:{x} of fixed shortest_path_to_cc is not in seen_neighbours")
-                return None
+            return x
+            # if x in seen_neighbours:
+            #     return x
+            # else:
+            #     logger.debug(f"Next node:{x} of fixed shortest_path_to_cc is not in seen_neighbours")
+            #     return None
     # empty shortest_path_to_cc []
     return None
 # -----------------------------------▲▲▲▲▲-----------------------------------
