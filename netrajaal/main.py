@@ -1521,6 +1521,7 @@ def process_message(data, rssi=None):
         asyncio.create_task(sync_and_transfer_spath(msg_uid, msg.decode()))
     elif msg_typ == "T":
         asyncio.create_task(event_text_process(msg, creator))
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "H":
         # Validate HB message payload length for encrypted messages
         if ENCRYPTION_ENABLED:
