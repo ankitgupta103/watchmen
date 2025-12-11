@@ -57,7 +57,7 @@ VALIDATE_WAIT_SEC = 1200
 PHOTO_TAKING_DELAY = 600
 
 PHOTO_SENDING_EMPTY_DELAY = 4
-PHOTO_SENDING_INTERVAL = 100  # Delay between uploads when queue has multiple images
+PHOTO_SENDING_TRY_INTERVAL = 20  # Delay between uploads when queue has multiple images
 PHOTO_SENDING_FAILED_PAUSE = 120
 
 EVENT_SENDING_EMPTY_DELAY = 4
@@ -1182,7 +1182,7 @@ async def event_text_process(msgbytes, creator):
 # Sensor Capture and Image Transmission
 # ---------------------------------------------------------------------------
 
-images_to_send = []
+imgpaths_to_send = []
 events_to_send = []
 detector = detect.Detector()
 
@@ -1249,12 +1249,12 @@ async def person_detection_loop():
             led.off()
 
             # Limit queue size to prevent memory overflow
-            if len(images_to_send) >= MAX_IMAGES_TO_SEND:
+            if len(imgpaths_to_send) >= MAX_IMAGES_TO_SEND:
                 # Remove oldest entry
-                oldest = images_to_send.pop(0)
+                oldest = imgpaths_to_send.pop(0)
                 logger.info(f"[PIR] Queue full, removing oldest image: {oldest}")
             events_to_send.append(get_epoch_ms())
-            images_to_send.append(raw_path)
+            imgpaths_to_send.append(raw_path)
             # logger.info(f"Saved image: {raw_path}")
             # logger.info(f"Person detected Image count: {person_image_count}")
             # if running_as_cc():
@@ -1289,10 +1289,10 @@ async def send_img_to_nxt_dst(imgbytes):
 
 async def image_sending_loop():
     # Input: None; Output: None (periodically sends queued images across mesh)
-    global images_to_send
+    global imgpaths_to_send
     while True:
         await asyncio.sleep(PHOTO_SENDING_EMPTY_DELAY)
-        if len(images_to_send) == 0:
+        if len(imgpaths_to_send) == 0:
             logger.debug("[IMG] No images to send, skipping sending...")
             continue
         next_dst = next_device_in_spath()
@@ -1306,20 +1306,20 @@ async def image_sending_loop():
 
         # Process all queued images one by one until queue is empty
         # This ensures all captured images get uploaded promptly
-        # queue_size = len(images_to_send)
+        # queue_size = len(imgpaths_to_send)
         # if queue_size > 0:
         #     logger.info(f"[IMG] Starting upload loop, {queue_size} images in queue")
 
-        while len(images_to_send) > 0:
-            queue_size = len(images_to_send)
+        while len(imgpaths_to_send) > 0:
+            queue_size = len(imgpaths_to_send)
             # logger.info(f"[IMG] Images to send = {queue_size}")
-            imagefile = images_to_send.pop(0)
-            logger.info(f"[IMG] Processing: {imagefile}")
+            img_filepath = imgpaths_to_send.pop(0)
+            logger.info(f"[IMG] Processing: {img_filepath}")
             img = None
             imgbytes = None
             encimgbytes = None
             try:
-                img = image.Image(imagefile)
+                img = image.Image(img_filepath)
                 imgbytes = img.bytearray()
                 transmission_start = time_msec()
                 if running_as_cc():
@@ -1328,34 +1328,35 @@ async def image_sending_loop():
                     logger.info(f"[IMG] Uploading encrypted image (size: {len(encimgbytes)} bytes)")
                     sent_succ = await upload_image(my_addr, encimgbytes)
                     if not sent_succ:
-                        images_to_send.append(imagefile) # pushed to back of queue
-                        logger.info(f"[IMG] upload_image failed, image re-queued: {imagefile}")
+                        imgpaths_to_send.append(img_filepath) # pushed to back of queue
+                        logger.info(f"[IMG] upload_image failed, image re-queued: {img_filepath}")
                         break
                 else:
                     sent_succ = await send_img_to_nxt_dst(imgbytes)
                     if not sent_succ:
-                        images_to_send.append(imagefile) # pushed to back of queue
-                        logger.info(f"[IMG] sending failed, image re-queued: {imagefile}")
+                        imgpaths_to_send.append(img_filepath) # pushed to back of queue
+                        logger.info(f"[IMG] sending failed, image re-queued: {img_filepath}")
                         break
 
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
                 logger.info(f"[IMG] Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
-                # logger.info(f"[IMG] Remaining in queue: {len(images_to_send)}")
+                # logger.info(f"[IMG] Remaining in queue: {len(imgpaths_to_send)}")
 
                 # Wait a short interval before processing next image in queue
                 # This prevents overwhelming the network/upload service
-                if len(images_to_send) > 0:
-                    await asyncio.sleep(PHOTO_SENDING_INTERVAL)
+                if len(imgpaths_to_send) > 0:
+                    await asyncio.sleep(PHOTO_SENDING_TRY_INTERVAL)
                 else:
                     logger.info(f"[IMG] Queue empty, all images uploaded")
 
             except Exception as e:
-                logger.error(f"[IMG] unexpected error processing image {imagefile}: {e}")
-                import sys
-                sys.print_exception(e)
+                logger.error(f"[IMG] unexpected error processing image {img_filepath}: {e}")
+                # import sys
+                # sys.print_exception(e)
+                
                 # Re-queue image on error
-                images_to_send.append(imagefile)
+                imgpaths_to_send.append(img_filepath) # TODO check this logic later
                 break
             finally:
                 # Explicitly clean up image objects
@@ -1392,10 +1393,10 @@ async def image_sending_loop():
 
         # After processing all queued images (or queue is empty), wait longer before checking again
         # Only use long delay if queue is empty to avoid missing new images
-        if len(images_to_send) == 0:
+        if len(imgpaths_to_send) == 0:
             # Queue is empty, sleep longer
-            await asyncio.sleep(PHOTO_SENDING_INTERVAL)
-        if len(images_to_send) == 0:
+            await asyncio.sleep(PHOTO_SENDING_EMPTY_DELAY)
+        if len(imgpaths_to_send) > 0:
             # Queue still has items (from failed uploads), check again soon
             await asyncio.sleep(PHOTO_SENDING_FAILED_PAUSE)
             
@@ -1833,9 +1834,9 @@ async def print_summary_and_flush_logs():
         mem_str = f", Free: {free_mem/1024:.1f}KB" if free_mem > 0 else ""
         log_str = f"sent: {len(msgs_sent)} Recd: {len(msgs_recd)} Unacked: {len(msgs_unacked)}{mem_str}"
         if running_as_cc():
-            logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Images at CC (received): {len(images_saved_at_cc)}, Center captured: {center_captured_image_count}, Queued: {len(images_to_send)}")
+            logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Images at CC (received): {len(images_saved_at_cc)}, Center captured: {center_captured_image_count}, Queued: {len(imgpaths_to_send)}")
         else:
-            logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Queued images: {len(images_to_send)}")
+            logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Queued images: {len(imgpaths_to_send)}")
         #logger.info(msgs_sent)
         #logger.info(msgs_recd)
         #logger.info(msgs_unacked)
