@@ -11,9 +11,9 @@ except ImportError:
 import time
 
 # Operation Mode: "configure", "read", or "write"
-# MODE = "configure"
+MODE = "configure"
 # MODE = "read"
-MODE = "write"
+# MODE = "write"
 
 # Global addresses for this node and its peer
 OWN_ADDR = 100
@@ -139,36 +139,6 @@ def configure():
     m1_pin.value(0)
     time.sleep_ms(100)
 
-def get_response():
-    """Get response from module and print raw"""
-    uart_num = 1
-    m0_pin_str = "P6"
-    m1_pin_str = "P7"
-
-    m0_pin = Pin(m0_pin_str, Pin.OUT)
-    m1_pin = Pin(m1_pin_str, Pin.OUT)
-
-    # Enter config mode
-    m0_pin.value(0)
-    m1_pin.value(1)
-    time.sleep_ms(100)
-
-    uart = UART(uart_num, 115200, timeout=2000)
-    time.sleep_ms(200)
-
-    if uart.any():
-        response = uart.read()
-        print("Raw response bytes:", [hex(x) for x in response] if response else "None")
-        print("Raw response hex:", response.hex() if response else "None")
-        print("Raw response length:", len(response) if response else 0)
-    else:
-        print("No response available")
-
-    # Exit config mode
-    m0_pin.value(0)
-    m1_pin.value(0)
-    time.sleep_ms(100)
-
 def read():
     """Read data from module"""
     uart_num = 1
@@ -189,27 +159,30 @@ def read():
     uart = UART(uart_num, 115200, timeout=2000)
 
     # Wait for data
-    start_time = time.ticks_ms()
-    while not uart.any():
-        if time.ticks_diff(time.ticks_ms(), start_time) > 10000:
-            print("No data (timeout)")
-            return
-        time.sleep_ms(10)
+    while True:
+        start_time = time.ticks_ms()
+        while not uart.any():
+            if time.ticks_diff(time.ticks_ms(), start_time) > 10000:
+                print("No data (timeout)")
+                return
+            time.sleep_ms(10)
 
-    time.sleep_ms(250)
-    data = uart.readline()
+        time.sleep_ms(250)
+        data = uart.readline()
 
-    if data and len(data) > 0:
-        if data[-1] == 0x0A:
-            data = data[:-1]
-        if len(data) >= 3:
-            message = data[3:]
-            print("Received message:", message)
-            print("Message length:", len(message), "bytes")
-        else:
-            print("Data too short:", len(data), "bytes")
-    else:
-        print("No data")
+        print("Data:", data)
+
+        # if data and len(data) > 0:
+        #     if data[-1] == 0x0A:
+        #         data = data[:-1]
+        #     if len(data) >= 3:
+        #         message = data[3:]
+        #         print("Received message:", message)
+        #         print("Message length:", len(message), "bytes")
+        #     else:
+        #         print("Data too short:", len(data), "bytes")
+        # else:
+        #     print("No data")
 
 def write():
     """Write data to module"""
@@ -260,7 +233,5 @@ elif MODE == "read":
     read()
 elif MODE == "write":
     write()
-elif MODE == "get_response":
-    get_response()
 else:
     print("Unknown mode. Use: 'configure', 'read', 'write', or 'get_response'")
