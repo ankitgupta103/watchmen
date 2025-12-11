@@ -1,36 +1,38 @@
+# openmv_spi_master.py  (run on the OpenMV Cam RT)
 from machine import SPI, Pin
 import time
 
-# Example: SPI2 supports slave mode on RT1062 OpenMV boards
+# Use SPI(2) or whichever bus your OpenMV board exposes for SPI master
 spi = SPI(2,
-          baudrate=1000000,
+          baudrate=1000000,   # 1 MHz (match ESP32)
           polarity=0,
           phase=0,
           bits=8,
           firstbit=SPI.MSB,
-          mode=SPI.SLAVE,
           sck=Pin("P2"),
           mosi=Pin("P0"),
           miso=Pin("P1"))
 
-cs = Pin("P3", Pin.IN)  # chip select from ESP32
+cs = Pin("P3", Pin.OUT, value=1)  # Chip select (active low)
 
-rx_buf = bytearray(4)   # incoming bytes
-tx_buf = bytearray([0xAA, 0x55, 0x11, 0x22])  # example reply
+TRANSFER_SIZE = 64
 
-print("OpenMV SPI Slave ready...")
+def master_transaction(tx_bytes):
+    # tx_bytes must be a buffer of TRANSFER_SIZE bytes
+    rx = bytearray(TRANSFER_SIZE)
+    cs.value(0)  # pull CS low
+    spi.write_readinto(tx_bytes, rx)  # full-duplex transfer
+    cs.value(1)  # release CS
+    return rx
 
+count = 0
 while True:
-    # Wait for CS LOW = active
-    if cs.value() == 0:
-        # Perform full-duplex transfer
-        spi.write_readinto(tx_buf, rx_buf)
-
-        print("Received:", [hex(b) for b in rx_buf])
-        print("Sent:", [hex(b) for b in tx_buf])
-
-        # Optional: modify reply based on input
-        tx_buf[0] = rx_buf[0] ^ 0xFF   # example response logic
-
-    time.sleep_ms(10)
-
+    tx = bytearray([0]*TRANSFER_SIZE)
+    # populate tx with a simple payload
+    for i in range(TRANSFER_SIZE):
+        tx[i] = (i + (count & 0xFF)) & 0xFF
+    rx = master_transaction(tx)
+    print("Sent:", [hex(b) for b in tx[:8]], "...")
+    print("Recv:", [hex(b) for b in rx[:8]], "...")
+    count += 1
+    time.sleep_ms(200)
