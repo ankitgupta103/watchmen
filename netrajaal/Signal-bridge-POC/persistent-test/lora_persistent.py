@@ -11,9 +11,9 @@ except ImportError:
 import time
 
 # Operation Mode: "configure", "read", or "write"
-MODE = "configure"
+# MODE = "configure"
 # MODE = "read"
-# MODE = "write"
+MODE = "write"
 
 # Global addresses for this node and its peer
 OWN_ADDR = 100
@@ -102,6 +102,8 @@ def configure():
         (crypt >> 8) & 0xFF,  # 10: REG4 - encryption key high byte
         crypt & 0xFF  # 11: REG5 - encryption key low byte
     ]
+
+    print("Configuration:", cfg_reg)
 
     # Clear buffer
     while uart.any():
@@ -223,7 +225,7 @@ def write():
 
     while True:
         uart.write(data)
-        time.sleep_ms(200)
+        time.sleep_ms(500)
         print("Sent", len(message), "bytes to address", target_addr)
 
 # Main execution
