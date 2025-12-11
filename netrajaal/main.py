@@ -115,6 +115,7 @@ image_in_progress = False
 busy_devices = [] # device those are busy in sending/receiving images
 
 COMMAN_CENTER_ADDRS = [219]
+IMAGE_CAPTURING_ADDRS = [221] # [] empty means capture at all device, else on list of devices
 my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
@@ -184,6 +185,7 @@ def get_fs_root_for_storage():
 FS_ROOT = get_fs_root_for_storage()
 logger.info(f"[FS] Using FS_ROOT : {FS_ROOT}")
 MY_IMAGE_DIR = f"{FS_ROOT}/myimages"
+MY_EVENT_DIR = f"{FS_ROOT}/myevents2"
 NET_IMAGE_DIR = f"{FS_ROOT}/netimages"
 
 def create_dir_if_not_exists(dir_path):
@@ -204,6 +206,7 @@ def create_dir_if_not_exists(dir_path):
 
 create_dir_if_not_exists(NET_IMAGE_DIR)
 create_dir_if_not_exists(MY_IMAGE_DIR)
+create_dir_if_not_exists(MY_EVENT_DIR)
 
 encnode = enc.EncNode(my_addr)
 logger.info(f"[INIT] ===> MyAddr = {my_addr}, uid={uid.decode()} <===\n")
@@ -623,8 +626,7 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest):
                 await asyncio.sleep(
                     ACK_SLEEP * min(i + 1, 3)
                 )  # progressively more sleep, capped at 3x
-        newline = "\n" if (retry_i + 1) == send_retry else ""
-        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{send_retry}{newline}")
+        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{send_retry}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
 
@@ -666,10 +668,11 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
         return succ
     else:
         img_id = get_rand()
-        chunks = make_chunks(msgbytes)
-        logger.info(f"[CHUNK] chunking msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, for dest={dest}, img_id:{img_id} into {len(chunks)} chunks")
         if get_transmode_lock(dest, img_id):
             asyncio.create_task(keep_transmode_lock(dest, img_id))
+            # sending start
+            chunks = make_chunks(msgbytes)
+            logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
             big_succ, _ = await send_single_packet("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
             if not big_succ:
                 logger.info(f"[CHUNK] Failed sending chunk begin")
@@ -1236,6 +1239,7 @@ async def person_detection_loop():
         img = None
         try:
             led.on()
+            event_epoch_ms = get_epoch_ms() # epoch milisecond for event
             logger.info(f"[PIR] Motion detected - (interrupt) capturing image...")
             img = sensor.snapshot()
             person_image_count += 1
@@ -1253,7 +1257,16 @@ async def person_detection_loop():
                 # Remove oldest entry
                 oldest = imgpaths_to_send.pop(0)
                 logger.info(f"[PIR] Queue full, removing oldest image: {oldest}")
-            events_to_send.append(get_epoch_ms())
+                
+            # Save empty JSON file for the event
+            event_filepath = f"{MY_EVENT_DIR}/{event_epoch_ms}.json"
+            try:
+                with open(event_filepath, "w") as f:
+                    f.write("{}")
+                logger.info(f"[PIR] Saved event file: {event_filepath}")
+            except Exception as e:
+                logger.error(f"[PIR] Failed to save event file {event_filepath}: {e}")
+            events_to_send.append(event_epoch_ms)
             imgpaths_to_send.append(raw_path)
             # logger.info(f"Saved image: {raw_path}")
             # logger.info(f"Person detected Image count: {person_image_count}")
@@ -1335,7 +1348,7 @@ async def image_sending_loop():
                     sent_succ = await send_img_to_nxt_dst(imgbytes)
                     if not sent_succ:
                         imgpaths_to_send.append(img_filepath) # pushed to back of queue
-                        logger.info(f"[IMG] sending failed, image re-queued: {img_filepath}")
+                        logger.error(f"[IMG] sending failed, image re-queued: {img_filepath}")
                         break
 
                 transmission_end = time_msec()
@@ -1351,7 +1364,7 @@ async def image_sending_loop():
                     logger.info(f"[IMG] Queue empty, all images uploaded")
 
             except Exception as e:
-                logger.error(f"[IMG] unexpected error processing image {img_filepath}: {e}")
+                logger.error(f"[IMG] unexpected error processing image {img_filepath}: {e}, re-queued")
                 # import sys
                 # sys.print_exception(e)
                 
@@ -2191,7 +2204,10 @@ async def main():
         asyncio.create_task(initiate_spath_pings()) # TODO enable for dynamic path
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
-        # asyncio.create_task(person_detection_loop())
+        if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
+            asyncio.create_task(person_detection_loop())
+        else:
+            logger.warning(f"[INIT] ===> Command center node {my_addr} is not configured to capture images")
         asyncio.create_task(event_text_sending_loop())
         asyncio.create_task(image_sending_loop())
     else:
@@ -2201,7 +2217,10 @@ async def main():
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
         #asyncio.create_task(keep_updating_gps())
-        # asyncio.create_task(person_detection_loop())
+        if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
+            asyncio.create_task(person_detection_loop())
+        else:
+            logger.warning(f"[INIT] ===> Unit node {my_addr} is not configured to capture images")
         asyncio.create_task(event_text_sending_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
