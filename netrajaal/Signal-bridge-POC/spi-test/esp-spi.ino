@@ -1,103 +1,122 @@
-// main.c  -- build with ESP-IDF (v4.x or v5.x)
-#include <stdio.h>
-#include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/spi_slave.h"
-#include "driver/gpio.h"
-#include "esp_log.h"
+/*
+ * ESP32 Classic SPI Peripheral (Slave) Code
+ * Bidirectional SPI communication with OpenMV RT1062
+ * 
+ * This uses ESP32's native SPI Slave driver for proper slave operation
+ */
 
-static const char *TAG = "spi_slave_demo";
+#include <driver/spi_slave.h>
+#include <esp_log.h>
 
-#define PIN_SCLK   18
-#define PIN_MOSI   23
-#define PIN_MISO   19
-#define PIN_CS     5
+// SPI Pin Configuration for ESP32
+// Adjust these pins based on your ESP32 board and connections
+#define SPI_MOSI 23  // Master Out, Slave In (from OpenMV perspective)
+#define SPI_MISO 19  // Master In, Slave Out (from OpenMV perspective)
+#define SPI_SCK 18   // Serial Clock
+#define SPI_SS 5     // Slave Select (Chip Select)
 
-// Max transfer size in bytes
-#define TRANSFER_SIZE  64
+// SPI Configuration
+#define SPI_HOST_ID SPI2_HOST  // Use HSPI (SPI2)
+#define DMA_CHAN 2              // DMA channel for SPI
+#define BUFFER_SIZE 64          // Maximum transaction size
 
-void app_main(void)
-{
-    esp_err_t ret;
+// Response counter
+uint8_t response_counter = 0;
 
-    // Configure SPI slave bus pins
-    spi_bus_config_t buscfg = {
-        .mosi_io_num = PIN_MOSI,
-        .miso_io_num = PIN_MISO,
-        .sclk_io_num = PIN_SCLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = TRANSFER_SIZE
-    };
-
-    // Configure CS pin (per-device)
-    spi_slave_interface_config_t slvcfg = {
-        .mode = 0,                 // SPI mode 0
-        .spics_io_num = PIN_CS,    // CS pin
-        .queue_size = 3,           // transaction queue depth
-        .flags = 0,
-        .post_setup_cb = NULL,
-        .post_trans_cb = NULL
-    };
-
-    // Initialize SPI slave interface (VSPI_HOST)
-    ret = spi_slave_initialize(VSPI_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "spi_slave_initialize failed: %d", ret);
-        return;
-    }
-    ESP_LOGI(TAG, "SPI slave initialized (CS=%d MOSI=%d MISO=%d SCLK=%d)", PIN_CS, PIN_MOSI, PIN_MISO, PIN_SCLK);
-
-    // Buffers for transaction
-    static uint8_t recvbuf[TRANSFER_SIZE];
-    static uint8_t sendbuf[TRANSFER_SIZE];
-
-    memset(sendbuf, 0xEE, sizeof(sendbuf)); // default reply pattern
-
-    while (1) {
-        // prepare a transaction descriptor
-        spi_slave_transaction_t t;
-        memset(&t, 0, sizeof(t));
-        t.length = TRANSFER_SIZE * 8; // length in bits
-        t.tx_buffer = sendbuf;
-        t.rx_buffer = recvbuf;
-
-        // Queue transaction and wait for master to start the transaction
-        ret = spi_slave_queue_trans(VSPI_HOST, &t, portMAX_DELAY);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "spi_slave_queue_trans failed: %d", ret);
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue;
-        }
-
-        // Wait for transaction to be completed
-        spi_slave_transaction_t *rt;
-        ret = spi_slave_get_trans_result(VSPI_HOST, &rt, portMAX_DELAY);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "spi_slave_get_trans_result failed: %d", ret);
-            continue;
-        }
-
-        // rt->rx_buffer now contains the bytes master sent
-        ESP_LOGI(TAG, "Received %d bytes from master:", TRANSFER_SIZE);
-        ESP_LOG_BUFFER_HEXDUMP(TAG, recvbuf, TRANSFER_SIZE, ESP_LOG_INFO);
-
-        // Prepare reply based on received data (simple example)
-        // We'll put echo of first 8 bytes + a counter
-        static uint32_t counter = 0;
-        counter++;
-        for (int i = 0; i < TRANSFER_SIZE; ++i) {
-            // simple demo reply: invert received byte, or send pattern if rx is 0
-            if (recvbuf[i] != 0) sendbuf[i] = ~recvbuf[i];
-            else sendbuf[i] = (counter + i) & 0xFF;
-        }
-
-        // loop to queue next transaction (sendbuf already updated)
-        // short delay to avoid busy loop; can be removed if master drives transactions
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-
-    // never reached
-    // spi_slave_free(VSPI_HOST);
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  
+  Serial.println("ESP32 SPI Peripheral (Slave) Starting...");
+  
+  // Configure SPI Bus
+  spi_bus_config_t buscfg = {
+    .mosi_io_num = SPI_MOSI,
+    .miso_io_num = SPI_MISO,
+    .sclk_io_num = SPI_SCK,
+    .quadwp_io_num = -1,  // Not used
+    .quadhd_io_num = -1,  // Not used
+    .max_transfer_sz = BUFFER_SIZE,
+  };
+  
+  // Configure SPI Slave Interface
+  spi_slave_interface_config_t slvcfg = {
+    .mode = 0,                    // SPI Mode 0: CPOL=0, CPHA=0 (matches OpenMV)
+    .spics_io_num = SPI_SS,       // CS pin
+    .queue_size = 3,              // Transaction queue size
+    .flags = 0,                   // No special flags
+    .post_setup_cb = NULL,        // Optional callback after CS setup
+    .post_trans_cb = NULL,        // Optional callback after transaction
+  };
+  
+  // Initialize SPI Slave
+  esp_err_t ret = spi_slave_initialize(SPI_HOST_ID, &buscfg, &slvcfg, DMA_CHAN);
+  
+  if (ret != ESP_OK) {
+    Serial.printf("SPI Slave initialization failed: %s\n", esp_err_to_name(ret));
+    while(1) delay(1000);
+  }
+  
+  Serial.println("ESP32 SPI Slave initialized successfully");
+  Serial.println("Mode: 0 (CPOL=0, CPHA=0)");
+  Serial.println("Waiting for data from OpenMV...");
+  Serial.println();
 }
+
+void loop() {
+  // Buffers for SPI transaction
+  uint8_t rx_data[BUFFER_SIZE];
+  uint8_t tx_data[BUFFER_SIZE];
+  
+  // Prepare transmit buffer (response data)
+  // You can modify this to send any data you want
+  for (int i = 0; i < BUFFER_SIZE; i++) {
+    tx_data[i] = response_counter + i;  // Simple pattern for testing
+  }
+  response_counter++;
+  
+  // Create SPI transaction structure
+  spi_slave_transaction_t t = {};
+  t.length = 32;  // Length in bits (4 bytes = 32 bits for this example)
+  t.tx_buffer = tx_data;
+  t.rx_buffer = rx_data;
+  
+  // Wait for and process SPI transaction (blocking)
+  // This will wait until the master (OpenMV) initiates a transfer
+  esp_err_t ret = spi_slave_transmit(SPI_HOST_ID, &t, portMAX_DELAY);
+  
+  if (ret == ESP_OK) {
+    // Transaction completed successfully
+    Serial.print("Transaction received! Length: ");
+    Serial.print(t.trans_len / 8);  // Convert bits to bytes
+    Serial.println(" bytes");
+    
+    // Print received data
+    Serial.print("Received: ");
+    uint8_t bytes_received = t.trans_len / 8;
+    for (int i = 0; i < bytes_received && i < BUFFER_SIZE; i++) {
+      Serial.print("0x");
+      if (rx_data[i] < 0x10) Serial.print("0");
+      Serial.print(rx_data[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println();
+    
+    // Print sent data
+    Serial.print("Sent: ");
+    for (int i = 0; i < bytes_received && i < BUFFER_SIZE; i++) {
+      Serial.print("0x");
+      if (tx_data[i] < 0x10) Serial.print("0");
+      Serial.print(tx_data[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println();
+    Serial.println("---");
+  } else {
+    Serial.printf("SPI transaction error: %s\n", esp_err_to_name(ret));
+  }
+  
+  // Small delay to prevent overwhelming the serial output
+  delay(10);
+}
+
