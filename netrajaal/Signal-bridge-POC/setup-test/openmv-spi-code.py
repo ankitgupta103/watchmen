@@ -61,12 +61,19 @@ def send_text(text, rx_size=64):
 def bytes_to_text(data):
     """Convert bytes to text string"""
     try:
+        # Find null terminator
         null_pos = data.find(0)
         if null_pos != -1:
             data = data[:null_pos]
+        
+        # Decode to string
         text = data.decode('utf-8', errors='ignore')
-        filtered = ''.join(c if (32 <= ord(c) < 127) or c in '\n\r\t' else '' for c in text)
-        return filtered
+        
+        # Remove only control characters (keep printable ASCII 32-126 and common whitespace)
+        # This is less aggressive - only removes actual control chars
+        filtered = ''.join(c for c in text if (32 <= ord(c) <= 126) or c in '\n\r\t')
+        
+        return filtered.strip() if filtered else ""
     except:
         return ""
 
@@ -113,7 +120,19 @@ while True:
         if rx_text and len(rx_text.strip()) > 0:
             print(f"RX: '{rx_text}'\n")
         else:
-            print(f"RX: [No response]\n")
+            # Fallback: try to extract text directly
+            try:
+                null_pos = rx_bytes.find(0)
+                if null_pos > 0:
+                    raw_text = rx_bytes[:null_pos].decode('utf-8', errors='ignore').strip()
+                    if raw_text:
+                        print(f"RX: '{raw_text}'\n")
+                    else:
+                        print(f"RX: [No response]\n")
+                else:
+                    print(f"RX: [No response]\n")
+            except:
+                print(f"RX: [No response]\n")
         
         counter += 1
         time.sleep_ms(500)
