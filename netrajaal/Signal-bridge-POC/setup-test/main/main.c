@@ -155,21 +155,27 @@ void spi_slave_task(void *pvParameters)
             }
             
             // Simple logging - just RX and TX text
+            // Use tx_buffer for TX logging since that's what was actually sent
             if (all_zeros && actual_len > 0) {
                 // Read request - show what we sent
                 char tx_text[BUFFER_SIZE];
-                extract_text(sent_buffer, BUFFER_SIZE, tx_text, sizeof(tx_text));
-                ESP_LOGI(TAG, "RX: [read request] | TX: '%s'", tx_text);
+                extract_text(tx_buffer, BUFFER_SIZE, tx_text, sizeof(tx_text));
+                if (strlen(tx_text) > 0) {
+                    ESP_LOGI(TAG, "RX: [read request] | TX: '%s'", tx_text);
+                } else {
+                    // Buffer appears empty - this shouldn't happen
+                    ESP_LOGW(TAG, "RX: [read request] | TX: [buffer was empty!]");
+                }
             } else if (is_text_data(rx_buffer, actual_len)) {
                 char rx_text[BUFFER_SIZE];
                 char tx_text[BUFFER_SIZE];
                 extract_text(rx_buffer, actual_len, rx_text, sizeof(rx_text));
-                extract_text(sent_buffer, actual_len, tx_text, sizeof(tx_text));
+                extract_text(tx_buffer, actual_len, tx_text, sizeof(tx_text));
                 ESP_LOGI(TAG, "RX: '%s' | TX: '%s'", rx_text, tx_text);
             } else {
                 // Binary data
                 char tx_text[BUFFER_SIZE];
-                extract_text(sent_buffer, actual_len, tx_text, sizeof(tx_text));
+                extract_text(tx_buffer, actual_len, tx_text, sizeof(tx_text));
                 ESP_LOGI(TAG, "RX: [binary %zu bytes] | TX: '%s'", actual_len, tx_text);
             }
         } else {
