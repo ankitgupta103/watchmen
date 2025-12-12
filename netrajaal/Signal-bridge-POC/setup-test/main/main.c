@@ -1,250 +1,254 @@
-// #include <stdio.h>
-// #include <string.h>
-// #include "driver/uart.h"
-// #include "driver/gpio.h"
-// #include "esp_log.h"
-// #include "freertos/FreeRTOS.h"
-// #include "freertos/task.h"
+/*
+ * ESP32 SPI Slave Code
+ * Bidirectional SPI communication with OpenMV RT1062
+ * 
+ * Uses ESP32's standard SPI Slave driver API
+ */
 
-// static const char *TAG = "UART_BRIDGE";
-
-// // Pin definitions
-// #define PIN_D21           GPIO_NUM_21
-// #define PIN_D22           GPIO_NUM_22
-// #define UART2_RX_PIN      GPIO_NUM_16  // External device TX -> ESP32 RX (GPIO16)
-// #define UART2_TX_PIN      GPIO_NUM_17  // External device RX <- ESP32 TX (GPIO17)
-// #define LED_PIN           GPIO_NUM_2   // On-board LED on most ESP32 dev boards
-
-// #define UART_PORT         UART_NUM_1
-// #define UART_BAUD_RATE    115200
-// #define UART_TIMEOUT_MS   2000
-// #define LED_BLINK_TIME_MS 200
-
-// static TickType_t led_off_time = 0;
-
-// static void blink_led(void)
-// {
-//     gpio_set_level(LED_PIN, 1);
-//     led_off_time = xTaskGetTickCount() + pdMS_TO_TICKS(LED_BLINK_TIME_MS);
-//     ESP_LOGI(TAG, "LED blinked - will turn off in %d ms", LED_BLINK_TIME_MS);
-// }
-
-// static void gpio_init(void)
-// {
-//     // Configure GPIO D21, D22, and LED as outputs
-//     gpio_config_t io_conf = {
-//         .intr_type = GPIO_INTR_DISABLE,
-//         .mode = GPIO_MODE_OUTPUT,
-//         .pin_bit_mask = (1ULL << PIN_D21) | (1ULL << PIN_D22) | (1ULL << LED_PIN),
-//         .pull_down_en = 0,
-//         .pull_up_en = 0,
-//     };
-//     ESP_ERROR_CHECK(gpio_config(&io_conf));
-    
-//     // Set D21 and D22 to LOW
-//     gpio_set_level(PIN_D21, 0);
-//     gpio_set_level(PIN_D22, 0);
-//     gpio_set_level(LED_PIN, 0);
-    
-//     ESP_LOGI(TAG, "GPIO D21 and D22 set to LOW (GND)");
-// }
-
-// static void uart_init(void)
-// {
-//     // Configure UART parameters
-//     uart_config_t uart_config = {
-//         .baud_rate = UART_BAUD_RATE,
-//         .data_bits = UART_DATA_8_BITS,
-//         .parity = UART_PARITY_DISABLE,
-//         .stop_bits = UART_STOP_BITS_1,
-//         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-//         .source_clk = UART_SCLK_APB,
-//     };
-
-//     // Install UART driver
-//     ESP_ERROR_CHECK(uart_driver_install(UART_PORT, 1024, 1024, 0, NULL, 0));
-    
-//     // Configure UART parameters
-//     ESP_ERROR_CHECK(uart_param_config(UART_PORT, &uart_config));
-    
-//     // Set UART pins (TX=17, RX=16)
-//     ESP_ERROR_CHECK(uart_set_pin(UART_PORT, UART2_TX_PIN, UART2_RX_PIN, 
-//                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    
-//     ESP_LOGI(TAG, "Serial2 started @%d, timeout=%d ms", UART_BAUD_RATE, UART_TIMEOUT_MS);
-// }
-
-// void app_main(void)
-// {
-//     ESP_LOGI(TAG, "ESP32 UART (Serial2) example with LED blink activity");
-    
-//     // Initialize GPIO
-//     gpio_init();
-    
-//     // Initialize UART
-//     uart_init();
-    
-//     ESP_LOGI(TAG, "Setup complete! Bridging UART <-> USB Serial");
-
-//     uint8_t uart_rx_buf[256];
-//     char usb_rx_buf[256];
-    
-//     while (1) {
-//         // Turn LED OFF when timeout expires
-//         if (xTaskGetTickCount() > led_off_time) {
-//             gpio_set_level(LED_PIN, 0);
-//         }
-
-//         // UART -> USB (Serial Monitor)
-//         // Check if data is available first
-//         size_t buffered_len = 0;
-//         uart_get_buffered_data_len(UART_PORT, &buffered_len);
-        
-//         if (buffered_len > 0) {
-//             int len = uart_read_bytes(UART_PORT, uart_rx_buf, sizeof(uart_rx_buf) - 1, 
-//                                       pdMS_TO_TICKS(100));
-//             if (len > 0) {
-//                 uart_rx_buf[len] = '\0';  // Null terminate
-//                 ESP_LOGI(TAG, "[UART -> USB] Received %d bytes: %s", len, uart_rx_buf);
-//                 blink_led();  // Blink LED on RX activity
-//             }
-//         } else {
-//             // Also try direct read with short timeout
-//             int len = uart_read_bytes(UART_PORT, uart_rx_buf, sizeof(uart_rx_buf) - 1, 
-//                                       pdMS_TO_TICKS(10));
-//             if (len > 0) {
-//                 uart_rx_buf[len] = '\0';  // Null terminate
-//                 ESP_LOGI(TAG, "[UART -> USB] Received %d bytes: %s", len, uart_rx_buf);
-//                 blink_led();  // Blink LED on RX activity
-//             }
-//         }
-
-//         // USB -> UART (from Serial Monitor)
-//         // Read from stdin (USB serial)
-//         if (fgets(usb_rx_buf, sizeof(usb_rx_buf), stdin) != NULL) {
-//             // Remove newline if present
-//             size_t usb_len = strlen(usb_rx_buf);
-//             if (usb_len > 0 && usb_rx_buf[usb_len - 1] == '\n') {
-//                 usb_rx_buf[usb_len - 1] = '\0';
-//                 usb_len--;
-//             }
-            
-//             if (usb_len > 0) {
-//                 // Send to UART
-//                 uart_write_bytes(UART_PORT, usb_rx_buf, usb_len);
-//                 uart_write_bytes(UART_PORT, "\n", 1);
-//                 ESP_LOGI(TAG, "[USB -> UART] %s", usb_rx_buf);
-//                 blink_led();  // Blink LED on TX activity
-//             }
-//         }
-
-//         vTaskDelay(pdMS_TO_TICKS(10));
-//     }
-// }
-
-
-
-
-// main.c  -- build with ESP-IDF (v4.x or v5.x)
-#include <stdio.h>
+#include <driver/spi_slave.h>
 #include <string.h>
+#include <ctype.h>
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/spi_slave.h"
-#include "driver/gpio.h"
-#include "esp_log.h"
 
-static const char *TAG = "spi_slave_demo";
+static const char *TAG = "spi_slave";
 
-#define PIN_SCLK   18
-#define PIN_MOSI   23
-#define PIN_MISO   19
-#define PIN_CS     5
+// SPI Pin Configuration for ESP32
+#define SPI_MOSI 23  // Master Out, Slave In
+#define SPI_MISO 19  // Master In, Slave Out
+#define SPI_SCK 18   // Serial Clock
+#define SPI_SS 5     // Slave Select (Chip Select)
 
-// Max transfer size in bytes
-#define TRANSFER_SIZE  64
+// SPI Configuration
+#define SPI_HOST_ID SPI2_HOST  // Use HSPI (SPI2)
+#define DMA_CHAN 2
+#define BUFFER_SIZE 64
+
+// Global response counter
+static uint8_t response_counter = 0;
+
+/**
+ * Check if received data is text (printable ASCII)
+ */
+static bool is_text_data(const uint8_t *data, size_t len)
+{
+    for (size_t i = 0; i < len; i++) {
+        if (data[i] == 0) break;  // Null terminator is OK
+        if (!isprint(data[i]) && data[i] != '\n' && data[i] != '\r' && data[i] != '\t') {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Extract text from received buffer (up to null terminator or buffer end)
+ */
+static void extract_text(const uint8_t *buffer, size_t len, char *text, size_t text_size)
+{
+    size_t i = 0;
+    while (i < len && i < text_size - 1 && buffer[i] != 0 && isprint(buffer[i])) {
+        text[i] = (char)buffer[i];
+        i++;
+    }
+    text[i] = '\0';
+}
+
+/**
+ * Prepare response message based on received data
+ */
+static void prepare_response(const uint8_t *rx_data, size_t rx_len, uint8_t *tx_buffer, size_t tx_size)
+{
+    // Always prepare a full response buffer
+    memset(tx_buffer, 0, tx_size);
+    
+    // Check if received data is text
+    if (is_text_data(rx_data, rx_len) && rx_len > 0) {
+        // Received text - respond with text acknowledgment
+        char rx_text[BUFFER_SIZE];
+        extract_text(rx_data, rx_len, rx_text, sizeof(rx_text));
+        
+        // Create response text (limit rx_text length to avoid truncation)
+        char response_msg[BUFFER_SIZE];
+        if (strlen(rx_text) > 0) {
+            // Limit rx_text to 40 chars to ensure response fits
+            char limited_text[41];
+            strncpy(limited_text, rx_text, 40);
+            limited_text[40] = '\0';
+            snprintf(response_msg, sizeof(response_msg), "ESP32 ACK #%d: Got '%s'", response_counter, limited_text);
+        } else {
+            snprintf(response_msg, sizeof(response_msg), "ESP32 ACK #%d", response_counter);
+        }
+        response_counter++;
+        
+        // Copy to transmit buffer
+        size_t msg_len = strlen(response_msg);
+        if (msg_len >= tx_size) {
+            msg_len = tx_size - 1;
+        }
+        memcpy(tx_buffer, response_msg, msg_len);
+    } else {
+        // Received binary data - respond with text acknowledgment mentioning binary
+        char response_msg[BUFFER_SIZE];
+        if (rx_len <= 4) {
+            // Short binary - show hex
+            snprintf(response_msg, sizeof(response_msg), "ESP32: Binary %02x%02x%02x%02x #%d", 
+                    rx_len > 0 ? rx_data[0] : 0,
+                    rx_len > 1 ? rx_data[1] : 0,
+                    rx_len > 2 ? rx_data[2] : 0,
+                    rx_len > 3 ? rx_data[3] : 0,
+                    response_counter);
+        } else {
+            snprintf(response_msg, sizeof(response_msg), "ESP32: Received %zu bytes binary #%d", rx_len, response_counter);
+        }
+        response_counter++;
+        
+        // Copy to transmit buffer
+        size_t msg_len = strlen(response_msg);
+        if (msg_len >= tx_size) {
+            msg_len = tx_size - 1;
+        }
+        memcpy(tx_buffer, response_msg, msg_len);
+    }
+}
+
+/**
+ * Send text message via SPI (helper function)
+ * Note: In slave mode, we can't initiate transfers, but we prepare responses
+ */
+void spi_slave_send_text(const char *text, uint8_t *tx_buffer, size_t buffer_size)
+{
+    memset(tx_buffer, 0, buffer_size);
+    size_t text_len = strlen(text);
+    if (text_len >= buffer_size) {
+        text_len = buffer_size - 1;
+    }
+    memcpy(tx_buffer, text, text_len);
+}
+
+void spi_slave_task(void *pvParameters)
+{
+  // Transaction buffers
+  uint8_t rx_buffer[BUFFER_SIZE] = {0};
+  uint8_t tx_buffer[BUFFER_SIZE] = {0};
+  uint8_t next_tx_buffer[BUFFER_SIZE] = {0};
+  
+  // Prepare initial response
+  spi_slave_send_text("ESP32 Ready", tx_buffer, BUFFER_SIZE);
+  
+  while (1) {
+    // Initialize SPI transaction
+    spi_slave_transaction_t trans = {};
+    trans.length = BUFFER_SIZE * 8;  // Maximum length in bits (master controls actual length)
+    trans.tx_buffer = tx_buffer;  // Send what we prepared
+    trans.rx_buffer = rx_buffer;  // Receive into this buffer
+    
+    // Clear receive buffer
+    memset(rx_buffer, 0, BUFFER_SIZE);
+    
+    // Wait for transaction from master (blocking)
+    esp_err_t ret = spi_slave_transmit(SPI_HOST_ID, &trans, portMAX_DELAY);
+    
+    if (ret == ESP_OK) {
+      // Get actual transaction length
+      size_t actual_len = trans.trans_len / 8;  // Convert bits to bytes
+      
+      // Prepare response for NEXT transaction based on what we received in THIS transaction
+      prepare_response(rx_buffer, actual_len, next_tx_buffer, BUFFER_SIZE);
+      
+      // Swap buffers: next_tx becomes current tx for next iteration
+      memcpy(tx_buffer, next_tx_buffer, BUFFER_SIZE);
+      
+      // Build log message
+      char log_msg[512];
+      int pos = 0;
+      
+      pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "RX: %zu bytes | ", actual_len);
+      
+      // Print received data (hex)
+      for (size_t i = 0; i < actual_len && i < BUFFER_SIZE && pos < sizeof(log_msg) - 20; i++) {
+        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "%02x ", rx_buffer[i]);
+      }
+      
+      pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "| ");
+      
+      // Print received data (text)
+      if (is_text_data(rx_buffer, actual_len)) {
+        char rx_text[BUFFER_SIZE];
+        extract_text(rx_buffer, actual_len, rx_text, sizeof(rx_text));
+        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "'%s'", rx_text);
+      } else {
+        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "[binary]");
+      }
+      
+      pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, " | TX: ");
+      
+      // Print sent data (hex) - show what we sent in THIS transaction
+      size_t tx_show_len = (actual_len < BUFFER_SIZE) ? actual_len : BUFFER_SIZE;
+      for (size_t i = 0; i < tx_show_len && pos < sizeof(log_msg) - 20; i++) {
+        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "%02x ", tx_buffer[i]);
+      }
+      
+      pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "| ");
+      
+      // Print sent data (text) - show what we sent in THIS transaction
+      if (is_text_data(tx_buffer, tx_show_len)) {
+        char tx_text[BUFFER_SIZE];
+        extract_text(tx_buffer, tx_show_len, tx_text, sizeof(tx_text));
+        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "'%s'", tx_text);
+      } else {
+        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "[binary]");
+      }
+      
+      ESP_LOGI(TAG, "%s", log_msg);
+    } else {
+      ESP_LOGE(TAG, "SPI error: %s", esp_err_to_name(ret));
+      // Prepare default response for next transaction
+      spi_slave_send_text("ESP32 Error", next_tx_buffer, BUFFER_SIZE);
+      memcpy(tx_buffer, next_tx_buffer, BUFFER_SIZE);
+    }
+    
+    // Small delay to prevent CPU spinning
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
 
 void app_main(void)
 {
-    esp_err_t ret;
-
-    // Configure SPI slave bus pins
-    spi_bus_config_t buscfg = {
-        .mosi_io_num = PIN_MOSI,
-        .miso_io_num = PIN_MISO,
-        .sclk_io_num = PIN_SCLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = TRANSFER_SIZE
-    };
-
-    // Configure CS pin (per-device)
-    spi_slave_interface_config_t slvcfg = {
-        .mode = 0,                 // SPI mode 0
-        .spics_io_num = PIN_CS,    // CS pin
-        .queue_size = 3,           // transaction queue depth
-        .flags = 0,
-        .post_setup_cb = NULL,
-        .post_trans_cb = NULL
-    };
-
-    // Initialize SPI slave interface (VSPI_HOST)
-    ret = spi_slave_initialize(VSPI_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "spi_slave_initialize failed: %d", ret);
-        return;
-    }
-    ESP_LOGI(TAG, "SPI slave initialized (CS=%d MOSI=%d MISO=%d SCLK=%d)", PIN_CS, PIN_MOSI, PIN_MISO, PIN_SCLK);
-
-    // Buffers for transaction
-    static uint8_t recvbuf[TRANSFER_SIZE];
-    static uint8_t sendbuf[TRANSFER_SIZE];
-
-    memset(sendbuf, 0xEE, sizeof(sendbuf)); // default reply pattern
-
-    while (1) {
-        // prepare a transaction descriptor
-        spi_slave_transaction_t t;
-        memset(&t, 0, sizeof(t));
-        t.length = TRANSFER_SIZE * 8; // length in bits
-        t.tx_buffer = sendbuf;
-        t.rx_buffer = recvbuf;
-
-        // Queue transaction and wait for master to start the transaction
-        ret = spi_slave_queue_trans(VSPI_HOST, &t, portMAX_DELAY);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "spi_slave_queue_trans failed: %d", ret);
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue;
-        }
-
-        // Wait for transaction to be completed
-        spi_slave_transaction_t *rt;
-        ret = spi_slave_get_trans_result(VSPI_HOST, &rt, portMAX_DELAY);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "spi_slave_get_trans_result failed: %d", ret);
-            continue;
-        }
-
-        // rt->rx_buffer now contains the bytes master sent
-        ESP_LOGI(TAG, "Received %d bytes from master:", TRANSFER_SIZE);
-        ESP_LOG_BUFFER_HEXDUMP(TAG, recvbuf, TRANSFER_SIZE, ESP_LOG_INFO);
-
-        // Prepare reply based on received data (simple example)
-        // We'll put echo of first 8 bytes + a counter
-        static uint32_t counter = 0;
-        counter++;
-        for (int i = 0; i < TRANSFER_SIZE; ++i) {
-            // simple demo reply: invert received byte, or send pattern if rx is 0
-            if (recvbuf[i] != 0) sendbuf[i] = ~recvbuf[i];
-            else sendbuf[i] = (counter + i) & 0xFF;
-        }
-
-        // loop to queue next transaction (sendbuf already updated)
-        // short delay to avoid busy loop; can be removed if master drives transactions
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-
-    // never reached
-    // spi_slave_free(VSPI_HOST);
+  ESP_LOGI(TAG, "ESP32 SPI Slave Starting...");
+  
+  // Configure SPI Bus
+  spi_bus_config_t buscfg = {
+    .mosi_io_num = SPI_MOSI,
+    .miso_io_num = SPI_MISO,
+    .sclk_io_num = SPI_SCK,
+    .quadwp_io_num = -1,
+    .quadhd_io_num = -1,
+    .max_transfer_sz = BUFFER_SIZE,
+  };
+  
+  // Configure SPI Slave Interface
+  spi_slave_interface_config_t slvcfg = {};
+  slvcfg.mode = 0;                    // SPI Mode 0: CPOL=0, CPHA=0
+  slvcfg.spics_io_num = SPI_SS;
+  slvcfg.queue_size = 3;
+  slvcfg.flags = 0;
+  slvcfg.post_setup_cb = NULL;
+  slvcfg.post_trans_cb = NULL;
+  
+  // Initialize SPI Slave
+  esp_err_t ret = spi_slave_initialize(SPI_HOST_ID, &buscfg, &slvcfg, DMA_CHAN);
+  
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "SPI Slave init failed: %s", esp_err_to_name(ret));
+    return;
+  }
+  
+  ESP_LOGI(TAG, "ESP32 SPI Slave ready");
+  ESP_LOGI(TAG, "Mode: 0 (CPOL=0, CPHA=0)");
+  ESP_LOGI(TAG, "Ready for bidirectional text communication");
+  
+  // Create task for SPI slave loop
+  xTaskCreate(spi_slave_task, "spi_slave_task", 4096, NULL, 5, NULL);
 }

@@ -39,14 +39,14 @@ void setup() {
   };
   
   // Configure SPI Slave Interface
-  spi_slave_interface_config_t slvcfg = {
-    .mode = 0,                    // SPI Mode 0: CPOL=0, CPHA=0
-    .spics_io_num = SPI_SS,
-    .queue_size = 3,
-    .flags = 0,
-    .post_setup_cb = NULL,
-    .post_trans_cb = NULL,
-  };
+  // Initialize to zero first, then set fields to avoid order issues
+  spi_slave_interface_config_t slvcfg = {};
+  slvcfg.mode = 0;                    // SPI Mode 0: CPOL=0, CPHA=0
+  slvcfg.spics_io_num = SPI_SS;
+  slvcfg.queue_size = 3;
+  slvcfg.flags = 0;
+  slvcfg.post_setup_cb = NULL;
+  slvcfg.post_trans_cb = NULL;
   
   // Initialize SPI Slave
   esp_err_t ret = spi_slave_initialize(SPI_HOST_ID, &buscfg, &slvcfg, DMA_CHAN);
