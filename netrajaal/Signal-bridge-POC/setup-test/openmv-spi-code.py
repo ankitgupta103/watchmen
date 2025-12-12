@@ -78,8 +78,10 @@ def bytes_to_text(data):
         return ""
 
 def receive_text(rx_size=64):
-    """Read response from ESP32 (send zeros to trigger response)"""
-    tx_bytes = b'\x00' * rx_size
+    """Read response from ESP32 (send read request marker)"""
+    # Send a read request marker (0x00) followed by zeros
+    # This ensures the SPI transaction completes properly
+    tx_bytes = b'\x00' + b'\x00' * (rx_size - 1)
     return spi_transfer(tx_bytes, rx_size)
 
 # Main loop
@@ -111,7 +113,8 @@ while True:
             print(f"RX (during send): '{rx_text_send}'")
         
         # Wait for ESP32 to prepare response (give it more time)
-        time.sleep_ms(100)
+        # Also add a small delay to ensure SPI is ready
+        time.sleep_ms(150)
         
         # Read response
         rx_bytes = receive_text(rx_size=64)

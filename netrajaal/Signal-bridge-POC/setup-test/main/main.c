@@ -144,15 +144,18 @@ void spi_slave_task(void *pvParameters)
             size_t actual_len = trans.trans_len / 8;
             
             // Check if all zeros (read request)
+            // A read request is identified by first byte being 0 and rest being 0 or very few non-zero bytes
             bool all_zeros = false;
-            if (actual_len > 0) {
-                all_zeros = true;
+            if (actual_len > 0 && rx_buffer[0] == 0) {
+                // Count non-zero bytes
+                int non_zero_count = 0;
                 for (size_t i = 0; i < actual_len && i < BUFFER_SIZE; i++) {
                     if (rx_buffer[i] != 0) {
-                        all_zeros = false;
-                        break;
+                        non_zero_count++;
                     }
                 }
+                // If less than 5% are non-zero, treat as read request
+                all_zeros = (non_zero_count < (actual_len / 20));
             }
             
             // Prepare new response only if we received actual data
