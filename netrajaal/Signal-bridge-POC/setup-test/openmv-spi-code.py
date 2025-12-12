@@ -78,10 +78,10 @@ def bytes_to_text(data):
         return ""
 
 def receive_text(rx_size=64):
-    """Read response from ESP32 (send read request marker)"""
-    # Send a read request marker (0x00) followed by zeros
-    # This ensures the SPI transaction completes properly
-    tx_bytes = b'\x00' + b'\x00' * (rx_size - 1)
+    """Read response from ESP32 (send read request command)"""
+    # Send 0xFF as read request command (ESP32 recognizes this)
+    # Using 0xFF instead of 0x00 because SPI driver drives MISO better with non-zero data
+    tx_bytes = b'\xFF' + b'\x00' * (rx_size - 1)
     return spi_transfer(tx_bytes, rx_size)
 
 # Main loop

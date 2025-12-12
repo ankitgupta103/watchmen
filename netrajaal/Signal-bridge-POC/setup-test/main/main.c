@@ -143,29 +143,30 @@ void spi_slave_task(void *pvParameters)
         if (ret == ESP_OK) {
             size_t actual_len = trans.trans_len / 8;
             
-            // Check if all zeros (read request)
-            // A read request is identified by first byte being 0 and rest being 0 or very few non-zero bytes
-            bool all_zeros = false;
-            if (actual_len > 0 && rx_buffer[0] == 0) {
-                // Count non-zero bytes
+            // Check if read request command (0xFF as first byte indicates read request)
+            // Using 0xFF instead of 0x00 because SPI driver might not drive MISO properly with all zeros
+            bool is_read_request = false;
+            if (actual_len > 0 && rx_buffer[0] == 0xFF) {
+                is_read_request = true;
+            } else if (actual_len > 0 && rx_buffer[0] == 0x00) {
+                // Also check for all zeros as fallback
                 int non_zero_count = 0;
                 for (size_t i = 0; i < actual_len && i < BUFFER_SIZE; i++) {
                     if (rx_buffer[i] != 0) {
                         non_zero_count++;
                     }
                 }
-                // If less than 5% are non-zero, treat as read request
-                all_zeros = (non_zero_count < (actual_len / 20));
+                is_read_request = (non_zero_count < (actual_len / 20));
             }
             
-            // Prepare new response only if we received actual data
-            if (!all_zeros && actual_len > 0) {
+            // Prepare new response only if we received actual data (not a read request)
+            if (!is_read_request && actual_len > 0) {
                 prepare_response(rx_buffer, actual_len, tx_buffer, BUFFER_SIZE);
             }
             
             // Simple logging - just RX and TX text
             // Use sent_buffer for TX logging since that's what was actually sent (copied before transaction)
-            if (all_zeros && actual_len > 0) {
+            if (is_read_request && actual_len > 0) {
                 // Read request - show what we sent
                 char tx_text[BUFFER_SIZE];
                 extract_text(sent_buffer, BUFFER_SIZE, tx_text, sizeof(tx_text));
