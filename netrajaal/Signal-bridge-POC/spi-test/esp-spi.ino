@@ -40,14 +40,14 @@ void setup() {
   };
   
   // Configure SPI Slave Interface
-  spi_slave_interface_config_t slvcfg = {
-    .mode = 0,                    // SPI Mode 0: CPOL=0, CPHA=0 (matches OpenMV)
-    .spics_io_num = SPI_SS,       // CS pin
-    .queue_size = 3,              // Transaction queue size
-    .flags = 0,                   // No special flags
-    .post_setup_cb = NULL,        // Optional callback after CS setup
-    .post_trans_cb = NULL,        // Optional callback after transaction
-  };
+  // Note: Field order must match struct declaration order
+  spi_slave_interface_config_t slvcfg = {};
+  slvcfg.mode = 0;                    // SPI Mode 0: CPOL=0, CPHA=0 (matches OpenMV)
+  slvcfg.spics_io_num = SPI_SS;       // CS pin
+  slvcfg.queue_size = 3;              // Transaction queue size
+  slvcfg.flags = 0;                   // No special flags
+  slvcfg.post_setup_cb = NULL;        // Optional callback after CS setup
+  slvcfg.post_trans_cb = NULL;        // Optional callback after transaction
   
   // Initialize SPI Slave
   esp_err_t ret = spi_slave_initialize(SPI_HOST_ID, &buscfg, &slvcfg, DMA_CHAN);
