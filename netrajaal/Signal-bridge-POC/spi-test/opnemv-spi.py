@@ -1,178 +1,132 @@
 """
-OpenMV RT1062 SPI Controller Code
-Bidirectional SPI communication with ESP32 Classic
+OpenMV RT1062 SPI Master Code
+Bidirectional SPI communication with ESP32
 
-# This work is licensed under the MIT license.
-# Copyright (c) 2013-2024 OpenMV LLC. All rights reserved.
+Uses standard OpenMV SPI API
 """
 
 from machine import SPI, Pin
 import time
 
-# Pin Configuration - adjust these based on your OpenMV board
-# CS (Chip Select) pin
-cs = Pin("P3", Pin.OUT, value=1)  # Active low, start high
+# Pin Configuration
+cs = Pin("P3", Pin.OUT, value=1)  # CS pin, active low, start high
 
-# The hardware SPI bus for your OpenMV RT1062 is always SPI bus 1.
-# NOTE: The SPI clock frequency will not always be the requested frequency. 
-# The hardware only supports frequencies that are the bus frequency divided by 
-# a prescaler (which can be 2, 4, 8, 16, 32, 64, 128 or 256).
-BAUDRATE = 1000000  # 1 MHz - adjust as needed
+# SPI Configuration
+BAUDRATE = 1000000  # 1 MHz
 spi = SPI(1, baudrate=BAUDRATE, polarity=0, phase=0)
 
-print("OpenMV SPI Controller initialized")
-print("SPI Configuration:", spi)
+print("OpenMV SPI Master initialized")
+print(f"SPI: {spi}")
+print()
 
-def send_receive_data(tx_data):
+def spi_transfer(tx_data, rx_length=None):
     """
-    Send data to ESP32 and receive response
+    Standard SPI transfer: send and receive data
     tx_data: bytes to send
+    rx_length: number of bytes to receive (default: same as tx_data length)
     Returns: bytes received
     """
+    if rx_length is None:
+        rx_length = len(tx_data)
+    
     # Prepare receive buffer
-    rx_data = bytearray(len(tx_data))
+    rx_buffer = bytearray(rx_length)
     
-    # Select ESP32 (CS low)
+    # CS low (select slave)
     cs.low()
-    time.sleep_us(10)  # Small delay for CS setup
+    time.sleep_us(5)  # CS setup time
     
     try:
-        # Simultaneous write and read
-        spi.write_readinto(tx_data, rx_data)
+        # Write and read simultaneously
+        if len(tx_data) == rx_length:
+            # Same length: use write_readinto
+            spi.write_readinto(tx_data, rx_buffer)
+        else:
+            # Different lengths: write first, then read
+            if len(tx_data) > 0:
+                spi.write(tx_data)
+            if rx_length > 0:
+                spi.readinto(rx_buffer, 0x00)
     finally:
-        # Deselect ESP32 (CS high)
-        time.sleep_us(10)
-        cs.high()
+        time.sleep_us(5)  # CS hold time
+        cs.high()  # Deselect slave
     
-    return bytes(rx_data)
+    return bytes(rx_buffer)
 
-def send_data(tx_data):
+def send_binary(data):
     """
-    Send data to ESP32 without reading
-    tx_data: bytes to send
-    """
-    cs.low()
-    time.sleep_us(10)
-    
-    try:
-        spi.write(tx_data)
-    finally:
-        time.sleep_us(10)
-        cs.high()
-
-def receive_data(length, write_byte=0x00):
-    """
-    Receive data from ESP32
-    length: number of bytes to receive
-    write_byte: byte to send while receiving (usually 0x00)
+    Send binary data and receive response of same length
+    data: bytes to send
     Returns: bytes received
     """
-    cs.low()
-    time.sleep_us(10)
-    
-    try:
-        rx_data = spi.read(length, write_byte)
-    finally:
-        time.sleep_us(10)
-        cs.high()
-    
-    return rx_data
+    return spi_transfer(data, len(data))
 
-def send_text(text, rx_length=64):
+def send_text(text, rx_size=64):
     """
-    Send text string to ESP32 and receive response
+    Send text string and receive response
     text: string to send
-    rx_length: number of bytes to receive (default 64)
-    Returns: bytes received (response from ESP32)
+    rx_size: number of bytes to receive (default 64)
+    Returns: bytes received
     """
-    # Convert string to bytes
-    tx_data = text.encode('utf-8')
-    # Ensure we don't exceed buffer size
-    if len(tx_data) > 64:
-        tx_data = tx_data[:64]
+    # Convert text to bytes
+    tx_bytes = text.encode('utf-8')
     
-    # Pad or truncate tx_data to match rx_length for proper SPI transaction
-    # SPI requires same length for send and receive
-    if len(tx_data) < rx_length:
-        # Pad with zeros if sending less than receiving
-        tx_padded = tx_data + b'\x00' * (rx_length - len(tx_data))
+    # Pad or truncate to match rx_size
+    if len(tx_bytes) < rx_size:
+        tx_bytes = tx_bytes + b'\x00' * (rx_size - len(tx_bytes))
     else:
-        # Truncate if sending more than receiving
-        tx_padded = tx_data[:rx_length]
+        tx_bytes = tx_bytes[:rx_size]
     
-    # Send and receive with fixed length
-    rx_data = send_receive_data(tx_padded)
-    return rx_data
+    return spi_transfer(tx_bytes, rx_size)
 
-def send_text_only(text):
+def bytes_to_text(data):
     """
-    Send text string to ESP32 without reading response
-    text: string to send
+    Convert bytes to text string, handling null terminators
+    data: bytes to convert
+    Returns: string
     """
-    # Convert string to bytes
-    tx_data = text.encode('utf-8')
-    # Ensure we don't exceed buffer size
-    if len(tx_data) > 64:
-        tx_data = tx_data[:64]
-    
-    # Send only
-    send_data(tx_data)
-
-def receive_text(length=64):
-    """
-    Receive text from ESP32
-    length: maximum number of bytes to receive
-    Returns: string received
-    """
-    rx_data = receive_data(length)
-    # Convert bytes to string, handling null terminators
     try:
-        # Find null terminator if present
-        null_pos = rx_data.find(0)
+        # Find null terminator
+        null_pos = data.find(0)
         if null_pos != -1:
-            rx_data = rx_data[:null_pos]
-        text = rx_data.decode('utf-8', errors='ignore')
-        return text
+            data = data[:null_pos]
+        return data.decode('utf-8', errors='ignore')
     except:
-        return str(rx_data)
+        return str(data)
 
 # Main loop
 print("Starting SPI communication...")
+print()
 
 counter = 0
 while True:
     try:
-        # Example 1: Send binary data and receive response
-        tx_buffer = bytes([0x01, 0x02, 0x03, counter & 0xFF])
-        print(f"\n--- Transfer #{counter} ---")
-        print(f"Sending (binary): {[hex(b) for b in tx_buffer]}")
+        print(f"--- Transfer #{counter} ---")
         
-        rx_buffer = send_receive_data(tx_buffer)
-        print(f"Received (binary): {[hex(b) for b in rx_buffer]}")
+        # Test 1: Binary data (4 bytes)
+        tx_bin = bytes([0x01, 0x02, 0x03, counter & 0xFF])
+        print(f"TX (bin): {[hex(b) for b in tx_bin]}")
         
-        # Example 2: Send text and receive text response
-        text_to_send = f"Hello ESP32 #{counter}"
-        print(f"\nSending (text): '{text_to_send}'")
+        rx_bin = send_binary(tx_bin)
+        print(f"RX (bin): {[hex(b) for b in rx_bin]}")
+        print()
         
-        # Send text and receive up to 64 bytes response
-        rx_text_bytes = send_text(text_to_send, rx_length=64)
-        print(f"Received (hex): {[hex(b) for b in rx_text_bytes]}")
+        # Test 2: Text data (64 bytes)
+        tx_text = f"Hello ESP32 #{counter}"
+        print(f"TX (text): '{tx_text}'")
         
-        # Try to decode as text
-        try:
-            null_pos = rx_text_bytes.find(0)
-            if null_pos != -1:
-                rx_text_bytes = rx_text_bytes[:null_pos]
-            rx_text = rx_text_bytes.decode('utf-8', errors='ignore')
-            print(f"Received (text): '{rx_text}'")
-        except Exception as e:
-            print(f"Received (raw): {rx_text_bytes}")
-            print(f"Decode error: {e}")
+        rx_bytes = send_text(tx_text, rx_size=64)
+        print(f"RX (hex): {[hex(b) for b in rx_bytes[:20]]}...")  # Show first 20 bytes
+        
+        rx_text = bytes_to_text(rx_bytes)
+        print(f"RX (text): '{rx_text}'")
+        print()
         
         counter += 1
-        time.sleep_ms(500)  # Wait 500ms between transfers
+        time.sleep_ms(500)
         
     except Exception as e:
         print(f"Error: {e}")
+        import sys
+        sys.print_exception(e)
         time.sleep(1)
-
