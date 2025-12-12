@@ -29,27 +29,30 @@ def spi_transfer(tx_data, rx_length=None):
     if rx_length is None:
         rx_length = len(tx_data)
     
-    # Prepare receive buffer
+    # Prepare receive buffer (initialize to 0, not 0xFF)
     rx_buffer = bytearray(rx_length)
+    
+    # Ensure tx_data is the right length
+    if len(tx_data) < rx_length:
+        # Pad tx_data to match rx_length
+        tx_padded = tx_data + b'\x00' * (rx_length - len(tx_data))
+    elif len(tx_data) > rx_length:
+        # Truncate tx_data to match rx_length
+        tx_padded = tx_data[:rx_length]
+    else:
+        tx_padded = tx_data
     
     # CS low (select slave)
     cs.low()
-    time.sleep_us(5)  # CS setup time
+    time.sleep_us(10)  # CS setup time - increased for stability
     
     try:
-        # Write and read simultaneously
-        if len(tx_data) == rx_length:
-            # Same length: use write_readinto
-            spi.write_readinto(tx_data, rx_buffer)
-        else:
-            # Different lengths: write first, then read
-            if len(tx_data) > 0:
-                spi.write(tx_data)
-            if rx_length > 0:
-                spi.readinto(rx_buffer, 0x00)
+        # Write and read simultaneously - must be same length
+        spi.write_readinto(tx_padded, rx_buffer)
     finally:
-        time.sleep_us(5)  # CS hold time
+        time.sleep_us(10)  # CS hold time - increased for stability
         cs.high()  # Deselect slave
+        time.sleep_us(5)  # Small delay after CS high
     
     return bytes(rx_buffer)
 
@@ -71,12 +74,13 @@ def send_text(text, rx_size=64):
     # Convert text to bytes
     tx_bytes = text.encode('utf-8')
     
-    # Pad or truncate to match rx_size
+    # Pad to match rx_size (SPI requires same length for tx and rx)
     if len(tx_bytes) < rx_size:
         tx_bytes = tx_bytes + b'\x00' * (rx_size - len(tx_bytes))
     else:
         tx_bytes = tx_bytes[:rx_size]
     
+    # Perform SPI transfer (tx and rx must be same length)
     return spi_transfer(tx_bytes, rx_size)
 
 def bytes_to_text(data):
@@ -129,18 +133,35 @@ while True:
             print(f"RX (text from binary): '{rx_text_bin}'")
         print()
         
+        # Small delay to allow ESP32 to prepare response
+        time.sleep_ms(10)
+        
         # Test 2: Text data (64 bytes) - full bidirectional text communication
         tx_text = f"Hello ESP32 #{counter}"
         print(f"TX (text): '{tx_text}'")
         
         rx_bytes = send_text(tx_text, rx_size=64)
         
-        # Show first 30 bytes in hex for debugging
-        hex_preview = [hex(b) for b in rx_bytes[:30]]
+        # Show first 40 bytes in hex for debugging (more to see the actual response)
+        hex_preview = [hex(b) for b in rx_bytes[:40]]
         print(f"RX (hex): {hex_preview}...")
         
         rx_text = bytes_to_text(rx_bytes)
-        print(f"RX (text): '{rx_text}'")
+        if rx_text and len(rx_text.strip()) > 0:
+            print(f"RX (text): '{rx_text}'")
+        else:
+            # Try to find text in the response
+            text_found = False
+            for i in range(len(rx_bytes)):
+                if rx_bytes[i] != 0xFF and rx_bytes[i] != 0x00:
+                    # Found start of potential text
+                    potential_text = bytes_to_text(rx_bytes[i:])
+                    if potential_text and len(potential_text.strip()) > 5:
+                        print(f"RX (text at offset {i}): '{potential_text}'")
+                        text_found = True
+                        break
+            if not text_found:
+                print(f"RX (text): [No readable text found]")
         print()
         
         counter += 1

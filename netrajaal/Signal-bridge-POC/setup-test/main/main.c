@@ -30,15 +30,32 @@ static uint8_t response_counter = 0;
 
 /**
  * Check if received data is text (printable ASCII)
+ * Handles zero-padding at the end
  */
 static bool is_text_data(const uint8_t *data, size_t len)
 {
+    if (len == 0) return false;
+    
+    // Find the actual text length (up to first null or end)
+    size_t text_len = 0;
     for (size_t i = 0; i < len; i++) {
-        if (data[i] == 0) break;  // Null terminator is OK
+        if (data[i] == 0) {
+            text_len = i;
+            break;
+        }
+        text_len = i + 1;
+    }
+    
+    // Need at least a few printable characters to consider it text
+    if (text_len < 3) return false;
+    
+    // Check if the non-zero portion is printable
+    for (size_t i = 0; i < text_len; i++) {
         if (!isprint(data[i]) && data[i] != '\n' && data[i] != '\r' && data[i] != '\t') {
             return false;
         }
     }
+    
     return true;
 }
 
@@ -48,19 +65,28 @@ static bool is_text_data(const uint8_t *data, size_t len)
 static void extract_text(const uint8_t *buffer, size_t len, char *text, size_t text_size)
 {
     size_t i = 0;
-    while (i < len && i < text_size - 1 && buffer[i] != 0 && isprint(buffer[i])) {
-        text[i] = (char)buffer[i];
-        i++;
+    // Extract up to first null or end of buffer
+    while (i < len && i < text_size - 1) {
+        if (buffer[i] == 0) {
+            break;
+        }
+        if (isprint(buffer[i]) || buffer[i] == '\n' || buffer[i] == '\r' || buffer[i] == '\t') {
+            text[i] = (char)buffer[i];
+            i++;
+        } else {
+            break;  // Stop at first non-printable
+        }
     }
     text[i] = '\0';
 }
 
 /**
  * Prepare response message based on received data
+ * Always fills the entire buffer to ensure proper SPI communication
  */
 static void prepare_response(const uint8_t *rx_data, size_t rx_len, uint8_t *tx_buffer, size_t tx_size)
 {
-    // Always prepare a full response buffer
+    // Always prepare a full response buffer - zero it first
     memset(tx_buffer, 0, tx_size);
     
     // Check if received data is text
@@ -72,29 +98,30 @@ static void prepare_response(const uint8_t *rx_data, size_t rx_len, uint8_t *tx_
         // Create response text (limit rx_text length to avoid truncation)
         char response_msg[BUFFER_SIZE];
         if (strlen(rx_text) > 0) {
-            // Limit rx_text to 40 chars to ensure response fits
-            char limited_text[41];
-            strncpy(limited_text, rx_text, 40);
-            limited_text[40] = '\0';
+            // Limit rx_text to 35 chars to ensure response fits in buffer
+            char limited_text[36];
+            strncpy(limited_text, rx_text, 35);
+            limited_text[35] = '\0';
             snprintf(response_msg, sizeof(response_msg), "ESP32 ACK #%d: Got '%s'", response_counter, limited_text);
         } else {
             snprintf(response_msg, sizeof(response_msg), "ESP32 ACK #%d", response_counter);
         }
         response_counter++;
         
-        // Copy to transmit buffer
+        // Copy to transmit buffer - fill entire buffer
         size_t msg_len = strlen(response_msg);
-        if (msg_len >= tx_size) {
+        if (msg_len > tx_size - 1) {
             msg_len = tx_size - 1;
         }
         memcpy(tx_buffer, response_msg, msg_len);
+        // Rest of buffer is already zeroed by memset above
     } else {
         // Received binary data - respond with text acknowledgment mentioning binary
         char response_msg[BUFFER_SIZE];
-        if (rx_len <= 4) {
+        if (rx_len <= 4 && rx_len > 0) {
             // Short binary - show hex
             snprintf(response_msg, sizeof(response_msg), "ESP32: Binary %02x%02x%02x%02x #%d", 
-                    rx_len > 0 ? rx_data[0] : 0,
+                    rx_data[0],
                     rx_len > 1 ? rx_data[1] : 0,
                     rx_len > 2 ? rx_data[2] : 0,
                     rx_len > 3 ? rx_data[3] : 0,
@@ -104,12 +131,13 @@ static void prepare_response(const uint8_t *rx_data, size_t rx_len, uint8_t *tx_
         }
         response_counter++;
         
-        // Copy to transmit buffer
+        // Copy to transmit buffer - fill entire buffer
         size_t msg_len = strlen(response_msg);
-        if (msg_len >= tx_size) {
+        if (msg_len > tx_size - 1) {
             msg_len = tx_size - 1;
         }
         memcpy(tx_buffer, response_msg, msg_len);
+        // Rest of buffer is already zeroed by memset above
     }
 }
 
@@ -132,19 +160,20 @@ void spi_slave_task(void *pvParameters)
   // Transaction buffers
   uint8_t rx_buffer[BUFFER_SIZE] = {0};
   uint8_t tx_buffer[BUFFER_SIZE] = {0};
-  uint8_t next_tx_buffer[BUFFER_SIZE] = {0};
   
-  // Prepare initial response
-  spi_slave_send_text("ESP32 Ready", tx_buffer, BUFFER_SIZE);
+  // Prepare initial response - fill entire buffer
+  memset(tx_buffer, 0, BUFFER_SIZE);
+  const char *init_msg = "ESP32 Ready";
+  memcpy(tx_buffer, init_msg, strlen(init_msg));
   
   while (1) {
     // Initialize SPI transaction
     spi_slave_transaction_t trans = {};
     trans.length = BUFFER_SIZE * 8;  // Maximum length in bits (master controls actual length)
-    trans.tx_buffer = tx_buffer;  // Send what we prepared
+    trans.tx_buffer = tx_buffer;  // Send what we prepared (always full buffer)
     trans.rx_buffer = rx_buffer;  // Receive into this buffer
     
-    // Clear receive buffer
+    // Clear receive buffer before transaction
     memset(rx_buffer, 0, BUFFER_SIZE);
     
     // Wait for transaction from master (blocking)
@@ -155,10 +184,8 @@ void spi_slave_task(void *pvParameters)
       size_t actual_len = trans.trans_len / 8;  // Convert bits to bytes
       
       // Prepare response for NEXT transaction based on what we received in THIS transaction
-      prepare_response(rx_buffer, actual_len, next_tx_buffer, BUFFER_SIZE);
-      
-      // Swap buffers: next_tx becomes current tx for next iteration
-      memcpy(tx_buffer, next_tx_buffer, BUFFER_SIZE);
+      // This will be sent in the next SPI transaction
+      prepare_response(rx_buffer, actual_len, tx_buffer, BUFFER_SIZE);
       
       // Build log message
       char log_msg[512];
@@ -205,8 +232,7 @@ void spi_slave_task(void *pvParameters)
     } else {
       ESP_LOGE(TAG, "SPI error: %s", esp_err_to_name(ret));
       // Prepare default response for next transaction
-      spi_slave_send_text("ESP32 Error", next_tx_buffer, BUFFER_SIZE);
-      memcpy(tx_buffer, next_tx_buffer, BUFFER_SIZE);
+      spi_slave_send_text("ESP32 Error", tx_buffer, BUFFER_SIZE);
     }
     
     // Small delay to prevent CPU spinning
