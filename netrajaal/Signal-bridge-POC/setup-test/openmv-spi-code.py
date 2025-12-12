@@ -110,8 +110,8 @@ while True:
         if rx_text_send and len(rx_text_send.strip()) > 0:
             print(f"RX (during send): '{rx_text_send}'")
         
-        # Wait for ESP32 to prepare response
-        time.sleep_ms(50)
+        # Wait for ESP32 to prepare response (give it more time)
+        time.sleep_ms(100)
         
         # Read response
         rx_bytes = receive_text(rx_size=64)
