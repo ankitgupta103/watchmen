@@ -92,7 +92,7 @@ while True:
     try:
         print(f"--- Transfer #{counter} ---")
         
-        # Binary handshake (4 bytes)
+        # Binary handshake (4 bytes) - this was working earlier
         tx_bin = bytes([0x01, 0x02, 0x03, counter & 0xFF])
         rx_bin = send_binary(tx_bin)
         rx_text_bin = bytes_to_text(rx_bin)
@@ -103,48 +103,31 @@ while True:
         time.sleep_ms(10)
         
         # Text communication
+        # Note: Response will be one transaction behind (this is normal for SPI slave)
+        # When we send "Hello ESP32 #N", we receive response to "Hello ESP32 #N-1"
         tx_text = f"Hello ESP32 #{counter}"
         print(f"TX: '{tx_text}'")
         
-        # Send text message
-        rx_bytes_send = send_text(tx_text, rx_size=64)
-        rx_text_send = bytes_to_text(rx_bytes_send)
-        if rx_text_send and len(rx_text_send.strip()) > 0:
-            print(f"RX (during send): '{rx_text_send}'")
+        # Send text message - receive response to previous message
+        rx_bytes = send_text(tx_text, rx_size=64)
+        rx_text = bytes_to_text(rx_bytes)
         
-        # Wait for ESP32 to prepare response (give it more time)
-        # Also add a small delay to ensure SPI is ready
-        time.sleep_ms(150)
-        
-        # Read response
-        rx_bytes = receive_text(rx_size=64)
-        
-        # Debug: show what we actually received (first 40 bytes)
-        non_zero = [b for b in rx_bytes[:40] if b != 0 and b != 0xFF]
-        if non_zero:
-            # Try to find text
-            null_pos = rx_bytes.find(0)
-            if null_pos > 0:
-                try:
+        if rx_text and len(rx_text.strip()) > 0:
+            print(f"RX: '{rx_text}'\n")
+        else:
+            # Try fallback decoding
+            try:
+                null_pos = rx_bytes.find(0)
+                if null_pos > 0:
                     raw_text = rx_bytes[:null_pos].decode('utf-8', errors='ignore').strip()
                     if raw_text:
                         print(f"RX: '{raw_text}'\n")
                     else:
-                        print(f"RX: [Received {len(non_zero)} non-zero bytes but no text]\n")
-                except Exception as e:
-                    print(f"RX: [Decode error: {e}]\n")
-            else:
-                try:
-                    # No null terminator, try to decode anyway
-                    raw_text = rx_bytes.decode('utf-8', errors='ignore').strip()
-                    if raw_text:
-                        print(f"RX: '{raw_text}'\n")
-                    else:
-                        print(f"RX: [Received {len(non_zero)} bytes but decode failed]\n")
-                except:
-                    print(f"RX: [Received {len(non_zero)} bytes but decode error]\n")
-        else:
-            print(f"RX: [No response - all zeros or 0xFF]\n")
+                        print(f"RX: [No readable response]\n")
+                else:
+                    print(f"RX: [No response]\n")
+            except:
+                print(f"RX: [No response]\n")
         
         counter += 1
         time.sleep_ms(500)
