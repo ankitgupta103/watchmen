@@ -2207,7 +2207,7 @@ async def main():
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
         else:
-            logger.warning(f"[INIT] ===> Command center node {my_addr} is not configured to capture images")
+            logger.warning(f"[INIT] ===> Command center node {my_addr} is not enabled to capture images")
         asyncio.create_task(event_text_sending_loop())
         asyncio.create_task(image_sending_loop())
     else:
@@ -2220,7 +2220,7 @@ async def main():
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
         else:
-            logger.warning(f"[INIT] ===> Unit node {my_addr} is not configured to capture images")
+            logger.warning(f"[INIT] ===> Unit node {my_addr} is not enabled to capture images")
         asyncio.create_task(event_text_sending_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
