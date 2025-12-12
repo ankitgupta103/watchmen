@@ -187,9 +187,26 @@ void spi_slave_task(void *pvParameters)
       // Get actual transaction length
       size_t actual_len = trans.trans_len / 8;  // Convert bits to bytes
       
-      // Prepare response for NEXT transaction based on what we received in THIS transaction
-      // This will be sent in the next SPI transaction
-      prepare_response(rx_buffer, actual_len, tx_buffer, BUFFER_SIZE);
+      // Check if we received all zeros (this is a "read response" request from master)
+      // In this case, don't prepare a new response, keep the current one
+      bool all_zeros = false;
+      if (actual_len > 0) {
+        all_zeros = true;
+        for (size_t i = 0; i < actual_len && i < BUFFER_SIZE; i++) {
+          if (rx_buffer[i] != 0) {
+            all_zeros = false;
+            break;
+          }
+        }
+      }
+      
+      // Only prepare new response if we received actual data (not a read request)
+      if (!all_zeros && actual_len > 0) {
+        // Prepare response for NEXT transaction based on what we received in THIS transaction
+        // This will be sent in the next SPI transaction
+        prepare_response(rx_buffer, actual_len, tx_buffer, BUFFER_SIZE);
+      }
+      // If all zeros or zero length, keep the current tx_buffer (don't overwrite the prepared response)
       
       // Build log message
       char log_msg[512];
@@ -205,7 +222,9 @@ void spi_slave_task(void *pvParameters)
       pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "| ");
       
       // Print received data (text)
-      if (is_text_data(rx_buffer, actual_len)) {
+      if (all_zeros && actual_len > 0) {
+        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "[read request]");
+      } else if (is_text_data(rx_buffer, actual_len)) {
         char rx_text[BUFFER_SIZE];
         extract_text(rx_buffer, actual_len, rx_text, sizeof(rx_text));
         pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "'%s'", rx_text);

@@ -147,10 +147,12 @@ while True:
         print(f"RX (during send, response to prev): {bytes_to_text(rx_bytes_send)}")
         
         # Small delay to ensure ESP32 has prepared the response
-        time.sleep_ms(20)
+        # ESP32 prepares response immediately after receiving, so short delay is enough
+        time.sleep_ms(50)
         
         # Step 2: Read the response to our text message
         # Send zeros to trigger response, receive the prepared response
+        # ESP32 will detect all zeros and keep the prepared response instead of overwriting it
         rx_bytes = receive_text(rx_size=64)
         
         # Show first 40 bytes in hex for debugging (more to see the actual response)
