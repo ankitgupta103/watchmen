@@ -89,7 +89,7 @@ void loop() {
   
   // Create SPI transaction structure
   spi_slave_transaction_t t = {};
-  t.length = 32;  // Length in bits (4 bytes = 32 bits for this example)
+  t.length = BUFFER_SIZE * 8;  // Length in bits (64 bytes = 512 bits)
   t.tx_buffer = tx_data;
   t.rx_buffer = rx_data;
   

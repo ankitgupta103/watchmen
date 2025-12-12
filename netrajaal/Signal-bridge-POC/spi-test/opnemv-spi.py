@@ -78,10 +78,11 @@ def receive_data(length, write_byte=0x00):
     
     return rx_data
 
-def send_text(text):
+def send_text(text, rx_length=64):
     """
-    Send text string to ESP32
+    Send text string to ESP32 and receive response
     text: string to send
+    rx_length: number of bytes to receive (default 64)
     Returns: bytes received (response from ESP32)
     """
     # Convert string to bytes
@@ -90,8 +91,17 @@ def send_text(text):
     if len(tx_data) > 64:
         tx_data = tx_data[:64]
     
-    # Send and receive
-    rx_data = send_receive_data(tx_data)
+    # Pad or truncate tx_data to match rx_length for proper SPI transaction
+    # SPI requires same length for send and receive
+    if len(tx_data) < rx_length:
+        # Pad with zeros if sending less than receiving
+        tx_padded = tx_data + b'\x00' * (rx_length - len(tx_data))
+    else:
+        # Truncate if sending more than receiving
+        tx_padded = tx_data[:rx_length]
+    
+    # Send and receive with fixed length
+    rx_data = send_receive_data(tx_padded)
     return rx_data
 
 def send_text_only(text):
@@ -144,7 +154,10 @@ while True:
         text_to_send = f"Hello ESP32 #{counter}"
         print(f"\nSending (text): '{text_to_send}'")
         
-        rx_text_bytes = send_text(text_to_send)
+        # Send text and receive up to 64 bytes response
+        rx_text_bytes = send_text(text_to_send, rx_length=64)
+        print(f"Received (hex): {[hex(b) for b in rx_text_bytes]}")
+        
         # Try to decode as text
         try:
             null_pos = rx_text_bytes.find(0)
@@ -152,8 +165,9 @@ while True:
                 rx_text_bytes = rx_text_bytes[:null_pos]
             rx_text = rx_text_bytes.decode('utf-8', errors='ignore')
             print(f"Received (text): '{rx_text}'")
-        except:
+        except Exception as e:
             print(f"Received (raw): {rx_text_bytes}")
+            print(f"Decode error: {e}")
         
         counter += 1
         time.sleep_ms(500)  # Wait 500ms between transfers
