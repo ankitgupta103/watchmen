@@ -137,10 +137,21 @@ while True:
         time.sleep_ms(10)
         
         # Test 2: Text data (64 bytes) - full bidirectional text communication
+        # Protocol: Send text message, then read response in next transaction
         tx_text = f"Hello ESP32 #{counter}"
         print(f"TX (text): '{tx_text}'")
         
-        rx_bytes = send_text(tx_text, rx_size=64)
+        # Step 1: Send the text message (ESP32 will prepare response based on this)
+        # We'll receive the response to the previous transaction here
+        rx_bytes_send = send_text(tx_text, rx_size=64)
+        print(f"RX (during send, response to prev): {bytes_to_text(rx_bytes_send)}")
+        
+        # Small delay to ensure ESP32 has prepared the response
+        time.sleep_ms(20)
+        
+        # Step 2: Read the response to our text message
+        # Send zeros to trigger response, receive the prepared response
+        rx_bytes = receive_text(rx_size=64)
         
         # Show first 40 bytes in hex for debugging (more to see the actual response)
         hex_preview = [hex(b) for b in rx_bytes[:40]]

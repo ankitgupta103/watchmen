@@ -160,6 +160,7 @@ void spi_slave_task(void *pvParameters)
   // Transaction buffers
   uint8_t rx_buffer[BUFFER_SIZE] = {0};
   uint8_t tx_buffer[BUFFER_SIZE] = {0};
+  uint8_t sent_buffer[BUFFER_SIZE] = {0};  // Keep track of what we actually sent
   
   // Prepare initial response - fill entire buffer
   memset(tx_buffer, 0, BUFFER_SIZE);
@@ -167,6 +168,9 @@ void spi_slave_task(void *pvParameters)
   memcpy(tx_buffer, init_msg, strlen(init_msg));
   
   while (1) {
+    // Save what we're about to send (for logging)
+    memcpy(sent_buffer, tx_buffer, BUFFER_SIZE);
+    
     // Initialize SPI transaction
     spi_slave_transaction_t trans = {};
     trans.length = BUFFER_SIZE * 8;  // Maximum length in bits (master controls actual length)
@@ -211,18 +215,18 @@ void spi_slave_task(void *pvParameters)
       
       pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, " | TX: ");
       
-      // Print sent data (hex) - show what we sent in THIS transaction
+      // Print sent data (hex) - show what we ACTUALLY sent in THIS transaction
       size_t tx_show_len = (actual_len < BUFFER_SIZE) ? actual_len : BUFFER_SIZE;
       for (size_t i = 0; i < tx_show_len && pos < sizeof(log_msg) - 20; i++) {
-        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "%02x ", tx_buffer[i]);
+        pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "%02x ", sent_buffer[i]);
       }
       
       pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "| ");
       
-      // Print sent data (text) - show what we sent in THIS transaction
-      if (is_text_data(tx_buffer, tx_show_len)) {
+      // Print sent data (text) - show what we ACTUALLY sent in THIS transaction
+      if (is_text_data(sent_buffer, tx_show_len)) {
         char tx_text[BUFFER_SIZE];
-        extract_text(tx_buffer, tx_show_len, tx_text, sizeof(tx_text));
+        extract_text(sent_buffer, tx_show_len, tx_text, sizeof(tx_text));
         pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "'%s'", tx_text);
       } else {
         pos += snprintf(log_msg + pos, sizeof(log_msg) - pos, "[binary]");
