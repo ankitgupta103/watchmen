@@ -115,24 +115,33 @@ while True:
         
         # Read response
         rx_bytes = receive_text(rx_size=64)
-        rx_text = bytes_to_text(rx_bytes)
         
-        if rx_text and len(rx_text.strip()) > 0:
-            print(f"RX: '{rx_text}'\n")
-        else:
-            # Fallback: try to extract text directly
-            try:
-                null_pos = rx_bytes.find(0)
-                if null_pos > 0:
+        # Debug: show what we actually received (first 40 bytes)
+        non_zero = [b for b in rx_bytes[:40] if b != 0 and b != 0xFF]
+        if non_zero:
+            # Try to find text
+            null_pos = rx_bytes.find(0)
+            if null_pos > 0:
+                try:
                     raw_text = rx_bytes[:null_pos].decode('utf-8', errors='ignore').strip()
                     if raw_text:
                         print(f"RX: '{raw_text}'\n")
                     else:
-                        print(f"RX: [No response]\n")
-                else:
-                    print(f"RX: [No response]\n")
-            except:
-                print(f"RX: [No response]\n")
+                        print(f"RX: [Received {len(non_zero)} non-zero bytes but no text]\n")
+                except Exception as e:
+                    print(f"RX: [Decode error: {e}]\n")
+            else:
+                try:
+                    # No null terminator, try to decode anyway
+                    raw_text = rx_bytes.decode('utf-8', errors='ignore').strip()
+                    if raw_text:
+                        print(f"RX: '{raw_text}'\n")
+                    else:
+                        print(f"RX: [Received {len(non_zero)} bytes but decode failed]\n")
+                except:
+                    print(f"RX: [Received {len(non_zero)} bytes but decode error]\n")
+        else:
+            print(f"RX: [No response - all zeros or 0xFF]\n")
         
         counter += 1
         time.sleep_ms(500)
