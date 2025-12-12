@@ -123,11 +123,17 @@ void spi_slave_task(void *pvParameters)
     memcpy(tx_buffer, init_msg, strlen(init_msg));
     
     while (1) {
+        // Save what we're about to send for logging
         memcpy(sent_buffer, tx_buffer, BUFFER_SIZE);
+        
+        // Verify tx_buffer has data before transaction (for read requests)
+        char pre_tx_check[BUFFER_SIZE];
+        extract_text(tx_buffer, BUFFER_SIZE, pre_tx_check, sizeof(pre_tx_check));
+        bool has_pre_data = (strlen(pre_tx_check) > 0);
         
         spi_slave_transaction_t trans = {};
         trans.length = BUFFER_SIZE * 8;
-        trans.tx_buffer = tx_buffer;
+        trans.tx_buffer = tx_buffer;  // This is what will be sent
         trans.rx_buffer = rx_buffer;
         
         memset(rx_buffer, 0, BUFFER_SIZE);
@@ -155,16 +161,22 @@ void spi_slave_task(void *pvParameters)
             }
             
             // Simple logging - just RX and TX text
-            // Use tx_buffer for TX logging since that's what was actually sent
+            // Use sent_buffer for TX logging since that's what was actually sent (copied before transaction)
             if (all_zeros && actual_len > 0) {
                 // Read request - show what we sent
                 char tx_text[BUFFER_SIZE];
-                extract_text(tx_buffer, BUFFER_SIZE, tx_text, sizeof(tx_text));
+                extract_text(sent_buffer, BUFFER_SIZE, tx_text, sizeof(tx_text));
                 if (strlen(tx_text) > 0) {
                     ESP_LOGI(TAG, "RX: [read request] | TX: '%s'", tx_text);
+                    // Also verify tx_buffer still has it (for debugging)
+                    char tx_check[BUFFER_SIZE];
+                    extract_text(tx_buffer, BUFFER_SIZE, tx_check, sizeof(tx_check));
+                    if (strlen(tx_check) == 0 && has_pre_data) {
+                        ESP_LOGW(TAG, "WARNING: tx_buffer was cleared during transaction!");
+                    }
                 } else {
                     // Buffer appears empty - this shouldn't happen
-                    ESP_LOGW(TAG, "RX: [read request] | TX: [buffer was empty!]");
+                    ESP_LOGW(TAG, "RX: [read request] | TX: [buffer was empty!] (pre-check: %s)", has_pre_data ? "had data" : "was empty");
                 }
             } else if (is_text_data(rx_buffer, actual_len)) {
                 char rx_text[BUFFER_SIZE];
