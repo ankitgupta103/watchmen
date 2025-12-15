@@ -138,8 +138,12 @@ if uid == b'e076465dd7194025':
     my_addr = 219
 elif uid == b'e076465dd7193a09':
     my_addr = 225
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = [219]
 elif uid ==  b'e076465dd7090d1c':
     my_addr = 221
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = [225, 219]
 elif uid == b'e076465dd7091027':
     my_addr = 222
 elif uid == b'e076465dd7091843':
@@ -336,7 +340,7 @@ async def keep_transmode_lock(device_id, img_id):
         paired_device = None
         data_id = None
     else:
-        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, device:{device_id}, img_id:{img_id} <@@@@@@@@@@") # todo, will move it to debug later
+        logger.debug(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, device:{device_id}, img_id:{img_id} <@@@@@@@@@@") # todo, will move it to debug later
 
 def check_transmode_lock(device_id, img_id): # check if transfer lock is active or not
     global image_in_progress, paired_device, data_id
@@ -354,7 +358,7 @@ def delete_transmode_lock(device_id, img_id):
         paired_device = None
         data_id = None
     else:
-        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, for device {device_id} and img_id {img_id} <@@@@@@@@@@") # will move it to debug later
+        logger.debug(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, for device {device_id} and img_id {img_id} <@@@@@@@@@@") # will move it to debug later
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
 
