@@ -114,38 +114,40 @@ lora_init_in_progress = False
 image_in_progress = False
 busy_devices = [] # device those are busy in sending/receiving images
 
-COMMAN_CENTER_ADDRS = [219]
-IMAGE_CAPTURING_ADDRS = [221] # [] empty means capture at all device, else on list of devices
 my_addr = None
 shortest_path_to_cc = []
 seen_neighbours = []
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
 
+# -----------------------------------▼▼▼▼▼-----------------------------------
+# --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
+
+COMMAN_CENTER_ADDRS = [219]
+IMAGE_CAPTURING_ADDRS = [221] # [] empty means capture at all device, else on list of devices
+import fakelayout
+flayout = fakelayout.Layout
+
+# --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
+# -----------------------------------▲▲▲▲▲-----------------------------------
 
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 # COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7194025':
     my_addr = 219
-    shortest_path_to_cc = []
 elif uid == b'e076465dd7193a09':
     my_addr = 225
-    shortest_path_to_cc = [219]
 elif uid ==  b'e076465dd7090d1c':
     my_addr = 221
-    shortest_path_to_cc = [225, 219]
-
 elif uid == b'e076465dd7091027':
     my_addr = 222
-    shortest_path_to_cc = []
 elif uid == b'e076465dd7091843':
     my_addr = 223
-    shortest_path_to_cc = [222]
-
 else:
     logger.error("error in main.py: Unknown device ID for " + omv.board_id())
     sys.exit()
+
 clock_start = utime.ticks_ms() # get millisecond counter
 
 def get_free_memory():
@@ -1507,6 +1509,11 @@ def process_message(data, rssi=None):
         return True
 
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
+
+    if not flayout.is_neighbour(sender, my_addr):
+        logger.warning(f"[LORA/FAKE LAYOUT] receiving something which is beyond my range so dropping this packet")
+        return True
+
     recv_log = ""
     if receiver == -1:
         recv_log = "⬇ BCAST"
