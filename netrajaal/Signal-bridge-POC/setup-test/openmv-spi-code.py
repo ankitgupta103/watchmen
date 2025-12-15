@@ -61,9 +61,13 @@ while True:
         # Show what we sent and what we received (response expected in rx2)
         print(f"TX: {msg}")
         rx_bytes = bytes(rx2)
-        print(f"RX: {rx_bytes.hex()}")
-        rx_text = rx_bytes.decode("utf-8", errors="ignore").rstrip("\x00")
-        print(f"RX (text): {rx_text}\n")
+        print("RX:", rx_bytes.hex())
+        # Decode defensively: no keyword args to avoid platform errors
+        try:
+            rx_text = rx_bytes.decode("utf-8", "ignore").rstrip("\x00")
+        except Exception:
+            rx_text = ""
+        print("RX (text): {}\n".format(rx_text))
 
         counter += 1
         time.sleep_ms(500)
