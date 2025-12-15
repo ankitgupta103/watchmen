@@ -5,10 +5,9 @@ FakeNeighbours = [
         (225,219),
         ]
 
-class Layout:
-    def __init__(self) -> None:
-        self.neighbours = FakeNeighbours
+class Layout:        
     def __init__(self):
+        self.neighbours = FakeNeighbours
         print(f"Starting fake network with the following neighbours")
         for n in self.neighbours:
             print(n)

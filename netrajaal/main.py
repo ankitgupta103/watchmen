@@ -31,7 +31,7 @@ import detect
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # TESTING VARIABLES
-DYNAMIC_SPATH = False
+DYNAMIC_SPATH = True
 ENCRYPTION_ENABLED = True
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
@@ -126,7 +126,7 @@ seen_neighbours = []
 COMMAN_CENTER_ADDRS = [219]
 IMAGE_CAPTURING_ADDRS = [221] # [] empty means capture at all device, else on list of devices
 import fakelayout
-flayout = fakelayout.Layout
+flayout = fakelayout.Layout()
 
 # --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
 # -----------------------------------▲▲▲▲▲-----------------------------------
@@ -1583,7 +1583,7 @@ def process_message(data, rssi=None):
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
 
     if not flayout.is_neighbour(sender, my_addr):
-        logger.warning(f"[LORA/FAKE LAYOUT] receiving something which is beyond my range so dropping this packet")
+        logger.warning(f"[LORA/FAKE LAYOUT] receiving something which is beyond my range so dropping this packet {sender}")
         return True
 
     recv_log = ""
