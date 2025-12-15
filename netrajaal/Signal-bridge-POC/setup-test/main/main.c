@@ -45,13 +45,17 @@ void spi_slave_task(void *pvParameters)
         if (ret == ESP_OK) {
             size_t actual_len = trans.trans_len / 8;
             
-            // Simple echo: clear TX buffer and copy received data for next transaction
+            // Prepare response: send acknowledgment with counter
             memset(tx_buffer, 0, BUFFER_SIZE);
-            size_t copy_len = (actual_len < BUFFER_SIZE) ? actual_len : BUFFER_SIZE;
-            memcpy(tx_buffer, rx_buffer, copy_len);
+            char response[BUFFER_SIZE];
+            snprintf(response, BUFFER_SIZE, "ESP32 ACK #%d", counter);
+            size_t resp_len = strlen(response);
+            if (resp_len > BUFFER_SIZE - 1) resp_len = BUFFER_SIZE - 1;
+            memcpy(tx_buffer, response, resp_len);
             
-            // Simple logging with counter
-            ESP_LOGI(TAG, "[%d] RX: %.*s", counter++, (int)copy_len, (char*)rx_buffer);
+            // Simple logging
+            ESP_LOGI(TAG, "[%d] RX: %.*s", counter, (int)actual_len, (char*)rx_buffer);
+            counter++;
         } else {
             ESP_LOGE(TAG, "SPI error: %s", esp_err_to_name(ret));
         }
