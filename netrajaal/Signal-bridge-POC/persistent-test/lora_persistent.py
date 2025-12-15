@@ -16,8 +16,8 @@ import time
 MODE = "write"
 
 # Global addresses for this node and its peer
-OWN_ADDR = 100
-TARGET_ADDR = 200
+OWN_ADDR = 200
+TARGET_ADDR = 100
 
 def configure():
     """
@@ -195,7 +195,6 @@ def write():
     own_addr = OWN_ADDR
     freq = 868
     freq_offset = freq - 850
-    message = b"Hello from LoRa!"
 
     m0_pin = Pin(m0_pin_str, Pin.OUT)
     m1_pin = Pin(m1_pin_str, Pin.OUT)
@@ -207,26 +206,35 @@ def write():
 
     uart = UART(uart_num, 115200, timeout=2000)
 
-    # Build message packet
-    data = (
-        bytes([target_addr >> 8]) +
-        bytes([target_addr & 0xFF]) +
-        bytes([freq_offset]) +
-        bytes([own_addr >> 8]) +
-        bytes([own_addr & 0xFF]) +
-        bytes([freq_offset]) +
-        message +
-        b"\n"
-    )
-
-    # Replace newlines
-    if data[-1] != 0x0A:
-        data = data + b"\n"
+    # Message counter
+    counter = 0
 
     while True:
+        # Build message with counter
+        message = ("Hello from LoRa! my name is anand and I am from heaven %d" % counter).encode()
+
+        # Build message packet
+        data = (
+            bytes([target_addr >> 8]) +
+            bytes([target_addr & 0xFF]) +
+            bytes([freq_offset]) +
+            bytes([own_addr >> 8]) +
+            bytes([own_addr & 0xFF]) +
+            bytes([freq_offset]) +
+            message +
+            b"\n"
+        )
+
+        # Ensure newline terminator
+        if data[-1] != 0x0A:
+            data = data + b"\n"
+
         uart.write(data)
-        time.sleep_ms(500)
-        print("Sent", len(message), "bytes to address", target_addr)
+        time.sleep_ms(800)
+        print("Sent", len(message), "bytes to address", target_addr, "counter", counter)
+
+        # Increment counter (wrap at 65535)
+        counter = (counter + 1) & 0xFFFF
 
 # Main execution
 if MODE == "configure":
