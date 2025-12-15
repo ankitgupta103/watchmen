@@ -1,11 +1,9 @@
 /*
- * ESP32 SPI Slave Code
- * Bidirectional SPI communication with OpenMV RT1062
+ * ESP32 SPI Slave - Simple Echo Communication with OpenMV RT1062
  */
 
 #include <driver/spi_slave.h>
 #include <string.h>
-#include <ctype.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,184 +19,41 @@ static const char *TAG = "spi_slave";
 // SPI Configuration
 #define SPI_HOST_ID SPI2_HOST
 #define DMA_CHAN 2
-#define BUFFER_SIZE 64
+#define BUFFER_SIZE 32
 
-static uint8_t response_counter = 0;
-
-// Check if data is text (printable ASCII)
-static bool is_text_data(const uint8_t *data, size_t len)
-{
-    if (len == 0) return false;
-    
-    size_t text_len = 0;
-    for (size_t i = 0; i < len; i++) {
-        if (data[i] == 0) {
-            text_len = i;
-            break;
-        }
-        text_len = i + 1;
-    }
-    
-    if (text_len < 3) return false;
-    
-    for (size_t i = 0; i < text_len; i++) {
-        if (!isprint(data[i]) && data[i] != '\n' && data[i] != '\r' && data[i] != '\t') {
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-// Extract text from buffer
-static void extract_text(const uint8_t *buffer, size_t len, char *text, size_t text_size)
-{
-    size_t i = 0;
-    while (i < len && i < text_size - 1) {
-        if (buffer[i] == 0) break;
-        if (isprint(buffer[i]) || buffer[i] == '\n' || buffer[i] == '\r' || buffer[i] == '\t') {
-            text[i] = (char)buffer[i];
-            i++;
-        } else {
-            break;
-        }
-    }
-    text[i] = '\0';
-}
-
-// Prepare response based on received data
-static void prepare_response(const uint8_t *rx_data, size_t rx_len, uint8_t *tx_buffer, size_t tx_size)
-{
-    memset(tx_buffer, 0, tx_size);
-    
-    if (is_text_data(rx_data, rx_len) && rx_len > 0) {
-        // Received text - respond with acknowledgment
-        char rx_text[BUFFER_SIZE];
-        extract_text(rx_data, rx_len, rx_text, sizeof(rx_text));
-        
-        char response_msg[BUFFER_SIZE];
-        if (strlen(rx_text) > 0) {
-            char limited_text[36];
-            strncpy(limited_text, rx_text, 35);
-            limited_text[35] = '\0';
-            snprintf(response_msg, sizeof(response_msg), "ESP32 ACK #%d: Got '%s'", response_counter, limited_text);
-        } else {
-            snprintf(response_msg, sizeof(response_msg), "ESP32 ACK #%d", response_counter);
-        }
-        response_counter++;
-        
-        size_t msg_len = strlen(response_msg);
-        if (msg_len > tx_size - 1) msg_len = tx_size - 1;
-        memcpy(tx_buffer, response_msg, msg_len);
-    } else {
-        // Received binary - respond with binary acknowledgment
-        char response_msg[BUFFER_SIZE];
-        if (rx_len <= 4 && rx_len > 0) {
-            snprintf(response_msg, sizeof(response_msg), "ESP32: Binary %02x%02x%02x%02x #%d", 
-                    rx_data[0],
-                    rx_len > 1 ? rx_data[1] : 0,
-                    rx_len > 2 ? rx_data[2] : 0,
-                    rx_len > 3 ? rx_data[3] : 0,
-                    response_counter);
-        } else {
-            snprintf(response_msg, sizeof(response_msg), "ESP32: Received %zu bytes binary #%d", rx_len, response_counter);
-        }
-        response_counter++;
-        
-        size_t msg_len = strlen(response_msg);
-        if (msg_len > tx_size - 1) msg_len = tx_size - 1;
-        memcpy(tx_buffer, response_msg, msg_len);
-    }
-}
+static uint8_t counter = 0;
 
 void spi_slave_task(void *pvParameters)
 {
     uint8_t rx_buffer[BUFFER_SIZE] = {0};
     uint8_t tx_buffer[BUFFER_SIZE] = {0};
-    uint8_t sent_buffer[BUFFER_SIZE] = {0};
     
-    // Initial response
-    memset(tx_buffer, 0, BUFFER_SIZE);
+    // Initial message
     const char *init_msg = "ESP32 Ready";
-    memcpy(tx_buffer, init_msg, strlen(init_msg));
+    memset(tx_buffer, 0, BUFFER_SIZE);
+    memcpy(tx_buffer, init_msg, strlen(init_msg) < BUFFER_SIZE ? strlen(init_msg) : BUFFER_SIZE - 1);
     
     while (1) {
-        // Save what we're about to send for logging
-        memcpy(sent_buffer, tx_buffer, BUFFER_SIZE);
-        
-        // Verify tx_buffer has data before transaction (for read requests)
-        char pre_tx_check[BUFFER_SIZE];
-        extract_text(tx_buffer, BUFFER_SIZE, pre_tx_check, sizeof(pre_tx_check));
-        bool has_pre_data = (strlen(pre_tx_check) > 0);
-        
-        spi_slave_transaction_t trans = {};
-        trans.length = BUFFER_SIZE * 8;
-        trans.tx_buffer = tx_buffer;  // This is what will be sent
-        trans.rx_buffer = rx_buffer;
-        
-        memset(rx_buffer, 0, BUFFER_SIZE);
+        spi_slave_transaction_t trans = {
+            .length = BUFFER_SIZE * 8,
+            .tx_buffer = tx_buffer,
+            .rx_buffer = rx_buffer,
+        };
         
         esp_err_t ret = spi_slave_transmit(SPI_HOST_ID, &trans, portMAX_DELAY);
         
         if (ret == ESP_OK) {
             size_t actual_len = trans.trans_len / 8;
             
-            // Check if read request command (0xFF as first byte indicates read request)
-            // Using 0xFF instead of 0x00 because SPI driver might not drive MISO properly with all zeros
-            bool is_read_request = false;
-            if (actual_len > 0 && rx_buffer[0] == 0xFF) {
-                is_read_request = true;
-            } else if (actual_len > 0 && rx_buffer[0] == 0x00) {
-                // Also check for all zeros as fallback
-                int non_zero_count = 0;
-                for (size_t i = 0; i < actual_len && i < BUFFER_SIZE; i++) {
-                    if (rx_buffer[i] != 0) {
-                        non_zero_count++;
-                    }
-                }
-                is_read_request = (non_zero_count < (actual_len / 20));
-            }
+            // Simple echo: clear TX buffer and copy received data for next transaction
+            memset(tx_buffer, 0, BUFFER_SIZE);
+            size_t copy_len = (actual_len < BUFFER_SIZE) ? actual_len : BUFFER_SIZE;
+            memcpy(tx_buffer, rx_buffer, copy_len);
             
-            // Prepare new response only if we received actual data (not a read request)
-            if (!is_read_request && actual_len > 0) {
-                prepare_response(rx_buffer, actual_len, tx_buffer, BUFFER_SIZE);
-            }
-            
-            // Simple logging - just RX and TX text
-            // Use sent_buffer for TX logging since that's what was actually sent (copied before transaction)
-            if (is_read_request && actual_len > 0) {
-                // Read request - show what we sent
-                char tx_text[BUFFER_SIZE];
-                extract_text(sent_buffer, BUFFER_SIZE, tx_text, sizeof(tx_text));
-                if (strlen(tx_text) > 0) {
-                    ESP_LOGI(TAG, "RX: [read request] | TX: '%s'", tx_text);
-                    // Also verify tx_buffer still has it (for debugging)
-                    char tx_check[BUFFER_SIZE];
-                    extract_text(tx_buffer, BUFFER_SIZE, tx_check, sizeof(tx_check));
-                    if (strlen(tx_check) == 0 && has_pre_data) {
-                        ESP_LOGW(TAG, "WARNING: tx_buffer was cleared during transaction!");
-                    }
-                } else {
-                    // Buffer appears empty - this shouldn't happen
-                    ESP_LOGW(TAG, "RX: [read request] | TX: [buffer was empty!] (pre-check: %s)", has_pre_data ? "had data" : "was empty");
-                }
-            } else if (is_text_data(rx_buffer, actual_len)) {
-                char rx_text[BUFFER_SIZE];
-                char tx_text[BUFFER_SIZE];
-                extract_text(rx_buffer, actual_len, rx_text, sizeof(rx_text));
-                extract_text(tx_buffer, actual_len, tx_text, sizeof(tx_text));
-                ESP_LOGI(TAG, "RX: '%s' | TX: '%s'", rx_text, tx_text);
-            } else {
-                // Binary data
-                char tx_text[BUFFER_SIZE];
-                extract_text(tx_buffer, actual_len, tx_text, sizeof(tx_text));
-                ESP_LOGI(TAG, "RX: [binary %zu bytes] | TX: '%s'", actual_len, tx_text);
-            }
+            // Simple logging with counter
+            ESP_LOGI(TAG, "[%d] RX: %.*s", counter++, (int)copy_len, (char*)rx_buffer);
         } else {
             ESP_LOGE(TAG, "SPI error: %s", esp_err_to_name(ret));
-            memset(tx_buffer, 0, BUFFER_SIZE);
-            const char *error_msg = "ESP32 Error";
-            memcpy(tx_buffer, error_msg, strlen(error_msg));
         }
         
         vTaskDelay(pdMS_TO_TICKS(1));
@@ -218,13 +73,12 @@ void app_main(void)
         .max_transfer_sz = BUFFER_SIZE,
     };
     
-    spi_slave_interface_config_t slvcfg = {};
-    slvcfg.mode = 0;
-    slvcfg.spics_io_num = SPI_SS;
-    slvcfg.queue_size = 3;
-    slvcfg.flags = 0;
-    slvcfg.post_setup_cb = NULL;
-    slvcfg.post_trans_cb = NULL;
+    spi_slave_interface_config_t slvcfg = {
+        .mode = 0,
+        .spics_io_num = SPI_SS,
+        .queue_size = 3,
+        .flags = 0,
+    };
     
     esp_err_t ret = spi_slave_initialize(SPI_HOST_ID, &buscfg, &slvcfg, DMA_CHAN);
     
@@ -233,8 +87,7 @@ void app_main(void)
         return;
     }
     
-    ESP_LOGI(TAG, "ESP32 SPI Slave ready");
-    ESP_LOGI(TAG, "Mode: 0 (CPOL=0, CPHA=0)");
+    ESP_LOGI(TAG, "ESP32 SPI Slave ready (Mode 0)");
     
     xTaskCreate(spi_slave_task, "spi_slave_task", 4096, NULL, 5, NULL);
 }
