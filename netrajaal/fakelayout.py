@@ -6,7 +6,8 @@ FakeNeighbours = [
         ]
 
 class Layout:
-    self.neighbours = FakeNeighbours
+    def __init__(self) -> None:
+        self.neighbours = FakeNeighbours
     def __init__(self):
         print(f"Starting fake network with the following neighbours")
         for n in self.neighbours:
