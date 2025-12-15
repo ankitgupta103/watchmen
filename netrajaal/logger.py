@@ -14,7 +14,7 @@ except ImportError:
         pass
 
 DEFAULT_LOG_LEVEL = "INFO"
-DEFAULT_SAVE_LOG = False # TODO, enable to save it to file
+DEFAULT_SAVE_LOG = True # TODO, enable to save it to file
 
 
 # Initialize RTC if available
@@ -54,7 +54,7 @@ def get_fs_root_for_storage():
     has_sdcard = True
     try:
         os.listdir("/sdcard")
-        print("INFO - SD card available")
+        print("info - SD card available")
     except OSError:
         print("ERROR - SD card not found!")
         has_sdcard = False
@@ -65,21 +65,37 @@ def get_fs_root_for_storage():
         return "/flash"
 
 
-def create_dir_if_not_exists(dir_path):
+def create_dir_if_not_exists(dir_path): # TODO this we may have to modify to delete the directory if failes multiple time
     try:
         parts = [p for p in dir_path.split("/") if p]
         if len(parts) < 2:
             print(f"WARNING - Invalid directory path (no parent): {dir_path}")
-            return
+            return False
         parent = "/" + "/".join(parts[:-1])
         dir_name = parts[-1]
         if dir_name not in os.listdir(parent):
             os.mkdir(dir_path)
-            print(f"INFO - Created {dir_path}")
+            print(f"info - Created {dir_path}")
         else:
-            print(f"INFO - {dir_path} directory already exists")
+            # Path exists, but need to check if it's a file or directory
+            try:
+                # Try to list it - if it works, it's a directory
+                os.listdir(dir_path)
+                print(f"info - {dir_path} directory already exists")
+            except OSError:
+                print(f"WARNING - {dir_path} is a file, not a directory, so deleting and recreating")
+                # If listing fails, it's likely a file (not a directory)
+                # Delete the file and create a directory instead
+                try:
+                    os.remove(dir_path)
+                    os.mkdir(dir_path)
+                    print(f"info - Removed file {dir_path} and created directory")
+                except OSError as e:
+                    print(f"WARNING - Failed to remove file {dir_path} and create directory: {e}")
+        return True
     except OSError as e:
         print(f"ERROR - Failed to create/access {dir_path} directory: {e}")
+        return False
 
 
 FS_ROOT = get_fs_root_for_storage()
@@ -109,7 +125,7 @@ class SimpleLogger:
     def __new__(cls, *args, **kwargs):
         """Singleton pattern - return the same instance every time"""
         if cls._instance is None:
-            print("INFO - Singleton Logger class Initiated, __new__")
+            print("info - Singleton Logger class Initiated, __new__")
             cls._instance = super(SimpleLogger, cls).__new__(cls)
         else:
             # print("DEBUG - Singleton Logger class already instantiated, __new__")
@@ -135,6 +151,17 @@ class SimpleLogger:
         self.show_terminal = show_terminal
         self.log_level = log_level or DEFAULT_LOG_LEVEL
         self.save_log = save_log or DEFAULT_SAVE_LOG
+        self.log_dir = log_dir
+        self.log_file_name = log_file_name
+        self.log_filepath = None
+        # crease log_filepath
+        if self.log_dir and self.log_file_name:
+            clean_log_dir = self.log_dir.strip()
+            if clean_log_dir.endswith("/"):
+                self.log_filepath = clean_log_dir + self.log_file_name
+            else:
+                self.log_filepath = clean_log_dir + "/" + self.log_file_name
+            
         # Handle both string and numeric log levels
         if isinstance(self.log_level, str):
             self.log_level_value = LOG_LEVELS.get(
@@ -146,60 +173,93 @@ class SimpleLogger:
 
         # File logging setup - open file once at initialization
         self.log_file = None
-        if self.save_log and log_dir and log_file_name:
-            self._open_log_file(log_dir, log_file_name)
+        if self.save_log:
+            self._open_log_file()
 
         SimpleLogger._initialized = True
 
-    def _open_log_file(self, log_dir, log_file_name):
+    def _is_file_handle_valid(self):
+        """Check if the current file handle is still valid"""
+        if self.log_file is None:
+            return False
+        try:
+            # Try to flush - if this fails, handle is invalid
+            self.log_file.flush()
+            return True
+        except (OSError, ValueError, AttributeError):
+            # Handle is invalid (EIO, closed, or corrupted)
+            return False
+        except Exception as e:
+            print(f"ERROR - _is_file_handle_valid failed, unknown error: {e}")
+            return False
+
+    def _reopen_log_file(self):
+        """Close invalid file handle and reopen the log file"""
+        # Close old handle if it exists (ignore errors)
+        if self.log_file is not None:
+            try:
+                self.log_file.close()
+            except:
+                pass
+            self.log_file = None
+        
+        # Reopen the file
+        return self._open_log_file()
+
+    def _open_log_file(self):
         """
         Open log file once for the entire SimpleLogger instance.
         Creates directory if it doesn't exist.
         Singleton ensures this is only called once.
         """
-        # Check if file is already open (shouldn't happen with singleton, but safety check)
+        if self.log_dir is None or self.log_file_name is None:
+            print("ERROR - cannot open log file, self.log_dir or self.log_file_name is None")
+            return False
+        
+        # Check if file is already open and valid (shouldn't happen with singleton, but safety check)
         if self.log_file is not None:
-            try:
-                # Check if file is still valid by trying to access it
-                self.log_file.flush()
-                print("INFO - Log file already open, reusing existing handle")
-                return
-            except (ValueError, OSError):
-                # File was closed or invalid, continue to reopen
+            if self._is_file_handle_valid():
+                print("info - Log file already open, reusing existing handle")
+                return True
+            else:
+                # File handle is invalid, need to reopen
+                print("WARNING - Log file handle is invalid, will reopen")
+                try:
+                    self.log_file.close()
+                except:
+                    pass
                 self.log_file = None
 
         try:
             # Check if directory exists by trying to list it
-            create_dir_if_not_exists(log_dir)
-
-            # MicroPython/OpenMV doesn't have os.path - use manual join
-            clean_log_dir = log_dir.strip()
-            if clean_log_dir.endswith("/"):
-                log_file_path = clean_log_dir + log_file_name
-            else:
-                log_file_path = clean_log_dir + "/" + log_file_name
+            succ = create_dir_if_not_exists(self.log_dir)
+            if not succ:
+                self.log_file = None
+                return False
 
             # Ensure file exists - create it if it doesn't exist
             try:
                 # Try to open in read mode to check if file exists
-                test_file = open(log_file_path, "r")
+                test_file = open(self.log_filepath, "r")
                 test_file.close()
             except OSError:
                 # File doesn't exist, create it by opening in write mode first
                 try:
-                    new_file = open(log_file_path, "w")
+                    new_file = open(self.log_filepath, "w")
                     new_file.close()
-                    print(f"INFO - Log file created: {log_file_path}")
+                    print(f"info - Log file created: {self.log_filepath}")
                 except Exception as e:
                     print(f"WARNING - Failed to create log file: {e}")
 
             # Open file in append mode and keep it open
-            self.log_file = open(log_file_path, "a")
+            self.log_file = open(self.log_filepath, "a")
             self.log_file.flush()
-            print(f"DEBUG - Log file opened: {log_file_path}")
+            print(f"DEBUG - Log file opened: {self.log_filepath}")
+            return True
         except Exception as e:
             print(f"WARNING - Failed to open log file: {e}")
             self.log_file = None
+            return False
 
     def _log(self, level, msg):
         # Get numeric value for the message level
@@ -230,6 +290,23 @@ class SimpleLogger:
                     except (AttributeError, OSError):
                         print("____log sync failed, AttributeError, OSError")
                         pass
+                except OSError as e:
+                    # EIO or other I/O errors - file handle likely invalid
+                    error_code = getattr(e, 'errno', None)
+                    if error_code == 5 or 'EIO' in str(e) or 'Input/output error' in str(e):
+                        print(f"ERROR - Log file I/O error (EIO), attempting recovery: {e}")
+                        # Attempt to reopen and retry once
+                        if self._reopen_log_file():
+                            try:
+                                self.log_file.write(log_message + "\n")
+                                self.log_file.flush()
+                                print("info - ===> Log file recovered, write succeeded after reopen <===")
+                            except Exception as retry_e:
+                                print(f"WARNING - Failed to write to log file after recovery: {retry_e}")
+                        else:
+                            print("WARNING - Failed to reopen log file, skipping file logging")
+                    else:
+                        print(f"WARNING - Failed to write to log file: {e}")
                 except Exception as e:
                     print(f"WARNING - Failed to write to log file: {e}")
 
@@ -268,7 +345,7 @@ class SimpleLogger:
                 # Close the file
                 self.log_file.close()
                 self.log_file = None
-                print("INFO - Log file closed")
+                print("info - Log file closed")
             except Exception as e:
                 print(f"WARNING - Failed to close log file: {e}")
                 # Try to set to None even if close failed

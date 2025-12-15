@@ -79,7 +79,7 @@ GC_COLLECT_INTERVAL_SEC = 60    # Run garbage collection every minute
 
 MIDLEN = 7
 FLAKINESS = 0
-FRAME_SIZE = 195
+PACKET_PAYLOAD_LIMIT = 195 # bytes
 
 AIR_SPEED = 19200
 
@@ -523,13 +523,6 @@ def cleanup_chunk_map():
             chunk_map.pop(key)
         logger.info(f"[MEM] Cleaned {entries_to_remove} old chunk_map entries")
 
-def cleanup_cc_images_list():
-    """Clean up the images_saved_at_cc list if too large"""
-    global images_saved_at_cc
-    if len(images_saved_at_cc) > MAX_IMAGES_SAVED_AT_CC:
-        # Keep only the most recent entries
-        images_saved_at_cc = images_saved_at_cc[-MAX_IMAGES_SAVED_AT_CC:]
-        logger.info(f"[MEM] Trimmed images_saved_at_cc to {MAX_IMAGES_SAVED_AT_CC} entries")
 
 async def periodic_memory_cleanup():
     """Periodically clean up memory buffers and run garbage collection"""
@@ -545,11 +538,7 @@ async def periodic_memory_cleanup():
 
             # Clean up chunk map
             cleanup_chunk_map()
-
-            # Clean up CC images list
-            if running_as_cc():
-                cleanup_cc_images_list()
-
+            
             # Run garbage collection
             gc.collect()
 
@@ -662,20 +651,85 @@ def encrypt_if_needed(msg_typ, msg):
 
 # === Send Function ===
 
-async def send_msg_internal(msg_typ, creator, msgbytes, dest):
+async def send_msg_internal(msg_typ, creator, msgbytes, dest): # all messages except image
+    if not is_lora_ready():
+        return False
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
-    if len(msgbytes) < FRAME_SIZE:
+    if len(msgbytes) < PACKET_PAYLOAD_LIMIT:
         logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet")
         succ, _ = await send_single_packet(msg_typ, creator, msgbytes, dest)
         return succ
     else:
+        logger.warning(f"msgbtyes size exceeds the packet payload limit, {len(msgbytes)} bytes > {PACKET_PAYLOAD_LIMIT} bytes")
+        return False
+    # else:
+    #     img_id = get_rand()
+    #     if get_transmode_lock(dest, img_id):
+    #         asyncio.create_task(keep_transmode_lock(dest, img_id))
+    #         # sending start
+    #         chunks = make_chunks(msgbytes)
+    #         logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
+    #         big_succ, _ = await send_single_packet("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
+    #         if not big_succ:
+    #             logger.info(f"[CHUNK] Failed sending chunk begin")
+    #             delete_transmode_lock(dest, img_id)
+    #             return False
+            
+    #         for i in range(len(chunks)):
+    #             if i % 10 == 0:
+    #                 logger.info(f"[CHUNK] Sending chunk {i}")
+    #             await asyncio.sleep(CHUNK_SLEEP)
+    #             chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
+    #             _ = await send_single_packet("I", creator, chunkbytes, dest)
+    #         for retry_i in range(20):
+    #             if retry_i == 0:
+    #                 await asyncio.sleep(0.1)  # Faster first check
+    #             else:
+    #                 await asyncio.sleep(CHUNK_SLEEP)
+    #             succ, missing_chunks = await send_single_packet("E", creator, img_id, dest)
+    #             if not succ:
+    #                 logger.error(f"[CHUNK] Failed sending chunk end")
+    #                 break
+
+    #             # Treat various ACK forms as success:
+    #             # - [-1]   : explicit "all done" from receiver
+    #             # - []/None: truncated or minimal ACK with no missing list (we assume success)
+    #             if (
+    #                 missing_chunks is None
+    #                 or len(missing_chunks) == 0
+    #                 or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
+    #             ):
+    #                 logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
+    #                 delete_transmode_lock(dest, img_id)
+    #                 return True
+
+    #             logger.info(
+    #                 f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
+    #             )
+    #             if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
+    #                 logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
+    #                 return False
+    #             for mis_chunk in missing_chunks:
+    #                 await asyncio.sleep(CHUNK_SLEEP)
+    #                 chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
+    #                 _ = await send_single_packet("I", creator, chunkbytes, dest)
+    #         delete_transmode_lock(dest, img_id)
+    #         return False
+    #     else: 
+    #         logger.warning(f"TRANS MODE already in use, could not get lock...")
+    #         return False
+        
+async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image sending
+    if not is_lora_ready():
+        return False
+    if msg_typ == "P":
         img_id = get_rand()
         if get_transmode_lock(dest, img_id):
             asyncio.create_task(keep_transmode_lock(dest, img_id))
             # sending start
             chunks = make_chunks(msgbytes)
             logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
-            big_succ, _ = await send_single_packet("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
+            big_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{len(chunks)}", dest)
             if not big_succ:
                 logger.info(f"[CHUNK] Failed sending chunk begin")
                 delete_transmode_lock(dest, img_id)
@@ -692,7 +746,7 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
                     await asyncio.sleep(0.1)  # Faster first check
                 else:
                     await asyncio.sleep(CHUNK_SLEEP)
-                succ, missing_chunks = await send_single_packet("E", creator, img_id, dest)
+                succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest)
                 if not succ:
                     logger.error(f"[CHUNK] Failed sending chunk end")
                     break
@@ -724,12 +778,12 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest):
         else: 
             logger.warning(f"TRANS MODE already in use, could not get lock...")
             return False
-        
+    else:
+        logger.warning(f"Invalid message type: {msg_typ}")
+        return False
+
 
 async def send_msg(msg_typ, creator, msgbytes, dest):
-    # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
-    if not is_lora_ready():
-        return False
     return await send_msg_internal(msg_typ, creator, msgbytes, dest)
 
 def ack_time(msg_uid):
@@ -777,11 +831,11 @@ def begin_chunk(msg):
     if len(parts) != 3:
         logger.error(f"[CHUNK] begin message unparsable {msg}")
         return
-    msg_typ = parts[0]
-    img_id = parts[1]
+    img_id = parts[0]
+    epoch_ms = int(parts[1])
     numchunks = int(parts[2])
-    chunk_map[img_id] = (msg_typ, numchunks, [])
-    return (msg_typ, img_id, numchunks)
+    chunk_map[img_id] = ("B", numchunks, [])
+    return (img_id, epoch_ms, numchunks)
     
 
 def get_missing_chunks(img_id):
@@ -851,23 +905,29 @@ def clear_chunkid(img_id):
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
 def end_chunk(msg_uid, msg):
-    # Input: msg_uid: bytes message id, msg: str chunk identifier; Output: tuple(status:bool, missing:str|None, img_id:str|None, data:bytes|None, creator:int|None)
-    img_id = msg
+    # is_all_chunk_arrived, missing_chunk_str, img_id, recompiled_msgbytes, epoch_ms
+    parts = msg.split(":")
+    if len(parts) != 2:
+        logger.error(f"[CHUNK] end message unparsable {msg}")
+        return
+    img_id = parts[0]
+    epoch_ms = int(parts[1])
+    
     creator = int(msg_uid[1])
     missing = get_missing_chunks(img_id)
     if len(missing) > 0:
         logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
         missing_str = str(missing[0])
         for i in range(1, len(missing)):
-            if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < FRAME_SIZE:
+            if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < PACKET_PAYLOAD_LIMIT:
                 missing_str += "," + str(missing[i])
-        return (False, missing_str, img_id, None, None)
+        return (False, missing_str, img_id, None, None, epoch_ms)
     else:
         if img_id not in chunk_map:
             logger.warning(f"[CHUNK] Ignoring end chunk, we dont have an entry for this img_id.., it might got processed already.")
-            return (True, None, img_id, None, None)
-        recompiled = recompile_msg(img_id)
-        return (True, None, img_id, recompiled, creator)
+            return (True, None, img_id, None, epoch_ms)
+        recompiled_msgbytes = recompile_msg(img_id)
+        return (True, None, img_id, recompiled_msgbytes, epoch_ms)
 
 # ---------------------------------------------------------------------------
 # Command Center Integration
@@ -1078,7 +1138,6 @@ async def hb_process(msg_uid, msgbytes, sender):
             hb_map[creator] = 0
         hb_map[creator] += 1
         logger.info(f"[HB] HB Counts = {hb_map}")
-        logger.info(f"[HB] Images saved at cc so far = {len(images_saved_at_cc)}")
 
         # Send raw heartbeat data (encrypted or not) to cloud
         # Convert bytes to base64 for JSON transmission, same as image data
@@ -1114,51 +1173,36 @@ async def hb_process(msg_uid, msgbytes, sender):
 
 images_saved_at_cc = []
 
-async def img_process(img_id, msg, creator, sender):
-    # Input: img_id: str, msg: bytes (possibly encrypted image), creator: int, sender: int; Output: None (stores or forwards image)
-    clear_chunkid(img_id)
-    if running_as_cc():
-        logger.info(f"[IMG] Received image of size {len(msg)}")
-        # ----- TODO REMOVE THIS IS FOR DEBUGGING ONLY -------
-        img_bytes = None
-        img = None
-        try:
-            if ENCRYPTION_ENABLED:
-                img_bytes = enc.decrypt_hybrid(msg, encnode.get_prv_key(creator))
-            else:
-                img_bytes = msg
-            img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
-            fname = f"{NET_IMAGE_DIR}/cc_{creator}_{img_id}.jpg"
-            logger.info(f"[IMG] Saving to file {fname}, img_size: {len(img_bytes)} bytes")
-            img.save(fname)
-            
-            images_saved_at_cc.append(fname)
-            if len(images_saved_at_cc) > MAX_IMAGES_SAVED_AT_CC: # Limit list size
-                images_saved_at_cc.pop(0)
-            # ------------------------------------------------------
-            asyncio.create_task(upload_image(creator, msg)) # TODO will be replaced by upload_payload_to_server later
-        finally:
-            # Explicitly clean up image objects
-            if img_bytes is not None:
-                del img_bytes
-            if img is not None:
-                del img
-            # Help GC reclaim memory
-            gc.collect()
-    else:
-        next_dst = next_device_in_spath()
-        if next_dst:
-            if is_device_busy(next_dst):
-                logger.warning(f"[IMG] Device {next_dst} is busy, skipping send")
-                return
-            logger.info(f"[IMG] Propogating Image to {next_dst}")
-            sent_succ = await send_msg("P", creator, msg, next_dst)
-            if not sent_succ:
-                logger.error(f"[IMG] forwarding image to {next_dst} failed")
-        else:
-            logger.error(f"[IMG] can't forward image because I dont have next device in spath yet")
+# async def img_process(img_id, msg, creator, sender): # Not in use only image_sending_loop is in use
+#     # Input: img_id: str, msg: bytes (possibly encrypted image), creator: int, sender: int; Output: None (stores or forwards image)
+#     clear_chunkid(img_id)
+#     if running_as_cc():
+#         logger.info(f"[IMG] Received image of size {len(msg)}")
+#         try:
+#             upload_success = await asyncio.create_task(upload_image(creator, msg)) # TODO will be replaced by upload_payload_to_server later
+#             if not upload_success:
+#                 logger.warning(f"[IMG] failed to upload image to cloud, adding it to queue") # TODO, 12-dec, requeue
+#             else:
+#                 logger.info(f"[IMG] image uploaded to cloud successfully")
+#         except Exception as e:
+#             pass # TODO, 12-dec, requeue
+#         finally:
+#             # Help GC reclaim memory
+#             gc.collect()
+#     else:
+#         next_dst = next_device_in_spath()
+#         if next_dst:
+#             if is_device_busy(next_dst):
+#                 logger.warning(f"[IMG] Device {next_dst} is busy, skipping send")
+#                 return
+#             logger.info(f"[IMG] Propogating Image to {next_dst}")
+#             sent_succ = await send_msg("P", creator, msg, next_dst)
+#             if not sent_succ:
+#                 logger.error(f"[IMG] forwarding image to {next_dst} failed")
+#         else:
+#             logger.error(f"[IMG] can't forward image because I dont have next device in spath yet")
 
-async def event_text_process(msgbytes, creator):
+async def event_text_process(creator, msgbytes):
     if running_as_cc():
         if isinstance(msgbytes, bytes):
             event_data = ubinascii.b2a_base64(msgbytes)
@@ -1187,8 +1231,8 @@ async def event_text_process(msgbytes, creator):
 # Sensor Capture and Image Transmission
 # ---------------------------------------------------------------------------
 
-imgpaths_to_send = []
-events_to_send = []
+imgpaths_to_send = [] # {creator, epoch_ms, enc_filepath}
+events_to_send = [] # {creator, epoch_ms}
 detector = detect.Detector()
 
 # ============================================================================
@@ -1249,27 +1293,41 @@ async def person_detection_loop():
             # Track center's own captured images separately
             if running_as_cc():
                 center_captured_image_count += 1
-            raw_path = f"{MY_IMAGE_DIR}/raw_{get_rand()}.jpg"
-            logger.info(f"[PIR] Saving image to {raw_path} : imbytesize = {len(img.bytearray())}...")
-            img.save(raw_path)
+            imgbytes = img.bytearray()
+            logger.info(f"[PIR] Captured image, size: {len(imgbytes)} bytes")
+            
+            # Encrypt image immediately
+            try:
+                enc_msgbytes = encrypt_if_needed("P", imgbytes)
+                enc_filepath = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}.enc"
+                logger.info(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(enc_msgbytes)} bytes...")
+                # Save encrypted bytes to binary file
+                with open(enc_filepath, "wb") as f:
+                    f.write(enc_msgbytes)
+                logger.info(f"[PIR] Saved encrypted image: {enc_filepath}")
+            except Exception as e:
+                logger.error(f"[PIR] Failed to save encrypted image: {e}")
+                continue
             led.off()
+            imgpaths_to_send.append({"creator": my_addr, "epoch_ms": event_epoch_ms, "enc_filepath": enc_filepath})
 
             # Limit queue size to prevent memory overflow
             if len(imgpaths_to_send) >= MAX_IMAGES_TO_SEND:
                 # Remove oldest entry
                 oldest = imgpaths_to_send.pop(0)
-                logger.info(f"[PIR] Queue full, removing oldest image: {oldest}")
+                logger.info(f"[PIR] Queue full, removing oldest image: {oldest['enc_filepath']}")
                 
-            # Save empty JSON file for the event
+            # Save JSON file for the event
             event_filepath = f"{MY_EVENT_DIR}/{event_epoch_ms}.json"
             try:
+                event_data = {"epoch_ms": event_epoch_ms}
                 with open(event_filepath, "w") as f:
-                    f.write("{}")
+                    f.write(json.dumps(event_data))
                 logger.info(f"[PIR] Saved event file: {event_filepath}")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save event file {event_filepath}: {e}")
-            events_to_send.append(event_epoch_ms)
-            imgpaths_to_send.append(raw_path)
+            events_to_send.append({"creator": my_addr, "epoch_ms": event_epoch_ms})
+            
             # logger.info(f"Saved image: {raw_path}")
             # logger.info(f"Person detected Image count: {person_image_count}")
             # if running_as_cc():
@@ -1283,17 +1341,16 @@ async def person_detection_loop():
                 gc.collect()  # Help GC reclaim memory immediately
 
 
-async def send_img_to_nxt_dst(imgbytes):
-    # Input: imgbytes: bytes raw image; 
+async def send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes):
+    # Input: enc_msgbytes: bytes already encrypted image; 
     # Output: bool indicating if image was forwarded successfully to next_node of spath
-    logger.info(f"[IMG] Sending {len(imgbytes)} bytes to the network")
-    msgbytes = encrypt_if_needed("P", imgbytes)
+    logger.info(f"[IMG] Sending {len(enc_msgbytes)} bytes (already encrypted) to the network")
     next_dst = next_device_in_spath()
     if next_dst:
         if is_device_busy(next_dst):
             logger.warning(f"[IMG] Device {next_dst} is busy, skipping send")
             return False
-        sent_succ = await send_msg("P", my_addr, msgbytes, next_dst)
+        sent_succ = await send_msg_big("P", creator, enc_msgbytes, next_dst, epoch_ms)
         if not sent_succ:
             logger.error(f"[IMG] forwarding image to {next_dst} failed")
             return False
@@ -1328,29 +1385,33 @@ async def image_sending_loop():
         while len(imgpaths_to_send) > 0:
             queue_size = len(imgpaths_to_send)
             # logger.info(f"[IMG] Images to send = {queue_size}")
-            img_filepath = imgpaths_to_send.pop(0)
-            logger.info(f"[IMG] Processing: {img_filepath}")
-            img = None
-            imgbytes = None
-            encimgbytes = None
+            img_entry = imgpaths_to_send.pop(0)
+            enc_filepath = img_entry["enc_filepath"]
+            creator = img_entry["creator"]
+            epoch_ms = img_entry["epoch_ms"]
+            
+            logger.info(f"[IMG] Processing: {enc_filepath}")
+            enc_msgbytes = None
             try:
-                img = image.Image(img_filepath)
-                imgbytes = img.bytearray()
+                # Read encrypted bytes directly from file
+                with open(enc_filepath, "rb") as f:
+                    enc_msgbytes = f.read()
+                logger.info(f"[IMG] Read encrypted image from file: {len(enc_msgbytes)} bytes")
                 transmission_start = time_msec()
                 if running_as_cc():
-                    # Encrypt image before uploading (same format as images from other units)
-                    encimgbytes = encrypt_if_needed("P", imgbytes)
-                    logger.info(f"[IMG] Uploading encrypted image (size: {len(encimgbytes)} bytes)")
-                    sent_succ = await upload_image(my_addr, encimgbytes)
+                    # Upload encrypted image directly (already encrypted)
+                    logger.info(f"[IMG] Uploading encrypted image (size: {len(enc_msgbytes)} bytes)")
+                    sent_succ = await upload_image(my_addr, enc_msgbytes)
                     if not sent_succ:
-                        imgpaths_to_send.append(img_filepath) # pushed to back of queue
-                        logger.info(f"[IMG] upload_image failed, image re-queued: {img_filepath}")
+                        imgpaths_to_send.append(img_entry) # pushed to back of queue
+                        logger.info(f"[IMG] upload_image failed, image re-queued: {enc_filepath}")
                         break
                 else:
-                    sent_succ = await send_img_to_nxt_dst(imgbytes)
+                    logger.info(f"[IMG] : sending encrypted image to {next_dst} {enc_filepath}")
+                    sent_succ = await send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes)
                     if not sent_succ:
-                        imgpaths_to_send.append(img_filepath) # pushed to back of queue
-                        logger.error(f"[IMG] sending failed, image re-queued: {img_filepath}")
+                        imgpaths_to_send.append(img_entry) # pushed to back of queue
+                        logger.error(f"[IMG] sending image failed, re-queued: {enc_filepath}")
                         break
 
                 transmission_end = time_msec()
@@ -1366,41 +1427,27 @@ async def image_sending_loop():
                     logger.info(f"[IMG] Queue empty, all images uploaded")
 
             except Exception as e:
-                logger.error(f"[IMG] unexpected error processing image {img_filepath}: {e}, re-queued")
+                logger.error(f"[IMG] unexpected error processing image {enc_filepath}: {e}, re-queued")
                 # import sys
                 # sys.print_exception(e)
                 
                 # Re-queue image on error
-                imgpaths_to_send.append(img_filepath) # TODO check this logic later
+                imgpaths_to_send.append(img_entry) # TODO check this logic later
                 break
             finally:
-                # Explicitly clean up image objects
+                # Explicitly clean up encrypted bytes
                 # Variables are initialized before try block, so they should always exist
                 # Use try-except for safety in case of unusual scoping issues
                 try:
-                    if img is not None:
-                        del img
-                except NameError:
-                    pass  # Variable not defined (shouldn't happen, but safe)
-                except:
-                    pass
-                try:
                     if imgbytes is not None:
+                        if enc_msgbytes is not None and enc_msgbytes is not imgbytes:
+                            del enc_msgbytes
                         del imgbytes
+                    else:
+                        if enc_msgbytes is not None: # imgbytes is None
+                            del enc_msgbytes
                 except NameError:
-                    pass
-                except:
-                    pass
-                try:
-                    # Only delete encimgbytes if it was assigned and is different from imgbytes
-                    # encimgbytes is only assigned when running_as_cc(), so check carefully
-                    if encimgbytes is not None:
-                        # Only delete if imgbytes is None or they're different objects
-                        # This avoids deleting the same object twice
-                        if imgbytes is None or encimgbytes is not imgbytes:
-                            del encimgbytes
-                except NameError:
-                    pass  # Variable not defined (e.g., if exception occurred before assignment)
+                    pass 
                 except:
                     pass
                 # Help GC reclaim memory
@@ -1431,14 +1478,15 @@ async def event_text_sending_loop():
 
         no_of_events = len(events_to_send)
         for i in range(no_of_events):
-            event_time = events_to_send.pop(0)
-            logger.info(f"[TXT] Processing event: {event_time} ms")
+            event_entry = events_to_send.pop(0)
+            epoch_ms = event_entry["epoch_ms"]
+            logger.info(f"[TXT] Processing event: {epoch_ms} ms")
             try:
                 transmission_start = time_msec()
-                sent_succ = await send_event_text(event_time)
+                sent_succ = await send_event_text(epoch_ms)
                 if not sent_succ:
-                    events_to_send.append(event_time) # pushed to back of queue
-                    logger.info(f"[TXT] sending failed, event re-queued: {event_time}")
+                    events_to_send.append(event_entry) # pushed to back of queue
+                    logger.info(f"[TXT] sending failed, event re-queued: {epoch_ms}")
                     break
 
                 transmission_end = time_msec()
@@ -1451,11 +1499,11 @@ async def event_text_sending_loop():
                     logger.info(f"[TXT] Queue empty, all events uploaded")
 
             except Exception as e:
-                logger.error(f"[TXT] unexpected error processing event {event_time}: {e}")
+                logger.error(f"[TXT] unexpected error processing event {epoch_ms}: {e}")
                 import sys
                 sys.print_exception(e)
                 # Re-queue event on error
-                events_to_send.append(event_time)
+                events_to_send.append(event_entry)
                 break
             finally:
                 pass
@@ -1542,7 +1590,7 @@ def process_message(data, rssi=None):
     elif msg_typ == "S":
         asyncio.create_task(sync_and_transfer_spath(msg_uid, msg.decode()))
     elif msg_typ == "T":
-        asyncio.create_task(event_text_process(msg, creator))
+        asyncio.create_task(event_text_process(creator, msg))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "H":
         # Validate HB message payload length for encrypted messages
@@ -1558,9 +1606,9 @@ def process_message(data, rssi=None):
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "W": # wait message
         asyncio.create_task(device_busy_life(sender))
-    elif msg_typ == "B": # TODO need img_id here
+    elif msg_typ == "B": # TODO need to ignore buplicate images, and send some response in A itself
         try:
-            msg_typ, img_id, _ = begin_chunk(msg.decode())
+            img_id, epoch_ms, numchunks = begin_chunk(msg.decode())
             if get_transmode_lock(sender, img_id):
                 asyncio.create_task(keep_transmode_lock(sender, img_id))
                 asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
@@ -1573,15 +1621,24 @@ def process_message(data, rssi=None):
             return False
     elif msg_typ == "I":
         add_chunk(msg)  # optional to check check_transmode_lock
-    elif msg_typ == "E": # TODO need img_id here
-        alldone, missing_str, img_id, recompiled, creator = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
+    elif msg_typ == "E": # 
+        alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
         if alldone:
             delete_transmode_lock(sender, img_id)
-            # Also when it fails
+            # also when it fails
             ackmessage += b":-1"
-            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-            if recompiled:
-                asyncio.create_task(img_process(img_id, recompiled, creator, sender))
+            asyncio.create_task(send_msg("A", creator, ackmessage, sender))
+            if recompiled_msgbytes:
+                try:
+                    enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
+                    logger.info(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
+                    with open(enc_filepath, "wb") as f:
+                        f.write(recompiled_msgbytes)
+                    imgpaths_to_send.append({"creator": my_addr, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
+                    logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
+                except Exception as e:
+                    logger.error(f"[CHUNK] error saving image to {enc_filepath}: {e}")
+                # asyncio.create_task(img_process(img_id, recompiled_msgbytes, creator, sender))
             else:
                 logger.warning(f"[CHUNK] img not recompiled, so not sending")
         else:
@@ -2000,15 +2057,15 @@ async def init_wifi():
                     wifi_nic.active(False)
                     return False
                 logger.info(f"[WIFI] Connecting... (status: {status}, wait: {wait_count}s)")
-            except:
+            except Exception as e:
                 # Status checking not available, just log wait time
-                logger.info(f"[WIFI] Connecting... (wait: {wait_count}s)")
+                logger.warning(f"[WIFI] error in Connecting... (wait: {wait_count}s) : {e}")
 
             await asyncio.sleep(1)
             wait_count += 1
 
         # Timeout
-        logger.info(f"[WIFI] Connection timeout after {max_wait} seconds")
+        logger.error(f"[WIFI] Wifi connection timeout after {max_wait} seconds")
         wifi_nic.active(False)
         return False
 

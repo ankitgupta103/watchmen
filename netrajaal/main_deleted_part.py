@@ -201,3 +201,56 @@ async def person_detection_loop():
 
 # elif msg_typ == "C":
 #     asyncio.create_task(command_process(msg_uid, msg))
+
+
+
+
+
+# ===== DELETE 12 dec =====
+# removed image saving part at CC
+# async def img_process(img_id, msg, creator, sender):
+#     # Input: img_id: str, msg: bytes (possibly encrypted image), creator: int, sender: int; Output: None (stores or forwards image)
+#     clear_chunkid(img_id)
+#     if running_as_cc():
+#         logger.info(f"[IMG] Received image of size {len(msg)}")
+#         # ----- TODO REMOVE THIS IS FOR DEBUGGING ONLY -------
+#         img_bytes = None
+#         img = None
+#         try:
+#             # if ENCRYPTION_ENABLED:
+#             #     img_bytes = enc.decrypt_hybrid(msg, encnode.get_prv_key(creator))
+#             # else:
+#             #     img_bytes = msg
+#             # img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
+#             # fname = f"{NET_IMAGE_DIR}/cc_{creator}_{img_id}.jpg"
+#             # logger.info(f"[IMG] Saving to file {fname}, img_size: {len(img_bytes)} bytes")
+#             # img.save(fname)
+            
+#             # images_saved_at_cc.append(fname)
+#             # if len(images_saved_at_cc) > MAX_IMAGES_SAVED_AT_CC: # Limit list size
+#             #     images_saved_at_cc.pop(0)
+#             # ------------------------------------------------------
+#             asyncio.create_task(upload_image(creator, msg)) # TODO will be replaced by upload_payload_to_server later
+#         finally:
+#             # Explicitly clean up image objects
+#             if img_bytes is not None:
+#                 del img_bytes
+#             if img is not None:
+#                 del img
+#             # Help GC reclaim memory
+#             gc.collect()
+
+
+# def cleanup_cc_images_list():
+#     """Clean up the images_saved_at_cc list if too large"""
+#     global images_saved_at_cc
+#     if len(images_saved_at_cc) > MAX_IMAGES_SAVED_AT_CC:
+#         # Keep only the most recent entries
+#         images_saved_at_cc = images_saved_at_cc[-MAX_IMAGES_SAVED_AT_CC:]
+#         logger.info(f"[MEM] Trimmed images_saved_at_cc to {MAX_IMAGES_SAVED_AT_CC} entries")
+        
+        
+
+# # Clean up CC images list
+# if running_as_cc():
+#     cleanup_cc_images_list()
