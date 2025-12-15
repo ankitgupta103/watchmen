@@ -31,7 +31,7 @@ import detect
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # TESTING VARIABLES
-DYNAMIC_SPATH = True
+DYNAMIC_SPATH = False
 ENCRYPTION_ENABLED = True
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
@@ -1585,9 +1585,10 @@ def process_message(data, rssi=None):
 
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
 
-    if not flayout.is_neighbour(sender, my_addr):
-        logger.warning(f"[LORA/FAKE LAYOUT] receiving something which is beyond my range so dropping this packet {sender}")
-        return True
+    if DYNAMIC_SPATH:
+        if not flayout.is_neighbour(sender, my_addr):
+            logger.warning(f"[LORA/FAKE LAYOUT] receiving something which is beyond my range so dropping this packet {sender}")
+            return True
 
     recv_log = ""
     if receiver == -1:
