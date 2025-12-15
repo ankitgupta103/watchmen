@@ -1293,11 +1293,24 @@ async def person_detection_loop():
             # Track center's own captured images separately
             if running_as_cc():
                 center_captured_image_count += 1
-            imgbytes = img.bytearray()
-            logger.info(f"[PIR] Captured image, size: {len(imgbytes)} bytes")
+            # imgbytes = img.bytearray() # this was bigger # TODO
+            # logger.info(f"[OLD] Captured image, size: {len(imgbytes)} bytes")
+            
+            try:
+                raw_path = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}_raw.jpg"
+                logger.info(f"Saving raw image to {raw_path} : imbytesize = {len(img.bytearray())}")
+                img.save(raw_path)
+                logger.info(f"Saved raw image: {raw_path}")
+            except Exception as e:
+                logger.warning(f"[PIR] Failed to save raw image: {e}")
+                continue
             
             # Encrypt image immediately
             try:
+                img = image.Image(raw_path)
+                imgbytes = img.bytearray() # updated 
+                logger.info(f"[PIR] Captured image, size: {len(imgbytes)} bytes")
+
                 enc_msgbytes = encrypt_if_needed("P", imgbytes)
                 enc_filepath = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}.enc"
                 logger.info(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(enc_msgbytes)} bytes...")
@@ -1394,9 +1407,16 @@ async def image_sending_loop():
             enc_msgbytes = None
             try:
                 # Read encrypted bytes directly from file
-                with open(enc_filepath, "rb") as f:
-                    enc_msgbytes = f.read()
-                logger.info(f"[IMG] Read encrypted image from file: {len(enc_msgbytes)} bytes")
+                try:
+                    logger.info(f"[IMG] Reading encrypted image from file: {enc_filepath}")
+                    with open(enc_filepath, "rb") as f:
+                        enc_msgbytes = f.read()
+                    logger.info(f"[IMG] Read encrypted image from file: {len(enc_msgbytes)} bytes")
+                except Exception as e:
+                    logger.error(f"[IMG] Failed to read encrypted image from file, image re-queued {enc_filepath}, e: {e}")
+                    imgpaths_to_send.append(img_entry) # pushed to back of queue
+                    break
+                
                 transmission_start = time_msec()
                 if running_as_cc():
                     # Upload encrypted image directly (already encrypted)
