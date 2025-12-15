@@ -25,19 +25,19 @@ while True:
     rx = bytearray(FRAME_SIZE)
 
     cs.low()
-    time.sleep_us(5)
+    time.sleep_us(1000)
     spi.write_readinto(tx, rx)
     time.sleep_us(5)
     cs.high()
 
     print("---- RX FRAME (250 bytes) ----")
 
-    # 1️⃣ Print ASCII view
+    # print ASCII view
     ascii_view = bytes_to_printable(rx)
     print("ASCII:")
     print(ascii_view)
 
-    # # 2️⃣ Print HEX view (formatted)
+    # # Print HEX view (formatted)
     # print("\nHEX:")
     # for i in range(0, FRAME_SIZE, 16):
     #     chunk = rx[i:i+16]
@@ -45,4 +45,4 @@ while True:
     #     print("{:03d}: {}".format(i, hex_line))
 
     print("------------------------------\n")
-    time.sleep_ms(2000)
+    time.sleep_ms(299)
