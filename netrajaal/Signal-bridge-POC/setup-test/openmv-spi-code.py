@@ -10,16 +10,23 @@ cs = Pin("P3", Pin.OUT, value=1)
 
 # SPI Configuration - Explicitly specify pins: MOSI=P0, MISO=P1, SCK=P2
 BUFFER_SIZE = 32
+# spi = SPI(
+#     1,
+#     baudrate=1000000,
+#     polarity=0,
+#     phase=0,
+#     bits=8,
+#     firstbit=SPI.MSB,
+#     sck=Pin("P2"),
+#     mosi=Pin("P0"),
+#     miso=Pin("P1"),
+# )
+
 spi = SPI(
     1,
     baudrate=1000000,
     polarity=0,
-    phase=0,
-    bits=8,
-    firstbit=SPI.MSB,
-    sck=Pin("P2"),
-    mosi=Pin("P0"),
-    miso=Pin("P1"),
+    phase=0
 )
 
 print("OpenMV SPI Master initialized")
