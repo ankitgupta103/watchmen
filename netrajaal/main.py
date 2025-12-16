@@ -317,7 +317,8 @@ sensor.skip_frames(time=2000)
 sent_count = 0
 recv_msg_count = {}
 
-URL = "https://n8n.vyomos.org/webhook/watchmen-detect/"
+URL_OLD = "https://n8n.vyomos.org/webhook/watchmen-detect/"
+URL = "https://hqapi.vyomos.org/watchmen-detect/"
 
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
