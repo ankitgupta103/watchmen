@@ -89,6 +89,10 @@ static void blink_led_fast(void)
 // ============================================================================
 static void configure_light_sleep(void)
 {
+    // Disable previous wakeup sources
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_GPIO);
+    
+    // Enable GPIO wakeup
     esp_sleep_enable_gpio_wakeup();
     gpio_wakeup_enable(SENSOR_GPIO, GPIO_INTR_HIGH_LEVEL);
 }
@@ -103,6 +107,28 @@ static void wait_for_signal_low(void)
         vTaskDelay(pdMS_TO_TICKS(SIGNAL_CHECK_MS));
     }
     ESP_LOGI(TAG, "Sensor is LOW - Ready to sleep");
+}
+
+// ============================================================================
+// Function: Check if wakeup was due to GPIO HIGH
+// ============================================================================
+static bool is_gpio_wakeup_high(void)
+{
+    // Small delay for GPIO to stabilize after wakeup
+    vTaskDelay(pdMS_TO_TICKS(50));
+    
+    // Check wakeup cause
+    esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
+    
+    if (wakeup_cause == ESP_SLEEP_WAKEUP_GPIO) {
+        // Verify GPIO is actually HIGH
+        int gpio_level = gpio_get_level(SENSOR_GPIO);
+        ESP_LOGI(TAG, "Wakeup cause: GPIO, GPIO level: %d", gpio_level);
+        return (gpio_level == 1);
+    } else {
+        ESP_LOGW(TAG, "Wakeup cause: %d (not GPIO)", wakeup_cause);
+        return false;
+    }
 }
 
 // ============================================================================
@@ -123,35 +149,49 @@ void app_main(void)
     
     // Main loop: Sleep -> Wake -> Blink -> ON -> Blink -> OFF -> Sleep
     while (1) {
+        // ========================================================================
+        // SLEEP MODE: LED OFF
+        // ========================================================================
         // Turn LED OFF before entering light sleep
         led_off();
         
         // Configure and enter light sleep
         configure_light_sleep();
-        ESP_LOGI(TAG, "Entering light sleep mode...");
+        ESP_LOGI(TAG, "Entering light sleep mode... GPIO12 level: %d", gpio_get_level(SENSOR_GPIO));
         esp_light_sleep_start();
         
-        // Woke up from light sleep - GPIO12 went HIGH
-        ESP_LOGI(TAG, "Woke up from light sleep - Sensor HIGH detected");
-        
-        // Blink LED 3 times fast (wake indication)
-        blink_led_fast();
-        
-        // Turn LED ON and keep it ON during active mode
-        led_on();
-        
-        // Stay awake for configured time
-        ESP_LOGI(TAG, "Staying awake for %d seconds", WAKE_TIME_SEC);
-        vTaskDelay(pdMS_TO_TICKS(WAKE_TIME_SEC * 1000));
-        
-        // Blink LED 3 times fast (sleep indication)
-        ESP_LOGI(TAG, "Preparing to sleep...");
-        blink_led_fast();
-        
-        // Turn LED OFF before sleeping
-        led_off();
-        
-        // Wait for signal to go LOW before sleeping again
-        wait_for_signal_low();
+        // Check if wakeup was due to GPIO HIGH
+        if (is_gpio_wakeup_high()) {
+            ESP_LOGI(TAG, "Valid GPIO HIGH wakeup detected - Processing...");
+            
+            // Blink LED 3 times fast (wake indication)
+            blink_led_fast();
+            
+            // ========================================================================
+            // ACTIVE MODE: LED ON
+            // ========================================================================
+            // Turn LED ON and keep it ON during active mode (normal operation)
+            led_on();
+            
+            // Stay awake for configured time with LED ON
+            ESP_LOGI(TAG, "Staying awake for %d seconds (LED ON)", WAKE_TIME_SEC);
+            vTaskDelay(pdMS_TO_TICKS(WAKE_TIME_SEC * 1000));
+            
+            // Blink LED 3 times fast (sleep indication)
+            ESP_LOGI(TAG, "Preparing to sleep...");
+            blink_led_fast();
+            
+            // Turn LED OFF before sleeping
+            led_off();
+            
+            // Wait for signal to go LOW before sleeping again
+            wait_for_signal_low();
+        } else {
+            // Invalid wakeup - go back to sleep immediately
+            ESP_LOGW(TAG, "Invalid wakeup - GPIO not HIGH. Going back to sleep...");
+            led_off();
+            // Small delay before going back to sleep
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
     }
 }
