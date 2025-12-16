@@ -1217,7 +1217,7 @@ async def person_detection_loop():
 async def send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes):
     # Input: enc_msgbytes: bytes already encrypted image; 
     # Output: bool indicating if image was forwarded successfully to next_node of spath
-    logger.info(f"[IMG] Sending {len(enc_msgbytes)} bytes (already encrypted) to the network")
+    logger.info(f"[IMG] Sending image of creator={creator}, size={len(enc_msgbytes)} bytes (already encrypted) to the network")
     try:
         next_dst = next_device_in_spath()
         if next_dst:
@@ -1273,10 +1273,10 @@ async def image_sending_loop():
             try:
                 # Read encrypted bytes directly from file
                 try:
-                    logger.info(f"[IMG] Reading encrypted image from file: {enc_filepath}")
+                    logger.info(f"[IMG] Reading encrypted image of creator: {creator}, file: {enc_filepath}")
                     with open(enc_filepath, "rb") as f:
                         enc_msgbytes = f.read()
-                    logger.info(f"[IMG] Read encrypted image from file: {len(enc_msgbytes)} bytes")
+                    logger.info(f"[IMG] Read encrypted image of creator: {creator}, file: {len(enc_msgbytes)} bytes")
                 except Exception as e:
                     logger.error(f"[IMG] Failed to read encrypted image from file, image re-queued {enc_filepath}, e: {e}")
                     imgpaths_to_send.append(img_entry) # pushed to back of queue
@@ -1285,7 +1285,7 @@ async def image_sending_loop():
                 transmission_start = time_msec()
                 if running_as_cc():
                     # Upload encrypted image directly (already encrypted)
-                    logger.info(f"[IMG] Uploading encrypted image (size: {len(enc_msgbytes)} bytes)")
+                    logger.info(f"[IMG] Uploading encrypted image (size: {len(enc_msgbytes)} bytes), from creator={creator}")
                     imgbytes = ubinascii.b2a_base64(enc_msgbytes)
                     img_payload =  {
                         "machine_id": creator,
@@ -1296,10 +1296,10 @@ async def image_sending_loop():
                     sent_succ = await upload_payload_to_server(img_payload, "event", creator)
                     if not sent_succ:
                         imgpaths_to_send.append(img_entry) # pushed to back of queue
-                        logger.info(f"[IMG] upload_payload to server failed, image re-queued: {enc_filepath}")
+                        logger.info(f"[IMG] upload_payload to server failed, image of creator={creator}, re-queued: {enc_filepath}")
                         break
                 else:
-                    logger.info(f"[IMG] : sending encrypted image to {next_dst} {enc_filepath}")
+                    logger.info(f"[IMG] : sending encrypted image of creator={creator}, to {next_dst} {enc_filepath}")
                     sent_succ = await send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes)
                     if not sent_succ:
                         imgpaths_to_send.append(img_entry) # pushed to back of queue
@@ -1534,7 +1534,7 @@ def process_message(data, rssi=None):
                     logger.debug(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
                     with open(enc_filepath, "wb") as f:
                         f.write(recompiled_msgbytes)
-                    imgpaths_to_send.append({"creator": my_addr, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
+                    imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
                     logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
                     logger.error(f"[CHUNK] error saving image to {enc_filepath}: {e}")
