@@ -509,3 +509,74 @@ async def person_detection_loop():
 #         return False
 
 
+
+
+
+# ====================
+# async def send_msg_internal(msg_typ, creator, msgbytes, dest): # all messages except image
+#     if not is_lora_ready():
+#         return False
+#     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
+#     if len(msgbytes) < PACKET_PAYLOAD_LIMIT:
+#         logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet")
+#         succ, _ = await send_single_packet(msg_typ, creator, msgbytes, dest)
+#         return succ
+#     else:
+#         logger.warning(f"msgbtyes size exceeds the packet payload limit, {len(msgbytes)} bytes > {PACKET_PAYLOAD_LIMIT} bytes")
+#         return False
+    # else:
+    #     img_id = get_rand()
+    #     if get_transmode_lock(dest, img_id):
+    #         asyncio.create_task(keep_transmode_lock(dest, img_id))
+    #         # sending start
+    #         chunks = make_chunks(msgbytes)
+    #         logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
+    #         big_succ, _ = await send_single_packet("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
+    #         if not big_succ:
+    #             logger.info(f"[CHUNK] Failed sending chunk begin")
+    #             delete_transmode_lock(dest, img_id)
+    #             return False
+            
+    #         for i in range(len(chunks)):
+    #             if i % 10 == 0:
+    #                 logger.info(f"[CHUNK] Sending chunk {i}")
+    #             await asyncio.sleep(CHUNK_SLEEP)
+    #             chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
+    #             _ = await send_single_packet("I", creator, chunkbytes, dest)
+    #         for retry_i in range(20):
+    #             if retry_i == 0:
+    #                 await asyncio.sleep(0.1)  # Faster first check
+    #             else:
+    #                 await asyncio.sleep(CHUNK_SLEEP)
+    #             succ, missing_chunks = await send_single_packet("E", creator, img_id, dest)
+    #             if not succ:
+    #                 logger.error(f"[CHUNK] Failed sending chunk end")
+    #                 break
+
+    #             # Treat various ACK forms as success:
+    #             # - [-1]   : explicit "all done" from receiver
+    #             # - []/None: truncated or minimal ACK with no missing list (we assume success)
+    #             if (
+    #                 missing_chunks is None
+    #                 or len(missing_chunks) == 0
+    #                 or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
+    #             ):
+    #                 logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
+    #                 delete_transmode_lock(dest, img_id)
+    #                 return True
+
+    #             logger.info(
+    #                 f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
+    #             )
+    #             if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
+    #                 logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
+    #                 return False
+    #             for mis_chunk in missing_chunks:
+    #                 await asyncio.sleep(CHUNK_SLEEP)
+    #                 chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
+    #                 _ = await send_single_packet("I", creator, chunkbytes, dest)
+    #         delete_transmode_lock(dest, img_id)
+    #         return False
+    #     else: 
+    #         logger.warning(f"TRANS MODE already in use, could not get lock...")
+    #         return False
