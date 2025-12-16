@@ -339,7 +339,7 @@ async def keep_transmode_lock(device_id, img_id):
     global image_in_progress, paired_device, data_id
     await asyncio.sleep(TRANSMODE_LOCK_TIME) # At this point this process might complete, also other might start
     if image_in_progress and paired_device == device_id and data_id == img_id: # TODO, test this
-        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended, device:{device_id}, img_id:{img_id} <@@@@@@@@@@")
+        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE ended, device:{device_id}, img_id:{img_id}, by TIMEOUT <@@@@@@@@@@")
         image_in_progress = False
         paired_device = None
         data_id = None
@@ -357,7 +357,7 @@ def delete_transmode_lock(device_id, img_id):
     # Input: None; Output: None (clears image_in_progress flag)
     global image_in_progress, paired_device, data_id
     if image_in_progress and paired_device == device_id and data_id == img_id:  # TODO, these has to handled using someuniqueness
-        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended for device:{device_id}, img_id:{img_id} <@@@@@@@@@@")
+        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended for device:{device_id}, img_id:{img_id}, by logic <@@@@@@@@@@")
         image_in_progress = False
         paired_device = None
         data_id = None
