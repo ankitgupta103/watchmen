@@ -591,7 +591,7 @@ def pop_and_get(msg_uid):
             return msgs_unacked.pop(i)
     return None
 
-async def send_single_packet(msg_typ, creator, msgbytes, dest):
+async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
     msg_uid = get_msg_uid(msg_typ, creator, dest) # TODO, msg_uid used anywhere except logging
     databytes = msg_uid + b";" + msgbytes
@@ -605,8 +605,7 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest):
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-    send_retry = 3
-    for retry_i in range(send_retry):
+    for retry_i in range(retry_count):
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(ACK_SLEEP)
         first_log_flag = True
@@ -625,7 +624,7 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest):
                 await asyncio.sleep(
                     ACK_SLEEP * min(i + 1, 3)
                 )  # progressively more sleep, capped at 3x
-        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{send_retry}")
+        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
 
@@ -754,7 +753,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     await asyncio.sleep(0.1)  # Faster first check
                 else:
                     await asyncio.sleep(CHUNK_SLEEP)
-                succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest)
+                succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 10)
                 if not succ:
                     logger.error(f"[CHUNK] Failed sending chunk end")
                     break
@@ -1572,7 +1571,14 @@ def process_message(data, rssi=None):
             delete_transmode_lock(sender, img_id)
             # also when it fails
             ackmessage += b":-1"
-            asyncio.create_task(send_msg("A", creator, ackmessage, sender))
+            # asyncio.create_task(send_msg("A", creator, ackmessage, sender))
+            async def send_ack_multiple(): # send ACK 2 times
+                msg_count = 2
+                for i in range(msg_count):
+                    await send_msg("A", creator, ackmessage, sender)
+                    if i < msg_count-1:
+                        await asyncio.sleep(1)
+            asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
                 try:
                     enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
