@@ -929,7 +929,7 @@ def end_chunk(msg_uid, msg):
         for i in range(1, len(missing)):
             if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < PACKET_PAYLOAD_LIMIT:
                 missing_str += "," + str(missing[i])
-        return (False, missing_str, img_id, None, None, epoch_ms)
+        return (False, missing_str, img_id, None, epoch_ms)
     else:
         if img_id not in chunk_map:
             logger.warning(f"[CHUNK] Ignoring end chunk, we dont have an entry for this img_id.., it might got processed already.")
