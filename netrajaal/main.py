@@ -128,6 +128,9 @@ IMAGE_CAPTURING_ADDRS = [221] # [] empty means capture at all device, else on li
 import fakelayout
 flayout = fakelayout.Layout()
 
+rtc = machine.RTC()
+rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
+
 # --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
