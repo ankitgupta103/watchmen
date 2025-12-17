@@ -58,7 +58,7 @@ PHOTO_TAKING_DELAY = 600
 
 PHOTO_SENDING_EMPTY_DELAY = 4
 PHOTO_SENDING_TRY_INTERVAL = 20  # Delay between uploads when queue has multiple images
-PHOTO_SENDING_FAILED_PAUSE = 120
+PHOTO_SENDING_FAILED_PAUSE = 20 # TODO earlier it was 120 second
 
 EVENT_SENDING_EMPTY_DELAY = 4
 EVENT_SENDING_INTERVAL = 10  # Delay between uploads when queue has multiple events
@@ -212,7 +212,22 @@ def create_dir_if_not_exists(dir_path):
             os.mkdir(dir_path)
             logger.info(f"[FS] Created {dir_path}")
         else:
-            logger.debug(f"[FS] {dir_path} directory already exists")
+            try:
+                os.listdir(dir_path)  # for valid diretory
+                logger.info(f"[FS] {dir_path} directory already exists")
+            except OSError:
+                logger.error(
+                    f"dir:{dir_path} exists but not a directory, so deleting and recreating"
+                )
+                try:
+                    os.remove(dir_path)
+                    os.mkdir(dir_path)
+                    print(f"info - Removed file {dir_path} and created directory")
+                except OSError as e:
+                    print(
+                        f"WARNING - Failed to remove file {dir_path} and create directory: {e}"
+                    )
+
     except OSError as e:
         logger.error(f"[FS] Failed to create/access {dir_path}: {e}")
 
@@ -1171,12 +1186,17 @@ async def person_detection_loop():
                 logger.warning(f"[PIR] Failed to save raw image: {e}")
                 continue
             
-            # Encrypt image immediately
+            # read raw file
             try:
                 img = image.Image(raw_path)
                 imgbytes = img.bytearray() # updated 
                 logger.info(f"[PIR] Captured image, size: {len(imgbytes)} bytes")
-
+            except Exception as e:
+                logger.error(f"[PIR] Failed read image file: {e}")
+                continue
+                
+            # Encrypt image immediately
+            try:
                 enc_msgbytes = encrypt_if_needed("P", imgbytes)
                 enc_filepath = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}.enc"
                 logger.debug(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(enc_msgbytes)} bytes...")
