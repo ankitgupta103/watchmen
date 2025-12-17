@@ -1561,10 +1561,9 @@ def process_message(data, rssi=None):
                 try:
                     enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
                     logger.debug(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
-                    async with lock:
-                        with open(enc_filepath, "wb") as f:
-                            f.write(recompiled_msgbytes)
-                        utime.sleep_ms(500)
+                    with open(enc_filepath, "wb") as f:
+                        f.write(recompiled_msgbytes)
+                    utime.sleep_ms(500)
                     imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
                     logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
