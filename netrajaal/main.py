@@ -1180,6 +1180,7 @@ async def person_detection_loop():
                 logger.debug(f"Saving raw image to {raw_path} : imbytesize = {len(img.bytearray())}")
                 async with lock:
                     img.save(raw_path)
+                    os.sync()  # Force filesystem sync to SD card
                     utime.sleep_ms(500)
                 logger.info(f"Saved raw image: {raw_path}: raw size = {len(img.bytearray())} bytes")
             except Exception as e:
@@ -1204,6 +1205,7 @@ async def person_detection_loop():
                 async with lock:
                     with open(enc_filepath, "wb") as f:
                         f.write(enc_msgbytes)
+                    os.sync()  # Force filesystem sync to SD card
                     utime.sleep_ms(500)
                 logger.info(f"[PIR] Saved encrypted image: {enc_filepath}: encrypted size = {len(enc_msgbytes)} bytes")
             except Exception as e:
@@ -1224,6 +1226,7 @@ async def person_detection_loop():
                 event_data = {"epoch_ms": event_epoch_ms}
                 with open(event_filepath, "w") as f:
                     f.write(json.dumps(event_data))
+                os.sync()  # Force filesystem sync to SD card
                 utime.sleep_ms(500)
                 logger.info(f"[PIR] Saved event file: {event_filepath}")
             except Exception as e:
@@ -1563,6 +1566,7 @@ def process_message(data, rssi=None):
                     logger.debug(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
                     with open(enc_filepath, "wb") as f:
                         f.write(recompiled_msgbytes)
+                    os.sync()  # Force filesystem sync to SD card
                     utime.sleep_ms(500)
                     imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
                     logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
