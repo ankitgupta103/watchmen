@@ -605,11 +605,12 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
+    ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
     for retry_i in range(retry_count):
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(ACK_SLEEP)
         first_log_flag = True
-        for i in range(5):
+        for i in range(ack_msg_recheck_count): # ack_msk recheck
             at, missing_chunks = ack_time(msg_uid)
             if at > 0:
                 logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
@@ -1160,6 +1161,7 @@ async def person_detection_loop():
                 raw_path = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}_raw.jpg"
                 logger.debug(f"Saving raw image to {raw_path} : imbytesize = {len(img.bytearray())}")
                 img.save(raw_path)
+                utime.sleep_ms(500)
                 logger.info(f"Saved raw image: {raw_path}: raw size = {len(img.bytearray())} bytes")
             except Exception as e:
                 logger.warning(f"[PIR] Failed to save raw image: {e}")
@@ -1177,6 +1179,7 @@ async def person_detection_loop():
                 # Save encrypted bytes to binary file
                 with open(enc_filepath, "wb") as f:
                     f.write(enc_msgbytes)
+                utime.sleep_ms(500)
                 logger.info(f"[PIR] Saved encrypted image: {enc_filepath}: encrypted size = {len(enc_msgbytes)} bytes")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save encrypted image: {e}")
@@ -1196,6 +1199,7 @@ async def person_detection_loop():
                 event_data = {"epoch_ms": event_epoch_ms}
                 with open(event_filepath, "w") as f:
                     f.write(json.dumps(event_data))
+                utime.sleep_ms(500)
                 logger.info(f"[PIR] Saved event file: {event_filepath}")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save event file {event_filepath}: {e}")
@@ -1534,6 +1538,7 @@ def process_message(data, rssi=None):
                     logger.debug(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
                     with open(enc_filepath, "wb") as f:
                         f.write(recompiled_msgbytes)
+                    utime.sleep_ms(500)
                     imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
                     logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
