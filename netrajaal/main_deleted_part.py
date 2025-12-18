@@ -580,3 +580,45 @@ async def person_detection_loop():
     #     else: 
     #         logger.warning(f"TRANS MODE already in use, could not get lock...")
     #         return False
+    
+    
+    
+    
+
+# ----------------------------------------------------
+    
+# def get_wifi_status():
+#     # Input: None; Output: dict with WiFi status information
+#     global wifi_nic
+#     if not wifi_nic or not WIFI_ENABLED:
+#         return {"enabled": False, "connected": False}
+
+#     try:
+#         is_connected = wifi_nic.isconnected()
+#         if is_connected:
+#             ifconfig = wifi_nic.ifconfig()
+#             status = wifi_nic.status()
+#             rssi = None
+#             try:
+#                 rssi = wifi_nic.status('rssi')
+#             except:
+#                 pass
+#             return {
+#                 "enabled": True,
+#                 "connected": True,
+#                 "ip": ifconfig[0],
+#                 "subnet": ifconfig[1],
+#                 "gateway": ifconfig[2],
+#                 "dns": ifconfig[3],
+#                 "status": status,
+#                 "rssi": rssi
+#             }
+#         else:
+#             return {
+#                 "enabled": True,
+#                 "connected": False,
+#                 "status": wifi_nic.status()
+#             }
+#     except Exception as e:
+#         logger.error(f"[WIFI] error in getting WiFi status: {e}")
+#         return {"enabled": True, "connected": False, "error": str(e)}

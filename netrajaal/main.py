@@ -1788,6 +1788,8 @@ async def validate_and_remove_neighbours():
         logger.debug(f"starting neighbours validation: {seen_neighbours}")
         to_be_removed = []
         for n in seen_neighbours:
+            
+            # ---- waiting, just to not abort partial validation ----
             global image_in_progress
             waiting_retry = 5
             while image_in_progress:
@@ -1796,6 +1798,7 @@ async def validate_and_remove_neighbours():
                     logger.warning(f"image in progress, aborting neighbours validation loop")
                     break
                 await asyncio.sleep(10)
+            # ---- * -----
                 
             msgbytes = b"Nothing"
             success = await send_msg("V", my_addr, msgbytes, n)
@@ -2015,46 +2018,10 @@ async def init_wifi():
                 pass
         return False
 
-def get_wifi_status():
-    # Input: None; Output: dict with WiFi status information
-    global wifi_nic
-    if not wifi_nic or not WIFI_ENABLED:
-        return {"enabled": False, "connected": False}
-
-    try:
-        is_connected = wifi_nic.isconnected()
-        if is_connected:
-            ifconfig = wifi_nic.ifconfig()
-            status = wifi_nic.status()
-            rssi = None
-            try:
-                rssi = wifi_nic.status('rssi')
-            except:
-                pass
-            return {
-                "enabled": True,
-                "connected": True,
-                "ip": ifconfig[0],
-                "subnet": ifconfig[1],
-                "gateway": ifconfig[2],
-                "dns": ifconfig[3],
-                "status": status,
-                "rssi": rssi
-            }
-        else:
-            return {
-                "enabled": True,
-                "connected": False,
-                "status": wifi_nic.status()
-            }
-    except Exception as e:
-        logger.error(f"[WIFI] error in getting WiFi status: {e}")
-        return {"enabled": True, "connected": False, "error": str(e)}
 
 # ---------------------------------------------------------------------------
 # Application Entry Point
 # ---------------------------------------------------------------------------
-
 async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
     global image_in_progress
