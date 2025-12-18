@@ -262,10 +262,13 @@ class Cellular:
         response = self.uart.read(3000)
         return "OK" in response or len(response) > 0
     
-    def upload_data(self, data_payload, url="https://n8n.vyomos.org/webhook/watchmen-detect"):
+    def upload_data(self, data_payload, url):
         """Upload data"""
+        if not url:
+            logger.error("URL is not passed, failed to upload data cellular_driver.upload_data")
+            return None
         if not self.connected or not self.http_initialized:
-            logger.warning("  System not initialized")
+            logger.error("System not initialized, failed to upload data cellular_driver.upload_data")
             return None
         
         try:

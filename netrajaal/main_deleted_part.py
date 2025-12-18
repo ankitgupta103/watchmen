@@ -254,3 +254,329 @@ async def person_detection_loop():
 # # Clean up CC images list
 # if running_as_cc():
 #     cleanup_cc_images_list()
+
+
+
+
+
+
+
+# ///////////////
+# async def image_sending_loop():
+    # sent_succ = await upload_image(my_addr, enc_msgbytes)
+
+# async def upload_image(creator, encimb): # TODO will be replaced by upload_payload_to_server later
+#     # Input: creator: int node id, encimb: bytes encrypted image; Output: bool upload success
+#     """Unified image upload: tries cellular first, falls back to WiFi"""
+#     if not running_as_cc():
+#         return False
+    
+#     if cellular_system:
+#         result = await sim_send_image(creator, encimb)
+#         if result:
+#             return True
+#         logger.warning("[IMG] cellular upload failed, trying WiFi fallback...")
+#     else:
+#         logger.warning("[HB] cellular system not initialized, trying WiFi fallback...")
+
+#     if wifi_nic and wifi_nic.isconnected():
+#         result = await wifi_send_image(creator, encimb)
+#         if result:
+#             return True
+#         logger.warning("[IMG] wifi upload failed, skipping image upload...")
+#     else:
+#         logger.warning("[IMG] wifi not connected, image upload failed (cellular and WiFi both unavailable)")
+
+#     return False
+
+# async def upload_heartbeat(heartbeat_data):
+#     # Input: heartbeat_data: dict payload; Output: bool indicating upload success
+#     """Unified heartbeat upload: tries cellular first, falls back to WiFi"""
+#     if not running_as_cc():
+#         return False
+
+#     if cellular_system:
+#         result = await sim_upload_hb(heartbeat_data)
+#         if result:
+#             return True
+#         logger.warning("[HB] cellular heartbeat upload failed, trying WiFi fallback...")
+#     else:
+#         logger.warning("[HB] cellular system not initialized, trying WiFi fallback...")
+
+#     if wifi_nic and wifi_nic.isconnected():
+#         result = await wifi_upload_hb(heartbeat_data)
+#         if result:
+#             return True
+#         logger.warning("[HB] wifi heartbeat upload failed, skipping heartbeat...")
+#     else:
+#         logger.error("[HB] wifi not connected, heartbeat upload failed (cellular and WiFi both unavailable)")
+
+#     return False
+
+
+
+
+# async def img_process(img_id, msg, creator, sender): # Not in use only image_sending_loop is in use
+#     # Input: img_id: str, msg: bytes (possibly encrypted image), creator: int, sender: int; Output: None (stores or forwards image)
+#     clear_chunkid(img_id)
+#     if running_as_cc():
+#         logger.info(f"[IMG] Received image of size {len(msg)}")
+#         try:
+#             upload_success = await asyncio.create_task(upload_image(creator, msg))
+#             if not upload_success:
+#                 logger.warning(f"[IMG] failed to upload image to cloud, adding it to queue") # TODO, 12-dec, requeue
+#             else:
+#                 logger.info(f"[IMG] image uploaded to cloud successfully")
+#         except Exception as e:
+#             pass # TODO, 12-dec, requeue
+#         finally:
+#             # Help GC reclaim memory
+#             gc.collect()
+#     else:
+#         next_dst = next_device_in_spath()
+#         if next_dst:
+#             if is_device_busy(next_dst):
+#                 logger.warning(f"[IMG] Device {next_dst} is busy, skipping send")
+#                 return
+#             logger.info(f"[IMG] Propogating Image to {next_dst}")
+#             sent_succ = await send_msg("P", creator, msg, next_dst)
+#             if not sent_succ:
+#                 logger.error(f"[IMG] forwarding image to {next_dst} failed")
+#         else:
+#             logger.error(f"[IMG] can't forward image because I dont have next device in spath yet")
+
+
+
+
+# async def wifi_send_image(creator, encimb):
+#     # Input: creator: int node id, encimb: bytes encrypted image; Output: bool upload success
+#     """Send image via WiFi"""
+#     global wifi_nic
+#     if not wifi_nic or not wifi_nic.isconnected():
+#         logger.warning("[WIFI] WiFi not connected")
+#         return False
+
+#     try:
+#         # Try to import requests
+#         try:
+#             import requests
+#             USE_REQUESTS = True
+#         except ImportError:
+#             USE_REQUESTS = False
+
+#         # Load and process image - same format as SIM upload
+#         imgbytes = ubinascii.b2a_base64(encimb)
+#         # logger.info(f"Sending image of size {len(imgbytes)} bytes")
+#         # Prepare payload with additional metadata - same format as SIM upload
+#         payload = {
+#             "machine_id": creator,
+#             "message_type": "event",
+#             "image": imgbytes,
+#         }
+
+#         if USE_REQUESTS:
+#             # Convert bytes to string for requests library (standard Python json needs strings)
+#             # Match SIM upload format: MicroPython json.dumps converts bytes to string automatically
+#             # We need to manually convert to match that behavior
+#             payload_str = payload.copy()
+#             if "image" in payload_str and isinstance(payload_str["image"], bytes):
+#                 # Decode base64 bytes to base64 string, remove all newlines to match MicroPython behavior
+#                 # ubinascii.b2a_base64 may include newlines every 76 chars, remove them
+#                 payload_str["image"] = payload_str["image"].decode('utf-8').replace('\n', '').replace('\r', '')
+#             headers = {"Content-Type": "application/json"}
+#             json_payload = json.dumps(payload_str)
+#             r = requests.post(URL, data=json_payload, headers=headers)
+#             if r.status_code == 200:
+#                 logger.info(f"[WIFI] Image uploaded via WiFi successfully")
+#                 return True
+#             else:
+#                 logger.info(f"[WIFI] Upload failed: status {r.status_code}")
+#                 return False
+#         else:
+#             # Fallback to socket-based HTTP (not implemented for brevity)
+#             logger.info("[WIFI] requests library not available, WiFi upload skipped")
+#             return False
+
+#     except Exception as e:
+#         logger.error(f"[WIFI] error in wifi_send_image: {e}")
+#         return False
+
+# async def wifi_upload_hb(heartbeat_data):
+#     # Input: heartbeat_data: dict payload; Output: bool indicating upload success
+#     """Send heartbeat data via WiFi"""
+#     global wifi_nic
+#     if not wifi_nic or not wifi_nic.isconnected():
+#         return False
+
+#     try:
+#         try:
+#             import requests
+#             USE_REQUESTS = True
+#         except ImportError:
+#             USE_REQUESTS = False
+
+#         if USE_REQUESTS:
+#             # Convert bytes to strings for requests library (standard Python json needs strings)
+#             # Match SIM upload format: MicroPython json.dumps converts bytes to string automatically
+#             # We need to manually convert to match that behavior
+#             payload = heartbeat_data.copy()
+#             if "heartbeat_data" in payload and isinstance(payload["heartbeat_data"], bytes):
+#                 # Decode base64 bytes to base64 string, remove all newlines to match MicroPython behavior
+#                 # ubinascii.b2a_base64 may include newlines every 76 chars, remove them
+#                 payload["heartbeat_data"] = payload["heartbeat_data"].decode('utf-8').replace('\n', '').replace('\r', '')
+#             headers = {"Content-Type": "application/json"}
+#             json_payload = json.dumps(payload)
+#             r = requests.post(URL, data=json_payload, headers=headers)
+#             if r.status_code == 200:
+#                 node_id = payload.get("machine_id", "unknown")
+#                 logger.info(f"[HB] Heartbeat from node {node_id} sent via WiFi successfully")
+#                 return True
+#             else:
+#                 logger.info(f"[HB] WiFi upload failed: status {r.status_code}")
+#                 if hasattr(r, 'text'):
+#                     logger.info(f"[HB] Response: {r.text[:200]}")
+#                 return False
+#         else:
+#             logger.info("[HB] requests library not available, WiFi upload skipped")
+#             return False
+
+#     except Exception as e:
+#         logger.error(f"[HB] error in wifi_upload_hb: {e}")
+#         return False
+
+
+
+
+# async def sim_send_image(creator, encimb): # TODO will be replaced by sim_upload_payload later 
+#     # Input: creator: int node id, encimb: bytes encrypted image; Output: bool upload success
+#     """Send image via cellular with better error handling and retry logic"""
+#     global cellular_system
+#     if not cellular_system:
+#         logger.info("[CELL] Cellular system not initialized")
+#         return False
+
+#     # Check connection health with retry
+#     max_connection_retries = 3
+#     for retry in range(max_connection_retries):
+#         if cellular_system.check_connection():
+#             break
+
+#         logger.info(f"[CELL] Connection check failed, attempt {retry + 1}/{max_connection_retries}")
+#         if retry < max_connection_retries - 1:
+#             logger.info("[CELL] Attempting reconnect...")
+#             if not cellular_system.reconnect():
+#                 logger.info(f"[CELL] Reconnection attempt {retry + 1} failed")
+#                 await asyncio.sleep(5)  # Wait before next retry
+#                 continue
+#         else:
+#             logger.info("[CELL] All connection attempts failed")
+#             return False
+
+#     try:
+#         # Load and process image
+#         imgbytes = ubinascii.b2a_base64(encimb)
+#         logger.info(f"[CELL] Sending image of size {len(imgbytes)} bytes")
+#         # Prepare payload with additional metadata
+#         payload = {
+#             "machine_id": creator,
+#             "message_type": "event",
+#             "image": imgbytes,
+#         }
+
+#         # Upload with retry logic
+#         max_upload_retries = 3
+#         for upload_retry in range(max_upload_retries):
+#             result = cellular_system.upload_data(payload, URL)
+
+#             if result and result.get('status_code') == 200:
+#                 logger.info(f"[CELL] Image uploaded successfully on attempt {upload_retry + 1}")
+#                 logger.info(f"[CELL] Upload time: {result.get('upload_time', 0):.2f}s")
+#                 logger.info(f"[CELL] Data size: {result.get('data_size', 0)/1024:.2f} KB")
+#                 return True
+#             else:
+#                 logger.info(f"[CELL] Upload attempt {upload_retry + 1} failed")
+#                 if result:
+#                     logger.info(f"[CELL] HTTP Status: {result.get('status_code', 'Unknown')}")
+
+#                 if upload_retry < max_upload_retries - 1:
+#                     await asyncio.sleep(2 ** upload_retry)  # Exponential backoff
+
+#         logger.info(f"[CELL] Failed to upload image after {max_upload_retries} attempts")
+#         return False
+
+#     except Exception as e:
+#         logger.error(f"[CELL] error in sim_send_image: {e}")
+#         return False
+
+
+
+
+
+# ====================
+# async def send_msg_internal(msg_typ, creator, msgbytes, dest): # all messages except image
+#     if not is_lora_ready():
+#         return False
+#     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
+#     if len(msgbytes) < PACKET_PAYLOAD_LIMIT:
+#         logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, single packet")
+#         succ, _ = await send_single_packet(msg_typ, creator, msgbytes, dest)
+#         return succ
+#     else:
+#         logger.warning(f"msgbtyes size exceeds the packet payload limit, {len(msgbytes)} bytes > {PACKET_PAYLOAD_LIMIT} bytes")
+#         return False
+    # else:
+    #     img_id = get_rand()
+    #     if get_transmode_lock(dest, img_id):
+    #         asyncio.create_task(keep_transmode_lock(dest, img_id))
+    #         # sending start
+    #         chunks = make_chunks(msgbytes)
+    #         logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
+    #         big_succ, _ = await send_single_packet("B", creator, f"{msg_typ}:{img_id}:{len(chunks)}", dest)
+    #         if not big_succ:
+    #             logger.info(f"[CHUNK] Failed sending chunk begin")
+    #             delete_transmode_lock(dest, img_id)
+    #             return False
+            
+    #         for i in range(len(chunks)):
+    #             if i % 10 == 0:
+    #                 logger.info(f"[CHUNK] Sending chunk {i}")
+    #             await asyncio.sleep(CHUNK_SLEEP)
+    #             chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
+    #             _ = await send_single_packet("I", creator, chunkbytes, dest)
+    #         for retry_i in range(20):
+    #             if retry_i == 0:
+    #                 await asyncio.sleep(0.1)  # Faster first check
+    #             else:
+    #                 await asyncio.sleep(CHUNK_SLEEP)
+    #             succ, missing_chunks = await send_single_packet("E", creator, img_id, dest)
+    #             if not succ:
+    #                 logger.error(f"[CHUNK] Failed sending chunk end")
+    #                 break
+
+    #             # Treat various ACK forms as success:
+    #             # - [-1]   : explicit "all done" from receiver
+    #             # - []/None: truncated or minimal ACK with no missing list (we assume success)
+    #             if (
+    #                 missing_chunks is None
+    #                 or len(missing_chunks) == 0
+    #                 or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
+    #             ):
+    #                 logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
+    #                 delete_transmode_lock(dest, img_id)
+    #                 return True
+
+    #             logger.info(
+    #                 f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
+    #             )
+    #             if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
+    #                 logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
+    #                 return False
+    #             for mis_chunk in missing_chunks:
+    #                 await asyncio.sleep(CHUNK_SLEEP)
+    #                 chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
+    #                 _ = await send_single_packet("I", creator, chunkbytes, dest)
+    #         delete_transmode_lock(dest, img_id)
+    #         return False
+    #     else: 
+    #         logger.warning(f"TRANS MODE already in use, could not get lock...")
+    #         return False
