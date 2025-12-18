@@ -1450,24 +1450,55 @@ async def sync_and_transfer_spath(msg_uid, msg):
     # Input: msg_uid: bytes, msg: str shortest-path data; Output: None (updates shortest_path_to_cc and propagates)
     global shortest_path_to_cc
     if running_as_cc():
-        # logger.info(f"Ignoring shortest path since I am cc")
+        logger.debug(f"Ignoring shortest path since I am cc")
         return
     if len(msg) == 0:
-        logger.error(f"empty spath message received")
+        logger.error(f"empty spath_received message received")
         return
-    spath = [int(x) for x in msg.split(",")]
-    if my_addr in spath:
-        logger.debug(f"[cyclic, ignoring {my_addr} already in {spath}")
+    spath_received = [int(x) for x in msg.split(",")]
+    if my_addr in spath_received:
+        logger.debug(f"[cyclic, ignoring {my_addr} already in {spath_received}")
         return
-    if len(shortest_path_to_cc) == 0 or len(shortest_path_to_cc) > len(spath):
-        logger.debug(f"updating and forwarding new spath:{spath}")
+    
+    if len(shortest_path_to_cc) == 0:
+        if len(seen_neighbours)>0:
+            logger.debug(f"spath_recived for first time, saving and forwarding:{spath_received}")
+        else:
+            logger.debug(f"spath_recived for first time, saving:{spath_received}, but no 'seen_neighbour'")
         if DYNAMIC_SPATH:
-            shortest_path_to_cc = spath
+            shortest_path_to_cc = spath_received
         for n in seen_neighbours:
             new_spath = [my_addr] + shortest_path_to_cc
             new_spath_msg = ",".join([str(x) for x in new_spath])
             logger.debug(f"propogating new_spath:{new_spath_msg}, to dst:{n}")
             asyncio.create_task(send_msg("S", int(msg_uid[1]), new_spath_msg.encode(), n))
+        
+    elif len(shortest_path_to_cc) > len(spath_received):
+        if len(seen_neighbours)>0:
+            logger.debug(f"smaller spath received, so updating and forwarding:{spath_received}")
+        else:
+            logger.debug(f"smaller spath received, so saving:{spath_received}, but no 'seen_neighbour'")
+        if DYNAMIC_SPATH:
+            shortest_path_to_cc = spath_received
+        for n in seen_neighbours:
+            new_spath = [my_addr] + shortest_path_to_cc
+            new_spath_msg = ",".join([str(x) for x in new_spath])
+            logger.debug(f"propogating new_spath:{new_spath_msg}, to dst:{n}")
+            asyncio.create_task(send_msg("S", int(msg_uid[1]), new_spath_msg.encode(), n))
+    elif len(shortest_path_to_cc) == len(spath_received):
+        if len(seen_neighbours)>0:
+            logger.debug(f"equal spath received, so updating and forwarding: {spath_received}")
+        else:
+            logger.debug(f"equal spath received, so updating: {spath_received}, but no 'seen_neighbour'")
+        if DYNAMIC_SPATH:
+            shortest_path_to_cc = spath_received
+        for n in seen_neighbours:
+            new_spath = [my_addr] + shortest_path_to_cc
+            new_spath_msg = ",".join([str(x) for x in new_spath])
+            logger.debug(f"propogating new_spath:{new_spath_msg}, to dst:{n}")
+            asyncio.create_task(send_msg("S", int(msg_uid[1]), new_spath_msg.encode(), n))
+    else:
+        logger.info(f"larger spath received, so ignoring it: {spath_received}")
 
 def process_message(data, rssi=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
