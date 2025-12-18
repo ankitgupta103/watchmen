@@ -31,7 +31,7 @@ import detect
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # TESTING VARIABLES
-DYNAMIC_SPATH = True
+DYNAMIC_SPATH = False
 ENCRYPTION_ENABLED = True
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
@@ -1275,7 +1275,7 @@ async def image_sending_loop():
     while True:
         await asyncio.sleep(PHOTO_SENDING_EMPTY_DELAY)
         if len(imgpaths_to_send) == 0:
-            logger.debug("[IMG] No image event to send, skipping sending...")
+            logger.debug("[IMG] No images to send, skipping sending...")
             continue
         next_dst = next_device_in_spath()
         if not running_as_cc() and not next_dst:
@@ -1351,7 +1351,7 @@ async def image_sending_loop():
                     logger.info(f"[IMG] Queue empty, all images uploaded")
 
             except Exception as e:
-                logger.error(f"[IMG] unexpected error processing image event {enc_filepath}: {e}, re-queued")
+                logger.error(f"[IMG] unexpected error processing image {enc_filepath}: {e}, re-queued")
                 # import sys
                 # sys.print_exception(e)
                 
@@ -1393,7 +1393,7 @@ async def event_text_sending_loop():
     while True:
         await asyncio.sleep(EVENT_SENDING_EMPTY_DELAY)
         if len(events_to_send) == 0:
-            logger.debug("[TXT] No message events to send, skipping sending...")
+            logger.debug("[TXT] No events to send, skipping sending...")
             continue
         next_dst = next_device_in_spath()
         if not running_as_cc() and not next_dst:
@@ -1423,7 +1423,7 @@ async def event_text_sending_loop():
                     logger.info(f"[TXT] Queue empty, all events uploaded")
 
             except Exception as e:
-                logger.error(f"[TXT] unexpected error processing message event {epoch_ms}: {e}")
+                logger.error(f"[TXT] unexpected error processing event {epoch_ms}: {e}")
                 import sys
                 sys.print_exception(e)
                 # Re-queue event on error
