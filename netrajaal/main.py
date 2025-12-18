@@ -1148,24 +1148,51 @@ async def person_detection_loop():
     PIR_PIN.irq(trigger=Pin.IRQ_RISING, handler=pir_interrupt_handler)
     logger.info(f"[PIR] Interrupt-driven detection initialized on pin {PIR_PIN}")
 
+    last_capture_time = None
+    next_capture_wait = None # max value is 16
+    MAX_CAPTURE_WAIT = 10
+    FRESH_MOTION_LAP = 16 
     while True:
         # Wait for PIR interrupt event (blocks until PIR detects motion)
         # Task is suspended here - uses minimal CPU until interrupt fires
         await pir_trigger_event.wait()
         # Clear the event for next trigger
         pir_trigger_event.clear()
+        await asyncio.sleep(0.5) # DEFAULT wait after every motion
+        
+        # Exponential backoff sleep logic to prevent rapid-fire triggers
+        curr_time = utime.time()  # Get current time in seconds
+        if last_capture_time is None:
+            last_capture_time = curr_time
+            next_capture_wait = 2
+            logger.info(f"[PIR] First motion detected - next_capture_wait={next_capture_wait}")
+        else:
+            # Calculate time difference since last trigger
+            time_diff = curr_time - last_capture_time
+            if time_diff<next_capture_wait:
+                logger.info(f"[PIR] skipping detection - time diff:{time_diff} is too small, should be min:{next_capture_wait}s")
+                continue
+            else:
+                if time_diff > FRESH_MOTION_LAP: # fresh movement detected
+                    last_capture_time = curr_time
+                    next_capture_wait = 2
+                    logger.info(f"[PIR] Fresh motion detected - next_capture_wait={next_capture_wait}")
+                else:
+                    last_capture_time = curr_time
+                    next_capture_wait = min(next_capture_wait * 2, MAX_CAPTURE_WAIT)
+                    logger.info(f"[PIR] consecutive motion detected - next_capture_wait={next_capture_wait}")
 
         # Check if image processing is in progress
-        if image_in_progress:
-            logger.info(f"[PIR] Skipping detection - image already in progress")
-            continue
+        # if image_in_progress:
+        #     logger.info(f"[PIR] Skipping detection - image already in progress")
+        #     continue
 
         # Motion detected - capture image
         img = None
         try:
             led.on()
             event_epoch_ms = get_epoch_ms() # epoch milisecond for event
-            logger.info(f"[PIR] Motion detected - (interrupt) capturing image...")
+            logger.info(f"[PIR] @@@@@@@@@@> Motion detected - capturing image... <@@@@@@@@@@")
             img = sensor.snapshot()
             person_image_count += 1
             total_image_count += 1
