@@ -44,7 +44,7 @@ led = LED("LED_BLUE")
 
 MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.3  # Increased from 0.2 to 0.3 (300ms) to exceed RX_DELAY_MS (250ms)
+CHUNK_SLEEP = 0.2  # Increased from 0.2 to 0.3 (300ms) to exceed RX_DELAY_MS (250ms)
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600

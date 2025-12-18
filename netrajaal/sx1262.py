@@ -87,7 +87,7 @@ UART_STABILIZE_DELAY_MS = 30  # Delay for UART to stabilize
 
 # Message transmission delays
 TX_DELAY_MS = 150  # Delay after sending message
-RX_DELAY_MS = 250  # Delay before reading received message (increased for better reliability with RSSI)
+RX_DELAY_MS = 150  # Delay before reading received message (increased for better reliability with RSSI)
 
 # RSSI command
 RSSI_CMD_BYTES = bytes([0xC0, 0xC1, 0xC2, 0xC3, 0x00, 0x02])
@@ -921,7 +921,7 @@ class sx126x:
 
     def receive(self):
         if self.ser.any():
-            time.sleep_ms(150)
+            time.sleep_ms(RX_DELAY_MS)
             r_buff = self.ser.readline()
             if r_buff and len(r_buff) >= 6:
                 # sender_addr = (r_buff[0] << 8) + r_buff[1]
