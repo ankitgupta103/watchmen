@@ -1484,7 +1484,7 @@ def process_message(data, rssi=None):
 
     if DYNAMIC_SPATH:
         if not flayout.is_neighbour(sender, my_addr):
-            logger.warning(f"[LORA/FAKE LAYOUT] receiving something which is beyond my range so dropping this packet {sender}")
+            logger.warning(f"[LORA/FAKE LAYOUT] receiving something which is beyond my range so dropping this packet {sender} : {parsed}")
             return True
 
     recv_log = ""
