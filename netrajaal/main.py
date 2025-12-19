@@ -1327,15 +1327,15 @@ async def image_sending_loop():
             creator = img_entry["creator"]
             epoch_ms = img_entry["epoch_ms"]
             
-            logger.info(f"[IMG] Processing: {enc_filepath}")
+            logger.debug(f"[IMG] Processing: {enc_filepath}")
             enc_msgbytes = None
             try:
                 # Read encrypted bytes directly from file
                 try:
-                    logger.info(f"[IMG] Reading encrypted image of creator: {creator}, file: {enc_filepath}")
+                    logger.debug(f"[IMG] Reading encrypted image of creator: {creator}, file: {enc_filepath}")
                     with open(enc_filepath, "rb") as f:
                         enc_msgbytes = f.read()
-                    logger.info(f"[IMG] Read encrypted image of creator: {creator}, file: {len(enc_msgbytes)} bytes")
+                    logger.debug(f"[IMG] Read encrypted image of creator: {creator}, file: {len(enc_msgbytes)} bytes")
                 except Exception as e:
                     logger.error(f"[IMG] Failed to read encrypted image from file, image re-queued {enc_filepath}, e: {e}")
                     imgpaths_to_send.append(img_entry) # pushed to back of queue
@@ -1344,7 +1344,7 @@ async def image_sending_loop():
                 transmission_start = time_msec()
                 if running_as_cc():
                     # Upload encrypted image directly (already encrypted)
-                    logger.info(f"[IMG] Uploading encrypted image (size: {len(enc_msgbytes)} bytes), from creator={creator}")
+                    logger.info(f"[IMG] ⋙⋙⋙ Uploading encrypted image (size: {len(enc_msgbytes)} bytes), file:{creator}_{epoch_ms}")
                     imgbytes = ubinascii.b2a_base64(enc_msgbytes)
                     img_payload =  {
                         "machine_id": creator,
@@ -1355,10 +1355,10 @@ async def image_sending_loop():
                     sent_succ = await upload_payload_to_server(img_payload, "event", creator)
                     if not sent_succ:
                         imgpaths_to_send.append(img_entry) # pushed to back of queue
-                        logger.info(f"[IMG] upload_payload to server failed, image of creator={creator}, re-queued: {enc_filepath}")
+                        logger.warning(f"[IMG] upload_payload to server failed, image of creator={creator}, re-queued: {enc_filepath}")
                         break
                 else:
-                    logger.info(f"[IMG] : sending encrypted image of creator={creator}, to {next_dst} {enc_filepath}")
+                    logger.info(f"[IMG] ⋙⋙⋙ sending encrypted image to {next_dst}, file:{enc_filepath}")
                     sent_succ = await send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes)
                     if not sent_succ:
                         imgpaths_to_send.append(img_entry) # pushed to back of queue
@@ -1367,7 +1367,7 @@ async def image_sending_loop():
 
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
-                logger.info(f"[IMG] Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
+                logger.info(f"[IMG] ✔✔✔ Image transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds), file:{creator}_{epoch_ms}")
                 # logger.info(f"[IMG] Remaining in queue: {len(imgpaths_to_send)}")
 
                 # Wait a short interval before processing next image in queue
@@ -1431,18 +1431,18 @@ async def event_text_sending_loop():
         for i in range(no_of_events):
             event_entry = events_to_send.pop(0)
             epoch_ms = event_entry["epoch_ms"]
-            logger.info(f"[TXT] Processing event: {epoch_ms} ms")
+            logger.info(f"[TXT] ⋙⋙⋙ Processing event: {epoch_ms} ms")
             try:
                 transmission_start = time_msec()
                 sent_succ = await send_event_text(epoch_ms)
                 if not sent_succ:
                     events_to_send.append(event_entry) # pushed to back of queue
-                    logger.info(f"[TXT] sending failed, event re-queued: {epoch_ms}")
+                    logger.warning(f"[TXT] sending failed, event re-queued: {epoch_ms}")
                     break
 
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
-                logger.info(f"[TXT] Event transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
+                logger.info(f"[TXT] ✔✔✔ Event transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
   
                 if len(events_to_send) > 0:
                     await asyncio.sleep(EVENT_SENDING_INTERVAL)
