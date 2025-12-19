@@ -349,7 +349,7 @@ def get_transmode_lock(device_id, img_id): # check and just lock for image
     image_in_progress = True
     paired_device = device_id
     data_id = img_id
-    logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE started, device:{device_id}, img_id:{img_id} <@@@@@@@@@@")
+    logger.info(f"[IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:{device_id}, img_id:{img_id} ❮❮●●●●●●●●●●")
     return True
     
 async def keep_transmode_lock(device_id, img_id):
@@ -357,12 +357,12 @@ async def keep_transmode_lock(device_id, img_id):
     global image_in_progress, paired_device, data_id
     await asyncio.sleep(TRANSMODE_LOCK_TIME) # At this point this process might complete, also other might start
     if image_in_progress and paired_device == device_id and data_id == img_id: # TODO, test this
-        logger.warning(f"[IMG] @@@@@@@@@@> TRANS MODE ended, device:{device_id}, img_id:{img_id}, by TIMEOUT <@@@@@@@@@@")
+        logger.warning(f"[IMG] ●●●●●●●●●●❯❯ TRANS MODE ended, device:{device_id}, img_id:{img_id}, by TIMEOUT ❮❮●●●●●●●●●●")
         image_in_progress = False
         paired_device = None
         data_id = None
     else:
-        logger.debug(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, device:{device_id}, img_id:{img_id} <@@@@@@@@@@") # todo, will move it to debug later
+        logger.debug(f"[IMG] ○○○○○○○○○○❯❯ TRANS MODE already ended, device:{device_id}, img_id:{img_id} ❮❮○○○○○○○○○○") # todo, will move it to debug later
 
 def check_transmode_lock(device_id, img_id): # check if transfer lock is active or not
     global image_in_progress, paired_device, data_id
@@ -375,12 +375,12 @@ def delete_transmode_lock(device_id, img_id):
     # Input: None; Output: None (clears image_in_progress flag)
     global image_in_progress, paired_device, data_id
     if image_in_progress and paired_device == device_id and data_id == img_id:  # TODO, these has to handled using someuniqueness
-        logger.info(f"[IMG] @@@@@@@@@@> TRANS MODE ended for device:{device_id}, img_id:{img_id}, by logic <@@@@@@@@@@")
+        logger.info(f"[IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:{device_id}, img_id:{img_id}, by logic ❮❮●●●●●●●●●●")
         image_in_progress = False
         paired_device = None
         data_id = None
     else:
-        logger.debug(f"[IMG] @@@@@@@@@@> TRANS MODE already ended, for device {device_id} and img_id {img_id} <@@@@@@@@@@") # will move it to debug later
+        logger.debug(f"[IMG] ○○○○○○○○○○❯❯ TRANS MODE already ended, for device {device_id} and img_id {img_id} ❮❮○○○○○○○○○○") # will move it to debug later
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
 
@@ -1192,7 +1192,7 @@ async def person_detection_loop():
         try:
             led.on()
             event_epoch_ms = get_epoch_ms() # epoch milisecond for event
-            logger.info(f"[PIR] @@@@@@@@@@> Motion detected - capturing image... <@@@@@@@@@@")
+            logger.info(f"[PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾")
             img = sensor.snapshot()
             person_image_count += 1
             total_image_count += 1
