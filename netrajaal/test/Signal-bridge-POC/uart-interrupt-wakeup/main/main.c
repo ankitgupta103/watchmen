@@ -13,6 +13,11 @@
 
 #define TAG "UART_READER"              // Logging tag
 
+// Mode selection: READ_MODE or WRITE_MODE
+#define READ_MODE  0
+#define WRITE_MODE 1
+#define CURRENT_MODE READ_MODE          // Change this to switch modes
+
 // GPIO pin definitions
 #define PIN_D21 21                     // GPIO21 - keep LOW
 #define PIN_D22 22                     // GPIO22 - keep LOW
@@ -37,6 +42,13 @@
 
 static TickType_t ledOffTime = 0;      // Timestamp when LED should turn off
 static uint8_t uartRxBuf[UART_RX_BUF_SIZE];  // Buffer for received UART data
+
+// UART write mode variables
+static uint16_t target_addr = 200;     // Target address (default: 200)
+static uint16_t own_addr = 100;        // Own address (default: 100)
+static int freq = 868;                  // Frequency in MHz
+static int freq_offset = 0;             // Frequency offset (freq - 850)
+static int message_counter = 0;        // Message counter
 
 // ============================================================================
 // GPIO FUNCTIONS
@@ -134,8 +146,9 @@ static void init_uart2(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
     
-    // Install UART driver with large buffer for 250+ byte packets
-    ESP_ERROR_CHECK(uart_driver_install(UART2_NUM, UART_DRIVER_BUF_SIZE, 0, 0, NULL, 0));
+    // Install UART driver with large RX buffer for 250+ byte packets
+    // TX buffer: 512 bytes for write mode
+    ESP_ERROR_CHECK(uart_driver_install(UART2_NUM, UART_DRIVER_BUF_SIZE, 512, 0, NULL, 0));
     
     // Apply UART configuration
     ESP_ERROR_CHECK(uart_param_config(UART2_NUM, &uart_config));
@@ -201,6 +214,47 @@ static int uart_read_packet(uint8_t *buffer, size_t buffer_size)
 }
 
 /**
+ * @brief Write data packet to UART2
+ * Packet format: [target_addr_high, target_addr_low, freq_offset, 
+ *                 own_addr_high, own_addr_low, freq_offset, message, \n]
+ * @param message Message data to send
+ * @param message_len Length of message
+ * @return Number of bytes written
+ */
+static int uart_write_packet(const uint8_t *message, size_t message_len)
+{
+    uint8_t packet[256];  // Max packet size
+    int idx = 0;
+    
+    // Build packet header
+    packet[idx++] = (target_addr >> 8) & 0xFF;      // target_addr high byte
+    packet[idx++] = target_addr & 0xFF;             // target_addr low byte
+    packet[idx++] = freq_offset & 0xFF;             // freq_offset
+    packet[idx++] = (own_addr >> 8) & 0xFF;         // own_addr high byte
+    packet[idx++] = own_addr & 0xFF;                 // own_addr low byte
+    packet[idx++] = freq_offset & 0xFF;             // freq_offset (again)
+    
+    // Add message
+    if (message_len > 0 && idx + message_len < sizeof(packet) - 1) {
+        memcpy(packet + idx, message, message_len);
+        idx += message_len;
+    }
+    
+    // Ensure newline terminator
+    if (idx == 0 || packet[idx - 1] != 0x0A) {
+        packet[idx++] = 0x0A;  // '\n'
+    }
+    
+    // Write to UART
+    int bytes_written = uart_write_bytes(UART2_NUM, packet, idx);
+    
+    ESP_LOGI(TAG, "Wrote packet: %d bytes (target=0x%04X, own=0x%04X, freq_offset=%d)", 
+             bytes_written, target_addr, own_addr, freq_offset);
+    
+    return bytes_written;
+}
+
+/**
  * @brief Print received packet in both ASCII and HEX format
  */
 static void print_packet(uint8_t *data, int length)
@@ -225,6 +279,40 @@ static void print_packet(uint8_t *data, int length)
 // ============================================================================
 // MAIN TASK
 // ============================================================================
+
+/**
+ * @brief UART write task - sends data packets periodically
+ */
+static void uart_write_task(void *pvParameters)
+{
+    ESP_LOGI(TAG, "UART write task started");
+    
+    // Ensure D21 and D22 are LOW in write mode
+    gpio_set_level(PIN_D21, 0);
+    gpio_set_level(PIN_D22, 0);
+    
+    while (1) {
+        // Build message with counter
+        char message[128];
+        int msg_len = snprintf(message, sizeof(message), 
+                              "Hello from LoRa! my name is anand and I am from heaven athat my meessage will not reach the target %d", 
+                              message_counter);
+        
+        if (msg_len > 0 && msg_len < sizeof(message)) {
+            // Write packet to UART
+            uart_write_packet((uint8_t *)message, msg_len);
+            
+            // Increment counter
+            message_counter++;
+            
+            // Blink LED to indicate data sent
+            led_blink();
+        }
+        
+        // Wait 800ms before next transmission
+        vTaskDelay(pdMS_TO_TICKS(350));
+    }
+}
 
 /**
  * @brief Main loop task - handles UART reading and LED control
@@ -271,11 +359,11 @@ static void main_loop_task(void *pvParameters)
 
 /**
  * @brief Main application entry point
- * Flow: Initialize -> Sleep -> Wake -> Start Reading
+ * Flow: Initialize -> (Read: Sleep -> Wake -> Read) or (Write: Start Writing)
  */
 void app_main(void)
 {
-    ESP_LOGI(TAG, "=== ESP32 UART Reader Application ===");
+    ESP_LOGI(TAG, "=== ESP32 UART Application ===");
     
     // Step 1: Initialize GPIO pins (D21, D22 LOW, LED)
     init_gpio_pins();
@@ -283,18 +371,40 @@ void app_main(void)
     // Step 2: Initialize UART2
     init_uart2();
     
-    // Step 3: Configure wake-up GPIO (D4) and enter light sleep
-    init_wakeup_gpio();
+    // Step 3: Calculate frequency offset
+    freq_offset = freq - 850;
+    ESP_LOGI(TAG, "Config: target_addr=0x%04X, own_addr=0x%04X, freq=%d, freq_offset=%d", 
+             target_addr, own_addr, freq, freq_offset);
     
-    ESP_LOGI(TAG, "Entering light sleep. Wake when D4 (GPIO4) goes LOW...");
+#if CURRENT_MODE == READ_MODE
+    // ========== READ MODE ==========
+    ESP_LOGI(TAG, "Mode: READ - Entering light sleep. Wake when D4 (GPIO4) goes LOW...");
+    
+    // Configure wake-up GPIO (D4) and enter light sleep
+    init_wakeup_gpio();
     esp_light_sleep_start();  // Sleep until D4 goes LOW
     
-    // Step 4: Woke up - check wake reason
+    // Woke up - check wake reason
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
     ESP_LOGI(TAG, "Woke from sleep (cause: %d)", cause);
     
-    // Step 5: Start UART reading task
+    // Start UART reading task
     xTaskCreate(main_loop_task, "uart_reader", 4096, NULL, 5, NULL);
+    ESP_LOGI(TAG, "UART reading task started");
     
-    ESP_LOGI(TAG, "Application ready - reading UART2 data...");
+#elif CURRENT_MODE == WRITE_MODE
+    // ========== WRITE MODE ==========
+    ESP_LOGI(TAG, "Mode: WRITE - Starting UART transmission");
+    
+    // Ensure D21 and D22 are LOW in write mode
+    gpio_set_level(PIN_D21, 0);
+    gpio_set_level(PIN_D22, 0);
+    
+    // Start UART write task
+    xTaskCreate(uart_write_task, "uart_writer", 4096, NULL, 5, NULL);
+    ESP_LOGI(TAG, "UART write task started");
+    
+#else
+    #error "Invalid CURRENT_MODE - must be READ_MODE or WRITE_MODE"
+#endif
 }
