@@ -209,10 +209,17 @@ class SX1262:
         
         Used for operations that take longer (SetTx, SetRx, calibration)
         
-        Note: If BUSY is already LOW, returns immediately (no wait needed)
+        Note: After SetTx/SetRx, chip may need a moment to start processing.
+        We wait briefly, then check BUSY state.
         """
-        # If BUSY is already LOW, no need to wait
+        # Small delay to allow chip to start processing command
+        # Some commands (like SetTx) may not assert BUSY immediately
+        time.sleep_us(100)  # 100us delay
+        
+        # Check BUSY state
         if self.busy.value() == 0:
+            # BUSY is LOW - command may have completed very quickly
+            # This is OK for some commands
             return
         
         # BUSY is HIGH - wait for it to go LOW
@@ -657,22 +664,20 @@ class SX1262:
         self.spi.write(bytes([CMD_SET_TX] + timeout_bytes))
         self.cs.value(1)
         
-        # After SetTx command, BUSY behavior:
-        # 1. BUSY may go HIGH immediately (chip processing command)
-        # 2. BUSY may stay LOW (command accepted, processing very fast, or TX already started)
-        # 3. We need to wait for BUSY to go LOW if it went HIGH
+        # After SetTx command:
+        # - Chip may assert BUSY HIGH immediately (processing command)
+        # - Chip may keep BUSY LOW (command processed very quickly)
+        # - We wait briefly, then check BUSY state
+        # - If BUSY is LOW, command completed quickly (OK)
+        # - If BUSY is HIGH, wait for it to go LOW
+        time.sleep_us(200)  # Brief delay to allow chip to start processing
         
-        # Check if BUSY is already LOW (command accepted immediately or TX already started)
-        if self.busy.value() == 0:
-            # BUSY is LOW - command may have completed very quickly
-            # This is OK - chip is ready, TX may have already started
-            # Small delay to allow any internal processing
-            time.sleep_ms(1)
-            return
-        
-        # BUSY is HIGH - wait for it to go LOW (command processing complete)
-        # Use extended timeout for SetTx (allows for TCXO + calibration delays)
-        self._wait_on_busy_extended(timeout_ms=5000)
+        # Check BUSY - if LOW, command completed quickly, proceed
+        # If HIGH, wait for it to go LOW (command processing)
+        if self.busy.value() == 1:
+            # BUSY is HIGH - wait for command processing to complete
+            self._wait_on_busy_extended(timeout_ms=5000)
+        # If BUSY is LOW, command completed quickly - proceed
     
     def set_rx(self, timeout=0xFFFFFF):
         """
@@ -1013,7 +1018,9 @@ class SX1262:
                 self._wait_on_busy()  # Wait for standby transition to complete
                 # Additional delay to ensure chip is fully settled in STDBY
                 # This prevents BUSY timeout on next SetTx() if chip is still in FS
-                time.sleep_ms(5)  # Allow FS → STDBY transition to complete
+                time.sleep_ms(10)  # Allow FS → STDBY transition to complete (increased for reliability)
+                # Final BUSY check to ensure chip is fully ready
+                self._wait_on_busy()
                 return True
             
             if irq & IRQ_RX_TX_TIMEOUT:
@@ -1050,10 +1057,18 @@ class SX1262:
         Returns:
             tuple: (data, rssi, snr) or (None, None, None) on timeout/error
         """
+        # Ensure chip is ready before starting RX sequence
+        # Simple approach: wait for BUSY LOW, then proceed
+        self._wait_on_busy()  # Wait for any pending operations (normal timeout)
+        
         # Switch to XOSC standby before RX (REQUIRED for stable RX)
         # RC oscillator is not stable enough - XOSC provides stable reference
         self.set_standby(STDBY_XOSC)
-        time.sleep_ms(2)  # Allow XOSC to stabilize
+        time.sleep_ms(5)  # Allow XOSC to stabilize (increased from 2ms)
+        self._wait_on_busy()  # Ensure standby transition completes
+        
+        # Clear device errors (stale errors can prevent command execution)
+        self.clear_device_errors()
         
         # Clear IRQ flags
         self.clear_irq_status(0xFFFF)
@@ -1097,10 +1112,9 @@ class SX1262:
                 # FS (Frequency Synthesis) state can take time and BUSY may be HIGH
                 # We must wait for this transition to complete
                 self.set_standby(STDBY_RC)
-                self._wait_on_busy()  # Wait for standby transition to complete
-                # Additional delay to ensure chip is fully settled in STDBY
-                # This prevents BUSY timeout on next SetRx() if chip is still in FS
-                time.sleep_ms(5)  # Allow FS → STDBY transition to complete
+                self._wait_on_busy()  # Wait for SetStandby command to complete
+                # Small delay to allow FS → STDBY transition to complete
+                time.sleep_ms(5)  # Allow state transition (reduced from 10ms for faster operation)
                 
                 return (data, rssi, snr)
             

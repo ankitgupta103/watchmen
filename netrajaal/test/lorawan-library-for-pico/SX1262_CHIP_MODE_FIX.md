@@ -21,6 +21,7 @@ Chip mode after TX: 1 (STDBY_XOSC)
 ### Wrong Decoding (Previous Implementation)
 
 ```python
+
 chip_mode = (status >> 6) & 0x03  # WRONG
 ```
 
