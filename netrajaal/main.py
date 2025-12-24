@@ -1276,7 +1276,7 @@ async def person_detection_loop():
 async def send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes):
     # Input: enc_msgbytes: bytes already encrypted image; 
     # Output: bool indicating if image was forwarded successfully to next_node of spath
-    logger.info(f"[IMG] Sending image of creator={creator}, size={len(enc_msgbytes)} bytes (already encrypted) to the network")
+    logger.info(f"[IMG] Sending image of creator={creator}, size={len(enc_msgbytes)} bytes, to the network")
     try:
         next_dst = next_device_in_spath()
         if next_dst:
