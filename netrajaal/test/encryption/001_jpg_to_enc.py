@@ -59,7 +59,7 @@ encnode = enc.EncNode(creator)
 # Main Task: Encrypt JPG image and save as ENC
 # ---------------------------------------------------------------------------
 def main():
-    
+    print("INFO, Starting JPG to ENC conversion test...")
     
     
     # input file

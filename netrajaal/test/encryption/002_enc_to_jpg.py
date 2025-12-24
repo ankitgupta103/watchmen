@@ -54,15 +54,16 @@ create_dir_if_not_exists(MY_IMAGE_DIR)
 # Main Task: Decrypt encrypted image and save as JPG
 # ---------------------------------------------------------------------------
 def main():
+    print("INFO, Starting ENC to JPG conversion test...")
     creator = 221
     encnode = enc.EncNode(creator)
     
     
     
     # input file
-    enc_filepath = f"{MY_IMAGE_DIR}/221_1735689810000.enc"
+    enc_filepath = f"{MY_IMAGE_DIR}/221_1735689700000.enc"
     # output file
-    jpg_file_path = f"{MY_IMAGE_DIR}/221_1735689810000_raw_testing.jpg"
+    jpg_file_path = f"{MY_IMAGE_DIR}/221_1735689700000_raw_testing.jpg"
     
     
     
@@ -86,6 +87,8 @@ def main():
         img = image.Image(320, 240, image.JPEG, buffer=img_bytes)
         print(f"INFO, [IMG] Saving to file {jpg_file_path}, img_size: {len(img_bytes)} bytes")
         img.save(jpg_file_path)
+    except Exception as e:
+        print(f"ERROR, [IMG] Failed to decrypt and save image: {e}")
     finally:
         # Explicitly clean up image objects
         if img_bytes is not None:
@@ -94,3 +97,6 @@ def main():
             del img
         # Help GC reclaim memory
         gc.collect()
+
+if __name__ == "__main__":
+    main()
