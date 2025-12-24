@@ -1006,9 +1006,14 @@ class SX1262:
                 # TX successful
                 self.clear_irq_status(IRQ_TX_DONE)
                 # Return to RC standby for power saving (XOSC was only needed for TX)
-                # Wait for BUSY to ensure standby transition completes before next TX
+                # CRITICAL: After TX_DONE, chip transitions: TX → FS → STDBY
+                # FS (Frequency Synthesis) state can take time and BUSY may be HIGH
+                # We must wait for this transition to complete before next command
                 self.set_standby(STDBY_RC)
-                self._wait_on_busy()  # Ensure standby transition completes
+                self._wait_on_busy()  # Wait for standby transition to complete
+                # Additional delay to ensure chip is fully settled in STDBY
+                # This prevents BUSY timeout on next SetTx() if chip is still in FS
+                time.sleep_ms(5)  # Allow FS → STDBY transition to complete
                 return True
             
             if irq & IRQ_RX_TX_TIMEOUT:
@@ -1088,7 +1093,14 @@ class SX1262:
                 # Clear IRQ
                 self.clear_irq_status(IRQ_RX_DONE)
                 # Return to RC standby for power saving
+                # CRITICAL: After RX_DONE, chip transitions: RX → FS → STDBY
+                # FS (Frequency Synthesis) state can take time and BUSY may be HIGH
+                # We must wait for this transition to complete
                 self.set_standby(STDBY_RC)
+                self._wait_on_busy()  # Wait for standby transition to complete
+                # Additional delay to ensure chip is fully settled in STDBY
+                # This prevents BUSY timeout on next SetRx() if chip is still in FS
+                time.sleep_ms(5)  # Allow FS → STDBY transition to complete
                 
                 return (data, rssi, snr)
             
@@ -1096,17 +1108,23 @@ class SX1262:
                 self.clear_irq_status(IRQ_CRC_ERROR)
                 # Return to RC standby
                 self.set_standby(STDBY_RC)
+                self._wait_on_busy()
+                time.sleep_ms(5)  # Allow state transition
                 return (None, None, None)
             
             if irq & IRQ_RX_TX_TIMEOUT:
                 self.clear_irq_status(IRQ_RX_TX_TIMEOUT)
                 # Return to RC standby
                 self.set_standby(STDBY_RC)
+                self._wait_on_busy()
+                time.sleep_ms(5)  # Allow state transition
                 return (None, None, None)
             
             if timeout_ms > 0 and time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
                 # Return to RC standby
                 self.set_standby(STDBY_RC)
+                self._wait_on_busy()
+                time.sleep_ms(5)  # Allow state transition
                 return (None, None, None)
             
             time.sleep_ms(10)
