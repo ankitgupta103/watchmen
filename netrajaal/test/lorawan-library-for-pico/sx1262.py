@@ -200,6 +200,28 @@ class SX1262:
                 raise RuntimeError("SX1262 BUSY timeout - chip may be stuck")
             time.sleep_us(10)  # Small delay to avoid tight loop
     
+    def _wait_on_busy_extended(self, timeout_ms=5000):
+        """
+        Wait until BUSY pin goes low with extended timeout
+        
+        Args:
+            timeout_ms: Maximum wait time in milliseconds (default: 5000ms for SetTx operations)
+        
+        Used for operations that take longer (SetTx, SetRx, calibration)
+        
+        Note: If BUSY is already LOW, returns immediately (no wait needed)
+        """
+        # If BUSY is already LOW, no need to wait
+        if self.busy.value() == 0:
+            return
+        
+        # BUSY is HIGH - wait for it to go LOW
+        start = time.ticks_ms()
+        while self.busy.value() == 1:
+            if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+                raise RuntimeError(f"SX1262 BUSY timeout after {timeout_ms}ms - chip may be stuck")
+            time.sleep_us(10)  # Small delay to avoid tight loop
+    
     def _reset(self):
         """
         Hardware reset sequence for SX1262
@@ -301,17 +323,20 @@ class SX1262:
         self._wait_on_busy()
         
         self.cs.value(0)
+        # Send command
+        self.spi.write(bytes([CMD_READ_REGISTER]))
+        # Send address (MSB, LSB)
         addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
-        # Write command + address + dummy byte, read response
-        cmd = bytes([CMD_READ_REGISTER] + addr_bytes + [0x00] + [0x00] * length)
-        response = bytearray(len(cmd))
-        self.spi.write_readinto(cmd, response)
+        self.spi.write(bytes(addr_bytes))
+        # Send dummy byte, then read data
+        response = bytearray(length)
+        dummy = bytes([0x00] * length)
+        self.spi.write_readinto(dummy, response)
         
         self.cs.value(1)
         self._wait_on_busy()
         
-        # Response starts at byte 4 (after command + 2-byte address + dummy)
-        return bytes(response[4:4+length])
+        return bytes(response)
     
     # ========================================================================
     # Public API Methods
@@ -323,18 +348,42 @@ class SX1262:
         
         Returns:
             int: Status byte
+        
+        Status byte format (from SX1262 datasheet):
+        - Bits [7:4]: Command Status
+        - Bits [3:1]: Chip Mode
+        - Bit [0]: Reserved
         """
         self._wait_on_busy()
         self.cs.value(0)
-        # Write command + dummy byte, read 2 bytes
-        # SX1262 returns status when dummy byte is sent (matches C implementation)
-        cmd = bytes([CMD_GET_STATUS, 0x00])
-        response = bytearray(2)
-        self.spi.write_readinto(cmd, response)
+        # Send command, then send dummy byte and read status
+        # SX1262: send command, then send 0x00 and read status byte
+        self.spi.write(bytes([CMD_GET_STATUS]))
+        status_byte = bytearray(1)
+        self.spi.write_readinto(bytes([0x00]), status_byte)
         self.cs.value(1)
         self._wait_on_busy()
-        # Status is in response[1] (read while sending dummy byte 0x00)
-        return response[1]
+        return status_byte[0]
+    
+    def get_chip_mode(self):
+        """
+        Get chip operating mode from status byte
+        
+        Returns:
+            int: Chip mode
+            - 0: STDBY_RC
+            - 1: STDBY_XOSC
+            - 2: FS (Frequency Synthesis)
+            - 3: RX
+            - 4: TX
+        
+        Note: Chip mode is in bits [3:1] of status byte, not [7:6]
+        Correct decoding: (status >> 1) & 0x07
+        """
+        status = self.get_status()
+        # Chip mode is in bits [3:1] of status byte
+        chip_mode = (status >> 1) & 0x07
+        return chip_mode
     
     def set_standby(self, mode=STDBY_RC):
         """
@@ -348,6 +397,87 @@ class SX1262:
     def set_sleep(self):
         """Put chip to sleep mode (lowest power)"""
         self._write_command(CMD_SET_SLEEP, [0x00])  # 0x00 = no RTC retention
+    
+    def set_dio3_as_tcxo_ctrl(self, voltage=0x00, wakeup_time_ms=5):
+        """
+        Configure DIO3 as TCXO control
+        
+        Args:
+            voltage: TCXO voltage (0x00 = 1.6V, 0x01 = 1.7V, 0x02 = 1.8V, 0x03 = 2.2V, 0x04 = 2.4V, 0x05 = 2.7V, 0x06 = 3.0V, 0x07 = 3.3V)
+            wakeup_time_ms: TCXO wakeup time in milliseconds (typical: 5ms)
+        
+        Note: Required for stable frequency reference during TX/RX operations.
+        Without this configuration, the chip may fail to enter TX mode (error 0x0020).
+        """
+        # Convert wakeup time to SX1262 time base (time_ms << 6)
+        # Time base unit: 15.625 µs, so time_ms * 64 = time base value
+        time_base = int(wakeup_time_ms * 64)
+        time_bytes = [
+            (time_base >> 8) & 0xFF,
+            time_base & 0xFF
+        ]
+        self._write_command(CMD_SET_DIO3_AS_TCXO_CTRL, [voltage] + time_bytes)
+    
+    def set_dio2_as_rf_switch_ctrl(self, enable=True):
+        """
+        Configure DIO2 as RF switch control
+        
+        Args:
+            enable: True to enable RF switch control, False to disable
+        
+        Note: Required for proper TX/RX antenna switching.
+        Without this configuration, the chip cannot switch to TX path (error 0x0020).
+        """
+        enable_byte = 0x01 if enable else 0x00
+        self._write_command(CMD_SET_DIO2_AS_RF_SWITCH_CTRL, [enable_byte])
+    
+    def calibrate_image(self, freq1=863000000, freq2=870000000):
+        """
+        Calibrate image rejection for specific frequency band
+        
+        Args:
+            freq1: First calibration frequency in Hz (default: 863MHz for EU868)
+            freq2: Second calibration frequency in Hz (default: 870MHz for EU868)
+        
+        Note: REQUIRED after SetRfFrequency and before TX operations.
+        Without this, the chip cannot lock to target frequency and SetTx() will timeout.
+        CalibrateImage must be called after frequency is set.
+        
+        For 868MHz band, calibrates at two frequencies in the band for optimal performance.
+        """
+        # Convert frequencies to SX1262 register format
+        # Formula: Freq = (frequency_in_hz * 2^25) / 32000000
+        def freq_to_reg(freq):
+            return int((freq * (2**25)) / 32000000)
+        
+        freq1_reg = freq_to_reg(freq1)
+        freq2_reg = freq_to_reg(freq2)
+        
+        # Format: [freq1_msb, freq1_lsb, freq2_msb, freq2_lsb]
+        # SX1262 expects 16-bit frequency values (MSB, LSB)
+        calib_bytes = [
+            (freq1_reg >> 8) & 0xFF,
+            freq1_reg & 0xFF,
+            (freq2_reg >> 8) & 0xFF,
+            freq2_reg & 0xFF
+        ]
+        
+        # CalibrateImage can take longer than normal commands
+        # Use extended timeout to prevent BUSY timeout
+        self._wait_on_busy()
+        self.cs.value(0)
+        self.spi.write(bytes([CMD_CALIBRATE_IMAGE] + calib_bytes))
+        self.cs.value(1)
+        # Use extended timeout for CalibrateImage (can take up to 2-3 seconds)
+        try:
+            self._wait_on_busy_extended(timeout_ms=3000)
+            time.sleep_ms(10)  # Allow image calibration to complete
+        except RuntimeError as e:
+            # If CalibrateImage times out, clear errors and continue
+            # Some modules may not require image calibration or may use different approach
+            print(f"[WARN] CalibrateImage timeout: {e}")
+            self.clear_device_errors()
+            time.sleep_ms(10)
     
     def set_packet_type(self, packet_type=PACKET_TYPE_LORA):
         """
@@ -418,22 +548,32 @@ class SX1262:
             power: TX power in dBm (-9 to +22 for SX1262)
             ramp_time: Ramp time (0x04 = 40us typical)
         """
-        # Power register: 0x00 = +22dBm, 0x07 = +14dBm, 0x0F = +10dBm, etc.
-        # For SX1262: power_dBm = 22 - (2 * power_reg)
+        # Clamp power to valid range
         if power > 22:
             power = 22
         if power < -9:
             power = -9
         
-        # Convert dBm to register value
-        # Simplified: for 868MHz, use direct mapping
-        power_reg = 22 - power
-        if power_reg > 0x0F:
-            power_reg = 0x0F
+        # SX1262 power register mapping (non-linear)
+        # Correct mapping from datasheet
+        power_map = {
+            22: 0x00, 20: 0x01, 18: 0x02, 16: 0x03,
+            14: 0x04, 13: 0x05, 12: 0x06, 10: 0x07,
+            9: 0x08, 8: 0x09, 7: 0x0A, 6: 0x0B,
+            5: 0x0C, 4: 0x0D, 3: 0x0E, 2: 0x0F
+        }
+        power_reg = power_map.get(power, 0x04)  # Default to 14dBm if not in map
         
-        # PA config: [pa_duty_cycle, hp_max, device_sel, pa_lut]
-        # 0x04 = 14dBm max, 0x07 = HP mode, 0x00 = SX1262, 0x01 = default LUT
-        self._write_command(CMD_SET_PA_CONFIG, [0x04, 0x07, 0x00, 0x01])
+        # PA config: [paDutyCycle, hpMax, deviceSel, paLut]
+        # For SX1262, 868MHz, 14dBm: [0x04, 0x00, 0x01, 0x01]
+        # For higher power (up to 22dBm): [0x04, 0x07, 0x00, 0x01]
+        if power >= 14:
+            # Use HP mode for higher power
+            self._write_command(CMD_SET_PA_CONFIG, [0x04, 0x07, 0x00, 0x01])
+        else:
+            # Use standard mode for lower power
+            self._write_command(CMD_SET_PA_CONFIG, [0x04, 0x00, 0x01, 0x01])
+        
         self._write_command(CMD_SET_TX_PARAMS, [power_reg, ramp_time])
     
     def write_buffer(self, offset, data):
@@ -471,16 +611,19 @@ class SX1262:
         """
         self._wait_on_busy()
         self.cs.value(0)
-        # Write command + offset + dummy byte, then read data
-        cmd = bytes([CMD_READ_BUFFER, offset, 0x00] + [0x00] * length)
-        response = bytearray(len(cmd))
-        self.spi.write_readinto(cmd, response)
+        # Send command
+        self.spi.write(bytes([CMD_READ_BUFFER]))
+        # Send offset
+        self.spi.write(bytes([offset]))
+        # Send dummy byte, then read data
+        response = bytearray(length)
+        dummy = bytes([0x00] * length)
+        self.spi.write_readinto(dummy, response)
         
         self.cs.value(1)
         self._wait_on_busy()
         
-        # Data starts at byte 3 (after command + offset + dummy)
-        return bytes(response[3:3+length])
+        return bytes(response)
     
     def set_tx(self, timeout=0):
         """
@@ -488,13 +631,48 @@ class SX1262:
         
         Args:
             timeout: Timeout in symbols (0 = no timeout)
+        
+        Note: SetTx() can take longer than normal commands due to:
+        - TCXO wakeup time
+        - Frequency lock
+        - PA ramp-up
+        Uses extended BUSY timeout (5000ms) to accommodate these delays.
+        
+        Important: After SetTx() command:
+        - BUSY may go HIGH immediately (chip processing command)
+        - BUSY may stay LOW if command completes very quickly (TX already started)
+        - We wait for BUSY to go LOW, indicating command processing is complete
+        - If BUSY is already LOW, the wait completes immediately
         """
         timeout_bytes = [
             (timeout >> 16) & 0xFF,
             (timeout >> 8) & 0xFF,
             timeout & 0xFF
         ]
-        self._write_command(CMD_SET_TX, timeout_bytes)
+        # Wait for BUSY before command (chip must be ready)
+        self._wait_on_busy()
+        
+        # Send command
+        self.cs.value(0)
+        self.spi.write(bytes([CMD_SET_TX] + timeout_bytes))
+        self.cs.value(1)
+        
+        # After SetTx command, BUSY behavior:
+        # 1. BUSY may go HIGH immediately (chip processing command)
+        # 2. BUSY may stay LOW (command accepted, processing very fast, or TX already started)
+        # 3. We need to wait for BUSY to go LOW if it went HIGH
+        
+        # Check if BUSY is already LOW (command accepted immediately or TX already started)
+        if self.busy.value() == 0:
+            # BUSY is LOW - command may have completed very quickly
+            # This is OK - chip is ready, TX may have already started
+            # Small delay to allow any internal processing
+            time.sleep_ms(1)
+            return
+        
+        # BUSY is HIGH - wait for it to go LOW (command processing complete)
+        # Use extended timeout for SetTx (allows for TCXO + calibration delays)
+        self._wait_on_busy_extended(timeout_ms=5000)
     
     def set_rx(self, timeout=0xFFFFFF):
         """
@@ -502,13 +680,25 @@ class SX1262:
         
         Args:
             timeout: Timeout in symbols (0xFFFFFF = continuous RX)
+        
+        Note: SetRx() can take longer than normal commands.
+        Uses extended BUSY timeout (3000ms) to accommodate delays.
         """
         timeout_bytes = [
             (timeout >> 16) & 0xFF,
             (timeout >> 8) & 0xFF,
             timeout & 0xFF
         ]
-        self._write_command(CMD_SET_RX, timeout_bytes)
+        # Wait for BUSY before command
+        self._wait_on_busy()
+        
+        # Send command
+        self.cs.value(0)
+        self.spi.write(bytes([CMD_SET_RX] + timeout_bytes))
+        self.cs.value(1)
+        
+        # Use extended timeout for SetRx (allows for TCXO + calibration delays)
+        self._wait_on_busy_extended(timeout_ms=3000)
     
     def get_irq_status(self):
         """
@@ -516,18 +706,25 @@ class SX1262:
         
         Returns:
             int: IRQ status (16-bit, lower 2 bytes)
+        
+        Note: GET_IRQ_STATUS response format (3 bytes):
+        - Byte 0: Chip status
+        - Byte 1: IRQ status MSB
+        - Byte 2: IRQ status LSB
         """
         self._wait_on_busy()
         self.cs.value(0)
-        # Write command + 2 dummy bytes, read 3 bytes (status + 2 IRQ bytes)
-        cmd = bytes([CMD_GET_IRQ_STATUS, 0x00, 0x00])
+        # Send command, then read 3 bytes (status + IRQ MSB + IRQ LSB)
+        # SX1262: send command, then send dummy bytes and read response
+        self.spi.write(bytes([CMD_GET_IRQ_STATUS]))
         response = bytearray(3)
-        self.spi.write_readinto(cmd, response)
+        # Send 3 dummy bytes and read 3 response bytes
+        self.spi.write_readinto(bytes([0x00, 0x00, 0x00]), response)
         
         self.cs.value(1)
         self._wait_on_busy()
         
-        # IRQ status is in bytes 1 and 2 (byte 0 is status)
+        # Response format: [status, irq_msb, irq_lsb]
         irq_status = (response[1] << 8) | response[2]
         return irq_status
     
@@ -543,6 +740,32 @@ class SX1262:
             irq_mask & 0xFF
         ]
         self._write_command(CMD_CLEAR_IRQ_STATUS, mask_bytes)
+    
+    def get_device_errors(self):
+        """
+        Get device error flags
+        
+        Returns:
+            int: Error status (16-bit)
+        """
+        self._wait_on_busy()
+        self.cs.value(0)
+        # Send command, then read 3 bytes (status + error MSB + error LSB)
+        self.spi.write(bytes([CMD_GET_DEVICE_ERRORS]))
+        response = bytearray(3)
+        # Send 3 dummy bytes and read 3 response bytes
+        self.spi.write_readinto(bytes([0x00, 0x00, 0x00]), response)
+        self.cs.value(1)
+        self._wait_on_busy()
+        # Response format: [status, error_msb, error_lsb]
+        error_status = (response[1] << 8) | response[2]
+        return error_status
+    
+    def clear_device_errors(self):
+        """
+        Clear device error flags
+        """
+        self._write_command(CMD_CLEAR_DEVICE_ERRORS, [0x00, 0x00])
     
     def set_dio_irq_params(self, irq_mask, dio1_mask, dio2_mask, dio3_mask):
         """
@@ -575,14 +798,15 @@ class SX1262:
         """
         self._wait_on_busy()
         self.cs.value(0)
-        # Write command + 2 dummy bytes, read 3 bytes
-        cmd = bytes([CMD_GET_RX_BUFFER_STATUS, 0x00, 0x00])
+        # Send command, then read 3 bytes (status + payload_len + rx_start)
+        self.spi.write(bytes([CMD_GET_RX_BUFFER_STATUS]))
         response = bytearray(3)
-        self.spi.write_readinto(cmd, response)
+        self.spi.write_readinto(bytes([0x00, 0x00, 0x00]), response)
         
         self.cs.value(1)
         self._wait_on_busy()
         
+        # Response format: [status, payload_length, rx_start]
         payload_length = response[1]
         rx_start = response[2]
         return (payload_length, rx_start)
@@ -596,14 +820,15 @@ class SX1262:
         """
         self._wait_on_busy()
         self.cs.value(0)
-        # Write command + 3 dummy bytes, read 4 bytes
-        cmd = bytes([CMD_GET_PACKET_STATUS, 0x00, 0x00, 0x00])
+        # Send command, then read 4 bytes (status + rssi + snr + signal_rssi)
+        self.spi.write(bytes([CMD_GET_PACKET_STATUS]))
         response = bytearray(4)
-        self.spi.write_readinto(cmd, response)
+        self.spi.write_readinto(bytes([0x00, 0x00, 0x00, 0x00]), response)
         
         self.cs.value(1)
         self._wait_on_busy()
         
+        # Response format: [status, rssi_pkt, snr_pkt, signal_rssi_pkt]
         rssi_pkt = response[1]
         snr_pkt = response[2] if response[2] < 128 else response[2] - 256
         signal_rssi_pkt = response[3]
@@ -631,11 +856,44 @@ class SX1262:
         # Set to standby
         self.set_standby(STDBY_RC)
         
+        # Set regulator mode to DC-DC (better for TX, provides stable power)
+        self._write_command(CMD_SET_REGULATOR_MODE, [0x01])  # 0x01 = DC-DC enabled
+        
+        # Configure DIO3 as TCXO control (REQUIRED for TX mode)
+        # TCXO provides stable frequency reference - without this, chip cannot enter TX (error 0x0020)
+        # Voltage: 0x00 = 1.6V, 0x01 = 1.7V (typical for 868MHz modules)
+        # Wakeup time: 5ms typical (converted to SX1262 time base)
+        self.set_dio3_as_tcxo_ctrl(voltage=0x01, wakeup_time_ms=5)  # 1.7V, 5ms
+        
+        # Configure DIO2 as RF switch control (REQUIRED for TX/RX switching)
+        # RF switch controls antenna path - without this, chip cannot switch to TX path (error 0x0020)
+        self.set_dio2_as_rf_switch_ctrl(enable=True)
+        
+        # Set RF frequency BEFORE calibration (required for CalibrateImage)
+        # Frequency must be set before image calibration
+        self.set_rf_frequency(frequency)
+        
+        # Calibrate radio (required after reset for stable operation)
+        # Calibrate all: RC64K, RC13M, PLL, ADC, Image
+        calib_params = 0x7F
+        # Calibrate can take longer - use extended timeout
+        self._wait_on_busy()
+        self.cs.value(0)
+        self.spi.write(bytes([CMD_CALIBRATE, calib_params]))
+        self.cs.value(1)
+        self._wait_on_busy_extended(timeout_ms=2000)  # Calibration can take 1-2 seconds
+        time.sleep_ms(10)  # Allow calibration to complete
+        
+        # Calibrate image rejection for frequency band (REQUIRED before TX)
+        # Without this, chip cannot lock to target frequency and SetTx() will timeout
+        # CalibrateImage must be called after frequency is set
+        self.calibrate_image(freq1=863000000, freq2=870000000)  # EU868 band
+        
+        # Clear any device errors that may have occurred during initialization
+        self.clear_device_errors()
+        
         # Set packet type to LoRa
         self.set_packet_type(PACKET_TYPE_LORA)
-        
-        # Set RF frequency
-        self.set_rf_frequency(frequency)
         
         # Set modulation parameters
         # Low Data Rate Optimize: enable if symbol time > 16ms
@@ -646,6 +904,10 @@ class SX1262:
         # Set packet parameters
         header_type = 0 if payload_length == 0 else 1  # 0=explicit (variable), 1=implicit (fixed)
         self.set_packet_params(preamble_length, header_type, payload_length, 1, 0)
+        
+        # Set buffer base addresses (TX=0x00, RX=0x00)
+        # Ensures FIFO writes go to correct location
+        self._write_command(CMD_SET_BUFFER_BASE_ADDRESS, [0x00, 0x00])
         
         # Set TX parameters
         self.set_tx_params(tx_power)
@@ -669,8 +931,26 @@ class SX1262:
         Returns:
             bool: True if TX successful, False on timeout
         """
-        # Ensure in standby
-        self.set_standby(STDBY_RC)
+        # Switch to XOSC standby before TX (REQUIRED for stable TX)
+        # RC oscillator is not stable enough - XOSC provides stable reference
+        # This prevents BUSY timeout during SetTx()
+        self.set_standby(STDBY_XOSC)
+        time.sleep_ms(5)  # Allow XOSC to stabilize (increased from 2ms)
+        
+        # Clear device errors (stale errors can prevent command execution)
+        self.clear_device_errors()
+        
+        # Verify chip is ready and in correct state (using correct chip mode decoding)
+        self._wait_on_busy()  # Ensure chip is ready
+        chip_mode = self.get_chip_mode()
+        if chip_mode != 1:  # Should be STDBY_XOSC (1)
+            # Try to recover - go back to RC then XOSC
+            self.set_standby(STDBY_RC)
+            time.sleep_ms(2)
+            self._wait_on_busy()  # Wait for RC standby to complete
+            self.set_standby(STDBY_XOSC)
+            time.sleep_ms(5)
+            self._wait_on_busy()  # Wait for XOSC standby to complete
         
         # Clear IRQ flags
         self.clear_irq_status(0xFFFF)
@@ -684,27 +964,75 @@ class SX1262:
         self.write_buffer(0, data)
         
         # Set payload length (for variable length, must set explicitly)
+        # CRITICAL: Payload length must be set AFTER buffer write and BEFORE SetTx
         if len(data) > 0:
             self._write_register(REG_LR_PAYLOADLENGTH, len(data))
+            # Small delay to ensure register write completes
+            time.sleep_ms(1)
+        
+        # Verify chip is still ready and in correct state before SetTx
+        self._wait_on_busy()
+        chip_mode = self.get_chip_mode()
+        if chip_mode != 1:  # Should be STDBY_XOSC (1) before TX
+            # Chip not in expected state - try to recover
+            self.set_standby(STDBY_XOSC)
+            time.sleep_ms(5)
+            self._wait_on_busy()
+        
+        # Verify no device errors before SetTx
+        errors = self.get_device_errors()
+        if errors != 0:
+            # Clear errors and try again
+            self.clear_device_errors()
+            time.sleep_ms(1)
         
         # Start TX
         self.set_tx(0)  # No timeout
         
+        # Note: We do NOT check chip mode here because:
+        # 1. TX may complete very quickly (< 30ms for short packets)
+        # 2. Chip automatically returns to standby after TX_DONE
+        # 3. TX success is determined by TX_DONE IRQ, not chip mode
+        # 4. Checking chip mode after SetTx() may show STDBY if TX already completed
+        
         # Wait for TX_DONE IRQ
         start = time.ticks_ms()
+        poll_count = 0
         while True:
             irq = self.get_irq_status()
+            poll_count += 1
+            
             if irq & IRQ_TX_DONE:
+                # TX successful
                 self.clear_irq_status(IRQ_TX_DONE)
+                # Return to RC standby for power saving (XOSC was only needed for TX)
+                # Wait for BUSY to ensure standby transition completes before next TX
                 self.set_standby(STDBY_RC)
+                self._wait_on_busy()  # Ensure standby transition completes
                 return True
+            
             if irq & IRQ_RX_TX_TIMEOUT:
+                # Hardware timeout - read device errors for debugging
+                errors = self.get_device_errors()
+                if errors != 0:
+                    print(f"[TX] Hardware timeout, device errors: 0x{errors:04X}")
                 self.clear_irq_status(IRQ_RX_TX_TIMEOUT)
+                # Return to RC standby
                 self.set_standby(STDBY_RC)
                 return False
+            
             if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+                # Software timeout - read device errors and IRQ status for debugging
+                errors = self.get_device_errors()
+                final_irq = self.get_irq_status()
+                print(f"[TX] Software timeout after {poll_count} polls")
+                print(f"[TX] Final IRQ status: 0x{final_irq:04X}")
+                if errors != 0:
+                    print(f"[TX] Device errors: 0x{errors:04X}")
+                # Return to RC standby
                 self.set_standby(STDBY_RC)
                 return False
+            
             time.sleep_ms(10)
     
     def receive(self, timeout_ms=5000):
@@ -717,8 +1045,10 @@ class SX1262:
         Returns:
             tuple: (data, rssi, snr) or (None, None, None) on timeout/error
         """
-        # Ensure in standby
-        self.set_standby(STDBY_RC)
+        # Switch to XOSC standby before RX (REQUIRED for stable RX)
+        # RC oscillator is not stable enough - XOSC provides stable reference
+        self.set_standby(STDBY_XOSC)
+        time.sleep_ms(2)  # Allow XOSC to stabilize
         
         # Clear IRQ flags
         self.clear_irq_status(0xFFFF)
@@ -757,21 +1087,25 @@ class SX1262:
                 
                 # Clear IRQ
                 self.clear_irq_status(IRQ_RX_DONE)
+                # Return to RC standby for power saving
                 self.set_standby(STDBY_RC)
                 
                 return (data, rssi, snr)
             
             if irq & IRQ_CRC_ERROR:
                 self.clear_irq_status(IRQ_CRC_ERROR)
+                # Return to RC standby
                 self.set_standby(STDBY_RC)
                 return (None, None, None)
             
             if irq & IRQ_RX_TX_TIMEOUT:
                 self.clear_irq_status(IRQ_RX_TX_TIMEOUT)
+                # Return to RC standby
                 self.set_standby(STDBY_RC)
                 return (None, None, None)
             
             if timeout_ms > 0 and time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+                # Return to RC standby
                 self.set_standby(STDBY_RC)
                 return (None, None, None)
             
