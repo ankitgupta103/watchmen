@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>LoRa Control</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+      @font-face {
+        font-family: "Roboto";
+        font-style: normal;
+        font-weight: 400;
+        src: url("/robo-reg.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Roboto Condensed";
+        font-style: normal;
+        font-weight: 400;
+        src: url("/robo-cnd-reg.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Next Rounded";
+        font-style: normal;
+        font-weight: 400;
+        src: url("/next-rnd-bold.woff2") format("woff2");
+      }
+      #log { font-family: "Roboto Condensed"; font-size: 17px; }
+      #title, #title_cfg { font-family: "Next Rounded", sans-serif; font-size: 28px; }
+
+      .std-inp {
+        font-size: 16px;
+        box-sizing: border-box; 
+        padding: 2px 6px;
+      }
+
+      .link-params p {
+        margin: 0 0 10px 0;
+      }
+      .link-params input {
+        width: 65px; 
+        font-size: 16px;
+        box-sizing: border-box; 
+        padding: 2px 6px;
+      }
+
+      .lora-cfg p {
+        margin: 0 0 10px 0;
+      }
+      .lora-cfg label {
+        display: inline-block;
+        text-align: left;
+        width: 154px;
+      }
+      .lora-cfg input, .lora-cfg select {
+        width: 115px; 
+        font-size: 16px;
+        box-sizing: border-box; 
+        padding: 2px 6px;
+      }
+      .num-wrapper {
+        display: inline-flex;
+        align-items: center;
+      }
+      .num-wrapper button {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        margin-left: 6px;
+      }      
+
+      .test-res th, .test-res td {
+        border: 1px solid gray;
+        padding: 4px;
+      }
+      .test-res th.label, .test-res td.label {
+        width: auto;
+        font-family: "Roboto Condensed";
+        font-weight: normal;
+        text-align: left;
+        padding-left: 8px;
+        background-color: #EEF;
+      }
+      .test-res th:not(.label), .test-res td:not(.label) {
+        width: 115px 
+      } 
+
+      .sum-lab {
+        padding: 3px 0 3px 8px;
+        text-align: left;
+        border: 1px solid silver;
+      }
+      .sum-val {
+        width: 120px;
+        text-align: center;
+        border: 1px solid silver;
+      }
+
+      .checkbox-std {
+        display: inline-flex; 
+        align-items: center; gap: 6px;
+      }
+      .checkbox-std input {
+        width: 18px;
+        height: 18px;
+        accent-color: #007ACC;
+        margin: 0;
+        padding: 0;
+        vertical-align: middle;
+      }
+
+      .bulk-cfg p {
+        margin: 0 0 10px 0;
+      }
+      .bulk-cfg label {
+        display: inline-block;
+        text-align: left;
+        width: 245px;
+      }
+      .bulk-cfg input, .bulk-cfg select {
+        width: 80px; 
+        font-size: 16px;
+        box-sizing: border-box; 
+        padding: 2px 6px;
+      }      
+    </style>
+
+  </head>
+  <body style="background-color: #444; font-family: Arial, sans-serif;">
+    <center>
+
+    <!------------------ RF Link Parameters ---------------------->  
+
+    <div class="link-params" style="width: 98%; font-size: 18px; border: 1px solid #000; border-radius: 14px; 
+      margin-top: 20px; margin-bottom: 10px; background-color: #CFF;">
+
+      <h2 id="title" style="color: navy;">RF Link Parameters</h2>
+
+      <p><label for="TAG">TX Antenna Gain (dBi):</label>
+        <input id="TAG" type="text" inputmode="numeric" value="5" maxlength="6" style="margin-left: 10px;"></p>
+
+      <p><label for="TCL">TX Cable Loss (dB):</label>
+        <input id="TCL" type="text" inputmode="numeric" value="0.3" maxlength="6" style="margin-left: 33px;"></p>
+
+      <p style="margin-bottom: 22px;"><label for="ERP">TX E.R.P. (dBm):</label>
+        <input id="ERP" type="text" inputmode="numeric" readonly value=""
+          style="margin-left: 58px; background-color: #DFF; border: 1px solid grey;"></p>
+
+      <p><label for="RAG">RX Antenna Gain (dBi):</label>
+        <input id="RAG" type="text" inputmode="numeric" value="5" maxlength="6" style="margin-left: 8px;"></p>
+
+      <p><label for="RCL">RX Cable Loss (dB):</label>
+        <input id="RCL" type="text" inputmode="numeric" value="0.3" maxlength="6" style="margin-left: 31px;"></p>
+
+      <p style="margin-bottom: 22px;"><label for="RFE">RX Front-end: (dB):</label>
+        <input id="RFE" type="text" inputmode="numeric" readonly value=""
+          style="margin-left: 38px; background-color: #DFF; border: 1px solid grey;"></p>    
+
+      <p style="margin-bottom: 25px;"><label for="RSN">Real Setup Noise (dB):</label>
+        <input id="RSN" type="text" inputmode="numeric" value="9.5" maxlength="6" style="margin-left: 11px;"></p>
+    </div>      
+
+    <!------------------ LoRa Configuration ---------------------->  
+
+    <div id="config" class="lora-cfg" style="width: 98%; font-size: 18px; border: 1px solid #000; 
+      border-radius: 14px; margin-bottom: 10px; background-color: #D6D6D6;">
+
+      <h2 id="title_cfg">LoRa Configuration</h2>
+
+      <p>
+        <label for="FQ">Frequency (MHz):</label>
+        <input id="FQ" list="fqlist" inputmode="numeric" maxlength="7">
+        <datalist id="fqlist">
+          <option value="868.300">600 KHz, 14 dBm, 1%</option>
+          <option value="869.525">250 KHz, 27 dBm, 10%</option>
+          <option value="869.850">300 KHz, 7 dBm, 100%</option>
+          <option value="864.700">600 KHz, 10 dBm, 100%</option>
+        </datalist>
+      </p>
+
+      <p>
+        <label for="PW">TX Power (dBm):</label>
+        <span class="num-wrapper">
+          <input id="PW" type="text" inputmode="numeric" value="" style="width: 55px; margin: 0;">
+          <button id="pwup" type="button" onclick="adjustPW(1)">▲</button>
+          <button id="pwdn" type="button" onclick="adjustPW(-1)">▼</button>
+        </span>
+      </p>
+
+      <p>
+        <label for="BW">Ch. Bandwidth:</label>
+        <select id="BW">
+          <option value="0">7.8 KHz</option>
+          <option value="1">10.4 KHz</option>
+          <option value="2">15.6 KHz</option>
+          <option value="3">20.8 KHz</option>
+          <option value="4">31.25 KHz</option>
+          <option value="5">41.7 KHz</option>
+          <option value="6">62.5 KHz</option>
+          <option value="7">125 KHz</option>
+          <option value="8">250 KHz</option>
+          <option value="9">500 KHz</option>
+        </select>
+      </p>
+    
+      <p>
+        <label for="SF">Spreading Factor:</label>
+        <select id="SF"></p>
+          <option value="0">SF5</option>
+          <option value="1">SF6</option>
+          <option value="2">SF7</option>
+          <option value="3">SF8</option>
+          <option value="4">SF9</option>
+          <option value="5">SF10</option>
+          <option value="6">SF11</option>
+          <option value="7">SF12</option>
+        </select>
+      </p>
+
+      <p>
+        <label for="CR">Coding Rate:</label>
+        <select id="CR">
+          <option value="0">4/5</option>
+          <option value="1">4/6</option>
+          <option value="2">4/7</option>
+          <option value="3">4/8</option>
+        </select>
+      </p>
+
+      <p>
+        <label for="PB">Preamble Length:</label>
+        <select id="PB">
+          <option value="0">6 symbols</option>
+          <option value="1">7 symbols</option>
+          <option value="2">8 symbols</option>
+          <option value="3">9 symbols</option>
+          <option value="4">10 symbols</option>
+          <option value="5">11 symbols</option>
+          <option value="6">12 symbols</option>
+          <option value="7">13 symbols</option>
+          <option value="8">14 symbols</option>
+          <option value="9">15 symbols</option>
+          <option value="10">16 symbols</option>
+          <option value="11">17 symbols</option>
+          <option value="12">18 symbols</option>
+          <option value="13">19 symbols</option>
+          <option value="14">20 symbols</option>
+        </select>
+      </p>
+
+      <button id="local" onclick="configApply(false)" style="width: 100px; margin: 12px 8px 24px 8px; 
+        padding: 4px 10px 4px 10px; font-size: 16px;">Set Local</button>
+      <button disabled id="cancel" onclick="configCancel()" style="width: 85px; margin: 12px 8px 24px 8px; 
+        padding: 4px 10px 4px 10px; font-size: 16px;">Cancel</button>
+      <button disabled id="apply" onclick="configApply()" style="width: 85px; margin: 12px 8px 24px 8px; 
+        padding: 4px 10px 4px 10px; font-size: 16px;">Apply</button>
+
+      <div id="cfg_stat" style="width: 94%; box-sizing: border-box; border: 1px solid gray; border-radius: 8px;
+        padding: 3px; margin-bottom: 15px; font-size: 16px;"></div>  
+    </div>
+
+    <!------------------ LoRa Link Summary --------------------->  
+
+    <div id="config" style="width: 98%; font-size: 18px; border: 1px solid #000; border-radius: 14px; 
+      margin-bottom: 10px; background-color: #DFD;">
+
+      <h2 id="title" style="color: #070;">LoRa Link Summary</h2>
+
+      <div style="margin-bottom: 10px; font-weight: bold; color: navy;">RF Performance:</div>
+      <table style="width: 94%; max-width: 350px; background-color: #EFE; border-collapse: collapse; 
+        border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px; margin-bottom: 20px;">
+        <tr> <td class="sum-lab">Minimum SNR Limit:</td>     <td class="sum-val" id="snr_min">–</td> </tr>
+        <tr> <td class="sum-lab">Effective Noise Floor:</td> <td class="sum-val" id="ef_nf">–</td> </tr>
+        <tr> <td class="sum-lab">Receiver Sensitivity:</td>  <td class="sum-val" id="rx_sens">–</td> </tr>
+        <tr> <td class="sum-lab">RF Link Budget:</td>        <td class="sum-val" id="lnk_bud">–</td> </tr>
+        <tr> <td class="sum-lab">Range by FSPL:</td>         <td class="sum-val" id="fs_rng">–</td> </tr>
+        <tr> <td class="sum-lab">Range by Semtech:</td>      <td class="sum-val" id="st_rng">–</td> </tr>
+      </table>
+
+      <div style="margin-bottom: 10px; font-weight: bold; color: navy;">Timing Results:</div>
+      <table style="width: 94%; max-width: 350px; background-color: #EFE; border-collapse: collapse; 
+        border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px; margin-bottom: 20px;">
+        <tr> <td class="sum-lab">Symbol Time:</td>           <td class="sum-val" id="syb_time">–</td> </tr>
+        <tr> <td class="sum-lab">Packet Symbols:</td>        <td class="sum-val" id="pk_sybs">–</td> </tr>
+        <tr> <td class="sum-lab">Packet Data Rate:</td>      <td class="sum-val" id="pk_rate">–</td> </tr>
+        <tr> <td class="sum-lab">Time On Air:</td>           <td class="sum-val" id="pk_toa">–</td> </tr>
+        <tr> <td class="sum-lab">Payload Data Rate:</td>     <td class="sum-val" id="pl_rate">–</td> </tr>
+      </table>
+      
+    </div> 
+
+    <!------------------ LoRa Test ----------------------------->  
+
+    <div style="width: 98%; border: 1px solid #000; border-radius: 14px; background-color: #FFD; 
+      margin-bottom: 10px;">
+
+      <h2 id="title" style="color:rgb(163, 93, 0); margin: 20px 0 16px 0;">LoRa Range Test</h2>
+
+      <div style="font-size: 18px; display: flex; padding: 8px 0 12px 0; margin-top: 10px;">
+        <div style="flex: 6; align-items: center; justify-content: center;">
+          <label>Payload Size (B):<input class="std-inp" id="BUF" inputmode="numeric" maxlength="3" value="32" 
+            style="width: 50px; text-align: center; margin-left: 5px;"></label>
+          <div style="margin-top: 15px;">Band RSSI: <span id="band_rssi">–</span> dBm</div>
+          <div style="margin-top: 8px;">Base Distance: <span id="distance">–</span> m</div>
+          <div style="margin-top: 8px;">GPS Precision: <span id="distacc">–</span> m</div> 
+        </div>
+        <div style="flex: 4; display: flex; align-items: center; justify-content: center; gap: 12px; flex-direction: column;">
+          <label class="checkbox-std"><input id="LCB" type="checkbox" onchange="logTestChanged()">Log this test</label>
+          <label class="checkbox-std"><input id="LER" type="checkbox">Failures too</label>
+          <button onclick="sendTestCommand()" style="margin: 5px 0 3px 0; padding: 15px 20px; border-radius: 8px; border: 1px solid gray;
+            font-size: 18px; font-weight: bold; background-color: rgb(232, 248, 255); color: rgb(0, 53, 214);">Start Test</button>
+        </div>
+      </div>  
+
+      <div style="width: 94%; display: flex; margin-bottom: 10px;">
+        <input id="TCOM" type="text" maxlength="100" placeholder="You can type a comment here..." value="" 
+          autocorrect="off" autocomplete="off" spellcheck="false" autocapitalize="on"
+          style="flex: 8; width: 94%; box-sizing: border-box; font-size: 16px; padding-left: 7px; margin: 0;">
+        <button onclick="clearComment()" style="width: 70px; margin-left: 4px; 
+          padding: 4px 10px; font-size: 16px;">Clear</button>
+      </div>
+
+      <div id="test_stat" style="width: 94%; box-sizing: border-box; border: 1px solid gray; border-radius: 8px;
+        padding: 3px; margin-bottom: 10px; margin-top: 10px; font-size: 16px; background-color: #E1FFAE; ">
+        Standing by. You can start the test.
+      </div>        
+
+      <table class="test-res" style="width: 94%; background-color: white; border-collapse: collapse;
+        margin-bottom: 15px; text-align: center; font-family: Roboto; font-size: 16px;">
+        <tr>
+          <th class="label">Last Test</th>
+          <th style="background-color: #FCC;">Remote RX</th>
+          <th style="background-color: #CFC;">Local RX</th>
+        </tr>
+        <tr> <td class="label">RSSI:</td>        <td id="tx_rssi">–</td>  <td id="rx_rssi">–</td> </tr>
+        <tr> <td class="label">SNR:</td>         <td id="tx_snr">–</td>   <td id="rx_snr">–</td> </tr>
+        <tr> <td class="label">Link Margin:</td> <td id="tx_lnkm">–</td>  <td id="rx_lnkm">–</td> </tr>
+        <tr> <td class="label">Path Loss:</td>   <td id="tx_plos">–</td>  <td id="rx_plos">–</td> </tr>
+        <tr> <td class="label">Noise Floor:</td> <td id="tx_nfl">–</td>   <td id="rx_nfl">–</td> </tr>
+        <tr> <td class="label">Freq.Err:</td>    <td id="tx_fqerr">–</td> <td id="rx_fqerr">–</td> </tr>
+        <tr> <td class="label">Distance:</td>    <td id="lnk_dist" colspan="2">–</td> </tr>
+      </table>
+
+    </div>
+   
+    <!------------------ LoRa Test Log --------------------------->  
+
+    <div style="width: 98%; box-sizing: border-box; margin-bottom: 10px; background-color: rgb(230, 230, 230);
+      border: 1px solid #000; border-radius: 14px;">
+      <h2 style="font-family: Next Rounded, sans-serif; font-size: 24px; color:rgb(114, 0, 190); margin: 12px 0 10px 0;">LoRa Test Results</h2>
+      <textarea id="log" rows="26" readonly style="width: 100%; box-sizing: border-box; resize: none; border: 0px; 
+      padding: 8px 8px; margin-bottom: 8px;"></textarea>
+      <button onclick="logDownload()" style="width: 140px; margin: 0 14px 14px 0; padding: 6px 10px; border: 1px solid gray;
+        font-size: 16px; background-color: #AFC; border-radius: 8px;">Download Log</button>
+      <button onclick="logClear()" style="width: 140px; margin: 0 0 14px 14px; padding: 6px 10px; border: 1px solid rgb(91, 91, 91);
+        font-size: 16px; background-color: #FAA; border-radius: 8px;">Clear Log</button>
+    </div>
+
+    <!------------------ Bulk Test --------------------------->  
+
+    <div class="bulk-cfg" style="width: 98%; font-size: 18px; border: 1px solid #000; 
+      border-radius: 14px; background-color: #FFD; margin-bottom: 10px;">
+
+      <h2 id="title" style="color: rgb(163, 93, 0);">LoRa Bulk Test</h2>   
+      
+      <p><label for="BulkPS">Bulk Payload Size (bytes):</label><input id="BulkPS" inputmode="numeric" maxlength="5" value="1200" ></p>
+      <p><label for="BulkDL">Packet TX Delay (ms):</label><input id="BulkDL" inputmode="numeric" maxlength="3" value="4" ></p>
+
+      <table style="width: 94%; max-width: 340px; background-color: #FFE; border-collapse: collapse; 
+        border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px; margin-top: 15px;">
+        <tr> <td class="sum-lab">Total Packet Count:</td>   <td class="sum-val" style="width: 140px;" id="pk_count">–</td> </tr>
+        <tr> <td class="sum-lab"> - header info:</td>       <td class="sum-val" style="width: 140px;" id="pk_head">–</td> </tr>
+        <tr> <td class="sum-lab"> - full size:</td>         <td class="sum-val" style="width: 140px;" id="pk_full">–</td> </tr>
+        <tr> <td class="sum-lab"> - partial used:</td>      <td class="sum-val" style="width: 140px;" id="pk_rest">–</td> </tr>
+      </table>
+
+      <button id="BulkTest" onclick="sendBulkTest()" style="width: 105px; 
+        padding: 4px 10px 4px 10px; font-size: 16px; margin-top: 15px;">Start Test</button>
+
+      <div id="BulkStat" style="width: 94%; box-sizing: border-box; border: 1px solid gray; border-radius: 8px;
+        padding: 3px; margin-top: 15px; font-size: 16px; background-color: #E1FFAE; ">
+        Standing by. You can start the test.
+      </div>  
+
+      <div style="width: 270px; background-color: #0579c6; box-sizing: border-box; padding: 8px 0;
+        border: 1px solid gray; border-radius: 8px; color: white; font-size: 20px; margin-top: 26px;">
+        Data Rate:&nbsp; <span id="blk_dr">–</span> KB/s
+      </div> 
+
+      <div id="pan_first" style="margin-top: 25px;">
+        <div id="title_first" style="margin: 15px 0 10px 0; font-weight: bold; color: navy;">First Pack Timing:</div>
+        <table style="width: 94%; max-width: 340px; background-color: #FFE; border-collapse: collapse; 
+          border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px;">
+          <tr> <td class="sum-lab">TX - Off Time:</td>   <td class="sum-val" style="width: 140px;" id="head_off">–</td> </tr>
+          <tr> <td class="sum-lab">RX - Read Time:</td>  <td class="sum-val" style="width: 140px;" id="head_read">–</td> </tr>
+        </table>
+        <table style="width: 94%; max-width: 340px; background-color: #FFE; border-collapse: collapse; 
+          border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px; margin-top: 8px;">
+          <tr> <td class="sum-lab">TX - Off & TOA:</td>   <td class="sum-val" style="width: 140px;" id="head_tx_all">–</td> </tr>
+          <tr> <td class="sum-lab">RX - Read & Work:</td>  <td class="sum-val" style="width: 140px;" id="head_rx_work">–</td> </tr>
+        </table>
+      </div>
+
+      <div id="pan_full">
+        <div style="margin: 15px 0 10px 0; font-weight: bold; color: navy;">Rest - Full Pack Timing:</div>
+        <table style="width: 94%; max-width: 340px; background-color: #FFE; border-collapse: collapse; 
+          border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px;">
+          <tr> <td class="sum-lab">TX - Off Time:</td>   <td class="sum-val" style="width: 140px;" id="full_off">–</td> </tr>
+          <tr> <td class="sum-lab">RX - Read Time:</td>  <td class="sum-val" style="width: 140px;" id="full_read">–</td> </tr>
+        </table>
+        <table style="width: 94%; max-width: 340px; background-color: #FFE; border-collapse: collapse; 
+          border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px; margin-top: 8px;">
+          <tr> <td class="sum-lab">TX - Off & TOA:</td>    <td class="sum-val" style="width: 140px;" id="full_tx_all">–</td> </tr>
+          <tr> <td class="sum-lab">RX - Read & Work:</td>  <td class="sum-val" style="width: 140px;" id="full_rx_work">–</td> </tr>
+        </table>
+      </div>  
+
+      <div id="pan_part">
+        <div style="margin: 15px 0 10px 0; font-weight: bold; color: navy;">Partial Pack Timing:</div>
+        <table style="width: 94%; max-width: 340px; background-color: #FFE; border-collapse: collapse; 
+          border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px;">
+          <tr> <td class="sum-lab">TX - Off Time:</td>   <td class="sum-val" style="width: 140px;" id="part_off">–</td> </tr>
+          <tr> <td class="sum-lab">RX - Read Time:</td>  <td class="sum-val" style="width: 140px;" id="part_read">–</td> </tr>
+        </table>
+        <table style="width: 94%; max-width: 340px; background-color: #FFE; border-collapse: collapse; 
+          border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px; margin-top: 8px;">
+          <tr> <td class="sum-lab">TX - Off & TOA:</td>    <td class="sum-val" style="width: 140px;" id="part_tx_all">–</td> </tr>
+          <tr> <td class="sum-lab">RX - Read & Work:</td>  <td class="sum-val" style="width: 140px;" id="part_rx_work">–</td> </tr>
+        </table>
+      </div>
+      
+      <div>
+        <div id="title_rpl" style="margin: 15px 0 10px 0; font-weight: bold; color: navy;">Reply Timing:</div>
+        <table style="width: 94%; max-width: 340px; background-color: #FFE; border-collapse: collapse; 
+          border: 1px solid; text-align: center; font-family: Roboto; font-size: 16px;">
+          <tr> <td class="sum-lab">TX - Receive Switch:</td> <td class="sum-val" style="width: 140px;" id="rpl_switch">–</td> </tr>
+          <tr> <td class="sum-lab">RX - Read & Work:</td>  <td class="sum-val" style="width: 140px;" id="rpl_rx_work">–</td> </tr>
+        </table>
+      </div>
+
+      <div style="margin-bottom: 20px;"></div>
+
+    </div>      
+
+    <!------------------ GPS Monitoring ---------------------->  
+
+    <div style="width: 98%; font-size: 18px; border: 1px solid #000; border-radius: 14px; 
+      background-color: #DEF; margin-bottom: 10px;">
+
+      <h2 id="title" style="color: rgb(0, 115, 181); margin: 14px 0">GPS Monitoring</h2>
+
+      <div style="display: flex;">
+        <div style="flex: 1; border-top: 1px solid gray; border-right: 1px solid gray; padding: 10px;">
+          <h3 style="margin: 10px 0; font-size: 20px">Current Location:</h3>
+          <p>Lat. : <span id="glat">–</span></p>
+          <p>Lon. : <span id="glon">–</span></p>
+          <p>Precision: <span id="gacc">–</span> m</p>
+        </div>
+        <div style="flex: 1; border-top: 1px solid gray; padding: 10px;">
+          <h3 style="margin: 10px 0; font-size: 20px">Base Location:</h3>
+          <p>Lat. : <span id="blat">–</span></p>
+          <p>Lon. : <span id="blon">–</span></p>
+          <button onclick="clearLocation()" style="width: 40%; max-width: 70px; margin: 0 5px 5px 5px; 
+            padding: 4px 10px; font-size: 16px;">Clear</button>
+          <button onclick="setLocation()" style="width: 40%; max-width: 70px; margin: 0 5px 5px 5px; 
+            padding: 4px 10px; font-size: 16px;">Set</button>
+        </div>
+      </div>    
+
+    </div>
+
+    <!------------------ Other Settings ---------------------->  
+
+    <div id="config" style="width: 98%; font-size: 18px; border: 1px solid #000; border-radius: 14px; 
+      margin-bottom: 30px; background-color: #DFD;">
+
+      <h2 id="title" style="color: #070;">Other Settings</h2>    
+
+      <label class="checkbox-std"><input id="RBM" type="checkbox" onchange="bandMonitorChanged()">Band RSSI Monitor</label>
+      <div style="margin-bottom: 20px;"></div>
+    </div>
+
+    <!--------------------------------------------------------->  
+
+
+    <script>
+      const msgTestReady = "Standing by. You can start the test.";
+      const cfgStatReady = "Ready - You can start changing the settings.";
+      const cfgStatEdit  = "The configuration is being edited...";
+      const msgCfgRead   = "Reading configuration from server...";
+      const msgLoraBusy  = "LoRa is busy ! Please wait..."; 
+
+      const MIME_PLAIN   = "text/plain";
+      const MIME_HTML    = "text/html";
+      const MIME_JSON    = "application/json";
+
+      const PW_MIN = -9;
+      const PW_MAX = 22;
+
+      const LORA_MAX_PACK_LENGTH = 255;
+      const MAX_BULK_PS = LORA_MAX_PACK_LENGTH -2;
+      const MAX_BULK_SIZE = (0xFF * MAX_BULK_PS) -2;
+      const BULK_HEAD_SIZE = 8;
+
+      let cfgMode  = null;
+      let cfgData  = null;
+      let cfgTemp  = null;   
+
+      const clErrorBkg = "#900";
+      const clErrorText = "#FF0";
+
+      const listBandwidth  = [7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125, 250, 500];
+      const listSpreading  = [5, 6, 7, 8, 9, 10, 11, 12];
+      const listCodingRate = [5, 6, 7, 8];
+      const listPreamble   = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+      const linkTAG    = document.getElementById("TAG");
+      const linkTCL    = document.getElementById("TCL");
+      const linkERP    = document.getElementById("ERP");
+      const linkRAG    = document.getElementById("RAG");
+      const linkRCL    = document.getElementById("RCL");
+      const linkRFE    = document.getElementById("RFE");
+      const setupNF    = document.getElementById("RSN");
+
+      const cfgPanel   = document.getElementById("config");
+      const cfgTitle   = document.getElementById("title_cfg");
+      const cfgFreq    = document.getElementById("FQ");
+      const cfgPwUp    = document.getElementById("pwup");
+      const cfgPwDn    = document.getElementById("pwdn");
+      const cfgInPW    = document.getElementById("PW");
+      const cfgSelBW   = document.getElementById("BW");
+      const cfgSelSF   = document.getElementById("SF");
+      const cfgSelCR   = document.getElementById("CR");
+      const cfgSelPB   = document.getElementById("PB");
+      const cfgLocal   = document.getElementById("local");
+      const cfgApply   = document.getElementById("apply");
+      const cfgCancel  = document.getElementById("cancel");
+      const cfgStat    = document.getElementById("cfg_stat");
+
+      const lsMinSnr   = document.getElementById("snr_min");
+      const lsEffNF    = document.getElementById("ef_nf");
+      const lsRxSens   = document.getElementById("rx_sens");
+      const lsBudget   = document.getElementById("lnk_bud");
+      const lsRngFS    = document.getElementById("fs_rng");
+      const lsRngST    = document.getElementById("st_rng");
+
+      const lsSybTime  = document.getElementById("syb_time");
+      const lsPkSybs   = document.getElementById("pk_sybs");
+      const lsPkRate   = document.getElementById("pk_rate");
+      const lsTOA      = document.getElementById("pk_toa");
+      const lsPlRate   = document.getElementById("pl_rate");
+
+      const cfgBuffer  = document.getElementById("BUF");
+      const bandRssi   = document.getElementById("band_rssi");
+      const logTest    = document.getElementById("LCB");
+      const logFails   = document.getElementById("LER");
+      const gpsDist    = document.getElementById("distance");
+      const distAcc    = document.getElementById("distacc");
+      const txRssi     = document.getElementById("tx_rssi");
+      const rxRssi     = document.getElementById("rx_rssi");
+      const txSnr      = document.getElementById("tx_snr");
+      const rxSnr      = document.getElementById("rx_snr");
+      const txMLnk     = document.getElementById("tx_lnkm");
+      const rxMLnk     = document.getElementById("rx_lnkm");
+      const txPLos     = document.getElementById("tx_plos");
+      const rxPLos     = document.getElementById("rx_plos");
+      const txNFloor   = document.getElementById("tx_nfl");
+      const rxNFloor   = document.getElementById("rx_nfl");
+      const txFqErr    = document.getElementById("tx_fqerr");
+      const rxFqErr    = document.getElementById("rx_fqerr");
+      const lnkDist    = document.getElementById("lnk_dist");
+      const testStat   = document.getElementById("test_stat");
+      const comText    = document.getElementById("TCOM");
+      
+      const testLog    = document.getElementById("log");
+
+      const blkPacks   = document.getElementById("pk_count");
+      const blkHP      = document.getElementById("pk_head");
+      const blkFP      = document.getElementById("pk_full");
+      const blkPP      = document.getElementById("pk_rest");
+      const panFirst   = document.getElementById("pan_first");
+      const ptFirst    = document.getElementById("title_first");
+      const panFull    = document.getElementById("pan_full");
+      const panPart    = document.getElementById("pan_part");
+      const ptReply    = document.getElementById("title_rpl");
+      const blkDRate   = document.getElementById("blk_dr");
+
+      const headOff    = document.getElementById("head_off");
+      const headRead   = document.getElementById("head_read");
+      const headTxAll  = document.getElementById("head_tx_all");
+      const headRxWork = document.getElementById("head_rx_work");
+      const fullOff    = document.getElementById("full_off");
+      const fullRead   = document.getElementById("full_read");
+      const fullTxAll  = document.getElementById("full_tx_all");
+      const fullRxWork = document.getElementById("full_rx_work");
+      const partOff    = document.getElementById("part_off");
+      const partRead   = document.getElementById("part_read");
+      const partTxAll  = document.getElementById("part_tx_all");
+      const partRxWork = document.getElementById("part_rx_work");
+      const rplSwitch  = document.getElementById("rpl_switch");
+      const rplRxWork  = document.getElementById("rpl_rx_work");
+
+      const gpsLat     = document.getElementById("glat");
+      const gpsLon     = document.getElementById("glon");
+      const gpsAcc     = document.getElementById("gacc");
+      const baseLat    = document.getElementById("blat");
+      const baseLon    = document.getElementById("blon");
+
+      const bandMon    = document.getElementById("RBM");
+
+      const bulkPSize  = document.getElementById("BulkPS");
+      const bulkDelay  = document.getElementById("BulkDL");
+      const bulkTest   = document.getElementById("BulkTest");
+      const bulkStat   = document.getElementById("BulkStat");
+
+      function isMobileDevice() {
+        //console.log(navigator.userAgent);
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      }
+
+      function haversine(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Earth radius in meters
+        const toRad = deg => deg * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+          Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }      
+
+      function triggerHapticFeedback() {
+        if ("vibrate" in navigator) navigator.vibrate(50);
+        else console.log("Vibration API is not available on this device.");
+      }
+
+      function logHeader(msg) {
+        const timestamp = new Date().toLocaleString("ro-RO");
+        const newLine = `[${timestamp}] ${msg}\n`;
+        return newLine;
+      }
+
+      function logAddMsg(msg) {
+        testLog.value = msg + "\n" + testLog.value;
+        testLog.scrollTop = 0;
+        localStorage.setItem("Log", testLog.value);
+      }
+
+      function logRestore() {
+        const savedLog = localStorage.getItem("Log");
+        if (savedLog) { testLog.value = savedLog; testLog.scrollTop = 0; }
+      }   
+      
+      function logClear() {
+        triggerHapticFeedback();
+        testLog.value = "";
+        localStorage.removeItem("Log");
+      }     
+
+      function logDownload() {
+        triggerHapticFeedback();
+        const logText = testLog.value;
+        const blob = new Blob([logText], { type: MIME_PLAIN });
+        const url = URL.createObjectURL(blob);
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`
+          + `-${String(now.getHours()).padStart(2,'0')}.${String(now.getMinutes()).padStart(2,'0')}.${String(now.getSeconds()).padStart(2,'0')}`;
+        const fname = `LoRa test log [${timestamp}].txt`;  
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fname;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+   
+      // ---------- LoRa TX/RX Test -------------------------
+
+      let LoraResTimer = null;
+      let distance = null;
+      let testTimer = null;
+
+      const testData = {
+        distance: null,
+        logTest: true,
+        logFails: false,
+        comment: "",
+        recvSens: null,
+        effPower: null
+      }
+
+      function testSetMsg(msg, error = false, temp = false) {
+        if (testTimer) { clearTimeout(testTimer); testTimer = null; }
+        if (error) {
+          testStat.style.backgroundColor = clErrorBkg;
+          testStat.style.color = clErrorText;
+        } else {
+          testStat.style.backgroundColor = "#E1FFAE";
+          testStat.style.color = "#302406";
+        }
+        testStat.innerText = msg;
+        if (temp) testTimer = setTimeout( () => { 
+          testStat.innerText = msgTestReady; 
+          testStat.style.backgroundColor = "#E1FFAE";
+          testStat.style.color = "#302406";
+          testTimer = null; 
+        }, 4000);
+      }      
+            
+      async function sendTestCommand() {
+        triggerHapticFeedback();
+        if (LoraResTimer) { testSetMsg(msgLoraBusy, true, true); return; }
+        clearTestResults();
+        try {
+          const response = await fetch("/dotest?buff="+cfgBuffer.value.trim(), { method: "POST" });          
+          if (response.status === 404) { testSetMsg("Error: Server is not reachable.", true, true); return; }
+          const cntType = response.headers.get("content-type");
+          if (!cntType) { testSetMsg("Error: no content type found.", true, true); return; }
+          let rpl_msg = null;
+          if (cntType.includes(MIME_PLAIN)) { rpl_msg = await response.text(); }
+          if (response.status !== 200) {
+            if (!rpl_msg) testSetMsg("Unknown error.", true, true);
+              else testSetMsg("Error: " + rpl_msg, true, true); 
+            return;
+          }
+          if (rpl_msg) testSetMsg(rpl_msg);
+          testData.distance = distance; 
+          testData.logTest = logTest.checked;
+          testData.logFails = logFails.checked;
+          testData.comment = comText.value.trim();
+          testData.recvSens = parseFloat(lsRxSens.innerText.split(' ', 1)[0]);
+          testData.effPower = parseFloat(linkERP.value) + parseFloat(linkRFE.value);
+          LoraResTimer = setInterval(checkTestResult, 1000);
+        } catch (error) { testSetMsg("Error: "+error.message, true, true) }
+      }
+     
+      async function checkTestResult() {
+        try {
+          const response = await fetch("/restest");
+          if (response.status === 202) return;
+          clearInterval(LoraResTimer);
+          if (response.status === 200) {
+            data = await response.json();
+            testSetMsg("The test was completed successfully.", false, true);
+            const tx_plos = testData.effPower - data.tx_rssi;
+            const rx_plos = testData.effPower - data.rx_rssi
+            txRssi.innerText   = data.tx_rssi.toFixed(2) + " dBm"; rxRssi.innerText  = data.rx_rssi.toFixed(2) + " dBm";
+            txSnr.innerText    = data.tx_snr.toFixed(2) + " dB";   rxSnr.innerText   = data.rx_snr.toFixed(2) + " dB";
+            txFqErr.innerText  = data.tx_fqerr.toFixed(1) + " Hz"; rxFqErr.innerText = data.rx_fqerr.toFixed(1) + " Hz";
+            txMLnk.innerText   = !isNaN(testData.recvSens) ? (data.tx_rssi - testData.recvSens).toFixed(2) + " dB" : "–";
+            rxMLnk.innerText   = !isNaN(testData.recvSens) ? (data.rx_rssi - testData.recvSens).toFixed(2) + " dB" : "–";
+            txPLos.innerText   = !isNaN(tx_plos) ? tx_plos.toFixed(2) + " dB" : "–";  
+            rxPLos.innerText   = !isNaN(rx_plos) ? rx_plos.toFixed(2) + " dB" : "–";  
+            txNFloor.innerText = data.tx_snr <= 8.0 ? (data.tx_rssi - data.tx_snr).toFixed(2) + " dBm" : "–";
+            rxNFloor.innerText = data.rx_snr <= 8.0 ? (data.rx_rssi - data.rx_snr).toFixed(2) + " dBm" : "–";
+            lnkDist.innerText  = testData.distance ? testData.distance.toFixed(1) + " meters" : "– meters";
+            if (testData.logTest) {
+              let msg;
+              if (!testData.distance) msg = logHeader("Test Results");
+                else msg = logHeader("Test Results for "+Math.round(testData.distance)+" m");
+              msg += "REM  ->  RSSI: "+data.tx_rssi.toFixed(2)+" dBm,  SNR: "+data.tx_snr.toFixed(2)+" dB\n";
+              msg += "LOC  ->  RSSI: "+data.rx_rssi.toFixed(2)+" dBm,  SNR: "+data.rx_snr.toFixed(2)+" dB\n";
+              const stx_plos = !isNaN(tx_plos) ? tx_plos.toFixed(2)+" dB" : "??? dB";
+              const srx_plos = !isNaN(rx_plos) ? rx_plos.toFixed(2)+" dB" : "??? dB";
+              msg += "REM  ->  Path Loss: "+stx_plos+",  Freq.Err: "+data.tx_fqerr.toFixed(1)+" Hz\n";
+              msg += "LOC  ->  Path Loss: "+srx_plos+",  Freq.Err: "+data.rx_fqerr.toFixed(1)+" Hz\n";
+              let fq_mhz = Math.trunc(cfgData.freq / 1000) / 1000;
+              msg += fq_mhz.toFixed(3)+" MHz, "+listBandwidth[cfgData.bandw]+" KHz, "+cfgData.txpwr+" dBm, SF"+
+                listSpreading[cfgData.spread]+", 4/"+listCodingRate[cfgData.cdrate]+", "+
+                listPreamble[cfgData.preamb]+"sy\n";
+              msg += testData.comment.length > 0 ? testData.comment + "\n" : "";
+              logAddMsg(msg);
+            }
+          } else {
+            let err_msg = await response.text();
+            testSetMsg(err_msg, true, true); 
+            if (testData.logTest && testData.logFails) {
+              let msg;
+              if (!testData.distance) msg = logHeader("Test Results");
+                else msg = logHeader("Test Results for "+Math.round(testData.distance)+" m");
+              msg += err_msg + "\n";
+              let fq_mhz = Math.trunc(cfgData.freq / 1000) / 1000;
+              msg += fq_mhz.toFixed(3)+" MHz, "+listBandwidth[cfgData.bandw]+" KHz, "+cfgData.txpwr+" dBm, SF"+
+                listSpreading[cfgData.spread]+", 4/"+listCodingRate[cfgData.cdrate]+", "+
+                listPreamble[cfgData.preamb]+"sy\n";
+              msg += testData.comment + "\n";
+              logAddMsg(msg); 
+            }
+          }
+          LoraResTimer = null;
+        } catch (error) {
+          testSetMsg("Error: " + error.message, true, true);
+          clearInterval(LoraResTimer); LoraResTimer = null;          
+        }
+      }
+
+      function clearTestResults() {
+        txRssi.innerText   = "–"; rxRssi.innerText   = "–";
+        txSnr.innerText    = "–"; rxSnr.innerText    = "–";
+        txMLnk.innerText   = "–"; rxMLnk.innerText   = "–";
+        txPLos.innerText   = "–"; rxPLos.innerText   = "–";
+        txNFloor.innerText = "–"; txNFloor.innerText = "–";
+        txFqErr.innerText  = "–"; rxFqErr.innerText  = "–";
+        lnkDist.innerText  = "–"; 
+        testData.valid = false; testData.clDone = false;
+      }
+
+      function logTestChanged() {
+        logFails.disabled = !logTest.checked;
+      }
+
+      function clearComment() {
+        triggerHapticFeedback();
+        comText.value = "";
+      }
+
+      // ----------- Bulk Tests ------------------ 
+
+      let bulkTimer = null;    
+      
+      const blkData = {
+        total: 0,
+        full: 0,
+        part: 0
+      }
+
+      const blkTest = {
+        total: 0,
+        full: 0,
+        part: 0
+      }      
+
+      function bulkSetMsg(msg, error = false, temp = false) {
+        if (testTimer) { clearTimeout(bulkTimer); bulkTimer = null; }
+        if (error) {
+          bulkStat.style.backgroundColor = clErrorBkg;
+          bulkStat.style.color = clErrorText;
+        } else {
+          bulkStat.style.backgroundColor = "#E1FFAE";
+          bulkStat.style.color = "#302406";
+        }
+        bulkStat.innerText = msg;
+        if (temp) bulkTimer = setTimeout( () => { 
+          bulkStat.innerText = msgTestReady; 
+          bulkStat.style.backgroundColor = "#E1FFAE";
+          bulkStat.style.color = "#302406";
+          bulkTimer = null; 
+        }, 4000);
+      }       
+
+      function clearTiming() {
+        headOff.innerText    = "–";
+        headRead.innerText   = "–";
+        headTxAll.innerText  = "–";
+        headRxWork.innerText = "–";
+        fullOff.innerText    = "–";
+        fullRead.innerText   = "–";
+        fullTxAll.innerHTML  = "–";
+        fullRxWork.innerText = "–";
+        partOff.innerText    = "–";
+        partRead.innerText   = "–";
+        partTxAll.innerText  = "–";
+        partRxWork.innerText = "–";
+        rplSwitch.innerText  = "–";
+        rplRxWork.innerText  = "–";
+      }
+
+      function setupTiming(full, part) {
+        clearTiming();
+        panFirst.style.display = "none";
+        panFull.style.display = "none";
+        panPart.style.display = "none";        
+        if (full > 0 || part) {
+          panFirst.style.display = "";
+          if (full > 0) ptFirst.innerText = "First - Full Pack Timing"; 
+            else ptFirst.innerText = "First - Partial Pack Timing";
+          if (full > 1) panFull.style.display = "";
+          if (full > 0 && part) panPart.style.display = "";
+        }
+        if (!full && !part) ptReply.innerText = "First - Reply Timing";
+          else ptReply.innerText = "Reply Timing";
+      }
+
+      function updateTiming(data) {
+        if (blkTest.total <= 1) {
+          rplSwitch.innerText = (data.ofhd / 1000).toFixed(3) + " ms";
+          rplRxWork.innerText = (data.wkhd / 1000).toFixed(3) + " ms";
+
+        } else {
+          headOff.innerText = (data.ofhd / 1000).toFixed(3) + " ms";
+          headRead.innerText = (data.rdhd / 1000).toFixed(3) + " ms";
+          headTxAll.innerText = ((data.ofhd + (blkTest.full > 0 ? data.toaf : data.toap)) / 1000).toFixed(3) + " ms";
+          headRxWork.innerText = (data.wkhd / 1000).toFixed(3) + " ms";
+
+          if (blkTest.full > 1) {
+            fullOff.innerText = (data.ofmi / 1000).toFixed(3) + " ms";
+            fullRead.innerText = (data.rdmx / 1000).toFixed(3) + " ms";
+            fullTxAll.innerHTML = ((data.ofmi+data.toaf) / 1000).toFixed(3) + " ms";
+            fullRxWork.innerText = (data.wkmx / 1000).toFixed(3) + " ms";
+          }
+          if (blkTest.full > 0 && blkTest.part) {
+            partOff.innerText = (data.ofpt / 1000).toFixed(3) + " ms";
+            partRead.innerText = (data.rdpt / 1000).toFixed(3) + " ms";
+            partTxAll.innerText = (data.ofpt + data.toap / 1000).toFixed(3) + " ms";
+            partRxWork.innerText = (data.wkpt / 1000).toFixed(3) + " ms";
+          }
+          rplSwitch.innerText = (data.ofrp / 1000).toFixed(3) + " ms";
+          rplRxWork.innerText = (data.wkrp / 1000).toFixed(3) + " ms";
+        }
+      }
+
+      function recalcBulk() {
+        const bulk_size = parseInt(bulkPSize.value , 10);
+        const bulk_head = 1; let bulk_full = 0; let bulk_part = 0; let rest = 0; let flag = false;
+        if (bulk_size) {
+          bulk_full = Math.trunc(bulk_size / MAX_BULK_PS);
+          rest = bulk_size % MAX_BULK_PS;
+          if (MAX_BULK_PS - rest >= 2) {
+            rest += 2; // +2 the CRC
+            if (rest === MAX_BULK_PS) { bulk_full++; rest = 0; } 
+              else { bulk_part = 1; rest += 2; }  // +2 pack header
+          } else {
+            bulk_full++; flag = true;
+            bulk_part = 1; rest = 4;
+          }
+        }
+        blkData.total = bulk_head + bulk_full + bulk_part;
+        blkData.full = bulk_full; blkData.part = bulk_part > 0;
+        blkPacks.innerText = `${blkData.total} packs`;
+        blkHP.innerText = `${bulk_head} pk : ${BULK_HEAD_SIZE} B`;
+        blkFP.innerText = `${bulk_full} pk : ${
+          bulk_full > 1 ?
+            `${LORA_MAX_PACK_LENGTH}${flag ? `(${(LORA_MAX_PACK_LENGTH - 1) % 10})` : ""}` :
+            (flag ? (LORA_MAX_PACK_LENGTH - 1) : LORA_MAX_PACK_LENGTH)
+          } B`;
+        blkPP.innerText = `${bulk_part} pk : ${rest} B`;
+        setupTiming(bulk_full, bulk_part > 0);
+      }
+
+      async function sendBulkTest() {
+        triggerHapticFeedback();
+        if (LoraResTimer) { bulkSetMsg(msgLoraBusy, true, true); return; }
+        try {
+          const response = await fetch(
+            "/bulk?buff="+bulkPSize.value.trim()+"&delay="+bulkDelay.value.trim(), { method: "POST" });          
+          if (response.status === 404) { bulkSetMsg("Error: Server is not reachable.", true, true); return; }
+          const cntType = response.headers.get("content-type");
+          if (!cntType) { bulkSetMsg("Error: no content type found.", true, true); return; }
+          let rpl_msg = null;
+          if (cntType.includes(MIME_PLAIN)) { rpl_msg = await response.text(); }
+          if (response.status !== 200) {
+            if (!rpl_msg) bulkSetMsg("Unknown error.", true, true);
+              else bulkSetMsg("Error: " + rpl_msg, true, true); 
+            return;
+          }
+          if (rpl_msg) bulkSetMsg(rpl_msg);
+          blkTest.total = blkData.total;
+          blkTest.full = blkData.full;
+          blkTest.part = blkData.part;
+          LoraResTimer = setInterval(checkBulkResult, 1000);
+        } catch (error) { bulkSetMsg("Error: "+error.message, true, true) }
+      } 
+
+      async function checkBulkResult() {
+        try {
+          const response = await fetch("/resbulk");
+          if (response.status === 202) return;
+          clearInterval(LoraResTimer);
+          if (response.status === 200) {
+            data = await response.json();
+            blkDRate.innerText = (data.rate / 1000).toFixed(3);
+            updateTiming(data);
+            bulkSetMsg("The test was completed successfully.", false, true);      
+          } else {
+            let err_msg = await response.text();
+            bulkSetMsg(err_msg, true, true); 
+          }
+          LoraResTimer = null;
+        } catch (error) {
+          bulkSetMsg("Error: " + error.message, true, true);
+          clearInterval(LoraResTimer); LoraResTimer = null;          
+        }
+      }
+      
+      // ----------- GPS Monitoring ------------------ 
+
+      let currentLat = null;
+      let currentLon = null;
+      let savedLat   = null;
+      let savedLon   = null;
+
+      function setLocation() {
+        if (currentLat !== null && currentLon !== null) {
+          triggerHapticFeedback();
+          savedLat = currentLat;
+          savedLon = currentLon;
+          baseLat.textContent = savedLat.toFixed(6);
+          baseLon.textContent = savedLon.toFixed(6);
+          localStorage.setItem("BaseLat", savedLat.toFixed(6));
+          localStorage.setItem("BaseLon", savedLon.toFixed(6));
+        }
+      }
+
+      function restoreLocation() {
+        const savedLatStr = localStorage.getItem("BaseLat");
+        const savedLonStr = localStorage.getItem("BaseLon");
+        if (savedLatStr !== null && savedLonStr !== null) {
+          savedLat = parseFloat(savedLatStr); 
+          savedLon = parseFloat(savedLonStr); 
+          baseLat.textContent = savedLat.toFixed(6);
+          baseLon.textContent = savedLon.toFixed(6);
+        }
+      }
+
+      function clearLocation() {
+        triggerHapticFeedback();
+        savedLat = null;
+        savedLon = null;
+        baseLat.textContent = "–";
+        baseLon.textContent = "–";
+        localStorage.removeItem("BaseLat");
+        localStorage.removeItem("BaseLon");
+      }
+
+      function handlePosition(position) {
+        currentLat = position.coords.latitude;
+        currentLon = position.coords.longitude;
+        const acc  = position.coords.accuracy;
+        gpsLat.textContent = currentLat.toFixed(6);
+        gpsLon.textContent = currentLon.toFixed(6);
+        gpsAcc.textContent = acc.toFixed(1);
+        if (savedLat !== null && savedLon !== null) {
+          distance = haversine(savedLat, savedLon, currentLat, currentLon);
+          gpsDist.textContent = distance.toFixed(1);
+          distAcc.textContent = acc.toFixed(1);
+        }      
+      }
+      function handleError(error) {
+        console.error("GPS Error:", error.message);
+      }
+
+      // ----------- Other Settings ---------------------- 
+
+      let rbmTimer = null;
+      let failCount = 0;
+
+      function bandMonitorChanged() {
+        BandMonitor(bandMon.checked);
+      }
+
+      function BandMonitor(state) {
+        if (rbmTimer !== null) { clearInterval(rbmTimer); rbmTimer = null; bandRssi.innerText = "–"; }
+        if (state) { rbmTimer = setInterval(updateBandRssi, 1000); failCount = 0; }
+        if (state) navigator.sendBeacon("/rssion"); else navigator.sendBeacon("/rssioff");
+      }
+
+      async function updateBandRssi() {
+        try {
+          const response = await fetch("/rssi");
+          if (response.status === 200) {
+            data = await response.json();
+            bandRssi.innerText = data.rssi.toFixed(2);
+          } else {
+            failCount++;
+            if (failCount = 3) { bandMon.checked = false; BandMonitor(false) }
+          }
+        } catch (error) {
+          failCount++;
+          if (failCount = 3) { bandMon.checked = false; BandMonitor(false) }
+        }
+      }
+
+      // ----------- LoRa Configuration ------------------ 
+
+      let cfgTimer = null;
+
+      const CFM = Object.freeze({ Init: 0, Ready: 1, Edit: 2 });
+      const Config = [
+        Object.freeze({ clPanelBkg: "#D6D6D6", clTitleText: "#202020", clStatBkg: "#C2FFC0", clStatText: "#062F1D", btnLocal: false, btnApply: false, btnCancel: false, StatMsg: msgCfgRead}),
+        Object.freeze({ clPanelBkg: "#D0F0D0", clTitleText: "#007000", clStatBkg: "#C2FFC0", clStatText: "#062F1D", btnLocal: true,  btnApply: false, btnCancel: false, StatMsg: cfgStatReady}),
+        Object.freeze({ clPanelBkg: "#F0C0E0", clTitleText: "#800000", clStatBkg: "#F0A8E8", clStatText: "#000000", btnLocal: false, btnApply: true , btnCancel: true , StatMsg: cfgStatEdit})
+      ];
+
+      function configStatColor(mode) {
+        cfgStat.style.backgroundColor = Config[mode].clStatBkg;
+        cfgStat.style.color = Config[mode].clStatText;
+      }
+
+      function configSetMode(mode, setmsg = true) {
+        if (cfgTimer) { clearTimeout(cfgTimer); cfgTimer = null; }
+        cfgPanel.style.backgroundColor = Config[mode].clPanelBkg;
+        cfgTitle.style.color= Config[mode].clTitleText;
+        cfgLocal.disabled = !Config[mode].btnLocal;
+        cfgApply.disabled = !Config[mode].btnApply;
+        cfgCancel.disabled = !Config[mode].btnCancel;
+        if (setmsg) cfgStat.innerText = Config[mode].StatMsg;
+        configStatColor(mode);
+        if (mode === CFM.Init) {
+          cfgInPW.value = "";
+          cfgSelBW.selectedIndex = -1;
+          cfgSelSF.selectedIndex = -1;
+          cfgSelCR.selectedIndex = -1;
+          cfgSelPB.selectedIndex = -1;
+        }
+        cfgMode = mode;
+      }
+
+      function configSetMsg(msg, error = false, temp = false) {
+        if (cfgTimer) { clearTimeout(cfgTimer); cfgTimer = null; }
+        if (error) {
+          cfgStat.style.backgroundColor = clErrorBkg;
+          cfgStat.style.color = clErrorText;
+        } else configStatColor(cfgMode); cfgTimer = null; 
+        cfgStat.innerText = msg;
+        if (temp) cfgTimer = setTimeout( () => { 
+          cfgStat.innerText = Config[cfgMode].StatMsg; 
+          configStatColor(cfgMode); cfgTimer = null; 
+        }, 4000);
+      }
+
+      function configEnable(state) {
+        if (state) {
+          cfgFreq.disabled  = false;
+          cfgPwUp.disabled  = false;
+          cfgPwDn.disabled  = false;
+          cfgInPW.disabled  = false;
+          cfgSelBW.disabled = false;
+          cfgSelSF.disabled = false;
+          cfgSelCR.disabled = false;
+          cfgSelPB.disabled = false;
+        } else {
+          cfgFreq.disabled  = true;
+          cfgPwUp.disabled  = true;
+          cfgPwDn.disabled  = true;
+          cfgInPW.disabled  = true;
+          cfgSelBW.disabled = true;
+          cfgSelSF.disabled = true;
+          cfgSelCR.disabled = true;
+          cfgSelPB.disabled = true;
+        }
+      }
+
+      function strDots(theStr) {
+        let dots = 0;
+        for (let i = 0; i < theStr.length; i++) { if (theStr[i] === '.') dots++; }
+        return dots;
+      }
+
+      function validateInput(theInput, isFloat, minVal, maxVal, doEdit, onExit) {
+        if (doEdit && (cfgMode === CFM.Ready)) configSetMode(CFM.Edit);
+        let tmpVal = theInput.value.trim();
+        let dots = strDots(tmpVal);
+        if (!onExit) {
+          if (tmpVal === "-" || tmpVal === "" || (isFloat && tmpVal === "-0")) 
+            { theInput.value = tmpVal; return; }
+          if (isFloat && tmpVal.endsWith(".")) {
+            tmpVal = tmpVal.replace(/\.+$/, ".");
+            dots = strDots(tmpVal);
+            if (dots === 1) { theInput.value = tmpVal; return; }
+          }   
+        }
+        const sign = tmpVal.startsWith("-");
+        const regexPattern = isFloat ? /[^0-9.]/g : /[^0-9]/g;
+        tmpVal = tmpVal.replace(regexPattern, "");
+        if (sign) tmpVal = "-"+tmpVal;
+        if (isFloat && dots > 0) {
+          const decimalParts = tmpVal.split('.');
+          if (decimalParts.length > 2) tmpVal = decimalParts[0] + '.' + decimalParts.slice(1).join('');
+        }    
+        if (onExit) {      
+          let tmpNum = isFloat ? parseFloat(tmpVal) : parseInt(tmpVal, 10);
+          if (isNaN(tmpNum)) tmpNum = 0;
+          if (minVal !== null && tmpNum < minVal) tmpNum = minVal;
+          if (maxVal !== null && tmpNum > maxVal) tmpNum = maxVal;
+          tmpVal = tmpNum.toString();
+        }
+        theInput.value = tmpVal;
+      }    
+
+      function adjustPW(step) {
+        triggerHapticFeedback();
+        if (cfgMode === CFM.Ready) configSetMode(CFM.Edit);
+        let num = parseInt(cfgInPW.value, 10);
+        if (isNaN(num)) num = 0;
+        num += step;
+        if (num < PW_MIN) num = PW_MIN;
+        if (num > PW_MAX) num = PW_MAX;
+        cfgInPW.value = num;
+        Recalculate();
+      }
+
+      async function configApply(cfgRemote = true) {
+        triggerHapticFeedback();
+        if (LoraResTimer) { configSetMsg(msgLoraBusy, true, true); return; }
+        try {
+          let cmd;
+          if (cfgRemote) {
+            cmd = "/setcfg?rem=1";
+            cfgTemp = {
+              freq:   Math.trunc(parseFloat(cfgFreq.value) * 1e6),
+              txpwr:  parseInt(cfgInPW.value, 10),
+              bandw:  cfgSelBW.selectedIndex,
+              spread: cfgSelSF.selectedIndex,
+              cdrate: cfgSelCR.selectedIndex,
+              preamb: cfgSelPB.selectedIndex
+            }
+          } else {
+            cmd = "/setcfg?rem=0";
+            cfgTemp = cfgData; 
+          }
+          const response = await fetch(cmd, { 
+            method: "POST", 
+            headers: {"Content-Type": MIME_JSON}, 
+            body: JSON.stringify(cfgTemp)
+          });
+          if (response.status === 404) { configSetMsg("Error: Server is not reachable.", true, true); return; }
+          const cntType = response.headers.get("content-type");
+          if (!cntType) { configSetMsg("Error: no content type found.", true, true); return; }
+          let rpl_msg = null;
+          if (cntType.includes(MIME_PLAIN)) rpl_msg = await response.text();
+          if (response.status !== 200) {
+            if (!rpl_msg) configSetMsg("Unknown error.", true, true);
+              else configSetMsg("Error: " + rpl_msg, true, true); 
+            return;
+          }
+          if (rpl_msg) configSetMsg(rpl_msg);
+          configEnable(false); cfgCancel.disabled = true; cfgApply.disabled = true;
+          LoraResTimer = setInterval(() => checkCfgResult(cfgRemote), 1000);
+        } catch (error) { configSetMsg("Error: "+error.message, true, true) }
+      }
+
+      async function checkCfgResult(cfgRemote) {
+        try {
+          const response = await fetch("/rescfg");
+          if (response.status === 202) return;
+          clearInterval(LoraResTimer);
+          configEnable(true); 
+          if (response.status === 200) {
+            if (cfgRemote) {
+              cfgData = cfgTemp;
+              configSetMode(CFM.Ready, false); 
+              configSetMsg("The changes were successfully applied.", false, true);
+            } else configSetMsg("Local LoRa config has been updated.", false, true);
+          } else {
+            configSetMsg(await response.text(), true, true);
+            cfgCancel.disabled = false; cfgApply.disabled = false;
+          }
+          LoraResTimer = null; cfgTemp = null;
+        } catch (error) {
+          configSetMsg("Error: " + error.message, true, true);
+          clearInterval(LoraResTimer); LoraResTimer = null; cfgTemp = null;
+        } 
+      }
+
+      function configCancel() {
+        triggerHapticFeedback();
+        let fq_mhz = Math.trunc(cfgData.freq / 1000) / 1000;
+        cfgFreq.value = fq_mhz.toFixed(3);        
+        cfgInPW.value = cfgData.txpwr;
+        cfgSelBW.selectedIndex = cfgData.bandw;
+        cfgSelSF.selectedIndex = cfgData.spread;
+        cfgSelCR.selectedIndex = cfgData.cdrate;
+        cfgSelPB.selectedIndex = cfgData.preamb;
+        configSetMode(CFM.Ready); 
+        Recalculate();
+      }
+
+      async function configRead() {
+        try {
+          const response = await fetch("/getcfg");
+          if (response.status === 404) { configSetMsg("Error: Server is not reachable.", true); return; }
+          const cntType = response.headers.get("content-type");
+          if (!cntType) { configSetMsg("Error: no content type found.", true); return; }
+          if (response.status !== 200) {
+            if (!cntType.includes(MIME_PLAIN)) configSetMsg("Unknown error.", true);
+              else configSetMsg("Error: " + await response.text(), true);
+            return;
+          }
+          if (!cntType.includes(MIME_JSON)) { configSetMsg("Error: Invalid data format.", true); return; }  
+          const data = await response.json();
+          let fq_mhz = Math.trunc(data.freq / 1000) / 1000;
+          cfgFreq.value = fq_mhz.toFixed(3);
+          cfgInPW.value = data.txpwr;
+          cfgSelBW.selectedIndex = data.bandw;
+          cfgSelSF.selectedIndex = data.spread;
+          cfgSelCR.selectedIndex = data.cdrate;
+          cfgSelPB.selectedIndex = data.preamb;
+          cfgData = data; configSetMode(CFM.Ready); Recalculate();
+        } catch (error) { configSetMsg("Error: "+error.message, true) }
+      }
+
+      function formatDistance(meters) {
+        if (meters < 1000) return Math.round(meters) + " m";
+        let km = meters / 1000;
+        let roundedKm = Math.round(km);
+        if (roundedKm >= 1000) return new Intl.NumberFormat('en-US').format(roundedKm) + " Km";
+        let formatted;
+        if (km < 10) formatted = km.toFixed(2);
+        else if (km < 100) formatted = km.toFixed(1);
+        else formatted = km.toFixed(0);
+        // Remove trailing zeros and decimal point if unnecessary
+        formatted = formatted.replace(/(\.\d*[1-9])0+$/, '$1');
+        formatted = formatted.replace(/\.0+$/, '');
+        return formatted + " Km";
+      }      
+
+      function formatTime(secs) {
+        if (secs < 0.001) return (secs * 1E6).toFixed(2).replace(/\.?0+$/, '') + " μs";
+        if (secs < 1)     return (secs * 1E3).toFixed(2).replace(/\.?0+$/, '') + " ms";
+        return secs.toFixed(2).replace(/\.?0+$/, '') + " s";
+      }
+
+      function Recalculate() {
+        const tx_ant_gain = parseFloat(linkTAG.value);
+        const tx_cab_loss = parseFloat(linkTCL.value);
+        const rx_ant_gain = parseFloat(linkRAG.value);
+        const rx_cab_loss = parseFloat(linkRCL.value);
+        const rx_setup_nf = parseFloat(setupNF.value);
+        const lora_freq = parseFloat(cfgFreq.value);
+        const tx_power = parseFloat(cfgInPW.value);
+        const lora_bw = listBandwidth[cfgSelBW.selectedIndex] * 1000;
+        const lora_sf = listSpreading[cfgSelSF.selectedIndex];
+        const lora_cr = listCodingRate[cfgSelCR.selectedIndex];
+        const lora_pb = listPreamble[cfgSelPB.selectedIndex];
+        const pl_size = parseInt(cfgBuffer.value, 10);
+
+        const rx_noise_fig = 6;
+        const tx_erp = tx_power + tx_ant_gain - tx_cab_loss;
+        const rx_fr_end = rx_ant_gain - rx_cab_loss;
+        const eff_power = tx_erp + rx_fr_end;
+        const snr_min = -2.5 * (lora_sf -4);
+        const abs_nf = 10 * Math.log10( 1.38E-23 * 293 * lora_bw * 1000 );
+        const eff_nf = abs_nf + rx_noise_fig + rx_setup_nf;
+        const rx_sens = eff_nf + snr_min;
+        const link_budget = eff_power - rx_sens;
+        const range_fspl = Math.pow(10, (link_budget - 32.45 - (20 * Math.log10(lora_freq))) / 20);
+        const range_semt = 2.03E-4 * Math.pow(10, 0.02845 * link_budget);
+
+        const useCrc = 1; const hdr_exp = 1;   // use CRC and explicit header
+        const syb_time = Math.pow(2, lora_sf) / lora_bw;
+        const ldr_opt = syb_time >= 16.0 ? 1 : 0;  // auto low data rate optimization
+        const rate_code = 4 / lora_cr; 
+        const pk_rate_bits = lora_sf * (rate_code / syb_time);
+        const pb_coeff = (lora_sf === 5 || lora_sf === 6) ? 6.25 : 4.25;
+        const sybs_pb = lora_pb + pb_coeff;
+        const pl_coeff = (lora_sf === 5 || lora_sf === 6) ? 0 : 8;
+        const sybs_pl = 8 + Math.max(lora_cr * Math.ceil((8 * pl_size - 4 * lora_sf + 16 * useCrc + pl_coeff + 20 * hdr_exp) / (4 * (lora_sf - 2 * ldr_opt))), 0);
+        const sybs_pk = sybs_pb + sybs_pl;
+        const pk_toa = sybs_pk * syb_time;
+        const pl_rate = pl_size / pk_toa; 
+
+        linkERP.value = !isNaN(tx_erp) ? tx_erp : "–";
+        linkRFE.value = !isNaN(rx_fr_end) ? rx_fr_end : "–";
+        lsMinSnr.innerText  = !isNaN(snr_min) ? snr_min.toFixed(1) + " dB" : "–";
+        lsEffNF.innerText   = !isNaN(eff_nf)  ? eff_nf.toFixed(2) + " dBm" : "–";
+        lsRxSens.innerText  = !isNaN(rx_sens) ? rx_sens.toFixed(2) + " dBm" : "–";
+        lsBudget.innerText  = !isNaN(link_budget) ? link_budget.toFixed(2) + " dBm" : "–";
+        lsRngFS.innerText   = !isNaN(range_fspl)  ? formatDistance(range_fspl*1000) : "–";
+        lsRngST.innerText   = !isNaN(range_semt)  ? formatDistance(range_semt*1000) : "–";
+        lsSybTime.innerText = !isNaN(syb_time) ? formatTime(syb_time) : "–";
+        lsPkSybs.innerText  = !isNaN(sybs_pk) ? sybs_pk.toFixed(2) : "–";
+        lsPkRate.innerText  = !isNaN(pk_rate_bits) ? (pk_rate_bits/1000).toFixed(3) + " kbps" : "–";
+        lsTOA.innerText     = !isNaN(pk_toa) ? formatTime(pk_toa) : "–";
+        lsPlRate.innerText  = !isNaN(pl_rate) ? pl_rate.toFixed(1) + " B/s" : "–";
+      }
+
+      // -------------------------------------------------------
+
+      configSetMode(CFM.Init);
+      function onValueChange() { if (cfgMode === CFM.Ready) configSetMode(CFM.Edit); Recalculate(); }  
+
+      linkTAG.addEventListener("input", function() { validateInput(this, true, -100, 100, false, false); });
+      linkTAG.addEventListener("blur",  function() { validateInput(this, true, -100, 100, false, true); Recalculate(); });
+      linkTCL.addEventListener("input", function() { validateInput(this, true, -100, 100, false, false); });
+      linkTCL.addEventListener("blur",  function() { validateInput(this, true, -100, 100, false, true); Recalculate(); });
+      linkRAG.addEventListener("input", function() { validateInput(this, true, -100, 100, false, false); });
+      linkRAG.addEventListener("blur",  function() { validateInput(this, true, -100, 100, false, true); Recalculate(); });
+      linkRCL.addEventListener("input", function() { validateInput(this, true, -100, 100, false, false); });
+      linkRCL.addEventListener("blur",  function() { validateInput(this, true, -100, 100, false, true); Recalculate(); });
+      setupNF.addEventListener("input", function() { validateInput(this, true, -100, 100, false, false); });
+      setupNF.addEventListener("blur",  function() { validateInput(this, true, -100, 100, false, true); Recalculate(); });
+
+      cfgFreq.addEventListener("input", function() { validateInput(this, true, 150, 960, true, false); });
+      cfgFreq.addEventListener("blur",  function() { validateInput(this, true, 150, 960, true, true); Recalculate(); });
+      cfgInPW.addEventListener("input", function() { validateInput(this, false, PW_MIN, PW_MAX, true, false); });
+      cfgInPW.addEventListener("blur",  function() { validateInput(this, false, PW_MIN, PW_MAX, true, true); Recalculate(); });
+      cfgSelBW.addEventListener("change", onValueChange);
+      cfgSelSF.addEventListener("change", onValueChange);
+      cfgSelCR.addEventListener("change", onValueChange);
+      cfgSelPB.addEventListener("change", onValueChange);
+
+      cfgBuffer.addEventListener("input", function() { validateInput(this, false, 1, LORA_MAX_PACK_LENGTH, false, false); });
+      cfgBuffer.addEventListener("blur",  function() { validateInput(this, false, 1, LORA_MAX_PACK_LENGTH, false, true); Recalculate(); });
+
+      bulkPSize.addEventListener("input", function() { validateInput(this, false, 0, MAX_BULK_SIZE, false, true); recalcBulk(); });
+      //bulkPSize.addEventListener("blur",  function() { validateInput(this, false, 0, MAX_BULK_SIZE, false, true); recalcBulk(); });
+      bulkDelay.addEventListener("input", function() { validateInput(this, false, 0, 200, false, false); });
+      bulkDelay.addEventListener("blur",  function() { validateInput(this, false, 0, 200, false, true); });
+
+      configRead();
+      logTest.checked = testData.logTest;
+      logFails.checked = testData.logFails;
+      logTestChanged();
+      comText.value = testData.comment;
+      recalcBulk();
+
+      document.addEventListener("DOMContentLoaded", function () { 
+        if (isMobileDevice()) {
+          logRestore(); 
+          restoreLocation();
+          if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition(handlePosition, handleError,
+              {enableHighAccuracy: true, maximumAge: 1000, timeout: 5000});
+          } else {
+            console.error("Geolocation is not supported by this device.");
+          }
+        }
+      } );
+
+    </script>
+  </body>
+</html>

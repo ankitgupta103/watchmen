@@ -1,2 +1,4 @@
 idf_component_register(SRCS "main.c"
-                    INCLUDE_DIRS ".")
+                             "lora_sx1262.cpp"
+                    INCLUDE_DIRS "."
+                    REQUIRES arduino)
