@@ -207,7 +207,10 @@ class SX1262:
         return response[0] if response and len(response) > 0 else 0
         
     def _write_buffer(self, offset, data):
-        """Write data to buffer"""
+        """Write data to buffer
+        For variable length packets, the first byte at offset should be the length
+        But we'll write the data directly and let the caller handle length if needed
+        """
         self._write_command(self.CMD_WRITE_BUFFER, [offset] + list(data))
         
     def _read_buffer(self, offset, length):
@@ -281,15 +284,21 @@ class SX1262:
         
     def set_packet_params(self, preamble_len, header_type, payload_len, crc_type, invert_iq=0):
         """Set packet parameters
-        preamble_len: Preamble length
+        preamble_len: Preamble length (16-bit)
         header_type: 0x00=variable, 0x01=fixed
-        payload_len: Payload length (for fixed header)
+        payload_len: Payload length (for fixed header, max 255)
         crc_type: 0x00=none, 0x01=CRC on
         invert_iq: 0=normal, 1=inverted
         """
+        # Ensure preamble is within valid range
+        if preamble_len > 0xFFFF:
+            preamble_len = 0xFFFF
+        if payload_len > 0xFF:
+            payload_len = 0xFF
+            
         packet_params = [
             (preamble_len >> 8) & 0xFF, preamble_len & 0xFF,
-            header_type, payload_len,
+            header_type, payload_len & 0xFF,
             crc_type, invert_iq
         ]
         self._write_command(self.CMD_SET_PACKET_PARAMS, packet_params)
@@ -424,6 +433,7 @@ class SX1262:
         self.set_modulation_params(sf, bw, cr, ldro)
         
         # Set packet parameters (variable length, CRC on)
+        # For variable length: payload_len is max length (0xFF = 255 bytes)
         self.set_packet_params(preamble_len, 0x00, 0xFF, 0x01, 0x00)
         
         # Set sync word
@@ -454,26 +464,50 @@ class SX1262:
         if isinstance(data, str):
             data = data.encode('utf-8')
         
-        # Clear IRQ first
+        # Clear all IRQ flags first
         self.clear_irq_status(0xFFFF)
         
-        # Write data to buffer
-        self._write_buffer(0, data)
+        # Ensure we're in standby before starting
+        self.set_standby(1)
+        time.sleep_ms(5)
+        
+        # Write data to buffer (offset 0)
+        # For variable length LoRa packets, SX1262 requires:
+        # - First byte at offset 0: payload length (1-255)
+        # - Following bytes: actual payload data
+        # So we need to prepend the length byte
+        if len(data) > 255:
+            data = data[:255]  # Truncate if too long
+        
+        # Create buffer with length byte first
+        buffer_data = bytearray([len(data)]) + bytearray(data)
+        self._write_buffer(0, buffer_data)
+        
+        # Set packet parameters with actual payload length for variable length mode
+        # In variable length mode, we need to set the length in the first byte of the buffer
+        # But SX1262 handles this automatically - we just write the data
         
         # Set RF switch to TX (must be done before SET_TX command)
         self.set_rf_switch(False)
-        time.sleep_ms(1)  # Small delay for RF switch to settle
-        
-        # Set TX mode with timeout (0x000000 = single transmission, no timeout)
-        timeout_bytes = [0x00, 0x00, 0x00]
+        time.sleep_ms(2)  # Delay for RF switch to settle
         
         # Wait for BUSY to be low before sending command
-        if not self.wait_for_not_busy(50):
+        if not self.wait_for_not_busy(100):
             self.set_rf_switch(True)
             return -5  # BUSY timeout before command
         
+        # Set TX mode
+        # Timeout format: 3 bytes, MSB first, in units of 15.625 us
+        # 0x000000 = single transmission (transmit once, no timeout)
+        # For continuous TX, use a large value
+        timeout_bytes = [0x00, 0x00, 0x00]  # Single transmission
+        
         # Send SET_TX command
         self._write_command(self.CMD_SET_TX, timeout_bytes)
+        
+        # After SET_TX, BUSY should go high immediately
+        # Wait a moment for it to start
+        time.sleep_ms(10)
         
         # After SET_TX, BUSY should go high (chip is processing/transmitting)
         # Give it a moment to respond
@@ -492,41 +526,78 @@ class SX1262:
         # But this isn't necessarily an error - some chips might process quickly
         # So we'll continue and check IRQ instead
         
-        # Wait for TX done (poll IRQ status)
-        # For a short packet, transmission should complete quickly
+        # Wait for TX done (poll IRQ status via DIO1 or direct IRQ check)
+        # For a short packet, transmission should complete in < 100ms typically
         start = time.ticks_ms()
-        timeout_ms = 5000  # 5 second timeout (should be much faster)
+        timeout_ms = 10000  # 10 second timeout (generous)
+        
+        # Calculate expected transmission time based on packet size and LoRa params
+        # This helps us know if we're waiting too long
+        packet_time_ms = len(data) * 8 * (2 ** SF) / (BW * 1000)  # Rough estimate
+        packet_time_ms = max(packet_time_ms, 100)  # At least 100ms
         
         while True:
-            # Check IRQ status
-            irq = self.get_irq_status()
+            # Check DIO1 pin first (faster than SPI read)
+            if self.dio1.value() == 1:
+                # DIO1 is high, IRQ occurred - read status
+                irq = self.get_irq_status()
+                
+                if irq & self.IRQ_TX_DONE:
+                    self.clear_irq_status(self.IRQ_TX_DONE)
+                    # Set RF switch back to RX
+                    self.set_rf_switch(True)
+                    return 0  # Success
+                elif irq & self.IRQ_RX_TX_TIMEOUT:
+                    # Timeout IRQ - this might mean the packet wasn't sent
+                    # But check if BUSY is low (might have completed anyway)
+                    if self.busy.value() == 0:
+                        # BUSY low, might have completed - check IRQ again
+                        irq2 = self.get_irq_status()
+                        if irq2 & self.IRQ_TX_DONE:
+                            self.clear_irq_status(self.IRQ_TX_DONE)
+                            self.set_rf_switch(True)
+                            return 0
+                    self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
+                    self.set_rf_switch(True)
+                    return -1  # Timeout
+                elif irq & self.IRQ_CRC_ERROR:
+                    self.clear_irq_status(self.IRQ_CRC_ERROR)
+                    self.set_rf_switch(True)
+                    return -4  # CRC error
+            else:
+                # DIO1 not set, but check IRQ anyway (might have missed edge)
+                irq = self.get_irq_status()
+                if irq & (self.IRQ_TX_DONE | self.IRQ_RX_TX_TIMEOUT | self.IRQ_CRC_ERROR):
+                    if irq & self.IRQ_TX_DONE:
+                        self.clear_irq_status(self.IRQ_TX_DONE)
+                        self.set_rf_switch(True)
+                        return 0
+                    elif irq & self.IRQ_RX_TX_TIMEOUT:
+                        self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
+                        self.set_rf_switch(True)
+                        return -1
+                    elif irq & self.IRQ_CRC_ERROR:
+                        self.clear_irq_status(self.IRQ_CRC_ERROR)
+                        self.set_rf_switch(True)
+                        return -4
             
-            if irq & self.IRQ_TX_DONE:
-                self.clear_irq_status(self.IRQ_TX_DONE)
-                # Set RF switch back to RX
-                self.set_rf_switch(True)
-                return 0  # Success
-            elif irq & self.IRQ_RX_TX_TIMEOUT:
-                self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
-                self.set_rf_switch(True)
-                return -1  # Timeout
-            elif irq & self.IRQ_CRC_ERROR:
-                self.clear_irq_status(self.IRQ_CRC_ERROR)
-                self.set_rf_switch(True)
-                return -4  # CRC error
-            
-            # Also check if BUSY went low (transmission might be done)
+            # Check if BUSY went low (transmission completed)
             if self.busy.value() == 0:
-                # BUSY is low, check IRQ one more time
+                # BUSY is low, transmission should be done
+                # Wait a moment for IRQ to be set
+                time.sleep_ms(5)
                 irq = self.get_irq_status()
                 if irq & self.IRQ_TX_DONE:
                     self.clear_irq_status(self.IRQ_TX_DONE)
                     self.set_rf_switch(True)
                     return 0
+                # BUSY low but no TX_DONE IRQ - might be an issue
+                # But continue waiting a bit more
             
             # Check timeout
-            if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
-                # Check IRQ one final time
+            elapsed = time.ticks_diff(time.ticks_ms(), start)
+            if elapsed > timeout_ms:
+                # Final check
                 irq = self.get_irq_status()
                 if irq & self.IRQ_TX_DONE:
                     self.clear_irq_status(self.IRQ_TX_DONE)
@@ -535,7 +606,8 @@ class SX1262:
                 self.set_rf_switch(True)
                 return -2  # Timeout
             
-            time.sleep_ms(10)  # Small delay
+            # Small delay to prevent CPU spinning
+            time.sleep_ms(5)
             
     def start_receive(self):
         """Start receiving"""
