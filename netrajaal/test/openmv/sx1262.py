@@ -140,24 +140,35 @@ class SX1262:
         
     def _spi_transfer(self, data_out, read_len=0):
         """Transfer data over SPI and return response
-        For write-only: read_len=0
-        For read: read_len=number of bytes to read
+        For write-only: read_len=0 (but still reads status byte)
+        For read: read_len=number of bytes to read (excluding status byte)
+        SX1262 always returns a status byte first
         """
         self.wait_for_not_busy()
         self.cs.value(0)
         time.sleep_us(1)
         
-        # Write command/data
-        self.spi.write(data_out)
+        # SX1262 SPI: write command/data, then read status byte + optional data
+        # We need to send dummy bytes to clock in the response
+        total_bytes = len(data_out) + 1 + read_len  # command + status + data
         
-        # Read response if needed
-        data_in = None
+        # Create write buffer: command/data + dummy bytes for reading
+        write_buf = bytearray(data_out) + bytearray([0x00] * (1 + read_len))
+        
+        # Create read buffer
+        read_buf = bytearray(total_bytes)
+        
+        # Perform bidirectional transfer
+        self.spi.write_readinto(write_buf, read_buf)
+        
+        # Extract result (skip command echo and status byte)
+        result = None
         if read_len > 0:
-            data_in = bytearray(read_len)
-            self.spi.readinto(data_in)
+            # Return data bytes (skip status byte which is at index len(data_out))
+            result = read_buf[len(data_out) + 1:]
         
         self.cs.value(1)
-        return data_in
+        return result
         
     def _write_command(self, cmd, data=None):
         """Write a command to SX1262"""
@@ -168,20 +179,10 @@ class SX1262:
         self.wait_for_not_busy()
         
     def _read_command(self, cmd, length):
-        """Read data from SX1262"""
-        self.wait_for_not_busy()
-        self.cs.value(0)
-        time.sleep_us(1)
-        
-        # Send command
-        self.spi.write(bytearray([cmd]))
-        
-        # Read response (SX1262 returns status byte + data)
-        response = bytearray(length + 1)
-        self.spi.readinto(response)
-        
-        self.cs.value(1)
-        return response[1:]  # Skip status byte
+        """Read data from SX1262
+        length: number of data bytes to read (excluding status byte)
+        """
+        return self._spi_transfer(bytearray([cmd]), read_len=length)
         
     def _write_register(self, address, value):
         """Write a register"""
@@ -190,20 +191,9 @@ class SX1262:
         
     def _read_register(self, address):
         """Read a register"""
-        self.wait_for_not_busy()
-        self.cs.value(0)
-        time.sleep_us(1)
-        
-        # Send command: CMD_READ_REGISTER, address MSB, address LSB
         addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
-        self.spi.write(bytearray([self.CMD_READ_REGISTER] + addr_bytes))
-        
-        # Read status byte + register value
-        response = bytearray(2)
-        self.spi.readinto(response)
-        
-        self.cs.value(1)
-        return response[1] if len(response) > 1 else 0
+        response = self._spi_transfer(bytearray([self.CMD_READ_REGISTER] + addr_bytes), read_len=1)
+        return response[0] if response and len(response) > 0 else 0
         
     def _write_buffer(self, offset, data):
         """Write data to buffer"""
@@ -211,19 +201,10 @@ class SX1262:
         
     def _read_buffer(self, offset, length):
         """Read data from buffer"""
-        self.wait_for_not_busy()
-        self.cs.value(0)
-        time.sleep_us(1)
-        
-        # Send command: CMD_READ_BUFFER, offset, dummy byte
-        self.spi.write(bytearray([self.CMD_READ_BUFFER, offset, 0x00]))
-        
-        # Read status byte + data
-        response = bytearray(length + 1)
-        self.spi.readinto(response)
-        
-        self.cs.value(1)
-        return response[1:]  # Skip status byte
+        # Command format: CMD_READ_BUFFER, offset, dummy byte
+        cmd_data = bytearray([self.CMD_READ_BUFFER, offset, 0x00])
+        response = self._spi_transfer(cmd_data, read_len=length)
+        return response if response else bytearray(length)
         
     def set_standby(self, mode=0):
         """Set standby mode (0=RC, 1=XOSC)"""
@@ -345,13 +326,18 @@ class SX1262:
         self._write_command(self.CMD_SET_DIO3_AS_TCXO_CTRL, [voltage] + delay_bytes)
         
     def set_rf_switch(self, rx_mode=True):
-        """Control RF switch pins"""
+        """Control RF switch pins
+        RX mode: RX_EN=HIGH, TX_EN=LOW
+        TX mode: RX_EN=LOW, TX_EN=HIGH
+        """
         if rx_mode:
-            self.rx_en.value(1)
-            self.tx_en.value(0)
+            self.tx_en.value(0)  # Set TX_EN low first
+            time.sleep_us(10)
+            self.rx_en.value(1)  # Then set RX_EN high
         else:
-            self.rx_en.value(0)
-            self.tx_en.value(1)
+            self.rx_en.value(0)  # Set RX_EN low first
+            time.sleep_us(10)
+            self.tx_en.value(1)  # Then set TX_EN high
         
     def begin(self, freq_mhz, bw, sf, cr, sync_word, tx_power, preamble_len, tcxo_voltage=0x01, use_ldo=False):
         """
@@ -371,8 +357,12 @@ class SX1262:
         # Reset
         self.reset_module()
         
+        # Small delay after reset
+        time.sleep_ms(10)
+        
         # Set standby
         self.set_standby(1)  # XOSC mode
+        time.sleep_ms(5)  # Small delay after standby
         
         # Calibrate
         calib_param = 0x7F  # Calibrate all
@@ -383,7 +373,29 @@ class SX1262:
         self._write_command(self.CMD_SET_REGULATOR_MODE, [reg_mode])
         
         # Set DIO3 as TCXO control
-        self.set_dio3_as_tcxo_ctrl(tcxo_voltage, delay=5000)  # ~78ms delay
+        # Convert voltage: 1.7V = 0x01, but we need to map it correctly
+        # 0x00=1.6V, 0x01=1.7V, 0x02=1.8V, etc.
+        if isinstance(tcxo_voltage, float):
+            # Convert float voltage to register value
+            if tcxo_voltage <= 1.6:
+                tcxo_reg = 0x00
+            elif tcxo_voltage <= 1.7:
+                tcxo_reg = 0x01
+            elif tcxo_voltage <= 1.8:
+                tcxo_reg = 0x02
+            elif tcxo_voltage <= 2.2:
+                tcxo_reg = 0x03
+            elif tcxo_voltage <= 2.4:
+                tcxo_reg = 0x04
+            elif tcxo_voltage <= 2.7:
+                tcxo_reg = 0x05
+            elif tcxo_voltage <= 3.0:
+                tcxo_reg = 0x06
+            else:
+                tcxo_reg = 0x07
+        else:
+            tcxo_reg = tcxo_voltage
+        self.set_dio3_as_tcxo_ctrl(tcxo_reg, delay=5000)  # ~78ms delay
         
         # Set DIO2 as RF switch control (optional, we'll use manual control)
         # self.set_dio2_as_rf_switch(True)
@@ -431,24 +443,31 @@ class SX1262:
         if isinstance(data, str):
             data = data.encode('utf-8')
         
-        # Set RF switch to TX
-        self.set_rf_switch(False)
-        time.sleep_ms(1)
+        # Clear IRQ first
+        self.clear_irq_status(0xFFFF)
         
         # Write data to buffer
         self._write_buffer(0, data)
         
-        # Clear IRQ
-        self.clear_irq_status(0xFFFF)
+        # Set RF switch to TX (must be done before SET_TX command)
+        self.set_rf_switch(False)
+        time.sleep_ms(1)  # Small delay for RF switch to settle
         
-        # Set TX mode
-        timeout = 0xFFFF  # No timeout
-        timeout_bytes = [0x00, 0x00, 0x00]  # 0 = no timeout
+        # Set TX mode with timeout (0x000000 = single transmission, no timeout)
+        timeout_bytes = [0x00, 0x00, 0x00]
         self._write_command(self.CMD_SET_TX, timeout_bytes)
         
-        # Wait for TX done
+        # Wait for BUSY to go low (command accepted)
+        if not self.wait_for_not_busy(100):
+            self.set_rf_switch(True)
+            return -3  # Busy timeout
+        
+        # Wait for TX done (poll IRQ or DIO1)
         start = time.ticks_ms()
+        timeout_ms = 30000  # 30 second timeout
+        
         while True:
+            # Check DIO1 pin (interrupt) or IRQ status
             irq = self.get_irq_status()
             if irq & self.IRQ_TX_DONE:
                 self.clear_irq_status(self.IRQ_TX_DONE)
@@ -459,10 +478,17 @@ class SX1262:
                 self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
                 self.set_rf_switch(True)
                 return -1  # Timeout
-            if time.ticks_diff(time.ticks_ms(), start) > 30000:  # 30s timeout
+            elif irq & self.IRQ_CRC_ERROR:
+                self.clear_irq_status(self.IRQ_CRC_ERROR)
+                self.set_rf_switch(True)
+                return -4  # CRC error
+            
+            # Check timeout
+            if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
                 self.set_rf_switch(True)
                 return -2  # Timeout
-            time.sleep_ms(10)
+            
+            time.sleep_ms(1)  # Small delay
             
     def start_receive(self):
         """Start receiving"""
@@ -473,9 +499,8 @@ class SX1262:
         # Clear IRQ
         self.clear_irq_status(0xFFFF)
         
-        # Set RX mode
-        timeout = 0xFFFF  # No timeout
-        timeout_bytes = [0x00, 0x00, 0x00]  # 0 = no timeout
+        # Set RX mode with timeout (0x000000 = continuous RX, no timeout)
+        timeout_bytes = [0x00, 0x00, 0x00]
         self._write_command(self.CMD_SET_RX, timeout_bytes)
         
         return 0
@@ -580,7 +605,7 @@ if __name__ == "__main__":
     SYNCW = 0xE3      # Sync Word
     TX_PWR = 9        # TX Power in dBm (-9 to 22)
     PREAMBLE = 8      # Preamble Length
-    XOV = 0x01        # TCXO Voltage (0x01 = 1.7V)
+    XOV = 1.7         # TCXO Voltage (1.7V, can be float or 0x01)
     LDO = False       # Use LDO only
     
     # Global variables
