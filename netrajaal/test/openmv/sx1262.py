@@ -224,8 +224,12 @@ class SX1262:
         Returns:
             (status_byte, data_bytes): Status byte and data bytes
         """
+        # Wait for BUSY LOW before transaction (RadioLib line 345-364)
+        # During TX mode, BUSY is already LOW, so this returns immediately
         if wait_for_busy:
-            self.wait_for_not_busy()
+            # RadioLib uses timeout from spiConfig.timeout (typically longer)
+            # We use shorter timeout since during TX mode BUSY is already LOW
+            self.wait_for_not_busy(timeout_ms=100)
         
         # RadioLib: buffLen = cmdLen + numBytes + statusLen
         # For SX126x: cmdLen=1, statusLen=1
@@ -247,6 +251,11 @@ class SX1262:
         self.cs.value(1)
         time.sleep_us(1)
         
+        # Debug: Print raw buffers for GET_IRQ_STATUS to diagnose issues
+        if cmd == self.CMD_GET_IRQ_STATUS:
+            print("[DEBUG] GET_IRQ_STATUS SPI: out={}, in={}".format(
+                out_buf.hex(), in_buf.hex()))
+        
         # Parse result according to RadioLib line 413:
         # Data extracted from: buffIn[cmdLen + statusLen:]
         # For SX126x: cmdLen=1, statusLen=1, so data starts at offset 2
@@ -255,11 +264,21 @@ class SX1262:
         data_bytes = in_buf[data_start:data_start+read_len] if read_len > 0 else bytearray()
         
         # Wait for BUSY to go HIGH then LOW (chip processing command)
+        # RadioLib line 382-402: Waits for GPIO to go LOW (checks if HIGH, waits for LOW)
+        # During TX mode, BUSY is LOW, so wait passes immediately
+        # For read commands during TX, BUSY may not go HIGH at all - that's OK!
         if wait_for_busy:
-            # Wait for BUSY HIGH (chip started processing)
-            self.wait_for_busy(timeout_ms=100)
-            # Wait for BUSY LOW (chip finished processing)
-            self.wait_for_not_busy(timeout_ms=100)
+            # Small delay first (RadioLib line 386: delayMicroseconds(1))
+            time.sleep_us(1)
+            # RadioLib line 388: while(digitalRead(gpioPin)) - waits for GPIO to go LOW
+            # If GPIO is already LOW, loop doesn't execute, continues immediately
+            # For GET_IRQ_STATUS during TX, BUSY stays LOW, so we should continue
+            # Check current BUSY state - if already LOW, skip wait (matches RadioLib behavior)
+            if self.busy.value() == 1:
+                # BUSY is HIGH, wait for it to go LOW
+                self.wait_for_not_busy(timeout_ms=100)
+            # If BUSY is LOW, continue immediately (data is already read)
+            # RadioLib continues even if timeout occurs (line 397: "do not return yet")
         
         return (status_byte, data_bytes)
         
@@ -448,13 +467,16 @@ class SX1262:
         RadioLib line 946: this->mod->SPIreadStream(RADIOLIB_SX126X_CMD_GET_IRQ_STATUS, data, 2);
         RadioLib line 947: return(((uint32_t)(data[0]) << 8) | data[1]);
         
-        Note: RadioLib uses default waitForGpio=true, but GET_IRQ_STATUS can be read during TX/RX.
-        We use wait_for_busy=True with short timeout to match RadioLib behavior.
+        Note: RadioLib uses default waitForGpio=true. During TX mode, BUSY stays LOW,
+        so post-transaction BUSY wait may timeout, but RadioLib continues anyway (line 397).
+        
+        CRITICAL: During TX mode, the chip may not respond to SPI commands immediately.
+        Try reading without BUSY wait first, or use very short timeout.
         """
-        # RadioLib uses default waitForGpio=true, so we should wait for BUSY
-        # But use short timeout since we might be in TX mode
-        # First try without waiting, but if that fails, we'll add wait
-        status_byte, data = self._spi_read_stream(self.CMD_GET_IRQ_STATUS, 2, wait_for_busy=True)
+        # During TX mode, BUSY is LOW and chip may not respond to SPI immediately
+        # Try with wait_for_busy=False first (GET_IRQ_STATUS can be read during TX/RX)
+        # If that doesn't work, try with very short timeout
+        status_byte, data = self._spi_read_stream(self.CMD_GET_IRQ_STATUS, 2, wait_for_busy=False)
         
         if len(data) >= 2:
             # Combine IRQ bytes: MSB first (matches RadioLib line 947)
@@ -462,14 +484,15 @@ class SX1262:
         else:
             irq_status = 0xFFFF  # Error reading
         
-        # Debug output with raw bytes (always show for debugging until confirmed working)
-        print("[DEBUG] IRQ read: status=0x{:02X}, data=[0x{:02X}, 0x{:02X}], irq=0x{:04X}, BUSY={}, DIO1={}".format(
-            status_byte, 
-            data[0] if len(data) > 0 else 0xFF, 
-            data[1] if len(data) > 1 else 0xFF, 
-            irq_status,
-            self.busy.value(), 
-            self.dio1.value()))
+        # Debug output with raw bytes (show if error or for debugging)
+        if irq_status == 0xFFFF or True:  # Always show for now
+            print("[DEBUG] IRQ read: status=0x{:02X}, data=[0x{:02X}, 0x{:02X}], irq=0x{:04X}, BUSY={}, DIO1={}".format(
+                status_byte, 
+                data[0] if len(data) > 0 else 0xFF, 
+                data[1] if len(data) > 1 else 0xFF, 
+                irq_status,
+                self.busy.value(), 
+                self.dio1.value()))
         
         return irq_status
         
@@ -761,8 +784,10 @@ class SX1262:
             # Check timeout
             elapsed = time.ticks_diff(time.ticks_ms(), start)
             if elapsed > timeout_ms:
-                print("[TX] TIMEOUT after {}ms! DIO1={}, BUSY={}, IRQ=0x{:04X}".format(
-                    elapsed, self.dio1.value(), self.busy.value(), self.get_irq_status()))
+                # On timeout, don't try to read IRQ status (DIO1 is still LOW, chip may not respond)
+                # RadioLib only reads IRQ when DIO1 is HIGH
+                print("[TX] TIMEOUT after {}ms! DIO1={}, BUSY={}".format(
+                    elapsed, self.dio1.value(), self.busy.value()))
                 # Cleanup on timeout (matches finishTransmit)
                 self.clear_irq_status(0xFFFF)
                 self.set_standby(1)
@@ -894,7 +919,7 @@ class SX1262:
 # ============================================================================
 if __name__ == "__main__":
     # Mode Selection
-    TX_MODE = True  # Set to False for RX mode
+    TX_MODE = False  # Set to False for RX mode
     
     # Pin Configuration (OpenMV RT1062)
     PIN_MOSI = "P0"   # SPI MOSI
@@ -1065,3 +1090,4 @@ if __name__ == "__main__":
                 
                 time.sleep_ms(10)  # Small delay to prevent watchdog issues
 
+ 
