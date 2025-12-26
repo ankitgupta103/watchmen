@@ -8,6 +8,8 @@ import sys
 import enc
 import image
 import sensor
+import uasyncio as asyncio
+from machine import LED
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # Device ID Detection - Set my_addr dynamically based on device unique ID
@@ -120,11 +122,11 @@ def encrypt_if_needed(msg_typ, msg):
 # Main Task: Continuously capture images, save raw and encrypted versions
 # ---------------------------------------------------------------------------
 def main():
+    capture_count = 0
+    SLEEP_TIME = 4
     print("INFO, Starting continuous image capture test...")
     print("INFO, Capturing images every 1 second...")
     
-    capture_count = 0
-    SLEEP_TIME = 4
     
     while True:
         img = None
@@ -197,4 +199,73 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+led = LED("LED_BLUE")
+lock = asyncio.Lock()
+SLEEP_TIME = 4
+async def person_detection_loop():
+    while True:
+        img = None
+        try:
+            led.on()
+            event_epoch_ms = get_epoch_ms() # epoch milisecond for event
+            print(f"[PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾")
+            img = sensor.snapshot()
+            # imgbytes = img.bytearray() # this was bigger # TODO
+            # print(f"[OLD] Captured image, size: {len(imgbytes)} bytes")
+            
+            try:
+                raw_path = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}_raw.jpg"
+                print(f"Saving raw image to {raw_path} : imbytesize = {len(img.bytearray())}")
+                async with lock:
+                    img.save(raw_path)
+                    os.sync()  # Force filesystem sync to SD card
+                    utime.sleep_ms(500)
+                print(f"Saved raw image: {raw_path}: raw size = {len(img.bytearray())} bytes")
+            except Exception as e:
+                print(f"[PIR] Failed to save raw image: {e}")
+                continue
+            
+            # read raw file
+            try:
+                img = image.Image(raw_path)
+                imgbytes = img.bytearray() # updated 
+                print(f"[PIR] Captured image, size: {len(imgbytes)} bytes")
+            except Exception as e:
+                print(f"ERROR: [PIR] Failed read image file: {e}")
+                continue
+                
+            # Encrypt image immediately
+            try:
+                enc_msgbytes = encrypt_if_needed("P", imgbytes)
+                enc_filepath = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}.enc"
+                print(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(enc_msgbytes)} bytes...")
+                # Save encrypted bytes to binary file
+                async with lock:
+                    with open(enc_filepath, "wb") as f:
+                        f.write(enc_msgbytes)
+                    os.sync()  # Force filesystem sync to SD card
+                    utime.sleep_ms(500)
+                print(f"[PIR] Saved encrypted image: {enc_filepath}: encrypted size = {len(enc_msgbytes)} bytes")
+            except Exception as e:
+                print(f"ERROR: [PIR] Failed to save encrypted image: {e}")
+                continue
+            led.off()
+        
+
+            
+
+        except Exception as e:
+            print(f"ERROR: [PIR] unexpected error in image taking and saving: {e}")
+        finally:
+            # Explicitly clean up image object
+            if img is not None:
+                del img
+                gc.collect()  # Help GC reclaim memory immediately
+                
+        await asyncio.sleep(SLEEP_TIME)
+
+
 
