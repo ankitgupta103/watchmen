@@ -97,20 +97,21 @@ class SX1262:
         self.dio1 = dio1
         
         # Set initial pin states
-        # Note: Pins should be initialized before passing to this class
+        # RadioLib Module::init() sets CS to HIGH (inactive) - line 40: digitalWrite(csPin, GpioLevelHigh)
+        # Ensure CS is HIGH before any SPI communication
         try:
-            self.cs.value(1)
-            self.reset.value(1)
-            self.rx_en.value(0)
-            self.tx_en.value(0)
+            self.cs.value(1)  # CS HIGH (inactive) - CRITICAL!
+            self.reset.value(1)  # RESET HIGH (not resetting)
+            self.rx_en.value(0)  # RX_EN LOW (RX disabled)
+            self.tx_en.value(0)  # TX_EN LOW (TX disabled)
         except:
             # If pins aren't initialized, initialize them
-            self.cs.init(Pin.OUT, value=1)
-            self.reset.init(Pin.OUT, value=1)
-            self.busy.init(Pin.IN)
-            self.rx_en.init(Pin.OUT, value=0)
-            self.tx_en.init(Pin.OUT, value=0)
-            self.dio1.init(Pin.IN)
+            self.cs.init(Pin.OUT, value=1)  # CS HIGH (inactive)
+            self.reset.init(Pin.OUT, value=1)  # RESET HIGH
+            self.busy.init(Pin.IN)  # BUSY is input
+            self.rx_en.init(Pin.OUT, value=0)  # RX_EN LOW
+            self.tx_en.init(Pin.OUT, value=0)  # TX_EN LOW
+            self.dio1.init(Pin.IN)  # DIO1 is input
         
         # State variables
         self._packet_type = 0
@@ -126,11 +127,25 @@ class SX1262:
         
     def reset_module(self):
         """Reset the SX1262 module"""
+        # RadioLib reset sequence: pull RESET low, wait, pull high, wait for BUSY low
+        # CRITICAL: Ensure CS is HIGH during reset (chip select inactive)
+        self.cs.value(1)  # CS HIGH (inactive) during reset
+        time.sleep_us(100)
+        
+        # Pull RESET low
         self.reset.value(0)
-        time.sleep_us(100)
+        time.sleep_ms(2)  # Reset low time (SX1262 datasheet: min 100us, we use 2ms for safety)
+        
+        # Pull RESET high
         self.reset.value(1)
+        time.sleep_ms(10)  # Wait for chip to stabilize after reset (datasheet: 3ms typical)
+        
+        # Wait for BUSY to go low (chip ready for SPI communication)
+        self.wait_for_not_busy(timeout_ms=100)
+        
+        # Ensure CS is HIGH after reset (idle state)
+        self.cs.value(1)
         time.sleep_us(100)
-        self.wait_for_not_busy()
         
     def wait_for_not_busy(self, timeout_ms=100):
         """Wait until BUSY pin goes low"""
@@ -178,17 +193,47 @@ class SX1262:
         out_buf = bytearray([cmd] + list(data))
         
         # Prepare input buffer: [status, ...] (same size as output)
+        # For write commands, chip returns status byte on first byte, then echoes nothing
         in_buf = bytearray(len(out_buf))
         
         # Single SPI transaction: ALL bytes in ONE transfer
+        # RadioLib: spiBeginTransaction() → CS LOW → spiTransfer() → CS HIGH → spiEndTransaction()
+        # RadioLib ArduinoHal::spiTransfer() does byte-by-byte transfer in a loop
+        # CRITICAL: SX1262 requires CS to be LOW during entire transaction
+        # MicroPython write_readinto() should handle this, but ensure proper timing
+        
+        # Ensure CS starts HIGH (idle state) - RadioLib Module::init() sets CS HIGH
+        if self.cs.value() != 1:
+            self.cs.value(1)
+            time.sleep_us(10)  # Ensure CS is stable HIGH
+        
+        # CS LOW - start transaction (RadioLib line 376: digitalWrite(csPin, GpioLevelLow))
         self.cs.value(0)
-        time.sleep_us(1)
-        self.spi.write_readinto(out_buf, in_buf)
+        time.sleep_us(5)  # CS setup time (SX1262 datasheet: min 100ns, we use 5us)
+        
+        # Perform SPI transfer - write_readinto does full-duplex transfer
+        # RadioLib ArduinoHal::spiTransfer() does: for each byte: in[i] = spi->transfer(out[i])
+        # MicroPython write_readinto() should do the same atomically
+        try:
+            self.spi.write_readinto(out_buf, in_buf)
+        except Exception as e:
+            print("[ERROR] SPI write_readinto failed: {}".format(e))
+            # If write_readinto fails, there's a fundamental SPI issue
+            # Set CS HIGH before returning
+            self.cs.value(1)
+            return 0xFF  # Return error status
+        
+        # CS HIGH - end transaction (RadioLib line 378: digitalWrite(csPin, GpioLevelHigh))
+        time.sleep_us(5)  # CS hold time (SX1262 datasheet: min 100ns)
         self.cs.value(1)
-        time.sleep_us(1)
+        time.sleep_us(5)  # CS recovery time
         
         # Status byte is first byte returned
         status_byte = in_buf[0]
+        
+        # Debug: Show status byte for critical commands
+        if cmd in [self.CMD_SET_TX, self.CMD_SET_RX, self.CMD_WRITE_BUFFER]:
+            print("[DEBUG] Command 0x{:02X}: status=0x{:02X}".format(cmd, status_byte))
         
         # Wait for BUSY to go HIGH then LOW (chip processing command)
         if wait_for_busy:
@@ -245,11 +290,36 @@ class SX1262:
         in_buf = bytearray(len(out_buf))
         
         # Single SPI transaction: ALL bytes in ONE transfer
+        # RadioLib: spiBeginTransaction() → CS LOW → spiTransfer() → CS HIGH → spiEndTransaction()
+        # RadioLib ArduinoHal::spiTransfer() does byte-by-byte transfer in a loop
+        # CRITICAL: SX1262 requires CS to be LOW during entire transaction
+        # MicroPython write_readinto() should handle this, but ensure proper timing
+        
+        # Ensure CS starts HIGH (idle state) - RadioLib Module::init() sets CS HIGH
+        if self.cs.value() != 1:
+            self.cs.value(1)
+            time.sleep_us(10)  # Ensure CS is stable HIGH
+        
+        # CS LOW - start transaction (RadioLib line 376: digitalWrite(csPin, GpioLevelLow))
         self.cs.value(0)
-        time.sleep_us(1)
-        self.spi.write_readinto(out_buf, in_buf)
+        time.sleep_us(5)  # CS setup time (SX1262 datasheet: min 100ns, we use 5us)
+        
+        # Perform SPI transfer - write_readinto does full-duplex transfer
+        # RadioLib ArduinoHal::spiTransfer() does: for each byte: in[i] = spi->transfer(out[i])
+        # MicroPython write_readinto() should do the same atomically
+        try:
+            self.spi.write_readinto(out_buf, in_buf)
+        except Exception as e:
+            print("[ERROR] SPI write_readinto failed: {}".format(e))
+            # If write_readinto fails, there's a fundamental SPI issue
+            # Set CS HIGH before returning
+            self.cs.value(1)
+            return 0xFF  # Return error status
+        
+        # CS HIGH - end transaction (RadioLib line 378: digitalWrite(csPin, GpioLevelHigh))
+        time.sleep_us(5)  # CS hold time (SX1262 datasheet: min 100ns)
         self.cs.value(1)
-        time.sleep_us(1)
+        time.sleep_us(5)  # CS recovery time
         
         # Debug: Print raw buffers for GET_IRQ_STATUS to diagnose issues
         if cmd == self.CMD_GET_IRQ_STATUS:
@@ -313,7 +383,7 @@ class SX1262:
         """
         Read a register
         Matches RadioLib: SPIreadRegisterBurst(addr, numBytes, data)
-        For SX126x: CMD_READ_REGISTER + [addr_msb, addr_lsb] + dummy bytes, read [status, data...]
+        For SX126x: CMD_READ_REGISTER + [addr_msb, addr_lsb] + dummy bytes, read [status, addr_msb, addr_lsb, data]
         """
         addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
         # Send: [CMD_READ_REGISTER, addr_msb, addr_lsb, 0x00], Read: [status, addr_msb, addr_lsb, data]
@@ -321,19 +391,25 @@ class SX1262:
         out_buf = bytearray([self.CMD_READ_REGISTER] + addr_bytes + [0x00])
         in_buf = bytearray(len(out_buf))
         self.wait_for_not_busy()
-        self.cs.value(0)
-        time.sleep_us(1)
+        self.cs.value(0)  # CS LOW
+        time.sleep_us(2)  # CS setup time
         self.spi.write_readinto(out_buf, in_buf)
-        self.cs.value(1)
-        time.sleep_us(1)
+        time.sleep_us(2)  # Before CS HIGH
+        self.cs.value(1)  # CS HIGH
+        time.sleep_us(1)  # CS hold time
         # Result: [status, addr_msb, addr_lsb, data]
         return in_buf[3] if len(in_buf) > 3 else 0
         
     def _write_buffer(self, offset, data):
-        """Write data to buffer
-        For variable length packets, the first byte at offset should be the length
-        But we'll write the data directly and let the caller handle length if needed
         """
+        Write data to buffer
+        Matches RadioLib: writeBuffer(data, numBytes, offset)
+        RadioLib line 123-124: cmd[] = {CMD_WRITE_BUFFER, offset}; SPIwriteStream(cmd, 2, data, numBytes)
+        So command is: [CMD_WRITE_BUFFER, offset] + data bytes
+        """
+        # RadioLib format: [CMD_WRITE_BUFFER, offset] + data
+        # This is sent as: SPIwriteStream([CMD, offset], 2, data, numBytes)
+        # Our _write_command handles this: cmd + [offset] + data
         self._write_command(self.CMD_WRITE_BUFFER, [offset] + list(data))
         
     def _read_buffer(self, offset, length):
@@ -346,11 +422,12 @@ class SX1262:
         out_buf = bytearray([self.CMD_READ_BUFFER, offset] + [0x00] * length)
         in_buf = bytearray(len(out_buf))
         self.wait_for_not_busy()
-        self.cs.value(0)
-        time.sleep_us(1)
+        self.cs.value(0)  # CS LOW
+        time.sleep_us(2)  # CS setup time
         self.spi.write_readinto(out_buf, in_buf)
-        self.cs.value(1)
-        time.sleep_us(1)
+        time.sleep_us(2)  # Before CS HIGH
+        self.cs.value(1)  # CS HIGH
+        time.sleep_us(1)  # CS hold time
         # Result: [status, data1, data2, ...]
         return in_buf[2:2+length] if len(in_buf) > 2 else bytearray(length)
         
@@ -547,10 +624,11 @@ class SX1262:
             use_ldo: Use LDO instead of DC-DC (False recommended)
         """
         # Reset
+        print("[INIT] Resetting module...")
         self.reset_module()
         
-        # Small delay after reset
-        time.sleep_ms(10)
+        # Small delay after reset (RadioLib waits longer)
+        time.sleep_ms(20)  # Increased from 10ms to 20ms for better stability
         
         # Set standby
         self.set_standby(1)  # XOSC mode
@@ -670,8 +748,16 @@ class SX1262:
         
         # Write data to buffer (offset 0) - NO length byte prepended!
         # For variable length LoRa packets, RadioLib writes data directly WITHOUT prepending length!
+        # RadioLib line 1077: writeBuffer(cfg->transmit.data, cfg->transmit.len)
         print("[TX] Writing {} bytes to buffer".format(len(data)))
         self._write_buffer(0, data)
+        
+        # Debug: Verify buffer was written (read back first few bytes)
+        # This helps diagnose if buffer write is working
+        if len(data) > 0:
+            test_read = self._read_buffer(0, min(4, len(data)))
+            print("[TX] Buffer verify: wrote={}, read={}".format(
+                data[:min(4, len(data))].hex(), test_read.hex()))
         
         # Clear IRQ status
         self.clear_irq_status(0xFFFF)
@@ -679,12 +765,18 @@ class SX1262:
         # Fix sensitivity (CRITICAL - RadioLib calls this before TX, line 1126)
         self.fix_sensitivity()
         
-        # Set RF switch to TX (BEFORE setTx, like RadioLib)
-        self.set_rf_switch(False)
+        # Set RF switch to TX (BEFORE setTx, like RadioLib line 1147)
+        # RadioLib: this->mod->setRfSwitchState(this->txMode);
+        print("[TX] Setting RF switch to TX mode...")
+        self.set_rf_switch(False)  # False = TX mode (TX_EN=HIGH, RX_EN=LOW)
         time.sleep_ms(1)
+        
+        # Debug: Verify RF switch state
+        print("[TX] RF switch: TX_EN={}, RX_EN={}".format(self.tx_en.value(), self.rx_en.value()))
         
         # Wait for BUSY to be low before sending command
         if not self.wait_for_not_busy(100):
+            print("[TX] ERROR: BUSY timeout before SET_TX command")
             self.set_rf_switch(True)
             return -5  # BUSY timeout before command
         
@@ -919,7 +1011,7 @@ class SX1262:
 # ============================================================================
 if __name__ == "__main__":
     # Mode Selection
-    TX_MODE = False  # Set to False for RX mode
+    TX_MODE = True  # Set to False for RX mode
     
     # Pin Configuration (OpenMV RT1062)
     PIN_MOSI = "P0"   # SPI MOSI
@@ -957,23 +1049,43 @@ if __name__ == "__main__":
     print("Simple LoRa Point-to-Point Communication")
     print("=" * 40 + "\n")
     
-    # Initialize SPI
-    spi = SPI(
-        1,
-        baudrate=2000000,  # 2 MHz (SX1262 max is 18MHz)
-        polarity=0,        # CPOL = 0
-        phase=0,           # CPHA = 0
-        bits=8,
-        firstbit=SPI.MSB
-    )
-    
-    # Initialize control pins
-    cs_pin = Pin(PIN_SS, Pin.OUT, value=1)
-    reset_pin = Pin(PIN_RESET, Pin.OUT, value=1)
+    # Initialize control pins FIRST (before SPI)
+    # CRITICAL: CS must be HIGH (inactive) before SPI initialization
+    print("[INIT] Initializing control pins...")
+    cs_pin = Pin(PIN_SS, Pin.OUT, value=1)  # CS HIGH (inactive) - CRITICAL!
+    reset_pin = Pin(PIN_RESET, Pin.OUT, value=1)  # RESET HIGH (not resetting)
     busy_pin = Pin(PIN_BUSY, Pin.IN)
     rx_en_pin = Pin(PIN_RX_EN, Pin.OUT, value=0)
     tx_en_pin = Pin(PIN_TX_EN, Pin.OUT, value=0)
     dio1_pin = Pin(PIN_DIO1, Pin.IN)
+    
+    # Small delay to let pins stabilize
+    time.sleep_ms(10)
+    
+    # Initialize SPI
+    # ESP32 uses: SPISettings(2000000, MSBFIRST, SPI_MODE0)
+    # ESP32: SPI.begin(PIN_CLK, PIN_MISO, PIN_MOSI, PIN_CS)
+    # SPI_MODE0 = CPOL=0, CPHA=0
+    # In MicroPython: polarity=0 (CPOL=0), phase=0 (CPHA=0) = MODE0
+    print("[INIT] Configuring SPI...")
+    print("[INIT] SPI pins: MOSI={}, MISO={}, SCLK={}, CS={}".format(PIN_MOSI, PIN_MISO, PIN_SCLK, PIN_SS))
+    
+    # OpenMV RT1062: SPI pins are pre-configured at board level
+    # SPI constructor does NOT accept pin parameters (unlike some MicroPython ports)
+    # SPI bus 1 must be pre-configured for P0(MOSI), P1(MISO), P2(SCLK) in OpenMV
+    spi = SPI(
+        1,
+        baudrate=2000000,  # 2 MHz (SX1262 max is 18MHz, ESP32 uses 2MHz)
+        polarity=0,        # CPOL = 0 (matches SPI_MODE0)
+        phase=0,           # CPHA = 0 (matches SPI_MODE0)
+        bits=8,
+        firstbit=SPI.MSB  # MSBFIRST (matches ESP32)
+    )
+    print("[INIT] SPI object created (OpenMV uses pre-configured pins for bus 1)")
+    
+    # Ensure CS is HIGH (inactive) before any SPI communication
+    cs_pin.value(1)
+    time.sleep_ms(10)  # Let everything stabilize
     
     # Create SX1262 instance
     lora = SX1262(
@@ -1007,6 +1119,51 @@ if __name__ == "__main__":
             time.sleep_ms(1000)
     
     print(" done!")
+    
+    # CRITICAL DIAGNOSTIC: Test simplest possible SPI read (GET_PACKET_TYPE)
+    # RadioLib calls getPacketType() early in begin() to verify chip communication
+    # This is the simplest read command (1 byte response, cmd=0x11)
+    # Expected: 0x01 (LoRa) after SET_PACKET_TYPE, or 0x00 (GFSK) by default
+    print("[INIT] Testing SPI communication (GET_PACKET_TYPE)...", end="")
+    try:
+        status_byte, data = lora._spi_read_stream(lora.CMD_GET_PACKET_TYPE, 1, wait_for_busy=True)
+        if len(data) > 0:
+            packet_type = data[0]
+            if packet_type == 0xFF and status_byte == 0xFF:
+                print(" FAILED (all 0xFF) - SPI not working!")
+                print("[ERROR] MISO line is returning all 0xFF - chip not responding to SPI")
+                print("[ERROR] Check: SPI wiring, CS pin, RESET pin, chip power")
+                print("[ERROR] CS pin state: {}".format(cs_pin.value()))
+                print("[ERROR] BUSY pin state: {}".format(busy_pin.value()))
+            else:
+                print(" OK (type=0x{:02X}, status=0x{:02X})".format(packet_type, status_byte))
+        else:
+            print(" FAILED (no data returned)")
+    except Exception as e:
+        print(" FAILED (exception: {})".format(e))
+    
+    # Test firmware version read (register read)
+    print("[INIT] Testing register read (firmware version)...", end="")
+    try:
+        fw_version_msb = lora._read_register(lora.REG_LR_FIRMWARE_VERSION_MSB)
+        fw_version_lsb = lora._read_register(lora.REG_LR_FIRMWARE_VERSION_LSB)
+        if fw_version_msb == 0xFF and fw_version_lsb == 0xFF:
+            print(" FAILED (all 0xFF)")
+        else:
+            print(" OK (FW=0x{:02X}{:02X})".format(fw_version_msb, fw_version_lsb))
+    except Exception as e:
+        print(" FAILED (exception: {})".format(e))
+    
+    # Test GET_IRQ_STATUS in STANDBY mode (verify SPI read works)
+    print("[INIT] Testing GET_IRQ_STATUS in STANDBY mode...", end="")
+    try:
+        test_irq = lora.get_irq_status()
+        if test_irq == 0xFFFF:
+            print(" FAILED (0xFFFF) - SPI read not working!")
+        else:
+            print(" OK (IRQ=0x{:04X})".format(test_irq))
+    except Exception as e:
+        print(" FAILED (exception: {})".format(e))
     
     # Set RX boosted gain mode
     print("[INIT] Setting RX boosted gain...", end="")
@@ -1090,4 +1247,3 @@ if __name__ == "__main__":
                 
                 time.sleep_ms(10)  # Small delay to prevent watchdog issues
 
- 
