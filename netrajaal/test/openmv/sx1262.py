@@ -140,43 +140,54 @@ class SX1262:
         
     def _spi_transfer(self, data_out, read_len=0):
         """Transfer data over SPI and return response
+        SX1262 SPI protocol:
+        - CS goes low
+        - Send command byte, chip returns status byte immediately
+        - Send parameter bytes (if any), chip doesn't echo them
+        - For read commands: send dummy bytes to clock in data
+        - CS goes high
+        
         For write-only: read_len=0 (but still reads status byte)
         For read: read_len=number of bytes to read (excluding status byte)
-        SX1262 always returns a status byte first
         """
         self.wait_for_not_busy()
         self.cs.value(0)
         time.sleep_us(1)
         
-        # SX1262 SPI: write command/data, then read status byte + optional data
-        # We need to send dummy bytes to clock in the response
-        total_bytes = len(data_out) + 1 + read_len  # command + status + data
+        # Send command byte and read status byte
+        cmd_byte = data_out[0]
+        param_bytes = data_out[1:] if len(data_out) > 1 else bytearray()
         
-        # Create write buffer: command/data + dummy bytes for reading
-        write_buf = bytearray(data_out) + bytearray([0x00] * (1 + read_len))
+        # Send command, read status
+        status_buf = bytearray(1)
+        self.spi.write_readinto(bytearray([cmd_byte]), status_buf)
+        status = status_buf[0]
         
-        # Create read buffer
-        read_buf = bytearray(total_bytes)
+        # Send parameter bytes (if any) - chip doesn't return them
+        if len(param_bytes) > 0:
+            self.spi.write(param_bytes)
         
-        # Perform bidirectional transfer
-        self.spi.write_readinto(write_buf, read_buf)
-        
-        # Extract result (skip command echo and status byte)
+        # For read commands, read the data
         result = None
         if read_len > 0:
-            # Return data bytes (skip status byte which is at index len(data_out))
-            result = read_buf[len(data_out) + 1:]
+            # Send dummy bytes to clock in data
+            dummy = bytearray([0x00] * read_len)
+            data_buf = bytearray(read_len)
+            self.spi.write_readinto(dummy, data_buf)
+            result = data_buf
         
         self.cs.value(1)
         return result
         
     def _write_command(self, cmd, data=None):
-        """Write a command to SX1262"""
+        """Write a command to SX1262
+        Note: After command, BUSY may go high (processing), don't wait for it here
+        """
         if data is None:
             data = []
         cmd_data = bytearray([cmd] + list(data))
         self._spi_transfer(cmd_data, read_len=0)
-        self.wait_for_not_busy()
+        # Don't wait for BUSY here - some commands make it go high for processing
         
     def _read_command(self, cmd, length):
         """Read data from SX1262
@@ -455,20 +466,41 @@ class SX1262:
         
         # Set TX mode with timeout (0x000000 = single transmission, no timeout)
         timeout_bytes = [0x00, 0x00, 0x00]
+        
+        # Wait for BUSY to be low before sending command
+        if not self.wait_for_not_busy(50):
+            self.set_rf_switch(True)
+            return -5  # BUSY timeout before command
+        
+        # Send SET_TX command
         self._write_command(self.CMD_SET_TX, timeout_bytes)
         
-        # Wait for BUSY to go low (command accepted)
-        if not self.wait_for_not_busy(100):
-            self.set_rf_switch(True)
-            return -3  # Busy timeout
+        # After SET_TX, BUSY should go high (chip is processing/transmitting)
+        # Give it a moment to respond
+        time.sleep_ms(5)
         
-        # Wait for TX done (poll IRQ or DIO1)
+        # Check if BUSY went high (command accepted and processing)
+        # Note: BUSY high means chip is busy, which is expected after SET_TX
+        busy_high = False
+        for _ in range(10):  # Check a few times
+            if self.busy.value() == 1:
+                busy_high = True
+                break
+            time.sleep_ms(1)
+        
+        # If BUSY never went high, command might not have been accepted
+        # But this isn't necessarily an error - some chips might process quickly
+        # So we'll continue and check IRQ instead
+        
+        # Wait for TX done (poll IRQ status)
+        # For a short packet, transmission should complete quickly
         start = time.ticks_ms()
-        timeout_ms = 30000  # 30 second timeout
+        timeout_ms = 5000  # 5 second timeout (should be much faster)
         
         while True:
-            # Check DIO1 pin (interrupt) or IRQ status
+            # Check IRQ status
             irq = self.get_irq_status()
+            
             if irq & self.IRQ_TX_DONE:
                 self.clear_irq_status(self.IRQ_TX_DONE)
                 # Set RF switch back to RX
@@ -483,12 +515,27 @@ class SX1262:
                 self.set_rf_switch(True)
                 return -4  # CRC error
             
+            # Also check if BUSY went low (transmission might be done)
+            if self.busy.value() == 0:
+                # BUSY is low, check IRQ one more time
+                irq = self.get_irq_status()
+                if irq & self.IRQ_TX_DONE:
+                    self.clear_irq_status(self.IRQ_TX_DONE)
+                    self.set_rf_switch(True)
+                    return 0
+            
             # Check timeout
             if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+                # Check IRQ one final time
+                irq = self.get_irq_status()
+                if irq & self.IRQ_TX_DONE:
+                    self.clear_irq_status(self.IRQ_TX_DONE)
+                    self.set_rf_switch(True)
+                    return 0
                 self.set_rf_switch(True)
                 return -2  # Timeout
             
-            time.sleep_ms(1)  # Small delay
+            time.sleep_ms(10)  # Small delay
             
     def start_receive(self):
         """Start receiving"""
