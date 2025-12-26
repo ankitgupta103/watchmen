@@ -140,6 +140,15 @@ class SX1262:
                 return False
             time.sleep_us(10)
         return True
+    
+    def wait_for_busy(self, timeout_ms=100):
+        """Wait until BUSY pin goes high (chip is busy)"""
+        start = time.ticks_ms()
+        while self.busy.value() == 0:
+            if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+                return False
+            time.sleep_us(10)
+        return True
         
     def _spi_transfer(self, data_out, read_len=0):
         """Transfer data over SPI and return response
@@ -353,18 +362,54 @@ class SX1262:
         """Get IRQ status
         Returns 16-bit IRQ status register
         RadioLib: SPIreadStream(CMD_GET_IRQ_STATUS, data, 2)
+        For SX1262, GET_IRQ_STATUS (0x12) reads 2 bytes of IRQ status
+        
+        Note: This can be called even when DIO1 is HIGH (interrupt pending).
+        The chip can respond to this command while in TX/RX mode.
         """
-        # Use _read_command which properly handles SPI read protocol
-        response = self._read_command(self.CMD_GET_IRQ_STATUS, 2)
-        if len(response) >= 2:
-            # Combine bytes: MSB first (matches RadioLib line 947)
-            irq_status = (response[0] << 8) | response[1]
-            # Debug: log if we get suspicious values
-            if irq_status == 0xFFFF:
-                print("[DEBUG] IRQ read as 0xFFFF - raw bytes: [0x{:02X}, 0x{:02X}]".format(
-                    response[0], response[1]))
-            return irq_status
-        return 0
+        # IMPORTANT: For GET_IRQ_STATUS, we don't need to wait for BUSY
+        # This command can be read at any time, even during TX/RX
+        # But let's wait a bit to ensure chip is ready (not processing other commands)
+        if not self.wait_for_not_busy(timeout_ms=10):
+            # If BUSY is stuck, continue anyway - GET_IRQ_STATUS should still work
+            pass
+        
+        # CS goes LOW - start SPI transaction
+        self.cs.value(0)
+        time.sleep_us(1)  # Small delay for CS setup
+        
+        # Send command byte (0x12 = GET_IRQ_STATUS)
+        # Chip immediately returns status byte on first transfer
+        cmd_buf = bytearray([self.CMD_GET_IRQ_STATUS])
+        status_buf = bytearray(1)
+        self.spi.write_readinto(cmd_buf, status_buf)
+        status_byte = status_buf[0]
+        
+        # For read commands, send dummy bytes (0x00) to clock in the actual data
+        # SX1262 returns 2 bytes: [IRQ_MSB, IRQ_LSB]
+        # Must send 2 dummy bytes to receive 2 data bytes
+        dummy = bytearray([0x00, 0x00])
+        data_buf = bytearray(2)
+        self.spi.write_readinto(dummy, data_buf)
+        
+        # CS goes HIGH - end SPI transaction
+        self.cs.value(1)
+        time.sleep_us(1)
+        
+        # Combine bytes: MSB first (matches RadioLib line 947: (data[0] << 8) | data[1])
+        irq_status = (data_buf[0] << 8) | data_buf[1]
+        
+        # Debug: Log if we get suspicious values (0xFFFF means all bits set, unlikely)
+        # Also log status byte to verify SPI is working
+        if irq_status == 0xFFFF:
+            print("[DEBUG] IRQ=0xFFFF! status_byte=0x{:02X}, data=[0x{:02X}, 0x{:02X}]".format(
+                status_byte, data_buf[0], data_buf[1]))
+            print("[DEBUG] BUSY={}, DIO1={} at time of read".format(self.busy.value(), self.dio1.value()))
+        elif irq_status != 0x0000 and irq_status != 0x0001:
+            # Log any other non-zero IRQ values for debugging
+            print("[DEBUG] IRQ=0x{:04X}, status_byte=0x{:02X}".format(irq_status, status_byte))
+        
+        return irq_status
         
     def clear_irq_status(self, irq_mask=0xFFFF):
         """Clear IRQ status"""
