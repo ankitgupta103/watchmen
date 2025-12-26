@@ -467,47 +467,52 @@ class SX1262:
         # Clear all IRQ flags first
         self.clear_irq_status(0xFFFF)
         
-        # Ensure we're in standby before starting
+        # Set mode to standby first (like RadioLib does)
         self.set_standby(1)
         time.sleep_ms(5)
         
-        # Write data to buffer (offset 0)
-        # For variable length LoRa packets, SX1262 requires:
-        # - First byte at offset 0: payload length (1-255)
-        # - Following bytes: actual payload data
-        # So we need to prepend the length byte
+        # Check packet length
         if len(data) > 255:
             data = data[:255]  # Truncate if too long
         
-        # Create buffer with length byte first
-        buffer_data = bytearray([len(data)]) + bytearray(data)
-        self._write_buffer(0, buffer_data)
+        # For variable length LoRa packets, RadioLib writes data directly WITHOUT prepending length!
+        # The SX1262 handles variable length automatically based on packet params
+        # Write data to buffer (offset 0) - NO length byte prepended!
+        self._write_buffer(0, data)
         
-        # Set packet parameters with actual payload length for variable length mode
-        # In variable length mode, we need to set the length in the first byte of the buffer
-        # But SX1262 handles this automatically - we just write the data
+        # Set packet parameters (for variable length, payload_len should be max = 0xFF)
+        # RadioLib uses implicitLen = 0xFF for variable length
+        self.set_packet_params(PREAMBLE, 0x00, 0xFF, 0x01, 0x00)  # variable length, CRC on
         
-        # Set RF switch to TX (must be done before SET_TX command)
+        # Set DIO IRQ parameters (TX_DONE and TIMEOUT on DIO1)
+        irq_mask = self.IRQ_TX_DONE | self.IRQ_RX_TX_TIMEOUT
+        dio1_mask = self.IRQ_TX_DONE
+        self.set_dio_irq_params(irq_mask, dio1_mask, 0x00, 0x00)
+        
+        # Clear IRQ status
+        self.clear_irq_status(0xFFFF)
+        
+        # Set RF switch to TX (BEFORE setTx, like RadioLib)
         self.set_rf_switch(False)
-        time.sleep_ms(2)  # Delay for RF switch to settle
+        time.sleep_ms(1)
         
         # Wait for BUSY to be low before sending command
         if not self.wait_for_not_busy(100):
             self.set_rf_switch(True)
             return -5  # BUSY timeout before command
         
-        # Set TX mode
-        # Timeout format: 3 bytes, MSB first, in units of 15.625 us
-        # 0x000000 = single transmission (transmit once, no timeout)
-        # For continuous TX, use a large value
-        timeout_bytes = [0x00, 0x00, 0x00]  # Single transmission
-        
-        # Send SET_TX command
+        # Set TX mode with timeout 0x000000 (single transmission, no timeout)
+        timeout_bytes = [0x00, 0x00, 0x00]
         self._write_command(self.CMD_SET_TX, timeout_bytes)
         
-        # After SET_TX, BUSY should go high immediately
-        # Wait a moment for it to start
-        time.sleep_ms(10)
+        # After SET_TX, wait for BUSY to go LOW (PA ramp up done)
+        # This is the key - RadioLib waits for BUSY LOW, not HIGH!
+        start_busy = time.ticks_ms()
+        while self.busy.value() == 1:
+            if time.ticks_diff(time.ticks_ms(), start_busy) > 100:
+                self.set_rf_switch(True)
+                return -6  # BUSY didn't go low after setTx
+            time.sleep_ms(1)
         
         # After SET_TX, BUSY should go high (chip is processing/transmitting)
         # Give it a moment to respond
@@ -526,88 +531,46 @@ class SX1262:
         # But this isn't necessarily an error - some chips might process quickly
         # So we'll continue and check IRQ instead
         
-        # Wait for TX done (poll IRQ status via DIO1 or direct IRQ check)
-        # For a short packet, transmission should complete in < 100ms typically
-        start = time.ticks_ms()
-        timeout_ms = 10000  # 10 second timeout (generous)
+        # Wait for TX done (poll DIO1 interrupt pin, exactly like RadioLib)
+        # Calculate timeout: 5ms + 500% of expected time-on-air
+        # Rough estimate: packet_time = (len * 8 * 2^SF) / (BW * 1000) ms
+        packet_time_ms = (len(data) * 8 * (2 ** SF)) / (BW * 1000)
+        timeout_ms = 5 + int(packet_time_ms * 5)
+        timeout_ms = max(timeout_ms, 1000)  # At least 1 second
         
-        # Calculate expected transmission time based on packet size and LoRa params
-        # This helps us know if we're waiting too long
-        packet_time_ms = len(data) * 8 * (2 ** SF) / (BW * 1000)  # Rough estimate
-        packet_time_ms = max(packet_time_ms, 100)  # At least 100ms
+        start = time.ticks_ms()
         
         while True:
-            # Check DIO1 pin first (faster than SPI read)
+            # Poll the interrupt pin (DIO1) - this is exactly what RadioLib does
             if self.dio1.value() == 1:
-                # DIO1 is high, IRQ occurred - read status
+                # DIO1 is high, interrupt occurred
+                # Check IRQ flags
                 irq = self.get_irq_status()
                 
                 if irq & self.IRQ_TX_DONE:
+                    # Transmission complete
                     self.clear_irq_status(self.IRQ_TX_DONE)
-                    # Set RF switch back to RX
                     self.set_rf_switch(True)
                     return 0  # Success
                 elif irq & self.IRQ_RX_TX_TIMEOUT:
-                    # Timeout IRQ - this might mean the packet wasn't sent
-                    # But check if BUSY is low (might have completed anyway)
-                    if self.busy.value() == 0:
-                        # BUSY low, might have completed - check IRQ again
-                        irq2 = self.get_irq_status()
-                        if irq2 & self.IRQ_TX_DONE:
-                            self.clear_irq_status(self.IRQ_TX_DONE)
-                            self.set_rf_switch(True)
-                            return 0
                     self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
                     self.set_rf_switch(True)
                     return -1  # Timeout
+                # Note: CRC error shouldn't occur on TX, but handle it anyway
                 elif irq & self.IRQ_CRC_ERROR:
                     self.clear_irq_status(self.IRQ_CRC_ERROR)
                     self.set_rf_switch(True)
                     return -4  # CRC error
-            else:
-                # DIO1 not set, but check IRQ anyway (might have missed edge)
-                irq = self.get_irq_status()
-                if irq & (self.IRQ_TX_DONE | self.IRQ_RX_TX_TIMEOUT | self.IRQ_CRC_ERROR):
-                    if irq & self.IRQ_TX_DONE:
-                        self.clear_irq_status(self.IRQ_TX_DONE)
-                        self.set_rf_switch(True)
-                        return 0
-                    elif irq & self.IRQ_RX_TX_TIMEOUT:
-                        self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
-                        self.set_rf_switch(True)
-                        return -1
-                    elif irq & self.IRQ_CRC_ERROR:
-                        self.clear_irq_status(self.IRQ_CRC_ERROR)
-                        self.set_rf_switch(True)
-                        return -4
-            
-            # Check if BUSY went low (transmission completed)
-            if self.busy.value() == 0:
-                # BUSY is low, transmission should be done
-                # Wait a moment for IRQ to be set
-                time.sleep_ms(5)
-                irq = self.get_irq_status()
-                if irq & self.IRQ_TX_DONE:
-                    self.clear_irq_status(self.IRQ_TX_DONE)
-                    self.set_rf_switch(True)
-                    return 0
-                # BUSY low but no TX_DONE IRQ - might be an issue
-                # But continue waiting a bit more
+                # If we got here, DIO1 is high but no expected IRQ - break and check timeout
+                break
             
             # Check timeout
-            elapsed = time.ticks_diff(time.ticks_ms(), start)
-            if elapsed > timeout_ms:
-                # Final check
-                irq = self.get_irq_status()
-                if irq & self.IRQ_TX_DONE:
-                    self.clear_irq_status(self.IRQ_TX_DONE)
-                    self.set_rf_switch(True)
-                    return 0
+            if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
                 self.set_rf_switch(True)
                 return -2  # Timeout
             
-            # Small delay to prevent CPU spinning
-            time.sleep_ms(5)
+            # Small delay (RadioLib uses yield, we use sleep)
+            time.sleep_ms(1)
             
     def start_receive(self):
         """Start receiving"""
