@@ -150,94 +150,150 @@ class SX1262:
             time.sleep_us(10)
         return True
         
-    def _spi_transfer(self, data_out, read_len=0):
-        """Transfer data over SPI and return response
-        SX1262 SPI protocol:
-        - CS goes low
-        - Send command byte, chip returns status byte immediately
-        - Send parameter bytes (if any), chip doesn't echo them
-        - For read commands: send dummy bytes to clock in data
-        - CS goes high
-        
-        For write-only: read_len=0 (but still reads status byte)
-        For read: read_len=number of bytes to read (excluding status byte)
+    def _spi_write_stream(self, cmd, data=None, wait_for_busy=True):
         """
-        self.wait_for_not_busy()
-        self.cs.value(0)
-        time.sleep_us(1)
+        Write command to SX1262 using single SPI transaction (matches RadioLib SPIwriteStream)
         
-        # Send command byte and read status byte
-        cmd_byte = data_out[0]
-        param_bytes = data_out[1:] if len(data_out) > 1 else bytearray()
+        RadioLib flow:
+        1. Wait for BUSY LOW (if waitForGpio=True)
+        2. Prepare buffer: [cmd, param1, param2, ...]
+        3. Single SPI transfer: ALL bytes in ONE transaction
+        4. CS LOW → transfer → CS HIGH
+        5. Wait for BUSY HIGH then LOW (if waitForGpio=True)
         
-        # Send command, read status
-        status_buf = bytearray(1)
-        self.spi.write_readinto(bytearray([cmd_byte]), status_buf)
-        status = status_buf[0]
+        Args:
+            cmd: Command byte
+            data: Parameter bytes (list or None)
+            wait_for_busy: Wait for BUSY pin (default True)
         
-        # Send parameter bytes (if any) - chip doesn't return them
-        if len(param_bytes) > 0:
-            self.spi.write(param_bytes)
-        
-        # For read commands, read the data
-        result = None
-        if read_len > 0:
-            # Send dummy bytes to clock in data
-            dummy = bytearray([0x00] * read_len)
-            data_buf = bytearray(read_len)
-            self.spi.write_readinto(dummy, data_buf)
-            result = data_buf
-        
-        self.cs.value(1)
-        return result
-        
-    def _write_command(self, cmd, data=None):
-        """Write a command to SX1262
-        Note: After command, BUSY may go high (processing), don't wait for it here
+        Returns:
+            status_byte: Status byte returned by chip
         """
+        if wait_for_busy:
+            self.wait_for_not_busy()
+        
+        # Prepare output buffer: [cmd, param1, param2, ...]
         if data is None:
             data = []
-        cmd_data = bytearray([cmd] + list(data))
-        self._spi_transfer(cmd_data, read_len=0)
-        # Don't wait for BUSY here - some commands make it go high for processing
+        out_buf = bytearray([cmd] + list(data))
         
-    def _read_command(self, cmd, length):
-        """Read data from SX1262
-        length: number of data bytes to read (excluding status byte)
-        For GET_IRQ_STATUS and similar read commands, we need to send command
-        and then read the data bytes (status byte is read automatically)
+        # Prepare input buffer: [status, ...] (same size as output)
+        in_buf = bytearray(len(out_buf))
+        
+        # Single SPI transaction: ALL bytes in ONE transfer
+        self.cs.value(0)
+        time.sleep_us(1)
+        self.spi.write_readinto(out_buf, in_buf)
+        self.cs.value(1)
+        time.sleep_us(1)
+        
+        # Status byte is first byte returned
+        status_byte = in_buf[0]
+        
+        # Wait for BUSY to go HIGH then LOW (chip processing command)
+        if wait_for_busy:
+            # Wait for BUSY HIGH (chip started processing)
+            self.wait_for_busy(timeout_ms=100)
+            # Wait for BUSY LOW (chip finished processing)
+            self.wait_for_not_busy(timeout_ms=100)
+        
+        return status_byte
+    
+    def _spi_read_stream(self, cmd, read_len, wait_for_busy=True):
         """
-        # Wait for BUSY to be low
+        Read data from SX1262 using single SPI transaction (matches RadioLib SPIreadStream)
+        
+        RadioLib flow:
+        1. Wait for BUSY LOW (if waitForGpio=True)
+        2. Prepare output buffer: [cmd, 0x00, 0x00, ...] (dummy bytes)
+        3. Prepare input buffer: [status, data1, data2, ...]
+        4. Single SPI transfer: ALL bytes in ONE transaction
+        5. CS LOW → transfer → CS HIGH
+        6. Wait for BUSY HIGH then LOW (if waitForGpio=True)
+        
+        Args:
+            cmd: Command byte
+            read_len: Number of data bytes to read (excluding status byte)
+            wait_for_busy: Wait for BUSY pin (default True)
+        
+        Returns:
+            (status_byte, data_bytes): Status byte and data bytes
+        """
+        if wait_for_busy:
+            self.wait_for_not_busy()
+        
+        # Prepare output buffer: [cmd, 0x00, 0x00, ...] (dummy bytes for clocking in data)
+        out_buf = bytearray([cmd] + [0x00] * read_len)
+        
+        # Prepare input buffer: [status, data1, data2, ...]
+        in_buf = bytearray(len(out_buf))
+        
+        # Single SPI transaction: ALL bytes in ONE transfer
+        self.cs.value(0)
+        time.sleep_us(1)
+        self.spi.write_readinto(out_buf, in_buf)
+        self.cs.value(1)
+        time.sleep_us(1)
+        
+        # Parse result: [status_byte, data1, data2, ...]
+        status_byte = in_buf[0]
+        data_bytes = in_buf[1:1+read_len] if read_len > 0 else bytearray()
+        
+        # Wait for BUSY to go HIGH then LOW (chip processing command)
+        if wait_for_busy:
+            # Wait for BUSY HIGH (chip started processing)
+            self.wait_for_busy(timeout_ms=100)
+            # Wait for BUSY LOW (chip finished processing)
+            self.wait_for_not_busy(timeout_ms=100)
+        
+        return (status_byte, data_bytes)
+        
+    def _write_command(self, cmd, data=None, wait_for_busy=True):
+        """
+        Write a command to SX1262
+        Matches RadioLib: mod->SPIwriteStream(cmd, data, numBytes, waitForGpio)
+        """
+        self._spi_write_stream(cmd, data, wait_for_busy)
+        
+    def _read_command(self, cmd, length, wait_for_busy=True):
+        """
+        Read data from SX1262
+        Matches RadioLib: mod->SPIreadStream(cmd, data, numBytes, waitForGpio)
+        
+        Returns:
+            data_bytes: Data bytes (excluding status byte)
+        """
+        _, data_bytes = self._spi_read_stream(cmd, length, wait_for_busy)
+        return data_bytes
+        
+    def _write_register(self, address, value):
+        """
+        Write a register
+        Matches RadioLib: SPIwriteRegisterBurst(addr, data, numBytes)
+        For SX126x: CMD_WRITE_REGISTER + [addr_msb, addr_lsb] + [data...]
+        """
+        addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
+        self._write_command(self.CMD_WRITE_REGISTER, addr_bytes + [value], wait_for_busy=True)
+        
+    def _read_register(self, address):
+        """
+        Read a register
+        Matches RadioLib: SPIreadRegisterBurst(addr, numBytes, data)
+        For SX126x: CMD_READ_REGISTER + [addr_msb, addr_lsb] + dummy bytes, read [status, data...]
+        """
+        addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
+        # Send: [CMD_READ_REGISTER, addr_msb, addr_lsb, 0x00], Read: [status, addr_msb, addr_lsb, data]
+        # Actually, for single byte read: send [CMD, addr_msb, addr_lsb, 0x00], read [status, addr_msb, addr_lsb, data]
+        out_buf = bytearray([self.CMD_READ_REGISTER] + addr_bytes + [0x00])
+        in_buf = bytearray(len(out_buf))
         self.wait_for_not_busy()
         self.cs.value(0)
         time.sleep_us(1)
-        
-        # Send command byte and read status byte
-        status_buf = bytearray(1)
-        self.spi.write_readinto(bytearray([cmd]), status_buf)
-        status = status_buf[0]
-        
-        # For read commands, send dummy bytes to clock in the actual data
-        if length > 0:
-            dummy = bytearray([0x00] * length)
-            data_buf = bytearray(length)
-            self.spi.write_readinto(dummy, data_buf)
-            self.cs.value(1)
-            return data_buf
-        
+        self.spi.write_readinto(out_buf, in_buf)
         self.cs.value(1)
-        return bytearray()
-        
-    def _write_register(self, address, value):
-        """Write a register"""
-        addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
-        self._write_command(self.CMD_WRITE_REGISTER, addr_bytes + [value])
-        
-    def _read_register(self, address):
-        """Read a register"""
-        addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
-        response = self._spi_transfer(bytearray([self.CMD_READ_REGISTER] + addr_bytes), read_len=1)
-        return response[0] if response and len(response) > 0 else 0
+        time.sleep_us(1)
+        # Result: [status, addr_msb, addr_lsb, data]
+        return in_buf[3] if len(in_buf) > 3 else 0
         
     def _write_buffer(self, offset, data):
         """Write data to buffer
@@ -248,10 +304,21 @@ class SX1262:
         
     def _read_buffer(self, offset, length):
         """Read data from buffer"""
-        # Command format: CMD_READ_BUFFER, offset, dummy byte
-        cmd_data = bytearray([self.CMD_READ_BUFFER, offset, 0x00])
-        response = self._spi_transfer(cmd_data, read_len=length)
-        return response if response else bytearray(length)
+        # Command format: CMD_READ_BUFFER, offset, dummy byte, then read length bytes
+        # RadioLib: SPIreadStream(CMD_READ_BUFFER, data, length)
+        # But we need to send offset first, so we use write then read
+        # Actually, READ_BUFFER command is: [CMD, offset, dummy], then read length bytes
+        # Let's use a combined approach: send [CMD, offset] + dummy bytes, read [status, data...]
+        out_buf = bytearray([self.CMD_READ_BUFFER, offset] + [0x00] * length)
+        in_buf = bytearray(len(out_buf))
+        self.wait_for_not_busy()
+        self.cs.value(0)
+        time.sleep_us(1)
+        self.spi.write_readinto(out_buf, in_buf)
+        self.cs.value(1)
+        time.sleep_us(1)
+        # Result: [status, data1, data2, ...]
+        return in_buf[2:2+length] if len(in_buf) > 2 else bytearray(length)
         
     def set_standby(self, mode=0):
         """Set standby mode (0=RC, 1=XOSC)"""
@@ -359,46 +426,25 @@ class SX1262:
         self._write_command(self.CMD_SET_DIO_IRQ_PARAMS, irq_bytes)
         
     def get_irq_status(self):
-        """Get IRQ status
-        Returns 16-bit IRQ status register
-        RadioLib: SPIreadStream(CMD_GET_IRQ_STATUS, data, 2)
-        
-        RadioLib does a SINGLE SPI transfer: command byte + 2 dummy bytes
-        All in one transaction with CS low throughout.
         """
-        # Wait for BUSY to be low (chip ready for command)
-        # BUT: GET_IRQ_STATUS can be read during TX/RX, so use short timeout
-        self.wait_for_not_busy(timeout_ms=5)
+        Get IRQ status
+        Returns 16-bit IRQ status register
+        Matches RadioLib: SPIreadStream(CMD_GET_IRQ_STATUS, data, 2)
+        RadioLib line 946: this->mod->SPIreadStream(RADIOLIB_SX126X_CMD_GET_IRQ_STATUS, data, 2);
+        RadioLib line 947: return(((uint32_t)(data[0]) << 8) | data[1]);
+        """
+        # GET_IRQ_STATUS can be read during TX/RX, so use short timeout and don't wait for BUSY
+        _, data = self._spi_read_stream(self.CMD_GET_IRQ_STATUS, 2, wait_for_busy=False)
         
-        # CS goes LOW - start SPI transaction
-        self.cs.value(0)
-        time.sleep_us(1)
-        
-        # RadioLib does a SINGLE transfer: [cmd, 0x00, 0x00] -> [status, data1, data2]
-        # We need to do this as ONE SPI transaction, not separate transfers!
-        cmd_byte = self.CMD_GET_IRQ_STATUS
-        out_buf = bytearray([cmd_byte, 0x00, 0x00])  # Command + 2 dummy bytes
-        in_buf = bytearray(3)  # Status byte + 2 data bytes
-        
-        # Single SPI transfer for all bytes
-        self.spi.write_readinto(out_buf, in_buf)
-        
-        # CS goes HIGH - end SPI transaction
-        self.cs.value(1)
-        time.sleep_us(1)
-        
-        # Parse result: [status_byte, irq_msb, irq_lsb]
-        status_byte = in_buf[0]
-        irq_msb = in_buf[1]
-        irq_lsb = in_buf[2]
-        
-        # Combine IRQ bytes: MSB first (matches RadioLib line 947)
-        irq_status = (irq_msb << 8) | irq_lsb
+        if len(data) >= 2:
+            # Combine IRQ bytes: MSB first (matches RadioLib line 947)
+            irq_status = (data[0] << 8) | data[1]
+        else:
+            irq_status = 0xFFFF  # Error reading
         
         # Debug output
         if irq_status == 0xFFFF:
-            print("[DEBUG] IRQ=0xFFFF! status=0x{:02X}, irq=[0x{:02X}, 0x{:02X}]".format(
-                status_byte, irq_msb, irq_lsb))
+            print("[DEBUG] IRQ=0xFFFF! data={}".format(data.hex() if len(data) > 0 else "empty"))
             print("[DEBUG] BUSY={}, DIO1={}".format(self.busy.value(), self.dio1.value()))
         
         return irq_status
@@ -597,36 +643,28 @@ class SX1262:
         
         # Set TX mode with timeout 0x000000 (single transmission, no timeout)
         # RadioLib: setTx(RADIOLIB_SX126X_TX_TIMEOUT_NONE) = 0x000000
+        # RadioLib line 1148: state = setTx(RADIOLIB_SX126X_TX_TIMEOUT_NONE);
+        # RadioLib line 1151: wait for BUSY to go low (= PA ramp up done)
         timeout_bytes = [0x00, 0x00, 0x00]
         print("[TX] Sending SET_TX command (timeout=0x000000)...")
         
-        # Send SET_TX command - this should make BUSY go HIGH
-        self._write_command(self.CMD_SET_TX, timeout_bytes)
+        # Send SET_TX command - _write_command waits for BUSY HIGH then LOW automatically
+        # This matches RadioLib's SPIwriteStream with waitForGpio=true
+        self._write_command(self.CMD_SET_TX, timeout_bytes, wait_for_busy=True)
         
-        # After SET_TX, BUSY should go HIGH immediately (chip processing command)
-        # Wait a short time for BUSY to respond
-        time.sleep_us(100)
+        # After _write_command returns, BUSY should be LOW (PA ramp up done)
+        # RadioLib line 1151: wait for BUSY to go low (= PA ramp up done)
         busy_after_cmd = self.busy.value()
-        print("[TX] SET_TX sent, BUSY={} (should be 1 if command accepted)".format(busy_after_cmd))
+        print("[TX] SET_TX sent, BUSY={} (should be 0 after PA ramp)".format(busy_after_cmd))
         
-        if busy_after_cmd == 0:
-            print("[TX] WARNING: BUSY did not go HIGH after SET_TX - command may not have been accepted!")
-            print("[TX] This could indicate SPI communication problem or chip error state")
-        
-        # After SET_TX, wait for BUSY to go LOW (PA ramp up done)
-        # This is CRITICAL - RadioLib waits for BUSY LOW, not HIGH!
-        # Once BUSY is LOW, the radio is transmitting and we should poll DIO1
-        print("[TX] Waiting for BUSY to go LOW (PA ramp up)...")
-        start_busy = time.ticks_ms()
-        busy_wait_count = 0
-        while self.busy.value() == 1:
-            busy_wait_count += 1
-            if time.ticks_diff(time.ticks_ms(), start_busy) > 500:
-                # Increased timeout - PA ramp up can take time
-                print("[TX] ERROR: BUSY didn't go low after {}ms".format(time.ticks_diff(time.ticks_ms(), start_busy)))
+        if busy_after_cmd == 1:
+            # BUSY should be LOW after _write_command returns (wait_for_busy=True handles this)
+            # But if it's still HIGH, wait a bit more
+            print("[TX] Waiting for BUSY to go LOW (PA ramp up)...")
+            if not self.wait_for_not_busy(timeout_ms=500):
+                print("[TX] ERROR: BUSY didn't go low after 500ms")
                 self.set_rf_switch(True)
                 return -6  # BUSY didn't go low after setTx
-            time.sleep_ms(1)
         
         print("[TX] BUSY is LOW (PA ramp done), radio transmitting. Polling DIO1...")
         
