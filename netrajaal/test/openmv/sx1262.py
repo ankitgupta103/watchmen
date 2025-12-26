@@ -118,6 +118,8 @@ class SX1262:
         self._rssi = 0
         self._snr = 0
         self._frequency_error = 0
+        self._bandwidth_khz = 125.0  # Default bandwidth
+        self._spreading_factor = 9   # Default spreading factor
         
         # Reset module
         self.reset_module()
@@ -272,6 +274,10 @@ class SX1262:
         cr: Coding rate (5-8, meaning 4/5 to 4/8)
         ldro: Low data rate optimize (0 or 1)
         """
+        # Store bandwidth and spreading factor for fix_sensitivity() and timeout calculation
+        self._bandwidth_khz = bw
+        self._spreading_factor = sf
+        
         # Convert bandwidth to register value
         bw_map = {
             7.8: 0x00, 10.4: 0x08, 15.6: 0x01, 20.8: 0x09,
@@ -435,7 +441,7 @@ class SX1262:
         # Calculate low data rate optimize
         symbol_time = (2 ** sf) / (bw * 1000)
         ldro = 1 if symbol_time >= 0.0016 else 0  # 16ms threshold
-        self.set_modulation_params(sf, bw, cr, ldro)
+        self.set_modulation_params(sf, bw, cr, ldro)  # This also stores _bandwidth_khz
         
         # Set packet parameters (variable length, CRC on)
         # For variable length: payload_len is max length (0xFF = 255 bytes)
@@ -500,6 +506,9 @@ class SX1262:
         # Clear IRQ status
         self.clear_irq_status(0xFFFF)
         
+        # Fix sensitivity (CRITICAL - RadioLib calls this before TX, line 1126)
+        self.fix_sensitivity()
+        
         # Set RF switch to TX (BEFORE setTx, like RadioLib)
         self.set_rf_switch(False)
         time.sleep_ms(1)
@@ -511,69 +520,84 @@ class SX1262:
         
         # Set TX mode with timeout 0x000000 (single transmission, no timeout)
         timeout_bytes = [0x00, 0x00, 0x00]
+        print("[TX] Sending SET_TX command...")
         self._write_command(self.CMD_SET_TX, timeout_bytes)
+        print("[TX] SET_TX sent, BUSY={}".format(self.busy.value()))
         
         # After SET_TX, wait for BUSY to go LOW (PA ramp up done)
-        # This is the key - RadioLib waits for BUSY LOW, not HIGH!
+        # This is CRITICAL - RadioLib waits for BUSY LOW, not HIGH!
+        # Once BUSY is LOW, the radio is transmitting and we should poll DIO1
+        print("[TX] Waiting for BUSY to go LOW (PA ramp up)...")
         start_busy = time.ticks_ms()
+        busy_wait_count = 0
         while self.busy.value() == 1:
-            if time.ticks_diff(time.ticks_ms(), start_busy) > 100:
+            busy_wait_count += 1
+            if time.ticks_diff(time.ticks_ms(), start_busy) > 500:
+                # Increased timeout - PA ramp up can take time
+                print("[TX] ERROR: BUSY didn't go low after {}ms".format(time.ticks_diff(time.ticks_ms(), start_busy)))
                 self.set_rf_switch(True)
                 return -6  # BUSY didn't go low after setTx
             time.sleep_ms(1)
         
-        # After SET_TX, BUSY should go high (chip is processing/transmitting)
-        # Give it a moment to respond
-        time.sleep_ms(5)
+        print("[TX] BUSY is LOW (PA ramp done), radio transmitting. Polling DIO1...")
         
-        # Check if BUSY went high (command accepted and processing)
-        # Note: BUSY high means chip is busy, which is expected after SET_TX
-        busy_high = False
-        for _ in range(10):  # Check a few times
-            if self.busy.value() == 1:
-                busy_high = True
-                break
-            time.sleep_ms(1)
-        
-        # If BUSY never went high, command might not have been accepted
-        # But this isn't necessarily an error - some chips might process quickly
-        # So we'll continue and check IRQ instead
+        # BUSY is now LOW - PA ramp up is complete, radio is transmitting
+        # Immediately start polling DIO1 for TX_DONE interrupt (like RadioLib does)
         
         # Wait for TX done (poll DIO1 interrupt pin, exactly like RadioLib)
         # Calculate timeout: 5ms + 500% of expected time-on-air
         # Rough estimate: packet_time = (len * 8 * 2^SF) / (BW * 1000) ms
-        packet_time_ms = (len(data) * 8 * (2 ** SF)) / (BW * 1000)
+        packet_time_ms = (len(data) * 8 * (2 ** self._spreading_factor)) / (self._bandwidth_khz * 1000)
         timeout_ms = 5 + int(packet_time_ms * 5)
         timeout_ms = max(timeout_ms, 1000)  # At least 1 second
+        print("[TX] Timeout set to {}ms (packet time ~{}ms, SF={}, BW={}kHz)".format(
+            timeout_ms, int(packet_time_ms), self._spreading_factor, self._bandwidth_khz))
         
         start = time.ticks_ms()
+        poll_count = 0
         
         while True:
+            poll_count += 1
+            dio1_state = self.dio1.value()
+            
             # Poll the interrupt pin (DIO1) - this is exactly what RadioLib does
-            if self.dio1.value() == 1:
+            if dio1_state == 1:
                 # DIO1 is high, interrupt occurred
+                print("[TX] DIO1 HIGH detected! Checking IRQ...")
                 # Check IRQ flags
                 irq = self.get_irq_status()
+                print("[TX] IRQ status: 0x{:04X}".format(irq))
                 
                 if irq & self.IRQ_TX_DONE:
                     # Transmission complete
+                    print("[TX] TX_DONE IRQ detected!")
                     self.clear_irq_status(self.IRQ_TX_DONE)
                     self.set_rf_switch(True)
                     return 0  # Success
                 elif irq & self.IRQ_RX_TX_TIMEOUT:
+                    print("[TX] TIMEOUT IRQ detected!")
                     self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
                     self.set_rf_switch(True)
                     return -1  # Timeout
                 # Note: CRC error shouldn't occur on TX, but handle it anyway
                 elif irq & self.IRQ_CRC_ERROR:
+                    print("[TX] CRC_ERROR IRQ detected!")
                     self.clear_irq_status(self.IRQ_CRC_ERROR)
                     self.set_rf_switch(True)
                     return -4  # CRC error
-                # If we got here, DIO1 is high but no expected IRQ - break and check timeout
-                break
+                else:
+                    print("[TX] DIO1 HIGH but unexpected IRQ: 0x{:04X}".format(irq))
+                    # If we got here, DIO1 is high but no expected IRQ - continue polling
+            elif poll_count % 100 == 0:
+                # Debug output every 100 polls
+                print("[TX] Polling... DIO1={}, BUSY={}, elapsed={}ms".format(
+                    dio1_state, self.busy.value(), time.ticks_diff(time.ticks_ms(), start)))
             
             # Check timeout
-            if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+            elapsed = time.ticks_diff(time.ticks_ms(), start)
+            if elapsed > timeout_ms:
+                print("[TX] TIMEOUT after {}ms! DIO1={}, BUSY={}, IRQ=0x{:04X}".format(
+                    elapsed, self.dio1.value(), self.busy.value(), self.get_irq_status()))
                 self.set_rf_switch(True)
                 return -2  # Timeout
             
@@ -666,6 +690,34 @@ class SX1262:
         """Set RX boosted gain mode"""
         # This is a simplified implementation
         # The actual implementation would modify the LNA gain settings
+        return 0  # Success
+        
+    def fix_sensitivity(self):
+        """
+        Fix receiver sensitivity for 500 kHz LoRa
+        See SX1262/SX1268 datasheet, chapter 15 Known Limitations, section 15.1
+        RadioLib calls this before TX (line 1126)
+        """
+        # Read current sensitivity configuration
+        REG_SENSITIVITY_CONFIG = 0x0889
+        sensitivity_config = self._read_register(REG_SENSITIVITY_CONFIG)
+        
+        # Fix the value for LoRa with 500 kHz bandwidth
+        # For other bandwidths or non-LoRa, set bit 2
+        if self._packet_type == 0x00:  # LoRa mode
+            # Check if bandwidth is 500 kHz (with small tolerance)
+            if abs(self._bandwidth_khz - 500.0) <= 0.001:
+                # Clear bit 2 (0xFB = 0b11111011)
+                sensitivity_config &= 0xFB
+            else:
+                # Set bit 2 (0x04 = 0b00000100)
+                sensitivity_config |= 0x04
+        else:
+            # Non-LoRa mode, set bit 2
+            sensitivity_config |= 0x04
+        
+        # Write back the configuration
+        self._write_register(REG_SENSITIVITY_CONFIG, sensitivity_config)
         return 0  # Success
 
 
