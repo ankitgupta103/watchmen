@@ -54,6 +54,7 @@ class SX1262:
     CMD_SET_SYNC_WORD_1_2_3 = 0x92
     CMD_SET_RANDOM_SEED = 0x81
     CMD_SET_BOOST_MODE = 0x96
+    CMD_SET_BUFFER_BASE_ADDRESS = 0x8F  # Same as SET_SYNC_WORD_1_2, but different usage
     
     # IRQ Masks
     IRQ_TX_DONE = 0x01
@@ -307,6 +308,10 @@ class SX1262:
         """Set sync word (1 byte)"""
         self._write_command(self.CMD_SET_SYNC_WORD_1_2, [sync_word, 0x00])
         
+    def set_buffer_base_address(self, tx_base=0x00, rx_base=0x00):
+        """Set buffer base addresses (CRITICAL - RadioLib calls this before writeBuffer!)"""
+        self._write_command(self.CMD_SET_BUFFER_BASE_ADDRESS, [tx_base, rx_base])
+        
     def set_dio_irq_params(self, irq_mask, dio1_mask, dio2_mask, dio3_mask):
         """Set DIO IRQ parameters"""
         irq_bytes = [
@@ -475,19 +480,22 @@ class SX1262:
         if len(data) > 255:
             data = data[:255]  # Truncate if too long
         
-        # For variable length LoRa packets, RadioLib writes data directly WITHOUT prepending length!
-        # The SX1262 handles variable length automatically based on packet params
-        # Write data to buffer (offset 0) - NO length byte prepended!
-        self._write_buffer(0, data)
-        
-        # Set packet parameters (for variable length, payload_len should be max = 0xFF)
-        # RadioLib uses implicitLen = 0xFF for variable length
-        self.set_packet_params(PREAMBLE, 0x00, 0xFF, 0x01, 0x00)  # variable length, CRC on
+        # Set packet parameters FIRST - CRITICAL: RadioLib uses ACTUAL length, not 0xFF!
+        # Variable length is indicated by header_type=0x00, not by using 0xFF
+        # RadioLib line 1043: setPacketParams(..., cfg->transmit.len, ...)
+        self.set_packet_params(PREAMBLE, 0x00, len(data), 0x01, 0x00)  # variable length, CRC on, ACTUAL length
         
         # Set DIO IRQ parameters (TX_DONE and TIMEOUT on DIO1)
         irq_mask = self.IRQ_TX_DONE | self.IRQ_RX_TX_TIMEOUT
         dio1_mask = self.IRQ_TX_DONE
         self.set_dio_irq_params(irq_mask, dio1_mask, 0x00, 0x00)
+        
+        # Set buffer base address (CRITICAL - RadioLib line 1072 calls this before writeBuffer!)
+        self.set_buffer_base_address(0x00, 0x00)
+        
+        # Write data to buffer (offset 0) - NO length byte prepended!
+        # For variable length LoRa packets, RadioLib writes data directly WITHOUT prepending length!
+        self._write_buffer(0, data)
         
         # Clear IRQ status
         self.clear_irq_status(0xFFFF)
