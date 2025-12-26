@@ -203,13 +203,18 @@ class SX1262:
         """
         Read data from SX1262 using single SPI transaction (matches RadioLib SPIreadStream)
         
-        RadioLib flow:
-        1. Wait for BUSY LOW (if waitForGpio=True)
-        2. Prepare output buffer: [cmd, 0x00, 0x00, ...] (dummy bytes)
-        3. Prepare input buffer: [status, data1, data2, ...]
-        4. Single SPI transfer: ALL bytes in ONE transaction
-        5. CS LOW → transfer → CS HIGH
-        6. Wait for BUSY HIGH then LOW (if waitForGpio=True)
+        RadioLib SPItransferStream for read (!write):
+        - buffLen = cmdLen + numBytes + statusLen (line 321-323)
+        - buffOut = [cmd(1), NOP(numBytes + statusLen)] (line 341)
+        - buffIn = [status, data...] (status at position 0, data follows)
+        - Data extracted from: buffIn[cmdLen + statusLen:] (line 413)
+        
+        For SX126x: statusLen = 1 byte, cmdLen = 1 byte
+        For GET_IRQ_STATUS (read 2 bytes):
+        - buffLen = 1 + 2 + 1 = 4 bytes
+        - buffOut = [0x12, 0x00, 0x00, 0x00] (cmd + 3 dummy bytes)
+        - buffIn = [status, ?, data0, data1] (status at 0, data at 2-3)
+        - Data extracted: buffIn[2:4] = [data0, data1]
         
         Args:
             cmd: Command byte
@@ -222,10 +227,17 @@ class SX1262:
         if wait_for_busy:
             self.wait_for_not_busy()
         
-        # Prepare output buffer: [cmd, 0x00, 0x00, ...] (dummy bytes for clocking in data)
-        out_buf = bytearray([cmd] + [0x00] * read_len)
+        # RadioLib: buffLen = cmdLen + numBytes + statusLen
+        # For SX126x: cmdLen=1, statusLen=1
+        cmd_len = 1
+        status_len = 1
+        total_len = cmd_len + read_len + status_len
         
-        # Prepare input buffer: [status, data1, data2, ...]
+        # Prepare output buffer: [cmd, NOP, NOP, ...]
+        # RadioLib uses NOP (0x00 for SX126x) for (numBytes + statusLen) dummy bytes
+        out_buf = bytearray([cmd] + [0x00] * (read_len + status_len))
+        
+        # Prepare input buffer: same size as output
         in_buf = bytearray(len(out_buf))
         
         # Single SPI transaction: ALL bytes in ONE transfer
@@ -235,9 +247,12 @@ class SX1262:
         self.cs.value(1)
         time.sleep_us(1)
         
-        # Parse result: [status_byte, data1, data2, ...]
+        # Parse result according to RadioLib line 413:
+        # Data extracted from: buffIn[cmdLen + statusLen:]
+        # For SX126x: cmdLen=1, statusLen=1, so data starts at offset 2
         status_byte = in_buf[0]
-        data_bytes = in_buf[1:1+read_len] if read_len > 0 else bytearray()
+        data_start = cmd_len + status_len  # 1 + 1 = 2
+        data_bytes = in_buf[data_start:data_start+read_len] if read_len > 0 else bytearray()
         
         # Wait for BUSY to go HIGH then LOW (chip processing command)
         if wait_for_busy:
@@ -432,9 +447,14 @@ class SX1262:
         Matches RadioLib: SPIreadStream(CMD_GET_IRQ_STATUS, data, 2)
         RadioLib line 946: this->mod->SPIreadStream(RADIOLIB_SX126X_CMD_GET_IRQ_STATUS, data, 2);
         RadioLib line 947: return(((uint32_t)(data[0]) << 8) | data[1]);
+        
+        Note: RadioLib uses default waitForGpio=true, but GET_IRQ_STATUS can be read during TX/RX.
+        We use wait_for_busy=True with short timeout to match RadioLib behavior.
         """
-        # GET_IRQ_STATUS can be read during TX/RX, so use short timeout and don't wait for BUSY
-        _, data = self._spi_read_stream(self.CMD_GET_IRQ_STATUS, 2, wait_for_busy=False)
+        # RadioLib uses default waitForGpio=true, so we should wait for BUSY
+        # But use short timeout since we might be in TX mode
+        # First try without waiting, but if that fails, we'll add wait
+        status_byte, data = self._spi_read_stream(self.CMD_GET_IRQ_STATUS, 2, wait_for_busy=True)
         
         if len(data) >= 2:
             # Combine IRQ bytes: MSB first (matches RadioLib line 947)
@@ -442,10 +462,14 @@ class SX1262:
         else:
             irq_status = 0xFFFF  # Error reading
         
-        # Debug output
-        if irq_status == 0xFFFF:
-            print("[DEBUG] IRQ=0xFFFF! data={}".format(data.hex() if len(data) > 0 else "empty"))
-            print("[DEBUG] BUSY={}, DIO1={}".format(self.busy.value(), self.dio1.value()))
+        # Debug output with raw bytes (always show for debugging until confirmed working)
+        print("[DEBUG] IRQ read: status=0x{:02X}, data=[0x{:02X}, 0x{:02X}], irq=0x{:04X}, BUSY={}, DIO1={}".format(
+            status_byte, 
+            data[0] if len(data) > 0 else 0xFF, 
+            data[1] if len(data) > 1 else 0xFF, 
+            irq_status,
+            self.busy.value(), 
+            self.dio1.value()))
         
         return irq_status
         
