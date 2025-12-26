@@ -362,52 +362,44 @@ class SX1262:
         """Get IRQ status
         Returns 16-bit IRQ status register
         RadioLib: SPIreadStream(CMD_GET_IRQ_STATUS, data, 2)
-        For SX1262, GET_IRQ_STATUS (0x12) reads 2 bytes of IRQ status
         
-        Note: This can be called even when DIO1 is HIGH (interrupt pending).
-        The chip can respond to this command while in TX/RX mode.
+        RadioLib does a SINGLE SPI transfer: command byte + 2 dummy bytes
+        All in one transaction with CS low throughout.
         """
-        # IMPORTANT: For GET_IRQ_STATUS, we don't need to wait for BUSY
-        # This command can be read at any time, even during TX/RX
-        # But let's wait a bit to ensure chip is ready (not processing other commands)
-        if not self.wait_for_not_busy(timeout_ms=10):
-            # If BUSY is stuck, continue anyway - GET_IRQ_STATUS should still work
-            pass
+        # Wait for BUSY to be low (chip ready for command)
+        # BUT: GET_IRQ_STATUS can be read during TX/RX, so use short timeout
+        self.wait_for_not_busy(timeout_ms=5)
         
         # CS goes LOW - start SPI transaction
         self.cs.value(0)
-        time.sleep_us(1)  # Small delay for CS setup
+        time.sleep_us(1)
         
-        # Send command byte (0x12 = GET_IRQ_STATUS)
-        # Chip immediately returns status byte on first transfer
-        cmd_buf = bytearray([self.CMD_GET_IRQ_STATUS])
-        status_buf = bytearray(1)
-        self.spi.write_readinto(cmd_buf, status_buf)
-        status_byte = status_buf[0]
+        # RadioLib does a SINGLE transfer: [cmd, 0x00, 0x00] -> [status, data1, data2]
+        # We need to do this as ONE SPI transaction, not separate transfers!
+        cmd_byte = self.CMD_GET_IRQ_STATUS
+        out_buf = bytearray([cmd_byte, 0x00, 0x00])  # Command + 2 dummy bytes
+        in_buf = bytearray(3)  # Status byte + 2 data bytes
         
-        # For read commands, send dummy bytes (0x00) to clock in the actual data
-        # SX1262 returns 2 bytes: [IRQ_MSB, IRQ_LSB]
-        # Must send 2 dummy bytes to receive 2 data bytes
-        dummy = bytearray([0x00, 0x00])
-        data_buf = bytearray(2)
-        self.spi.write_readinto(dummy, data_buf)
+        # Single SPI transfer for all bytes
+        self.spi.write_readinto(out_buf, in_buf)
         
         # CS goes HIGH - end SPI transaction
         self.cs.value(1)
         time.sleep_us(1)
         
-        # Combine bytes: MSB first (matches RadioLib line 947: (data[0] << 8) | data[1])
-        irq_status = (data_buf[0] << 8) | data_buf[1]
+        # Parse result: [status_byte, irq_msb, irq_lsb]
+        status_byte = in_buf[0]
+        irq_msb = in_buf[1]
+        irq_lsb = in_buf[2]
         
-        # Debug: Log if we get suspicious values (0xFFFF means all bits set, unlikely)
-        # Also log status byte to verify SPI is working
+        # Combine IRQ bytes: MSB first (matches RadioLib line 947)
+        irq_status = (irq_msb << 8) | irq_lsb
+        
+        # Debug output
         if irq_status == 0xFFFF:
-            print("[DEBUG] IRQ=0xFFFF! status_byte=0x{:02X}, data=[0x{:02X}, 0x{:02X}]".format(
-                status_byte, data_buf[0], data_buf[1]))
-            print("[DEBUG] BUSY={}, DIO1={} at time of read".format(self.busy.value(), self.dio1.value()))
-        elif irq_status != 0x0000 and irq_status != 0x0001:
-            # Log any other non-zero IRQ values for debugging
-            print("[DEBUG] IRQ=0x{:04X}, status_byte=0x{:02X}".format(irq_status, status_byte))
+            print("[DEBUG] IRQ=0xFFFF! status=0x{:02X}, irq=[0x{:02X}, 0x{:02X}]".format(
+                status_byte, irq_msb, irq_lsb))
+            print("[DEBUG] BUSY={}, DIO1={}".format(self.busy.value(), self.dio1.value()))
         
         return irq_status
         
@@ -604,10 +596,22 @@ class SX1262:
             return -5  # BUSY timeout before command
         
         # Set TX mode with timeout 0x000000 (single transmission, no timeout)
+        # RadioLib: setTx(RADIOLIB_SX126X_TX_TIMEOUT_NONE) = 0x000000
         timeout_bytes = [0x00, 0x00, 0x00]
-        print("[TX] Sending SET_TX command...")
+        print("[TX] Sending SET_TX command (timeout=0x000000)...")
+        
+        # Send SET_TX command - this should make BUSY go HIGH
         self._write_command(self.CMD_SET_TX, timeout_bytes)
-        print("[TX] SET_TX sent, BUSY={}".format(self.busy.value()))
+        
+        # After SET_TX, BUSY should go HIGH immediately (chip processing command)
+        # Wait a short time for BUSY to respond
+        time.sleep_us(100)
+        busy_after_cmd = self.busy.value()
+        print("[TX] SET_TX sent, BUSY={} (should be 1 if command accepted)".format(busy_after_cmd))
+        
+        if busy_after_cmd == 0:
+            print("[TX] WARNING: BUSY did not go HIGH after SET_TX - command may not have been accepted!")
+            print("[TX] This could indicate SPI communication problem or chip error state")
         
         # After SET_TX, wait for BUSY to go LOW (PA ramp up done)
         # This is CRITICAL - RadioLib waits for BUSY LOW, not HIGH!
