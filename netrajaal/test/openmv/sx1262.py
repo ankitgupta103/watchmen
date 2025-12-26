@@ -56,7 +56,7 @@ class SX1262:
     CMD_SET_BOOST_MODE = 0x96
     CMD_SET_BUFFER_BASE_ADDRESS = 0x8F  # Same as SET_SYNC_WORD_1_2, but different usage
     
-    # IRQ Masks
+    # IRQ Masks (from RadioLib SX126x_commands.h)
     IRQ_TX_DONE = 0x01
     IRQ_RX_DONE = 0x02
     IRQ_PREAMBLE_DETECTED = 0x04
@@ -66,7 +66,7 @@ class SX1262:
     IRQ_CRC_ERROR = 0x40
     IRQ_CAD_DONE = 0x80
     IRQ_CAD_ACTIVITY_DETECTED = 0x0100
-    IRQ_RX_TX_TIMEOUT = 0x0200
+    IRQ_TIMEOUT = 0x0200  # RadioLib uses IRQ_TIMEOUT, not IRQ_RX_TX_TIMEOUT
     
     # Status
     STATUS_MODE_STDBY_RC = 0x20
@@ -195,8 +195,29 @@ class SX1262:
     def _read_command(self, cmd, length):
         """Read data from SX1262
         length: number of data bytes to read (excluding status byte)
+        For GET_IRQ_STATUS and similar read commands, we need to send command
+        and then read the data bytes (status byte is read automatically)
         """
-        return self._spi_transfer(bytearray([cmd]), read_len=length)
+        # Wait for BUSY to be low
+        self.wait_for_not_busy()
+        self.cs.value(0)
+        time.sleep_us(1)
+        
+        # Send command byte and read status byte
+        status_buf = bytearray(1)
+        self.spi.write_readinto(bytearray([cmd]), status_buf)
+        status = status_buf[0]
+        
+        # For read commands, send dummy bytes to clock in the actual data
+        if length > 0:
+            dummy = bytearray([0x00] * length)
+            data_buf = bytearray(length)
+            self.spi.write_readinto(dummy, data_buf)
+            self.cs.value(1)
+            return data_buf
+        
+        self.cs.value(1)
+        return bytearray()
         
     def _write_register(self, address, value):
         """Write a register"""
@@ -329,11 +350,28 @@ class SX1262:
         self._write_command(self.CMD_SET_DIO_IRQ_PARAMS, irq_bytes)
         
     def get_irq_status(self):
-        """Get IRQ status"""
-        response = self._read_command(self.CMD_GET_IRQ_STATUS, 2)
-        if len(response) >= 2:
-            return (response[0] << 8) | response[1]
-        return 0
+        """Get IRQ status
+        Returns 16-bit IRQ status register
+        RadioLib: SPIreadStream(CMD_GET_IRQ_STATUS, data, 2)
+        """
+        # Use _spi_transfer directly for read commands
+        self.wait_for_not_busy()
+        self.cs.value(0)
+        time.sleep_us(1)
+        
+        # Send command, read status byte
+        status_buf = bytearray(1)
+        self.spi.write_readinto(bytearray([self.CMD_GET_IRQ_STATUS]), status_buf)
+        
+        # Read 2 data bytes (IRQ status is 16-bit)
+        dummy = bytearray([0x00, 0x00])
+        data_buf = bytearray(2)
+        self.spi.write_readinto(dummy, data_buf)
+        self.cs.value(1)
+        
+        # Combine bytes: MSB first
+        irq_status = (data_buf[0] << 8) | data_buf[1]
+        return irq_status
         
     def clear_irq_status(self, irq_mask=0xFFFF):
         """Clear IRQ status"""
@@ -446,6 +484,8 @@ class SX1262:
         # Set packet parameters (variable length, CRC on)
         # For variable length: payload_len is max length (0xFF = 255 bytes)
         self.set_packet_params(preamble_len, 0x00, 0xFF, 0x01, 0x00)
+        # Store preamble length for transmit()
+        self._preamble_len = preamble_len
         
         # Set sync word
         self.set_sync_word(sync_word)
@@ -454,7 +494,7 @@ class SX1262:
         self.set_tx_params(tx_power)
         
         # Set IRQ parameters
-        irq_mask = self.IRQ_TX_DONE | self.IRQ_RX_DONE | self.IRQ_RX_TX_TIMEOUT | self.IRQ_CRC_ERROR
+        irq_mask = self.IRQ_TX_DONE | self.IRQ_RX_DONE | self.IRQ_TIMEOUT | self.IRQ_CRC_ERROR
         self.set_dio_irq_params(irq_mask, irq_mask, 0x00, 0x00)
         
         # Clear IRQ
@@ -492,7 +532,8 @@ class SX1262:
         self.set_packet_params(PREAMBLE, 0x00, len(data), 0x01, 0x00)  # variable length, CRC on, ACTUAL length
         
         # Set DIO IRQ parameters (TX_DONE and TIMEOUT on DIO1)
-        irq_mask = self.IRQ_TX_DONE | self.IRQ_RX_TX_TIMEOUT
+        # RadioLib line 1065: setDioIrqParams(IRQ_TX_DONE | IRQ_TIMEOUT, IRQ_TX_DONE)
+        irq_mask = self.IRQ_TX_DONE | self.IRQ_TIMEOUT
         dio1_mask = self.IRQ_TX_DONE
         self.set_dio_irq_params(irq_mask, dio1_mask, 0x00, 0x00)
         
@@ -546,12 +587,20 @@ class SX1262:
         
         # Wait for TX done (poll DIO1 interrupt pin, exactly like RadioLib)
         # Calculate timeout: 5ms + 500% of expected time-on-air
-        # Rough estimate: packet_time = (len * 8 * 2^SF) / (BW * 1000) ms
-        packet_time_ms = (len(data) * 8 * (2 ** self._spreading_factor)) / (self._bandwidth_khz * 1000)
+        # Formula: time_on_air = (preamble + header + payload) * symbol_duration
+        # Symbol duration = (2^SF) / BW
+        # For variable header: header = 1 symbol (contains payload length)
+        preamble_len = getattr(self, '_preamble_len', 8)
+        symbol_duration_ms = (2 ** self._spreading_factor) / (self._bandwidth_khz * 1000.0)  # ms per symbol
+        preamble_time = preamble_len * symbol_duration_ms
+        header_time = 1 * symbol_duration_ms  # Variable header = 1 symbol
+        payload_time = len(data) * 8 * symbol_duration_ms  # Each bit = 1 symbol
+        packet_time_ms = preamble_time + header_time + payload_time
+        
         timeout_ms = 5 + int(packet_time_ms * 5)
-        timeout_ms = max(timeout_ms, 1000)  # At least 1 second
-        print("[TX] Timeout set to {}ms (packet time ~{}ms, SF={}, BW={}kHz)".format(
-            timeout_ms, int(packet_time_ms), self._spreading_factor, self._bandwidth_khz))
+        timeout_ms = max(timeout_ms, 2000)  # At least 2 seconds
+        print("[TX] Timeout set to {}ms (packet time ~{}ms, SF={}, BW={}kHz, len={})".format(
+            timeout_ms, int(packet_time_ms), self._spreading_factor, self._bandwidth_khz, len(data)))
         
         start = time.ticks_ms()
         poll_count = 0
@@ -574,9 +623,9 @@ class SX1262:
                     self.clear_irq_status(self.IRQ_TX_DONE)
                     self.set_rf_switch(True)
                     return 0  # Success
-                elif irq & self.IRQ_RX_TX_TIMEOUT:
+                elif irq & self.IRQ_TIMEOUT:
                     print("[TX] TIMEOUT IRQ detected!")
-                    self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
+                    self.clear_irq_status(self.IRQ_TIMEOUT)
                     self.set_rf_switch(True)
                     return -1  # Timeout
                 # Note: CRC error shouldn't occur on TX, but handle it anyway
@@ -655,8 +704,8 @@ class SX1262:
         elif irq & self.IRQ_CRC_ERROR:
             self.clear_irq_status(self.IRQ_CRC_ERROR)
             return (None, -1)  # CRC error
-        elif irq & self.IRQ_RX_TX_TIMEOUT:
-            self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
+        elif irq & self.IRQ_TIMEOUT:
+            self.clear_irq_status(self.IRQ_TIMEOUT)
             return (None, -2)  # Timeout
             
         return (None, -3)  # No data
