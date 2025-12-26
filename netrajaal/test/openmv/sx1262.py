@@ -620,12 +620,18 @@ class SX1262:
                 if irq & self.IRQ_TX_DONE:
                     # Transmission complete
                     print("[TX] TX_DONE IRQ detected!")
-                    self.clear_irq_status(self.IRQ_TX_DONE)
+                    # Call finishTransmit equivalent (matches RadioLib line 276)
+                    # RadioLib finishTransmit(): clear all IRQs, then set standby mode
+                    self.clear_irq_status(0xFFFF)  # Clear ALL IRQs (not just TX_DONE)
+                    # Set module to standby mode (disables transmitter/RF switch automatically)
+                    self.set_standby(1)
+                    # RF switch is controlled by module state, but set it explicitly too
                     self.set_rf_switch(True)
                     return 0  # Success
                 elif irq & self.IRQ_TIMEOUT:
                     print("[TX] TIMEOUT IRQ detected!")
-                    self.clear_irq_status(self.IRQ_TIMEOUT)
+                    self.clear_irq_status(0xFFFF)  # Clear all IRQs
+                    self.set_standby(1)  # Set to standby
                     self.set_rf_switch(True)
                     return -1  # Timeout
                 # Note: CRC error shouldn't occur on TX, but handle it anyway
@@ -647,6 +653,9 @@ class SX1262:
             if elapsed > timeout_ms:
                 print("[TX] TIMEOUT after {}ms! DIO1={}, BUSY={}, IRQ=0x{:04X}".format(
                     elapsed, self.dio1.value(), self.busy.value(), self.get_irq_status()))
+                # Cleanup on timeout (matches finishTransmit)
+                self.clear_irq_status(0xFFFF)
+                self.set_standby(1)
                 self.set_rf_switch(True)
                 return -2  # Timeout
             
