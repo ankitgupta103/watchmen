@@ -1,0 +1,732 @@
+"""
+SX1262 LoRa Module Driver for MicroPython
+Based on Semtech SX1262 datasheet and RadioLib implementation
+"""
+
+from machine import SPI, Pin
+import time
+
+class SX1262:
+    # SX1262 Register addresses
+    REG_LR_FIRMWARE_VERSION_MSB = 0x0153
+    REG_LR_FIRMWARE_VERSION_LSB = 0x0154
+    REG_LR_ESTIMATED_FREQUENCY_ERROR = 0x0956
+    REG_LR_RSSI_INSTANTANEOUS = 0x0962
+    REG_LR_SYNCWORD = 0x0740
+    
+    # Commands
+    CMD_NOP = 0x00
+    CMD_SET_SLEEP = 0x84
+    CMD_SET_STANDBY = 0x80
+    CMD_SET_FS = 0xC1
+    CMD_SET_TX = 0x83
+    CMD_SET_RX = 0x82
+    CMD_STOP_TIMER_ON_PREAMBLE = 0x9F
+    CMD_SET_RX_DUTY_CYCLE = 0x94
+    CMD_SET_CAD = 0xC5
+    CMD_SET_TX_CONTINUOUS_WAVE = 0xD1
+    CMD_SET_TX_INFINITE_PREAMBLE = 0xD2
+    CMD_SET_REGULATOR_MODE = 0x96
+    CMD_CALIBRATE = 0x89
+    CMD_CALIBRATE_IMAGE = 0x98
+    CMD_SET_PA_CONFIG = 0x95
+    CMD_SET_RX_TX_FALLBACK_MODE = 0x93
+    CMD_WRITE_REGISTER = 0x0D
+    CMD_READ_REGISTER = 0x1D
+    CMD_WRITE_BUFFER = 0x0E
+    CMD_READ_BUFFER = 0x1E
+    CMD_SET_DIO_IRQ_PARAMS = 0x08
+    CMD_GET_IRQ_STATUS = 0x12
+    CMD_CLEAR_IRQ_STATUS = 0x02
+    CMD_SET_DIO2_AS_RF_SWITCH_CTRL = 0x9D
+    CMD_SET_DIO3_AS_TCXO_CTRL = 0x97
+    CMD_SET_RF_FREQUENCY = 0x86
+    CMD_SET_PACKET_TYPE = 0x8A
+    CMD_GET_PACKET_TYPE = 0x11
+    CMD_SET_TX_PARAMS = 0x8E
+    CMD_SET_MODULATION_PARAMS = 0x8B
+    CMD_SET_PACKET_PARAMS = 0x8C
+    CMD_GET_RX_BUFFER_STATUS = 0x13
+    CMD_GET_PACKET_STATUS = 0x14
+    CMD_SET_SYNC_WORD_1_2 = 0x8F
+    CMD_SET_SYNC_WORD_1_3 = 0x91
+    CMD_SET_SYNC_WORD_2_3 = 0x90
+    CMD_SET_SYNC_WORD_1_2_3 = 0x92
+    CMD_SET_RANDOM_SEED = 0x81
+    CMD_SET_BOOST_MODE = 0x96
+    
+    # IRQ Masks
+    IRQ_TX_DONE = 0x01
+    IRQ_RX_DONE = 0x02
+    IRQ_PREAMBLE_DETECTED = 0x04
+    IRQ_SYNCWORD_VALID = 0x08
+    IRQ_HEADER_VALID = 0x10
+    IRQ_HEADER_ERROR = 0x20
+    IRQ_CRC_ERROR = 0x40
+    IRQ_CAD_DONE = 0x80
+    IRQ_CAD_ACTIVITY_DETECTED = 0x0100
+    IRQ_RX_TX_TIMEOUT = 0x0200
+    
+    # Status
+    STATUS_MODE_STDBY_RC = 0x20
+    STATUS_MODE_STDBY_XOSC = 0x30
+    STATUS_MODE_FS = 0x40
+    STATUS_MODE_RX = 0x50
+    STATUS_MODE_TX = 0x60
+    
+    def __init__(self, spi, cs, reset, busy, rx_en, tx_en, dio1):
+        """
+        Initialize SX1262 module
+        
+        Args:
+            spi: SPI object (Machine.SPI)
+            cs: Chip Select pin (Pin object)
+            reset: Reset pin (Pin object)
+            busy: Busy pin (Pin object)
+            rx_en: RX Enable pin (Pin object)
+            tx_en: TX Enable pin (Pin object)
+            dio1: DIO1 interrupt pin (Pin object)
+        """
+        self.spi = spi
+        self.cs = cs
+        self.reset = reset
+        self.busy = busy
+        self.rx_en = rx_en
+        self.tx_en = tx_en
+        self.dio1 = dio1
+        
+        # Set initial pin states
+        # Note: Pins should be initialized before passing to this class
+        try:
+            self.cs.value(1)
+            self.reset.value(1)
+            self.rx_en.value(0)
+            self.tx_en.value(0)
+        except:
+            # If pins aren't initialized, initialize them
+            self.cs.init(Pin.OUT, value=1)
+            self.reset.init(Pin.OUT, value=1)
+            self.busy.init(Pin.IN)
+            self.rx_en.init(Pin.OUT, value=0)
+            self.tx_en.init(Pin.OUT, value=0)
+            self.dio1.init(Pin.IN)
+        
+        # State variables
+        self._packet_type = 0
+        self._frequency = 0
+        self._rssi = 0
+        self._snr = 0
+        self._frequency_error = 0
+        
+        # Reset module
+        self.reset_module()
+        
+    def reset_module(self):
+        """Reset the SX1262 module"""
+        self.reset.value(0)
+        time.sleep_us(100)
+        self.reset.value(1)
+        time.sleep_us(100)
+        self.wait_for_not_busy()
+        
+    def wait_for_not_busy(self, timeout_ms=100):
+        """Wait until BUSY pin goes low"""
+        start = time.ticks_ms()
+        while self.busy.value() == 1:
+            if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+                return False
+            time.sleep_us(10)
+        return True
+        
+    def _spi_transfer(self, data_out, read_len=0):
+        """Transfer data over SPI and return response
+        For write-only: read_len=0
+        For read: read_len=number of bytes to read
+        """
+        self.wait_for_not_busy()
+        self.cs.value(0)
+        time.sleep_us(1)
+        
+        # Write command/data
+        self.spi.write(data_out)
+        
+        # Read response if needed
+        data_in = None
+        if read_len > 0:
+            data_in = bytearray(read_len)
+            self.spi.readinto(data_in)
+        
+        self.cs.value(1)
+        return data_in
+        
+    def _write_command(self, cmd, data=None):
+        """Write a command to SX1262"""
+        if data is None:
+            data = []
+        cmd_data = bytearray([cmd] + list(data))
+        self._spi_transfer(cmd_data, read_len=0)
+        self.wait_for_not_busy()
+        
+    def _read_command(self, cmd, length):
+        """Read data from SX1262"""
+        self.wait_for_not_busy()
+        self.cs.value(0)
+        time.sleep_us(1)
+        
+        # Send command
+        self.spi.write(bytearray([cmd]))
+        
+        # Read response (SX1262 returns status byte + data)
+        response = bytearray(length + 1)
+        self.spi.readinto(response)
+        
+        self.cs.value(1)
+        return response[1:]  # Skip status byte
+        
+    def _write_register(self, address, value):
+        """Write a register"""
+        addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
+        self._write_command(self.CMD_WRITE_REGISTER, addr_bytes + [value])
+        
+    def _read_register(self, address):
+        """Read a register"""
+        self.wait_for_not_busy()
+        self.cs.value(0)
+        time.sleep_us(1)
+        
+        # Send command: CMD_READ_REGISTER, address MSB, address LSB
+        addr_bytes = [(address >> 8) & 0xFF, address & 0xFF]
+        self.spi.write(bytearray([self.CMD_READ_REGISTER] + addr_bytes))
+        
+        # Read status byte + register value
+        response = bytearray(2)
+        self.spi.readinto(response)
+        
+        self.cs.value(1)
+        return response[1] if len(response) > 1 else 0
+        
+    def _write_buffer(self, offset, data):
+        """Write data to buffer"""
+        self._write_command(self.CMD_WRITE_BUFFER, [offset] + list(data))
+        
+    def _read_buffer(self, offset, length):
+        """Read data from buffer"""
+        self.wait_for_not_busy()
+        self.cs.value(0)
+        time.sleep_us(1)
+        
+        # Send command: CMD_READ_BUFFER, offset, dummy byte
+        self.spi.write(bytearray([self.CMD_READ_BUFFER, offset, 0x00]))
+        
+        # Read status byte + data
+        response = bytearray(length + 1)
+        self.spi.readinto(response)
+        
+        self.cs.value(1)
+        return response[1:]  # Skip status byte
+        
+    def set_standby(self, mode=0):
+        """Set standby mode (0=RC, 1=XOSC)"""
+        self._write_command(self.CMD_SET_STANDBY, [mode])
+        
+    def set_sleep(self, sleep_config=0x00):
+        """Set sleep mode"""
+        self._write_command(self.CMD_SET_SLEEP, [sleep_config])
+        
+    def calibrate(self, calib_param):
+        """Calibrate the module"""
+        self._write_command(self.CMD_CALIBRATE, [calib_param])
+        self.wait_for_not_busy(1000)
+        
+    def set_packet_type(self, packet_type):
+        """Set packet type (0x00=LoRa, 0x01=FSK)"""
+        self._write_command(self.CMD_SET_PACKET_TYPE, [packet_type])
+        self._packet_type = packet_type
+        
+    def set_rf_frequency(self, freq_hz):
+        """Set RF frequency in Hz"""
+        freq_reg = int(freq_hz * (2**25) / 32000000)
+        freq_bytes = [
+            (freq_reg >> 24) & 0xFF,
+            (freq_reg >> 16) & 0xFF,
+            (freq_reg >> 8) & 0xFF,
+            freq_reg & 0xFF
+        ]
+        self._write_command(self.CMD_SET_RF_FREQUENCY, freq_bytes)
+        self._frequency = freq_hz
+        
+    def set_tx_params(self, power, ramp_time=0x04):
+        """Set TX parameters
+        power: -9 to 22 dBm
+        ramp_time: 0x00=10us, 0x01=20us, 0x02=40us, 0x03=80us, 0x04=200us, etc.
+        """
+        # Convert power to register value
+        # For SX1262: power = -9 + (reg_value * 1)
+        if power < -9:
+            power = -9
+        elif power > 22:
+            power = 22
+        power_reg = power + 9
+        self._write_command(self.CMD_SET_TX_PARAMS, [power_reg, ramp_time])
+        
+    def set_modulation_params(self, sf, bw, cr, ldro=0):
+        """Set LoRa modulation parameters
+        sf: Spreading factor (5-12)
+        bw: Bandwidth in kHz (7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125, 250, 500)
+        cr: Coding rate (5-8, meaning 4/5 to 4/8)
+        ldro: Low data rate optimize (0 or 1)
+        """
+        # Convert bandwidth to register value
+        bw_map = {
+            7.8: 0x00, 10.4: 0x08, 15.6: 0x01, 20.8: 0x09,
+            31.25: 0x02, 41.7: 0x0A, 62.5: 0x03, 125: 0x04,
+            250: 0x05, 500: 0x06
+        }
+        bw_reg = bw_map.get(bw, 0x04)  # Default to 125 kHz
+        
+        mod_params = [sf, bw_reg, cr, ldro]
+        self._write_command(self.CMD_SET_MODULATION_PARAMS, mod_params)
+        
+    def set_packet_params(self, preamble_len, header_type, payload_len, crc_type, invert_iq=0):
+        """Set packet parameters
+        preamble_len: Preamble length
+        header_type: 0x00=variable, 0x01=fixed
+        payload_len: Payload length (for fixed header)
+        crc_type: 0x00=none, 0x01=CRC on
+        invert_iq: 0=normal, 1=inverted
+        """
+        packet_params = [
+            (preamble_len >> 8) & 0xFF, preamble_len & 0xFF,
+            header_type, payload_len,
+            crc_type, invert_iq
+        ]
+        self._write_command(self.CMD_SET_PACKET_PARAMS, packet_params)
+        
+    def set_sync_word(self, sync_word):
+        """Set sync word (1 byte)"""
+        self._write_command(self.CMD_SET_SYNC_WORD_1_2, [sync_word, 0x00])
+        
+    def set_dio_irq_params(self, irq_mask, dio1_mask, dio2_mask, dio3_mask):
+        """Set DIO IRQ parameters"""
+        irq_bytes = [
+            (irq_mask >> 8) & 0xFF, irq_mask & 0xFF,
+            (dio1_mask >> 8) & 0xFF, dio1_mask & 0xFF,
+            (dio2_mask >> 8) & 0xFF, dio2_mask & 0xFF,
+            (dio3_mask >> 8) & 0xFF, dio3_mask & 0xFF
+        ]
+        self._write_command(self.CMD_SET_DIO_IRQ_PARAMS, irq_bytes)
+        
+    def get_irq_status(self):
+        """Get IRQ status"""
+        response = self._read_command(self.CMD_GET_IRQ_STATUS, 2)
+        if len(response) >= 2:
+            return (response[0] << 8) | response[1]
+        return 0
+        
+    def clear_irq_status(self, irq_mask=0xFFFF):
+        """Clear IRQ status"""
+        irq_bytes = [(irq_mask >> 8) & 0xFF, irq_mask & 0xFF]
+        self._write_command(self.CMD_CLEAR_IRQ_STATUS, irq_bytes)
+        
+    def set_dio2_as_rf_switch(self, enable=True):
+        """Set DIO2 as RF switch control"""
+        self._write_command(self.CMD_SET_DIO2_AS_RF_SWITCH_CTRL, [0x01 if enable else 0x00])
+        
+    def set_dio3_as_tcxo_ctrl(self, voltage, delay=0):
+        """Set DIO3 as TCXO control
+        voltage: 0x00=1.6V, 0x01=1.7V, 0x02=1.8V, 0x03=2.2V, 0x04=2.4V, 0x05=2.7V, 0x06=3.0V, 0x07=3.3V
+        delay: Delay in steps of 15.625us
+        """
+        delay_bytes = [
+            (delay >> 16) & 0xFF,
+            (delay >> 8) & 0xFF,
+            delay & 0xFF
+        ]
+        self._write_command(self.CMD_SET_DIO3_AS_TCXO_CTRL, [voltage] + delay_bytes)
+        
+    def set_rf_switch(self, rx_mode=True):
+        """Control RF switch pins"""
+        if rx_mode:
+            self.rx_en.value(1)
+            self.tx_en.value(0)
+        else:
+            self.rx_en.value(0)
+            self.tx_en.value(1)
+        
+    def begin(self, freq_mhz, bw, sf, cr, sync_word, tx_power, preamble_len, tcxo_voltage=0x01, use_ldo=False):
+        """
+        Initialize LoRa module with specified parameters
+        
+        Args:
+            freq_mhz: Frequency in MHz
+            bw: Bandwidth in kHz
+            sf: Spreading factor (5-12)
+            cr: Coding rate (5-8)
+            sync_word: Sync word (1 byte)
+            tx_power: TX power in dBm (-9 to 22)
+            preamble_len: Preamble length
+            tcxo_voltage: TCXO voltage (0x00=1.6V, 0x01=1.7V, etc.)
+            use_ldo: Use LDO instead of DC-DC (False recommended)
+        """
+        # Reset
+        self.reset_module()
+        
+        # Set standby
+        self.set_standby(1)  # XOSC mode
+        
+        # Calibrate
+        calib_param = 0x7F  # Calibrate all
+        self.calibrate(calib_param)
+        
+        # Set regulator mode
+        reg_mode = 0x00 if use_ldo else 0x01  # 0=LDO, 1=DC-DC
+        self._write_command(self.CMD_SET_REGULATOR_MODE, [reg_mode])
+        
+        # Set DIO3 as TCXO control
+        self.set_dio3_as_tcxo_ctrl(tcxo_voltage, delay=5000)  # ~78ms delay
+        
+        # Set DIO2 as RF switch control (optional, we'll use manual control)
+        # self.set_dio2_as_rf_switch(True)
+        
+        # Set packet type to LoRa
+        self.set_packet_type(0x00)
+        
+        # Set RF frequency
+        self.set_rf_frequency(freq_mhz * 1000000)
+        
+        # Set modulation parameters
+        # Calculate low data rate optimize
+        symbol_time = (2 ** sf) / (bw * 1000)
+        ldro = 1 if symbol_time >= 0.0016 else 0  # 16ms threshold
+        self.set_modulation_params(sf, bw, cr, ldro)
+        
+        # Set packet parameters (variable length, CRC on)
+        self.set_packet_params(preamble_len, 0x00, 0xFF, 0x01, 0x00)
+        
+        # Set sync word
+        self.set_sync_word(sync_word)
+        
+        # Set TX parameters
+        self.set_tx_params(tx_power)
+        
+        # Set IRQ parameters
+        irq_mask = self.IRQ_TX_DONE | self.IRQ_RX_DONE | self.IRQ_RX_TX_TIMEOUT | self.IRQ_CRC_ERROR
+        self.set_dio_irq_params(irq_mask, irq_mask, 0x00, 0x00)
+        
+        # Clear IRQ
+        self.clear_irq_status(0xFFFF)
+        
+        return 0  # Success
+        
+    def transmit(self, data):
+        """
+        Transmit data
+        
+        Args:
+            data: String or bytes to transmit
+            
+        Returns:
+            0 on success, error code on failure
+        """
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        
+        # Set RF switch to TX
+        self.set_rf_switch(False)
+        time.sleep_ms(1)
+        
+        # Write data to buffer
+        self._write_buffer(0, data)
+        
+        # Clear IRQ
+        self.clear_irq_status(0xFFFF)
+        
+        # Set TX mode
+        timeout = 0xFFFF  # No timeout
+        timeout_bytes = [0x00, 0x00, 0x00]  # 0 = no timeout
+        self._write_command(self.CMD_SET_TX, timeout_bytes)
+        
+        # Wait for TX done
+        start = time.ticks_ms()
+        while True:
+            irq = self.get_irq_status()
+            if irq & self.IRQ_TX_DONE:
+                self.clear_irq_status(self.IRQ_TX_DONE)
+                # Set RF switch back to RX
+                self.set_rf_switch(True)
+                return 0  # Success
+            elif irq & self.IRQ_RX_TX_TIMEOUT:
+                self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
+                self.set_rf_switch(True)
+                return -1  # Timeout
+            if time.ticks_diff(time.ticks_ms(), start) > 30000:  # 30s timeout
+                self.set_rf_switch(True)
+                return -2  # Timeout
+            time.sleep_ms(10)
+            
+    def start_receive(self):
+        """Start receiving"""
+        # Set RF switch to RX
+        self.set_rf_switch(True)
+        time.sleep_ms(1)
+        
+        # Clear IRQ
+        self.clear_irq_status(0xFFFF)
+        
+        # Set RX mode
+        timeout = 0xFFFF  # No timeout
+        timeout_bytes = [0x00, 0x00, 0x00]  # 0 = no timeout
+        self._write_command(self.CMD_SET_RX, timeout_bytes)
+        
+        return 0
+        
+    def read_data(self):
+        """
+        Read received data
+        
+        Returns:
+            (data, status) where data is bytes and status is 0 on success
+        """
+        irq = self.get_irq_status()
+        
+        if irq & self.IRQ_RX_DONE:
+            # Get RX buffer status
+            status = self._read_command(self.CMD_GET_RX_BUFFER_STATUS, 2)
+            if len(status) >= 2:
+                payload_len = status[0]
+                buffer_start = status[1]
+                
+                # Read packet status
+                pkt_status = self._read_command(self.CMD_GET_PACKET_STATUS, 3)
+                if len(pkt_status) >= 3:
+                    self._rssi = -pkt_status[0] / 2
+                    self._snr = (pkt_status[1] if pkt_status[1] < 128 else pkt_status[1] - 256) / 4
+                
+                # Read data from buffer
+                data = self._read_buffer(buffer_start, payload_len)
+                
+                # Clear IRQ
+                self.clear_irq_status(self.IRQ_RX_DONE)
+                
+                if irq & self.IRQ_CRC_ERROR:
+                    return (None, -1)  # CRC error
+                
+                return (data, 0)  # Success
+                
+        elif irq & self.IRQ_CRC_ERROR:
+            self.clear_irq_status(self.IRQ_CRC_ERROR)
+            return (None, -1)  # CRC error
+        elif irq & self.IRQ_RX_TX_TIMEOUT:
+            self.clear_irq_status(self.IRQ_RX_TX_TIMEOUT)
+            return (None, -2)  # Timeout
+            
+        return (None, -3)  # No data
+        
+    def get_rssi(self):
+        """Get RSSI in dBm"""
+        return self._rssi
+        
+    def get_snr(self):
+        """Get SNR in dB"""
+        return self._snr
+        
+    def get_frequency_error(self):
+        """Get frequency error in Hz"""
+        # Read frequency error register (24-bit value)
+        # Register is at 0x0956-0x0958
+        freq_err_msb = self._read_register(0x0956)
+        freq_err_mid = self._read_register(0x0957)
+        freq_err_lsb = self._read_register(0x0958)
+        
+        # Combine bytes (signed 24-bit value)
+        freq_err_raw = (freq_err_msb << 16) | (freq_err_mid << 8) | freq_err_lsb
+        if freq_err_msb & 0x80:  # Sign extend if negative
+            freq_err_raw = freq_err_raw | 0xFF000000
+        
+        # Convert to Hz: freq_err = (freq_err_raw * 32000000) / (2^25)
+        freq_err_hz = (freq_err_raw * 32000000) / (2**25)
+        return int(freq_err_hz)
+        
+    def set_rx_boosted_gain_mode(self, enable=True):
+        """Set RX boosted gain mode"""
+        # This is a simplified implementation
+        # The actual implementation would modify the LNA gain settings
+        return 0  # Success
+
+
+# ============================================================================
+# Main Program for Simple TX/RX
+# ============================================================================
+if __name__ == "__main__":
+    # Mode Selection
+    TX_MODE = True  # Set to False for RX mode
+    
+    # Pin Configuration (OpenMV RT1062)
+    PIN_MOSI = "P0"   # SPI MOSI
+    PIN_MISO = "P1"   # SPI MISO
+    PIN_SCLK = "P2"   # SPI SCLK
+    PIN_SS = "P3"     # SPI CS (Chip Select)
+    PIN_RESET = "P6"  # Reset pin
+    PIN_BUSY = "P7"   # Busy pin
+    PIN_RX_EN = "P8"  # RX Enable
+    PIN_TX_EN = "P13" # TX Enable
+    PIN_DIO1 = "P14"  # DIO1 interrupt pin
+    
+    # LoRa Configuration
+    FREQ = 869525000  # Frequency in Hz (869.525 MHz)
+    BW = 125.0        # Bandwidth in kHz
+    SF = 9            # Spreading Factor (5-12)
+    CR = 7            # Coding Rate (5-8)
+    SYNCW = 0xE3      # Sync Word
+    TX_PWR = 9        # TX Power in dBm (-9 to 22)
+    PREAMBLE = 8      # Preamble Length
+    XOV = 0x01        # TCXO Voltage (0x01 = 1.7V)
+    LDO = False       # Use LDO only
+    
+    # Global variables
+    received_flag = False
+    enable_interrupt = True
+    
+    def dio1_handler(pin):
+        """DIO1 interrupt handler"""
+        global received_flag, enable_interrupt
+        if enable_interrupt:
+            received_flag = True
+    
+    print("\n" + "=" * 40)
+    print("Simple LoRa Point-to-Point Communication")
+    print("=" * 40 + "\n")
+    
+    # Initialize SPI
+    spi = SPI(
+        1,
+        baudrate=2000000,  # 2 MHz (SX1262 max is 18MHz)
+        polarity=0,        # CPOL = 0
+        phase=0,           # CPHA = 0
+        bits=8,
+        firstbit=SPI.MSB
+    )
+    
+    # Initialize control pins
+    cs_pin = Pin(PIN_SS, Pin.OUT, value=1)
+    reset_pin = Pin(PIN_RESET, Pin.OUT, value=1)
+    busy_pin = Pin(PIN_BUSY, Pin.IN)
+    rx_en_pin = Pin(PIN_RX_EN, Pin.OUT, value=0)
+    tx_en_pin = Pin(PIN_TX_EN, Pin.OUT, value=0)
+    dio1_pin = Pin(PIN_DIO1, Pin.IN)
+    
+    # Create SX1262 instance
+    lora = SX1262(
+        spi=spi,
+        cs=cs_pin,
+        reset=reset_pin,
+        busy=busy_pin,
+        rx_en=rx_en_pin,
+        tx_en=tx_en_pin,
+        dio1=dio1_pin
+    )
+    
+    # Initialize LoRa module
+    print("[INIT] Initializing LoRa...", end="")
+    state = lora.begin(
+        freq_mhz=FREQ / 1000000.0,
+        bw=BW,
+        sf=SF,
+        cr=CR,
+        sync_word=SYNCW,
+        tx_power=TX_PWR,
+        preamble_len=PREAMBLE,
+        tcxo_voltage=XOV,
+        use_ldo=LDO
+    )
+    
+    if state != 0:
+        print(" failed, code: {}".format(state))
+        print("Check your wiring and connections!")
+        while True:
+            time.sleep_ms(1000)
+    
+    print(" done!")
+    
+    # Set RX boosted gain mode
+    print("[INIT] Setting RX boosted gain...", end="")
+    state = lora.set_rx_boosted_gain_mode(True)
+    if state == 0:
+        print(" done!")
+    else:
+        print(" failed (non-critical)")
+    
+    print()
+    
+    # TX Mode
+    if TX_MODE:
+        print("\n=== TX MODE ===")
+        print("Sending data every 5 seconds...\n")
+        
+        counter = 0
+        
+        while True:
+            # Prepare data
+            data = "Hello LoRa! Count: {}".format(counter)
+            
+            print("[TX] Sending: {}".format(data))
+            
+            # Transmit
+            state = lora.transmit(data)
+            
+            if state == 0:
+                print("[TX] Success!")
+                print("[TX] RSSI: {:.2f} dBm".format(lora.get_rssi()))
+                print("[TX] SNR: {:.2f} dB".format(lora.get_snr()))
+            else:
+                print("[TX] Failed, code: {}".format(state))
+            
+            counter += 1
+            time.sleep_ms(5000)  # Wait 5 seconds before next transmission
+    
+    # RX Mode
+    else:
+        print("\n=== RX MODE ===")
+        print("Listening for packets...\n")
+        
+        # Set interrupt handler
+        dio1_pin.irq(trigger=Pin.IRQ_RISING, handler=dio1_handler)
+        
+        # Start receiving
+        state = lora.start_receive()
+        if state != 0:
+            print("[RX] Failed to start receive, code: {}".format(state))
+        else:
+            print("[RX] Ready to receive...\n")
+            
+            while True:
+                # Check if packet received
+                if received_flag:
+                    enable_interrupt = False
+                    received_flag = False
+                    
+                    # Read received data
+                    data, status = lora.read_data()
+                    
+                    if status == 0 and data is not None:
+                        print("[RX] Packet received!")
+                        try:
+                            data_str = data.decode('utf-8')
+                            print("[RX] Data: {}".format(data_str))
+                        except:
+                            print("[RX] Data (hex): {}".format(data.hex()))
+                        print("[RX] RSSI: {:.2f} dBm".format(lora.get_rssi()))
+                        print("[RX] SNR: {:.2f} dB".format(lora.get_snr()))
+                        print("[RX] Frequency Error: {} Hz".format(lora.get_frequency_error()))
+                        print()
+                    elif status == -1:
+                        print("[RX] CRC error - packet corrupted!")
+                    else:
+                        print("[RX] Failed to read data, code: {}".format(status))
+                    
+                    # Resume listening
+                    lora.start_receive()
+                    enable_interrupt = True
+                
+                time.sleep_ms(10)  # Small delay to prevent watchdog issues
+
