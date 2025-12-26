@@ -354,24 +354,17 @@ class SX1262:
         Returns 16-bit IRQ status register
         RadioLib: SPIreadStream(CMD_GET_IRQ_STATUS, data, 2)
         """
-        # Use _spi_transfer directly for read commands
-        self.wait_for_not_busy()
-        self.cs.value(0)
-        time.sleep_us(1)
-        
-        # Send command, read status byte
-        status_buf = bytearray(1)
-        self.spi.write_readinto(bytearray([self.CMD_GET_IRQ_STATUS]), status_buf)
-        
-        # Read 2 data bytes (IRQ status is 16-bit)
-        dummy = bytearray([0x00, 0x00])
-        data_buf = bytearray(2)
-        self.spi.write_readinto(dummy, data_buf)
-        self.cs.value(1)
-        
-        # Combine bytes: MSB first
-        irq_status = (data_buf[0] << 8) | data_buf[1]
-        return irq_status
+        # Use _read_command which properly handles SPI read protocol
+        response = self._read_command(self.CMD_GET_IRQ_STATUS, 2)
+        if len(response) >= 2:
+            # Combine bytes: MSB first (matches RadioLib line 947)
+            irq_status = (response[0] << 8) | response[1]
+            # Debug: log if we get suspicious values
+            if irq_status == 0xFFFF:
+                print("[DEBUG] IRQ read as 0xFFFF - raw bytes: [0x{:02X}, 0x{:02X}]".format(
+                    response[0], response[1]))
+            return irq_status
+        return 0
         
     def clear_irq_status(self, irq_mask=0xFFFF):
         """Clear IRQ status"""
@@ -484,7 +477,7 @@ class SX1262:
         # Set packet parameters (variable length, CRC on)
         # For variable length: payload_len is max length (0xFF = 255 bytes)
         self.set_packet_params(preamble_len, 0x00, 0xFF, 0x01, 0x00)
-        # Store preamble length for transmit()
+        # Store preamble length for transmit() - CRITICAL!
         self._preamble_len = preamble_len
         
         # Set sync word
@@ -529,12 +522,17 @@ class SX1262:
         # Set packet parameters FIRST - CRITICAL: RadioLib uses ACTUAL length, not 0xFF!
         # Variable length is indicated by header_type=0x00, not by using 0xFF
         # RadioLib line 1043: setPacketParams(..., cfg->transmit.len, ...)
-        self.set_packet_params(PREAMBLE, 0x00, len(data), 0x01, 0x00)  # variable length, CRC on, ACTUAL length
+        # Use stored preamble length from begin() - PREAMBLE constant is not accessible here!
+        preamble_len = getattr(self, '_preamble_len', 8)  # Default to 8 if not set
+        print("[TX] Setting packet params: preamble={}, header=0x00 (var), payload_len={}, CRC=0x01 (on)".format(
+            preamble_len, len(data)))
+        self.set_packet_params(preamble_len, 0x00, len(data), 0x01, 0x00)  # variable length, CRC on, ACTUAL length
         
         # Set DIO IRQ parameters (TX_DONE and TIMEOUT on DIO1)
         # RadioLib line 1065: setDioIrqParams(IRQ_TX_DONE | IRQ_TIMEOUT, IRQ_TX_DONE)
         irq_mask = self.IRQ_TX_DONE | self.IRQ_TIMEOUT
         dio1_mask = self.IRQ_TX_DONE
+        print("[TX] Setting DIO IRQ params: irq_mask=0x{:04X}, dio1_mask=0x{:04X}".format(irq_mask, dio1_mask))
         self.set_dio_irq_params(irq_mask, dio1_mask, 0x00, 0x00)
         
         # Set buffer base address (CRITICAL - RadioLib line 1072 calls this before writeBuffer!)
@@ -542,6 +540,7 @@ class SX1262:
         
         # Write data to buffer (offset 0) - NO length byte prepended!
         # For variable length LoRa packets, RadioLib writes data directly WITHOUT prepending length!
+        print("[TX] Writing {} bytes to buffer".format(len(data)))
         self._write_buffer(0, data)
         
         # Clear IRQ status
