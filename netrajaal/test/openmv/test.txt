@@ -14,9 +14,8 @@ Press Ctrl+C to stop
 [RESET] Module reset successful
 [INIT] Initializing module (may need several attempts after reset)...
 [WARNING] BUSY did not go HIGH - command may not have started
-[INIT] Module initialized successfully after 1 attempt(s) (5001ms)
+[INIT] Module initialized successfully after 1 attempt(s) (5002ms)
 [RX] Configuring LoRa...
-[WARNING] BUSY did not go HIGH - command may not have started
 [WARNING] BUSY did not go HIGH - command may not have started
 [RX] Module ready for reception
 
@@ -25,6 +24,12 @@ Press Ctrl+C to stop
 [WARNING] BUSY did not go HIGH - command may not have started
 [WARNING] BUSY did not go HIGH - command may not have started
 [RX] Waiting for RX_DONE interrupt (max 30 seconds)...
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
 [RX] [INFO] RX_DONE interrupt timeout (no packet received)
 [WARNING] BUSY did not go HIGH - command may not have started
 [INTERRUPT] DIO1 interrupt disabled
@@ -33,14 +38,10 @@ Press Ctrl+C to stop
 [WARNING] BUSY did not go HIGH - command may not have started
 [WARNING] BUSY did not go HIGH - command may not have started
 [RX] Waiting for RX_DONE interrupt (max 30 seconds)...
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
+[WARNING] BUSY did not go HIGH - command may not have started
 [RX] [INFO] RX_DONE interrupt timeout (no packet received)
-[WARNING] BUSY did not go HIGH - command may not have started
-[INTERRUPT] DIO1 interrupt disabled
-[RX] Overall timeout reached (60 seconds)
-[INTERRUPT] DIO1 interrupt disabled
-[WARNING] BUSY did not go HIGH - command may not have started
-[RX] Cleanup complete (total packets received: 0)
-
-======================================================================
-Testing complete
-======================================================================
