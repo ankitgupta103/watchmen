@@ -2589,6 +2589,11 @@ def clear_irq_status(clear_mask=IRQ_ALL):
 def set_tx(timeout=TX_TIMEOUT_NONE):
     """
     Set module to TX mode.
+    
+    Note: SET_TX is a mode transition command. Like SET_RX, it should use
+    wait_for_busy=False because BUSY pin behavior differs for mode transitions.
+    The module enters TX mode asynchronously and starts transmitting.
+    
     Args:
         timeout: TX timeout in ticks (default: TX_TIMEOUT_NONE for single packet)
     Returns:
@@ -2599,7 +2604,8 @@ def set_tx(timeout=TX_TIMEOUT_NONE):
         (timeout >> 8) & 0xFF,
         timeout & 0xFF
     ]
-    result = spi_transfer(CMD_SET_TX, data_out=data)
+    # Use wait_for_busy=False for SET_TX (mode transition command, like SET_RX)
+    result = spi_transfer(CMD_SET_TX, data_out=data, wait_for_busy=False)
     if result is None:
         return None
     status, _ = result
@@ -2696,12 +2702,16 @@ def start_transmit(data, payload_len=None):
     # 5. Set RF switch to TX mode
     set_tx_mode()
 
-    # 6. Set module to TX mode
+    # 6. Set module to TX mode (asynchronous command - module enters TX mode and starts transmitting)
     status = set_tx(TX_TIMEOUT_NONE)
     if status is None or status == STATUS_SPI_FAILED:
         print("[ERROR] Failed to set TX mode")
         set_idle_mode()  # Restore RF switch
         return False
+
+    # Small delay to allow module to enter TX mode and start transmitting
+    # This gives the module a moment before we start polling IRQ status
+    time.sleep_ms(1)
 
     return True
 
@@ -3086,12 +3096,16 @@ def start_receive(timeout=RX_TIMEOUT_INF):
     # 3. Set RF switch to RX mode
     set_rx_mode()
 
-    # 4. Set module to RX mode
+    # 4. Set module to RX mode (asynchronous command - module enters RX mode and starts listening)
     status = set_rx(timeout)
     if status is None or status == STATUS_SPI_FAILED:
         print("[ERROR] Failed to set RX mode")
         set_idle_mode()  # Restore RF switch
         return False
+
+    # Small delay to allow module to enter RX mode and start listening
+    # This gives the module a moment before we start polling IRQ status
+    time.sleep_ms(1)
 
     return True
 
