@@ -92,8 +92,13 @@ else:
 # Receive data
 received_data = bytearray()
 packet_count = 0
+crc_error_count = 0
 first_packet_time = None
 last_packet_time = None
+
+# Error code constants
+ERR_CRC_MISMATCH = -7
+ERR_RX_TIMEOUT = -6
 
 print("Starting reception...")
 print("=" * 60)
@@ -112,7 +117,8 @@ while len(received_data) < EXPECTED_DATA_SIZE:
     # Receive a packet
     msg, status = sx.recv(timeout_en=True, timeout_ms=10000)  # 10 second timeout per packet
     
-    if status == 0 and len(msg) > 0:
+    # Accept packets with status 0 (OK) or -7 (CRC_MISMATCH but data still provided)
+    if (status == 0 or status == ERR_CRC_MISMATCH) and len(msg) > 0:
         # Record timing for first and last packet
         current_time = ticks_ms()
         if first_packet_time is None:
@@ -122,16 +128,21 @@ while len(received_data) < EXPECTED_DATA_SIZE:
         received_data.extend(msg)
         packet_count += 1
         
+        # Track CRC errors
+        if status == ERR_CRC_MISMATCH:
+            crc_error_count += 1
+        
         rssi = sx.getRSSI()
         snr = sx.getSNR()
-        print(f"Packet {packet_count}: Received {len(msg)} bytes "
+        status_str = "CRC_ERROR" if status == ERR_CRC_MISMATCH else "OK"
+        print(f"Packet {packet_count}: Received {len(msg)} bytes [{status_str}] "
               f"(Total: {len(received_data)}/{EXPECTED_DATA_SIZE} bytes) "
               f"RSSI: {rssi:.1f} dBm, SNR: {snr:.1f} dB")
         
         # If we received the expected amount, we're done
         if len(received_data) >= EXPECTED_DATA_SIZE:
             break
-    elif status == -6:  # RX_TIMEOUT
+    elif status == ERR_RX_TIMEOUT:  # RX_TIMEOUT
         # No packet received, continue waiting
         continue
     else:
@@ -165,6 +176,10 @@ print("=" * 60)
 print(f"Total data received: {total_received} bytes ({total_received / 1024:.2f} KB)")
 print(f"Expected data size: {EXPECTED_DATA_SIZE} bytes ({EXPECTED_DATA_SIZE / 1024:.2f} KB)")
 print(f"Number of packets: {packet_count}")
+print(f"Packets with CRC errors: {crc_error_count}")
+print(f"Packets OK: {packet_count - crc_error_count}")
+if packet_count > 0:
+    print(f"CRC error rate: {crc_error_count / packet_count * 100:.1f}%")
 print(f"Data completeness: {total_received / EXPECTED_DATA_SIZE * 100:.1f}%")
 print()
 print(f"First packet received at: {first_packet_time} ms")
