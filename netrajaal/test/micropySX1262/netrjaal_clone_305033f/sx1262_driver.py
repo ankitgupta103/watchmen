@@ -4,6 +4,8 @@ from sx126x import SX126X
 _SX126X_PA_CONFIG_SX1262 = const(0x00)
 
 class SX1262(SX126X):
+    """Simplified SX1262 driver for high-speed LoRa communication"""
+    
     TX_DONE = SX126X_IRQ_TX_DONE
     RX_DONE = SX126X_IRQ_RX_DONE
     ADDR_FILT_OFF = SX126X_GFSK_ADDRESS_FILT_OFF
@@ -24,6 +26,7 @@ class SX1262(SX126X):
               power=14, currentLimit=60.0, preambleLength=8, implicit=False, implicitLen=0xFF,
               crcOn=True, txIq=False, rxIq=False, tcxoVoltage=1.6, useRegulatorLDO=False,
               blocking=True):
+        """Initialize LoRa mode"""
         state = super().begin(bw, sf, cr, syncWord, currentLimit, preambleLength, tcxoVoltage, useRegulatorLDO, txIq, rxIq)
         ASSERT(state)
 
@@ -46,7 +49,6 @@ class SX1262(SX126X):
         ASSERT(state)
 
         state = self.setBlockingCallback(blocking)
-
         return state
 
     def beginFSK(self, freq=434.0, br=48.0, freqDev=50.0, rxBw=156.2, power=14, currentLimit=60.0,
@@ -54,14 +56,12 @@ class SX1262(SX126X):
                  addrFilter=SX126X_GFSK_ADDRESS_FILT_OFF, addr=0x00, crcLength=2, crcInitial=0x1D0F, crcPolynomial=0x1021,
                  crcInverted=True, whiteningOn=True, whiteningInitial=0x0100,
                  fixedPacketLength=False, packetLength=0xFF, preambleDetectorLength=SX126X_GFSK_PREAMBLE_DETECT_16,
-                 tcxoVoltage=1.6, useRegulatorLDO=False,
-                 blocking=True):
+                 tcxoVoltage=1.6, useRegulatorLDO=False, blocking=True):
+        """Initialize FSK mode (not used for LoRa)"""
         state = super().beginFSK(br, freqDev, rxBw, currentLimit, preambleLength, dataShaping, preambleDetectorLength, tcxoVoltage, useRegulatorLDO)
         ASSERT(state)
-
         state = super().setSyncBits(syncWord, syncBitsLength)
         ASSERT(state)
-
         if addrFilter == SX126X_GFSK_ADDRESS_FILT_OFF:
             state = super().disableAddressFiltering()
         elif addrFilter == SX126X_GFSK_ADDRESS_FILT_NODE:
@@ -71,38 +71,29 @@ class SX1262(SX126X):
         else:
             state = ERR_UNKNOWN
         ASSERT(state)
-
         state = super().setCRC(crcLength, crcInitial, crcPolynomial, crcInverted)
         ASSERT(state)
-
         state = super().setWhitening(whiteningOn, whiteningInitial)
         ASSERT(state)
-
         if fixedPacketLength:
             state = super().fixedPacketLengthMode(packetLength)
         else:
             state = super().variablePacketLengthMode(packetLength)
         ASSERT(state)
-
         state = self.setFrequency(freq)
         ASSERT(state)
-
         state = self.setOutputPower(power)
         ASSERT(state)
-
         state = super().fixPaClamping()
         ASSERT(state)
-
         state = self.setBlockingCallback(blocking)
-
         return state
 
     def setFrequency(self, freq, calibrate=True):
+        """Set frequency with automatic calibration"""
         if freq < 150.0 or freq > 960.0:
             return ERR_INVALID_FREQUENCY
-
         state = ERR_NONE
-
         if calibrate:
             data = bytearray(2)
             if freq > 900.0:
@@ -122,42 +113,27 @@ class SX1262(SX126X):
                 data[1] = SX126X_CAL_IMG_430_MHZ_2
             state = super().calibrateImage(data)
             ASSERT(state)
-
         return super().setFrequencyRaw(freq)
 
     def setOutputPower(self, power):
+        """Set output power"""
         if not ((power >= -9) and (power <= 22)):
             return ERR_INVALID_OUTPUT_POWER
-
         ocp = bytearray(1)
         ocp_mv = memoryview(ocp)
         state = super().readRegister(SX126X_REG_OCP_CONFIGURATION, ocp_mv, 1)
         ASSERT(state)
-
         state = super().setPaConfig(0x04, _SX126X_PA_CONFIG_SX1262)
         ASSERT(state)
-
         state = super().setTxParams(power)
         ASSERT(state)
-
         return super().writeRegister(SX126X_REG_OCP_CONFIGURATION, ocp, 1)
 
-    def setTxIq(self, txIq):
-        self._txIq = txIq
-
-    def setRxIq(self, rxIq):
-        self._rxIq = rxIq
-        if not self.blocking:
-            ASSERT(super().startReceive())
-
-    def setPreambleDetectorLength(self, preambleDetectorLength):
-        self._preambleDetectorLength = preambleDetectorLength
-        if not self.blocking:
-            ASSERT(super().startReceive())
-
     def setBlockingCallback(self, blocking, callback=None):
+        """Set blocking/non-blocking mode"""
         self.blocking = blocking
         if not self.blocking:
+            # Non-blocking: start receive mode immediately
             state = super().startReceive()
             ASSERT(state)
             if callback != None:
@@ -168,6 +144,7 @@ class SX1262(SX126X):
                 super().clearDio1Action()
             return state
         else:
+            # Blocking: put in standby
             state = super().standby()
             ASSERT(state)
             self._callbackFunction = self._dummyFunction
@@ -175,113 +152,92 @@ class SX1262(SX126X):
             return state
 
     def recv(self, len=0, timeout_en=False, timeout_ms=0):
+        """Receive data - routes to blocking or non-blocking handler"""
         if not self.blocking:
             return self._readData(len)
         else:
             return self._receive(len, timeout_en, timeout_ms)
 
     def send(self, data):
+        """Send data - routes to blocking or non-blocking handler"""
         if not self.blocking:
             return self._startTransmit(data)
         else:
             return self._transmit(data)
 
-    def _events(self):
-        return super().getIrqStatus()
-
     def _receive(self, len_=0, timeout_en=False, timeout_ms=0):
-        state = ERR_NONE
-        
-        length = len_
-        
-        if len_ == 0:
-            length = SX126X_MAX_PACKET_LENGTH
-
+        """Blocking receive"""
+        length = len_ if len_ > 0 else SX126X_MAX_PACKET_LENGTH
         data = bytearray(length)
         data_mv = memoryview(data)
-
         try:
             state = super().receive(data_mv, length, timeout_en, timeout_ms)
         except AssertionError as e:
             state = list(ERROR.keys())[list(ERROR.values()).index(str(e))]
-
         if state == ERR_NONE or state == ERR_CRC_MISMATCH:
             if len_ == 0:
                 length = super().getPacketLength(False)
                 data = data[:length]
-
-        else:
-            return b'', state
-
-        return  bytes(data), state
+            return bytes(data), state
+        return b'', state
 
     def _transmit(self, data):
-        if isinstance(data, bytes) or isinstance(data, bytearray):
-            pass
-        else:
+        """Blocking transmit"""
+        if not isinstance(data, (bytes, bytearray)):
             return 0, ERR_INVALID_PACKET_TYPE
-
         state = super().transmit(data, len(data))
         return len(data), state
 
     def _readData(self, len_=0):
-        state = ERR_NONE
-
+        """Non-blocking receive - simplified version"""
+        # Get packet length first
         try:
             length = super().getPacketLength()
-            if length == 0 or length > SX126X_MAX_PACKET_LENGTH:
-                # No valid packet or invalid length, restart receive
+            if length == 0:
+                # No packet available
+                return b'', ERR_RX_TIMEOUT
+            if length > SX126X_MAX_PACKET_LENGTH:
+                # Invalid length - restart receive
                 super().startReceive()
                 return b'', ERR_RX_TIMEOUT
-        except Exception as e:
-            # getPacketLength failed, restart receive
-            try:
-                super().startReceive()
-            except:
-                pass
+        except:
+            # Error getting length - restart receive
+            super().startReceive()
             return b'', ERR_RX_TIMEOUT
 
-        if len_ < length and len_ != 0:
+        # Adjust length if needed
+        if len_ > 0 and len_ < length:
             length = len_
 
+        # Read the packet
         data = bytearray(length)
         data_mv = memoryview(data)
-
         try:
             state = super().readData(data_mv, length)
         except AssertionError as e:
             state = list(ERROR.keys())[list(ERROR.values()).index(str(e))]
 
-        # Always restart receive mode after reading (critical for continuous listening)
-        # This ensures we're ready for the next packet immediately
-        try:
-            super().startReceive()
-        except Exception as e:
-            # Log but don't fail - receive mode restart is best effort
-            pass
+        # Always restart receive mode after reading
+        super().startReceive()
 
         if state == ERR_NONE or state == ERR_CRC_MISMATCH:
             return bytes(data), state
-
-        else:
-            return b'', state
+        return b'', state
 
     def _startTransmit(self, data):
-        if isinstance(data, bytes) or isinstance(data, bytearray):
-            pass
-        else:
+        """Non-blocking transmit"""
+        if not isinstance(data, (bytes, bytearray)):
             return 0, ERR_INVALID_PACKET_TYPE
-
         state = super().startTransmit(data, len(data))
-        # For non-blocking mode, we don't wait for TX_DONE here
-        # The caller should check IRQ status if needed
         return len(data), state
 
     def _dummyFunction(self, *args):
+        """Dummy callback function"""
         pass
 
     def _onIRQ(self, callback):
-        events = self._events()
+        """IRQ callback handler"""
+        events = super().getIrqStatus()
         if events & SX126X_IRQ_TX_DONE:
             super().startReceive()
         self._callbackFunction(events)
