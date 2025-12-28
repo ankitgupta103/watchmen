@@ -1,256 +1,70 @@
-"""
-RX Test: Receive 10KB of data and calculate time
-OpenMV RT1062 + Waveshare Core1262-868M
-
-This script receives 10KB (10,240 bytes) of data and calculates the time taken.
-It must be configured with the same parameters as the TX script:
-- Spreading Factor: 5 (lowest for highest data rate)
-- Bandwidth: 500 kHz (highest available)
-- Coding Rate: 5 (4/5, lowest for highest data rate)
-- Preamble Length: 8 (minimum)
-"""
-
 import time
-try:
-    from utime import ticks_ms, ticks_diff, sleep_ms
-except ImportError:
-    # Fallback for systems where time module provides these functions
-    ticks_ms = time.ticks_ms
-    ticks_diff = time.ticks_diff
-    sleep_ms = time.sleep_ms if hasattr(time, 'sleep_ms') else lambda ms: time.sleep(ms / 1000.0)
-
 from sx1262 import SX1262
 
-# Pin definitions for OpenMV RT1062
 SPI_BUS = 1
-P0_MOSI = 'P0'  # MOSI
-P1_MISO = 'P1'  # MISO
-P2_SCLK = 'P2'  # SCLK
-P3_CS = 'P3'    # Chip Select
-P6_RST = 'P6'   # Reset
-P7_BUSY = 'P7'  # Busy
-P13_DIO1 = 'P13'  # DIO1 (IRQ)
+P0_MOSI = 'P0'
+P1_MISO = 'P1'
+P2_SCLK = 'P2'
+P3_CS = 'P3'
+P6_RST = 'P6'
+P7_BUSY = 'P7'
+P13_DIO1 = 'P13'
 
-# SPI Configuration
-SPI_BAUDRATE = 2000000
-SPI_POLARITY = 0
-SPI_PHASE = 0
+EXPECTED_SIZE = 10 * 1024
+MAX_PAYLOAD = 254
 
-# Expected data size: 10KB = 10,240 bytes
-EXPECTED_DATA_SIZE = 10 * 1024  # 10,240 bytes
-MAX_PACKET_SIZE = 255  # Maximum LoRa packet size
-SEQ_NUM_SIZE = 1  # Sequence number size in bytes
-ACK_SIZE = 1  # ACK packet size (just sequence number)
-MAX_PAYLOAD_SIZE = MAX_PACKET_SIZE - SEQ_NUM_SIZE  # Max data per packet
-
-# Initialize SX1262
 print("Initializing SX1262...")
 sx = SX1262(
-    spi_bus=SPI_BUS,
-    clk=P2_SCLK,
-    mosi=P0_MOSI,
-    miso=P1_MISO,
-    cs=P3_CS,
-    irq=P13_DIO1,
-    rst=P6_RST,
-    gpio=P7_BUSY,
-    spi_baudrate=SPI_BAUDRATE,
-    spi_polarity=SPI_POLARITY,
-    spi_phase=SPI_PHASE
+    spi_bus=SPI_BUS, clk=P2_SCLK, mosi=P0_MOSI, miso=P1_MISO, cs=P3_CS,
+    irq=P13_DIO1, rst=P6_RST, gpio=P7_BUSY, spi_baudrate=2000000
 )
 
-# Configure LoRa for HIGHEST DATA RATE (must match TX configuration)
-# SF5, BW500kHz, CR5 (4/5), Preamble 8
-print("Configuring LoRa for highest data rate...")
-print("  - Spreading Factor: 5")
-print("  - Bandwidth: 500 kHz")
-print("  - Coding Rate: 5 (4/5)")
-print("  - Preamble Length: 8")
-print("  - Frequency: 868.0 MHz")
-print("  - CRC: Enabled")
-print()
+print("Configuring LoRa...")
+sx.begin(freq=868.0, bw=500.0, sf=5, cr=5, power=14, preambleLength=8, crcOn=True, blocking=True)
+print("SX1262 ready! Waiting for data...\n")
 
-status = sx.begin(
-    freq=868.0,
-    bw=500.0,          # 500 kHz - highest bandwidth for max data rate
-    sf=5,              # SF5 - lowest spreading factor for max data rate
-    cr=5,              # CR5 (4/5) - lowest coding rate for max data rate
-    syncWord=0x12,
-    power=14,
-    currentLimit=60.0,
-    preambleLength=8,  # Minimum preamble length
-    implicit=False,
-    crcOn=True,        # Keep CRC enabled for reliability
-    tcxoVoltage=1.6,
-    useRegulatorLDO=False,
-    blocking=True
-)
-
-if status != 0:
-    print(f"Error initializing SX1262: {status}")
-else:
-    print("SX1262 initialized successfully!")
-    print("Waiting for data transmission to start...")
-    print()
-
-# Receive data with ACK protocol
 received_data = bytearray()
 packet_count = 0
-crc_error_count = 0
-expected_seq = 0  # Expected sequence number
-first_packet_time = None
-last_packet_time = None
-acks_sent = 0
+expected_seq = 0
+first_time = None
+last_time = None
 
-# Error code constants
-ERR_CRC_MISMATCH = -7
-ERR_RX_TIMEOUT = -6
-
-print("Starting reception with ACK protocol...")
-print("=" * 60)
-
-# Receive packets until we have 10KB or timeout
-timeout_ms = 300000  # 5 minute timeout (longer due to ACK protocol)
-receive_start_time = ticks_ms()
-
-while len(received_data) < EXPECTED_DATA_SIZE:
-    # Check for timeout
-    elapsed = ticks_diff(ticks_ms(), receive_start_time)
-    if elapsed > timeout_ms:
-        print(f"\nTimeout waiting for data (waited {elapsed} ms)")
-        break
+while len(received_data) < EXPECTED_SIZE:
+    msg, status = sx.recv(timeout_en=True, timeout_ms=30000)
     
-    # Receive a packet
-    msg, status = sx.recv(timeout_en=True, timeout_ms=30000)  # 30 second timeout per packet
-    
-    # Accept packets with status 0 (OK) or -7 (CRC_MISMATCH but data still provided)
-    if (status == 0 or status == ERR_CRC_MISMATCH) and len(msg) >= SEQ_NUM_SIZE:
-        # Extract sequence number and data
+    if (status == 0 or status == -7) and len(msg) >= 1:
         packet_seq = msg[0]
-        packet_data = msg[SEQ_NUM_SIZE:]
+        packet_data = msg[1:]
         
-        # Check if this is the expected packet (handle out-of-order or duplicates)
         if packet_seq == expected_seq:
-            # Record timing for first and last packet
-            current_time = ticks_ms()
-            if first_packet_time is None:
-                first_packet_time = current_time
+            current_time = time.ticks_ms()
+            if first_time is None:
+                first_time = current_time
+            last_time = current_time
             
-            last_packet_time = current_time
             received_data.extend(packet_data)
             packet_count += 1
-            expected_seq = (expected_seq + 1) & 0xFF  # Increment expected sequence
+            expected_seq = (expected_seq + 1) & 0xFF
             
-            # Track CRC errors
-            if status == ERR_CRC_MISMATCH:
-                crc_error_count += 1
+            print(f"Packet {packet_count} (seq {packet_seq}): {len(packet_data)} bytes (Total: {len(received_data)}/{EXPECTED_SIZE})")
             
-            rssi = sx.getRSSI()
-            snr = sx.getSNR()
-            status_str = "CRC_ERROR" if status == ERR_CRC_MISMATCH else "OK"
-            print(f"Packet {packet_count} (seq {packet_seq}): Received {len(packet_data)} bytes [{status_str}] "
-                  f"(Total: {len(received_data)}/{EXPECTED_DATA_SIZE} bytes) "
-                  f"RSSI: {rssi:.1f} dBm, SNR: {snr:.1f} dB")
+            time.sleep_ms(50)
+            sx.send(bytes([packet_seq]))
             
-            # Small delay to ensure TX module has switched to RX mode
-            sleep_ms(50)
-            
-            # Send ACK
-            ack_packet = bytes([packet_seq])
-            ack_len, ack_status = sx.send(ack_packet)
-            if ack_status == 0:
-                acks_sent += 1
-                print(f"  -> ACK sent for seq {packet_seq}")
-            else:
-                print(f"  -> ACK send failed: {ack_status}")
-            
-            # If we received the expected amount, we're done
-            if len(received_data) >= EXPECTED_DATA_SIZE:
+            if len(received_data) >= EXPECTED_SIZE:
                 break
-        elif packet_seq < expected_seq:
-            # Old/duplicate packet, send ACK anyway but don't process data
-            print(f"Received duplicate/old packet (seq {packet_seq}, expected {expected_seq}), sending ACK...")
-            ack_packet = bytes([packet_seq])
-            sx.send(ack_packet)
-            acks_sent += 1
-        else:
-            # Out-of-order packet (future sequence), send ACK but don't process yet
-            # Note: This simple implementation doesn't buffer out-of-order packets
-            print(f"Received out-of-order packet (seq {packet_seq}, expected {expected_seq}), sending ACK...")
-            ack_packet = bytes([packet_seq])
-            sx.send(ack_packet)
-            acks_sent += 1
-    elif status == ERR_RX_TIMEOUT:  # RX_TIMEOUT
-        # No packet received, continue waiting
-        continue
-    else:
-        print(f"Error receiving packet: {status}")
-        if len(received_data) == 0:
-            # If we haven't received anything yet, continue waiting
-            continue
-        else:
-            # If we received some data but got an error, continue waiting (don't break)
-            continue
 
-receive_end_time = ticks_ms()
-
-print("=" * 60)
-print()
-
-# Calculate statistics
 total_received = len(received_data)
-if first_packet_time is not None and last_packet_time is not None:
-    reception_duration_ms = ticks_diff(last_packet_time, first_packet_time)
-    reception_duration_s = reception_duration_ms / 1000.0
+if first_time and last_time:
+    duration_ms = time.ticks_diff(last_time, first_time)
+    duration_s = duration_ms / 1000.0
 else:
-    reception_duration_ms = 0
-    reception_duration_s = 0.0
+    duration_ms = 0
+    duration_s = 0.0
 
-total_time_ms = ticks_diff(receive_end_time, receive_start_time)
-total_time_s = total_time_ms / 1000.0
-
-print("RECEPTION COMPLETE")
-print("=" * 60)
-print(f"Total data received: {total_received} bytes ({total_received / 1024:.2f} KB)")
-print(f"Expected data size: {EXPECTED_DATA_SIZE} bytes ({EXPECTED_DATA_SIZE / 1024:.2f} KB)")
-print(f"Number of packets: {packet_count}")
-print(f"ACKs sent: {acks_sent}")
-print(f"Packets with CRC errors: {crc_error_count}")
-print(f"Packets OK: {packet_count - crc_error_count}")
-if packet_count > 0:
-    print(f"CRC error rate: {crc_error_count / packet_count * 100:.1f}%")
-print(f"Data completeness: {total_received / EXPECTED_DATA_SIZE * 100:.1f}%")
-print()
-print(f"First packet received at: {first_packet_time} ms")
-print(f"Last packet received at: {last_packet_time} ms")
-print(f"Reception duration (first to last): {reception_duration_ms} ms ({reception_duration_s:.3f} seconds)")
-print(f"Total receive time (including waits): {total_time_ms} ms ({total_time_s:.3f} seconds)")
-print()
-
-if reception_duration_s > 0:
-    print(f"Effective data rate: {total_received / reception_duration_s:.2f} bytes/sec "
-          f"({total_received * 8 / reception_duration_s / 1000:.2f} kbps)")
-    print(f"Average time per packet: {reception_duration_ms / packet_count:.2f} ms")
-    print(f"Packet rate: {packet_count / reception_duration_s:.2f} packets/sec")
-print("=" * 60)
-
-# Verify data integrity (check pattern)
-if total_received == EXPECTED_DATA_SIZE:
-    print("\nVerifying data integrity...")
-    data_correct = True
-    for i in range(min(100, total_received)):  # Check first 100 bytes as sample
-        expected_byte = i % 256
-        if received_data[i] != expected_byte:
-            print(f"Data mismatch at position {i}: expected {expected_byte}, got {received_data[i]}")
-            data_correct = False
-            break
-    
-    if data_correct:
-        print("Data verification: PASSED (sample check)")
-    else:
-        print("Data verification: FAILED")
-else:
-    print(f"\nWarning: Received {total_received} bytes, expected {EXPECTED_DATA_SIZE} bytes")
-
-print("\nReception test complete!")
-
+print("\nRECEPTION COMPLETE")
+print(f"Received: {total_received} bytes ({total_received / 1024:.2f} KB)")
+print(f"Packets: {packet_count}")
+print(f"Duration: {duration_ms} ms ({duration_s:.3f} s)")
+if duration_s > 0:
+    print(f"Rate: {total_received / duration_s:.2f} bytes/s ({total_received * 8 / duration_s / 1000:.2f} kbps)")
