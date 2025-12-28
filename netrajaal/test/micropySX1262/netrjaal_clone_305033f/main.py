@@ -44,9 +44,10 @@ led = LED("LED_BLUE")
 
 # Optimized timing for high-speed LoRa (SF5, BW500kHz, CR5)
 # LoRa SF5 packets transmit in ~2-3ms for 200 bytes, much faster than old UART driver
-MIN_SLEEP = 0.01  # Reduced from 0.1s - LoRa is much faster
-ACK_SLEEP = 0.05  # Reduced from 0.2s - faster ACK response with LoRa
-CHUNK_SLEEP = 0.02  # Reduced from 0.1s - LoRa SF5 transmits 200 bytes in ~2-3ms
+# With SF5/BW500kHz, air time is ~2-3ms per 200-byte packet, so we can be very aggressive
+MIN_SLEEP = 0.002  # 2ms - minimal delay for packet processing
+ACK_SLEEP = 0.005  # 5ms - fast ACK polling (SF5 transmits in ~2-3ms)
+CHUNK_SLEEP = 0.003  # 3ms - minimal delay between chunks for maximum throughput
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -494,7 +495,8 @@ async def init_lora():
             spi_baudrate=2000000
         )
         
-        # Configure LoRa mode (blocking=True for reliable communication like example)
+        # Configure LoRa mode (blocking=False for maximum performance with IRQ-based receive)
+        # Non-blocking mode allows faster polling and better async integration
         logger.info(f"[LORA] Configuring LoRa: SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, freq={LORA_FREQ}MHz")
         status = loranode.begin(
             freq=LORA_FREQ,
@@ -504,8 +506,17 @@ async def init_lora():
             power=LORA_POWER,
             preambleLength=LORA_PREAMBLE,
             crcOn=True,
-            blocking=True  # Use blocking mode like example for reliable communication
+            blocking=False  # Non-blocking for faster async receive loop
         )
+        
+        # Start receive mode immediately after initialization
+        if status == 0:
+            try:
+                from _sx126x import SX126X_RX_TIMEOUT_INF
+                loranode.startReceive(SX126X_RX_TIMEOUT_INF)
+                logger.info(f"[LORA] Receive mode started")
+            except Exception as e:
+                logger.warning(f"[LORA] Could not start receive mode: {e}")
         
         if status != 0:
             logger.error(f"[LORA] SX1262 initialization failed with status: {status}")
@@ -664,13 +675,26 @@ def radio_send(dest, data, msg_uid):
         + data
     )
     
-    # Send using SX1262 driver directly (blocking mode)
+    # Send using SX1262 driver (non-blocking mode for faster operation)
     try:
         bytes_sent, status = loranode.send(packet)
         if status != 0:
             logger.warning(f"[LORA] Send failed with status: {status}")
+        else:
+            # Ensure receive mode is restarted after transmission (critical for non-blocking mode)
+            try:
+                from _sx126x import SX126X_RX_TIMEOUT_INF
+                loranode.startReceive(SX126X_RX_TIMEOUT_INF)
+            except Exception as e:
+                logger.debug(f"[LORA] Could not restart receive after send: {e}")
     except Exception as e:
         logger.error(f"[LORA] Error sending message: {e}")
+        # Restart receive mode on error
+        try:
+            from _sx126x import SX126X_RX_TIMEOUT_INF
+            loranode.startReceive(SX126X_RX_TIMEOUT_INF)
+        except:
+            pass
     
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
@@ -698,12 +722,15 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-    ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
+    
+    # Optimized ACK waiting for high-speed LoRa (SF5)
+    # With SF5, packets transmit in ~2-3ms, so we can check ACKs very frequently
+    ack_msg_recheck_count = 10  # Increased checks for faster ACK detection
     for retry_i in range(retry_count):
         radio_send(dest, databytes, msg_uid)
-        await asyncio.sleep(ACK_SLEEP)
+        await asyncio.sleep(ACK_SLEEP)  # Initial short wait after send
         first_log_flag = True
-        for i in range(ack_msg_recheck_count): # ack_msk recheck
+        for i in range(ack_msg_recheck_count):
             at, missing_chunks = ack_time(msg_uid)
             if at > 0:
                 logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
@@ -711,13 +738,12 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                 return (True, missing_chunks)
             else:
                 if first_log_flag:
-                    logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
+                    logger.info(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
                     first_log_flag = False
                 else:
                     logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                await asyncio.sleep(
-                    ACK_SLEEP * min(i + 1, 3)
-                )  # progressively more sleep, capped at 3x
+                # Progressive backoff but much faster for SF5
+                await asyncio.sleep(ACK_SLEEP * (1 + i * 0.5))  # 5ms, 7.5ms, 10ms, etc.
         logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
@@ -780,17 +806,21 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 delete_transmode_lock(dest, img_id)
                 return False
             
+            # Optimized chunk transmission - minimal delays for maximum throughput
             for i in range(len(chunks)):
                 if i % 10 == 0:
-                    logger.info(f"[CHUNK] Sending chunk {i}")
+                    logger.info(f"[CHUNK] Sending chunk {i}/{len(chunks)}")
+                # Minimal delay - SF5 transmits 200 bytes in ~2-3ms
                 await asyncio.sleep(CHUNK_SLEEP)
                 chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
                 _ = await send_single_packet("I", creator, chunkbytes, dest)
+            
+            # Faster end packet ACK checking for high-speed LoRa
             for retry_i in range(20):
                 if retry_i == 0:
-                    await asyncio.sleep(0.01)  # Faster first check - optimized for LoRa SF5
+                    await asyncio.sleep(ACK_SLEEP)  # Very short initial wait
                 else:
-                    await asyncio.sleep(CHUNK_SLEEP)
+                    await asyncio.sleep(ACK_SLEEP * 2)  # Still fast for SF5
                 succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 10)
                 if not succ:
                     logger.error(f"[CHUNK] Failed sending chunk end")
@@ -1733,21 +1763,54 @@ async def radio_read():
             continue
         
         try:
-            # Use blocking receive with timeout (like example)
-            # timeout_en=True, timeout_ms=100 for non-blocking polling
-            message, status = loranode.recv(timeout_en=True, timeout_ms=100)
+            # Use non-blocking receive with IRQ checking for maximum performance
+            # Check IRQ status first to avoid unnecessary recv() calls
+            from _sx126x import (
+                SX126X_IRQ_RX_DONE, SX126X_IRQ_RX_TIMEOUT, SX126X_IRQ_CRC_ERR,
+                ERR_NONE, ERR_CRC_MISMATCH, SX126X_RX_TIMEOUT_INF
+            )
             
-            if status == 0 or status == -7:  # ERR_NONE or ERR_CRC_MISMATCH
-                if message and len(message) >= 7:
-                    # Extract message payload (skip first 6 bytes: addressing header)
-                    msg = message[6:]
-                    if len(msg) > 0:
-                        msg = msg.replace(b"{}[]", b"\n")
-                        process_message(msg, None)  # RSSI not available in blocking mode
+            irq_status = loranode.getIrqStatus()
+            
+            if irq_status & SX126X_IRQ_RX_DONE:
+                # Packet received - read it immediately
+                message, status = loranode.recv(len=0, timeout_en=False, timeout_ms=0)
+                
+                if status == ERR_NONE or status == ERR_CRC_MISMATCH:
+                    if message and len(message) >= 7:
+                        # Extract message payload (skip first 6 bytes: addressing header)
+                        msg = message[6:]
+                        if len(msg) > 0:
+                            msg = msg.replace(b"{}[]", b"\n")
+                            process_message(msg, None)
+                
+                # Clear all IRQ flags and ensure receive mode continues
+                loranode.clearIrqStatus(SX126X_IRQ_RX_DONE | SX126X_IRQ_RX_TIMEOUT | SX126X_IRQ_CRC_ERR)
+                # Ensure receive mode is active (critical for continuous listening)
+                try:
+                    loranode.startReceive(SX126X_RX_TIMEOUT_INF)
+                except:
+                    pass
+            elif irq_status & SX126X_IRQ_RX_TIMEOUT:
+                # RX timeout is normal in continuous receive mode - just restart
+                loranode.clearIrqStatus(SX126X_IRQ_RX_TIMEOUT)
+                try:
+                    loranode.startReceive(SX126X_RX_TIMEOUT_INF)
+                except:
+                    pass
+            else:
+                # No packet ready - very short sleep for efficient polling
+                await asyncio.sleep(0.001)  # 1ms sleep for high-frequency polling
+                
         except Exception as e:
             logger.debug(f"[LORA] Receive error: {e}")
-        
-        await asyncio.sleep(0.01)  # Small delay for async loop
+            # Ensure receive mode is restarted on error
+            try:
+                from _sx126x import SX126X_RX_TIMEOUT_INF
+                loranode.startReceive(SX126X_RX_TIMEOUT_INF)
+            except:
+                pass
+            await asyncio.sleep(0.001)
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers

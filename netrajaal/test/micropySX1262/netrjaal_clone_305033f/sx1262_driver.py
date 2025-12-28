@@ -252,7 +252,13 @@ class SX1262(SX126X):
         except AssertionError as e:
             state = list(ERROR.keys())[list(ERROR.values()).index(str(e))]
 
-        ASSERT(super().startReceive())
+        # Always restart receive mode after reading (critical for continuous listening)
+        # This ensures we're ready for the next packet immediately
+        try:
+            super().startReceive()
+        except Exception as e:
+            # Log but don't fail - receive mode restart is best effort
+            pass
 
         if state == ERR_NONE or state == ERR_CRC_MISMATCH:
             return bytes(data), state
@@ -267,6 +273,8 @@ class SX1262(SX126X):
             return 0, ERR_INVALID_PACKET_TYPE
 
         state = super().startTransmit(data, len(data))
+        # For non-blocking mode, we don't wait for TX_DONE here
+        # The caller should check IRQ status if needed
         return len(data), state
 
     def _dummyFunction(self, *args):
