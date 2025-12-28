@@ -1,12 +1,4 @@
-from sys import implementation
-
-if implementation.name == 'micropython':
-  from utime import sleep_ms
-
-if implementation.name == 'circuitpython':
-    from time import sleep
-    def sleep_ms(ms):
-        sleep(ms/1000)
+from utime import sleep_ms
 
 def ASSERT(state):
     assert state == ERR_NONE, ERROR[state]
