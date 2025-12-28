@@ -47,7 +47,7 @@ SPI_PHASE = 0
 EXPECTED_DATA_SIZE = 10 * 1024  # 10,240 bytes
 MAX_PACKET_SIZE = 255  # Maximum FSK packet size
 SEQ_NUM_SIZE = 1  # Sequence number size in bytes
-MAX_PAYLOAD_SIZE = MAX_PACKET_SIZE - SEQ_NUM_SIZE  # Max data per packet
+MAX_PAYLOAD_SIZE = 200  # Reduced to 200 bytes for better reliability (must match TX)
 
 # Protocol constants
 CORRUPTION_LIST_HEADER = 0xFF  # Header byte to identify corruption list packet
@@ -114,6 +114,7 @@ if status != 0:
 else:
     print("SX1262 initialized successfully in FSK mode!")
     print("Waiting for data transmission to start...")
+    print("Receiver is ready and listening...")
     print()
 
 # Error code constants
@@ -151,7 +152,8 @@ while len(received_packets) < expected_num_packets:
         break
     
     # Check if we're stuck (no packets received for a while)
-    if last_packet_received_time is not None:
+    # But only after we've received at least one packet
+    if last_packet_received_time is not None and len(received_packets) > 0:
         time_since_last_packet = ticks_diff(ticks_ms(), last_packet_received_time)
         if time_since_last_packet > PACKET_STUCK_TIMEOUT_MS:
             print(f"\nNo packets received for {time_since_last_packet} ms, assuming transmission complete")

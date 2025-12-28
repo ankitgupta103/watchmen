@@ -46,7 +46,7 @@ SPI_PHASE = 0
 DATA_SIZE = 10 * 1024  # 10,240 bytes
 MAX_PACKET_SIZE = 255  # Maximum FSK packet size
 SEQ_NUM_SIZE = 1  # Sequence number size in bytes
-MAX_PAYLOAD_SIZE = MAX_PACKET_SIZE - SEQ_NUM_SIZE  # Max data per packet
+MAX_PAYLOAD_SIZE = 200  # Reduced to 200 bytes for better reliability (was 254)
 
 # Protocol constants
 CORRUPTION_LIST_TIMEOUT_MS = 10000  # Timeout for waiting for corruption list (10 seconds)
@@ -137,6 +137,10 @@ print("=" * 60)
 print("PHASE 1: Sending all packets sequentially...")
 print("=" * 60)
 
+# Give receiver extra time to be ready before starting transmission
+print("Waiting for receiver to be ready...")
+sleep_ms(200)  # Initial delay to ensure receiver is in RX mode and ready
+
 phase1_start_time = ticks_ms()
 total_sent = 0
 
@@ -170,9 +174,11 @@ for packet_num in range(num_packets):
     # Delay between packets to allow receiver to process
     # Longer delay after first packet to ensure receiver is fully ready
     if packet_num == 0:
-        sleep_ms(50)  # Extra delay after first packet for receiver initialization
+        sleep_ms(100)  # Extra delay after first packet for receiver initialization (increased)
+    elif packet_num < 5:
+        sleep_ms(50)  # Longer delay for first few packets to ensure receiver is catching up
     else:
-        sleep_ms(20)  # Increased delay between subsequent packets for reliability
+        sleep_ms(30)  # Increased delay between subsequent packets for reliability
 
 phase1_end_time = ticks_ms()
 phase1_duration_ms = ticks_diff(phase1_end_time, phase1_start_time)
@@ -305,7 +311,7 @@ if len(corrupted_seqs) > 0:
                     print(f"Retransmitted packet seq {seq} ({len(chunk)} bytes)")
                 
                 # Delay between retransmissions to allow receiver to process
-                sleep_ms(20)  # Increased delay for retransmissions
+                sleep_ms(30)  # Increased delay for retransmissions to ensure reliability
                 packet_found = True
                 break
         
