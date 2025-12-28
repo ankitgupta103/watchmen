@@ -154,17 +154,17 @@ else:
     if len(received_data) >= img_size and img_width and img_height:
         print("Reconstructing image...")
         try:
-            # Create image from received bytes (uncompressed RGB565)
-            img_data = bytes(received_data[:img_size])
-            received_img = image.Image(img_width, img_height, sensor.RGB565, copy_to_fb=False)
-            img_bytes = received_img.bytearray()
-            # Copy data into image bytearray using slice assignment
-            if len(img_data) <= len(img_bytes):
-                img_bytes[0:len(img_data)] = img_data
-            else:
-                img_bytes[0:len(img_bytes)] = img_data[0:len(img_bytes)]
+            # Get JPEG compressed bytes
+            jpeg_data = bytes(received_data[:img_size])
             
-            # Display image on frame buffer
+            # Create compressed image from JPEG bytes (1 byte per pixel for JPEG)
+            compressed_img = image.Image(img_size, 1, jpeg_data, copy_to_fb=False)
+            
+            # Decompress JPEG to RGB565 image (returns mutable image)
+            received_img = compressed_img.decompress(copy_to_fb=False)
+            print("JPEG decompressed")
+            
+            # Display image on frame buffer (received_img is mutable)
             print("Displaying image...")
             sensor.get_fb().replace(received_img)
             print("Image displayed! Check OpenMV IDE.")

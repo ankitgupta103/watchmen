@@ -88,12 +88,15 @@ else:
 # Capture image
 print("Capturing image...")
 img = sensor.snapshot()
-# Get raw image bytes (uncompressed RGB565)
-img_bytes = img.bytearray()
-img_size = len(img_bytes)
 img_width = img.width()
 img_height = img.height()
-print(f"Image captured: {img_size} bytes ({img_width}x{img_height})")
+
+# Compress image to JPEG
+print("Compressing image to JPEG...")
+compressed_img = img.compress(quality=90)
+img_bytes = compressed_img.bytearray()
+img_size = len(img_bytes)
+print(f"Image captured: {img_width}x{img_height}, compressed: {img_size} bytes (JPEG)")
 
 # Send image header: [0xFF, width_hi, width_lo, height_hi, height_lo, size_bytes...]
 # 0xFF = header marker, then 2 bytes width, 2 bytes height, 4 bytes size
