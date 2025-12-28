@@ -24,7 +24,7 @@ import json
 import gc                   # garbage collection for memory management
 
 import enc
-import sx1262_driver as sx1262
+from sx1262_driver import SX1262
 import gps_driver
 from cellular_driver import Cellular
 import detect
@@ -451,6 +451,24 @@ def next_device_in_spath():
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # LoRa Setup and Transmission
 # ---------------------------------------------------------------------------
+# SPI Pin Configuration for OpenMV RT1062
+SPI_BUS = 1
+P0_MOSI = 'P0'
+P1_MISO = 'P1'
+P2_SCLK = 'P2'
+P3_CS = 'P3'
+P6_RST = 'P6'
+P7_BUSY = 'P7'
+P13_DIO1 = 'P13'
+
+# LoRa Configuration - High speed (SF5, BW500kHz, CR5)
+LORA_FREQ = 868.0
+LORA_BW = 500.0
+LORA_SF = 5
+LORA_CR = 5
+LORA_POWER = 22
+LORA_PREAMBLE = 8
+
 loranode = None
 async def init_lora():
     # Input: None; Output: None (initializes global loranode, updates lora_reinit_count)
@@ -461,17 +479,44 @@ async def init_lora():
     lora_init_in_progress = True
     try:
         lora_init_count += 1
-        logger.info(f"[LORA] Initializing LoRa SX126X module... my lora addr = {my_addr}")
-        loranode = sx1262.sx126x(
-            uart_num=1,        # UART port number - adjust as needed
-            freq=868,          # Frequency in MHz
-            addr=my_addr,      # Node address
-            power=22,          # Transmission power in dBm
-            rssi=False,     # Enable RSSI reporting
-            air_speed=AIR_SPEED,# Air data rate
-            m0_pin='P6',       # M0 control pin - adjust to your wiring
-            m1_pin='P7'        # M1 control pin - adjust to your wiring
+        logger.info(f"[LORA] Initializing LoRa SX1262 module... my lora addr = {my_addr}")
+        
+        # Initialize SX1262 driver directly (like example)
+        loranode = SX1262(
+            spi_bus=SPI_BUS,
+            clk=P2_SCLK,
+            mosi=P0_MOSI,
+            miso=P1_MISO,
+            cs=P3_CS,
+            irq=P13_DIO1,
+            rst=P6_RST,
+            gpio=P7_BUSY,
+            spi_baudrate=2000000
         )
+        
+        # Configure LoRa mode (blocking=True for reliable communication like example)
+        logger.info(f"[LORA] Configuring LoRa: SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, freq={LORA_FREQ}MHz")
+        status = loranode.begin(
+            freq=LORA_FREQ,
+            bw=LORA_BW,
+            sf=LORA_SF,
+            cr=LORA_CR,
+            power=LORA_POWER,
+            preambleLength=LORA_PREAMBLE,
+            crcOn=True,
+            blocking=True  # Use blocking mode like example for reliable communication
+        )
+        
+        if status != 0:
+            logger.error(f"[LORA] SX1262 initialization failed with status: {status}")
+            loranode = None
+            raise Exception(f"SX1262 initialization failed: {status}")
+        
+        logger.info(f"[LORA] SX1262 initialized successfully! LoRa mode: SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}")
+    except Exception as e:
+        logger.error(f"[LORA] Initialization error: {e}")
+        loranode = None
+        raise
     finally:
         lora_init_in_progress = False
 
@@ -479,7 +524,7 @@ def is_lora_ready():
     # Input: None; Output: bool indicating if LoRa is ready to send
     # Returns True if connected, False if not (and starts initialization if needed)
     global lora_init_in_progress, loranode
-    if loranode is None or loranode.is_connected is False:
+    if loranode is None:
         if not lora_init_in_progress:
             logger.error(f"[LORA] Not connected to network, init started in background.., msg marked as failed")
             asyncio.create_task(init_lora())
@@ -598,7 +643,35 @@ def radio_send(dest, data, msg_uid):
         logger.error(f"[LORA] msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
-    loranode.send(dest, data)
+    
+    # Build message packet with addressing header
+    # Format: [target_high][target_low][target_freq][own_high][own_low][own_freq][message]
+    # Calculate frequency offset for compatibility
+    if LORA_FREQ > 850:
+        offset_freq = int(LORA_FREQ - 850)
+    elif LORA_FREQ > 410:
+        offset_freq = int(LORA_FREQ - 410)
+    else:
+        offset_freq = 0
+    
+    packet = (
+        bytes([dest >> 8])
+        + bytes([dest & 0xFF])
+        + bytes([offset_freq])
+        + bytes([my_addr >> 8])
+        + bytes([my_addr & 0xFF])
+        + bytes([offset_freq])
+        + data
+    )
+    
+    # Send using SX1262 driver directly (blocking mode)
+    try:
+        bytes_sent, status = loranode.send(packet)
+        if status != 0:
+            logger.warning(f"[LORA] Send failed with status: {status}")
+    except Exception as e:
+        logger.error(f"[LORA] Error sending message: {e}")
+    
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
@@ -1655,11 +1728,26 @@ async def radio_read():
     logger.info(f"===> Readio Read, LoRa receive loop started... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
     while True:
-        message, rssi = loranode.receive()
-        if message:
-            message = message.replace(b"{}[]", b"\n")
-            process_message(message, rssi)
-        await asyncio.sleep(0.05)  # Optimized for fast LoRa SF5 - reduced from 0.15s
+        if loranode is None:
+            await asyncio.sleep(0.1)
+            continue
+        
+        try:
+            # Use blocking receive with timeout (like example)
+            # timeout_en=True, timeout_ms=100 for non-blocking polling
+            message, status = loranode.recv(timeout_en=True, timeout_ms=100)
+            
+            if status == 0 or status == -7:  # ERR_NONE or ERR_CRC_MISMATCH
+                if message and len(message) >= 7:
+                    # Extract message payload (skip first 6 bytes: addressing header)
+                    msg = message[6:]
+                    if len(msg) > 0:
+                        msg = msg.replace(b"{}[]", b"\n")
+                        process_message(msg, None)  # RSSI not available in blocking mode
+        except Exception as e:
+            logger.debug(f"[LORA] Receive error: {e}")
+        
+        await asyncio.sleep(0.01)  # Small delay for async loop
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
