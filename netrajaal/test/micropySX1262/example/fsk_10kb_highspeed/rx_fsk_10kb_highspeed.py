@@ -293,11 +293,19 @@ print(f"DEBUG: Corruption list packet: len={len(corruption_list_bytes)}, "
       f"bytes={[hex(b) for b in corruption_list_bytes[:min(10, len(corruption_list_bytes))]]}")
 
 # Small delay before sending to ensure TX is ready to receive
-sleep_ms(300)  # Delay to ensure TX has switched to RX mode (reduced from 500ms)
+sleep_ms(400)  # Delay to ensure TX has switched to RX mode (increased to ensure TX is ready)
 
-# Send corruption list
+# Send corruption list - send it multiple times to ensure it's received
 print("Sending corruption list...")
-corruption_list_len, status = sx.send(corruption_list_bytes)
+for attempt in range(3):
+    corruption_list_len, status = sx.send(corruption_list_bytes)
+    if status == 0:
+        print(f"Corruption list sent (attempt {attempt + 1}/3)")
+    else:
+        print(f"Error sending corruption list (attempt {attempt + 1}/3): {status}")
+    
+    if attempt < 2:  # Don't delay after last attempt
+        sleep_ms(50)  # Small delay between retransmissions
 
 if status == 0:
     print(f"Corruption list sent successfully: {len(all_corrupted_seqs)} corrupted/missing packet(s)")

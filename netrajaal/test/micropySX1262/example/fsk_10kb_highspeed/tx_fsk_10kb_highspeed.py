@@ -171,14 +171,12 @@ for packet_num in range(num_packets):
             print(f"Packet {packet_num + 1}/{num_packets} (seq {packet_seq}): Sent {len(chunk)} bytes "
                   f"(Total: {total_sent}/{DATA_SIZE} bytes)")
     
-    # Delay between packets to allow receiver to process
-    # Longer delay after first packet to ensure receiver is fully ready
+    # Delay between packets - minimized for high-speed transfer
+    # Small delay to allow receiver to process, but keep it minimal for speed
     if packet_num == 0:
-        sleep_ms(100)  # Extra delay after first packet for receiver initialization (increased)
-    elif packet_num < 5:
-        sleep_ms(50)  # Longer delay for first few packets to ensure receiver is catching up
+        sleep_ms(20)  # Small delay after first packet for receiver initialization
     else:
-        sleep_ms(30)  # Increased delay between subsequent packets for reliability
+        sleep_ms(5)  # Minimal delay between packets for maximum speed
 
 phase1_end_time = ticks_ms()
 phase1_duration_ms = ticks_diff(phase1_end_time, phase1_start_time)
@@ -190,7 +188,7 @@ print()
 
 # Give receiver time to finish processing all packets before switching to RX mode
 print("Waiting for receiver to process all packets...")
-sleep_ms(500)  # Allow receiver to finish processing and prepare corruption list
+sleep_ms(200)  # Reduced delay - allow receiver to finish processing and prepare corruption list
 
 # ============================================================================
 # PHASE 2: Receive corruption list from RX device
@@ -202,8 +200,9 @@ print("=" * 60)
 # Ensure we're ready to receive by calling recv once to put device in RX mode
 # This helps ensure the device is in the correct state
 print("Switching to RX mode...")
-dummy_msg, dummy_status = sx.recv(timeout_en=True, timeout_ms=100)  # Quick call to ensure RX mode
-sleep_ms(100)  # Brief delay after switching to RX mode
+# Don't wait for a packet, just ensure we're in RX mode by starting receive
+# The recv() call will put device in RX mode automatically
+sleep_ms(200)  # Brief delay to ensure RX mode is fully active
 
 corrupted_seqs = set()
 corruption_list_received = False
@@ -224,18 +223,18 @@ while ticks_diff(ticks_ms(), corruption_list_start_time) < CORRUPTION_LIST_TIMEO
             print(f"DEBUG: Receive attempt {receive_attempts}: status={status}, msg_len={len(msg)}")
     
     if status == 0 and len(msg) > 0:
-        # In FSK variable length mode, first byte may be length byte added by chip
-        # Corruption list format could be:
-        # Option 1: [length_byte, 0xFF, count, seq1, seq2, ...] (with length byte)
-        # Option 2: [0xFF, count, seq1, seq2, ...] (without length byte)
+        # In FSK variable length mode, packet structure is: [seq_num, data...]
+        # So corruption list format is: [0xFF, count, seq1, seq2, ...]
+        # First byte is the header (0xFF), not a length byte
         
         # Check if this is a corruption list packet
         header_pos = -1
         if len(msg) >= 1 and msg[0] == CORRUPTION_LIST_HEADER:
-            # Format without length byte: [0xFF, count, seq1, seq2, ...]
+            # Format: [0xFF, count, seq1, seq2, ...]
             header_pos = 0
         elif len(msg) >= 2 and msg[1] == CORRUPTION_LIST_HEADER:
-            # Format with length byte: [length_byte, 0xFF, count, seq1, seq2, ...]
+            # Alternative: might have length byte, but unlikely based on our packet structure
+            # Format: [length_byte, 0xFF, count, seq1, seq2, ...]
             header_pos = 1
         
         if header_pos >= 0:
@@ -270,7 +269,7 @@ while ticks_diff(ticks_ms(), corruption_list_start_time) < CORRUPTION_LIST_TIMEO
     elif status == ERR_CRC_MISMATCH:
         # CRC error, but might still be readable - try to parse
         if len(msg) > 0:
-            # Try same parsing logic
+            # Try same parsing logic - corruption list format: [0xFF, count, seq1, seq2, ...]
             header_pos = -1
             if len(msg) >= 1 and msg[0] == CORRUPTION_LIST_HEADER:
                 header_pos = 0
@@ -331,8 +330,8 @@ if len(corrupted_seqs) > 0:
                     retransmitted_count += 1
                     print(f"Retransmitted packet seq {seq} ({len(chunk)} bytes)")
                 
-                # Delay between retransmissions to allow receiver to process
-                sleep_ms(30)  # Increased delay for retransmissions to ensure reliability
+                # Delay between retransmissions - minimal for speed
+                sleep_ms(10)  # Minimal delay for retransmissions
                 packet_found = True
                 break
         
