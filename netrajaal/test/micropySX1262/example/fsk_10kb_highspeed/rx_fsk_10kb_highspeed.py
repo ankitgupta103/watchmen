@@ -289,22 +289,29 @@ corruption_list_bytes = bytes([CORRUPTION_LIST_HEADER, len(all_corrupted_seqs)])
 if len(all_corrupted_seqs) > 0:
     corruption_list_bytes += bytes(sorted(all_corrupted_seqs))
 
+print(f"DEBUG: Corruption list packet: len={len(corruption_list_bytes)}, "
+      f"bytes={[hex(b) for b in corruption_list_bytes[:min(10, len(corruption_list_bytes))]]}")
+
 # Small delay before sending to ensure TX is ready to receive
-sleep_ms(300)  # Increased delay to ensure TX has switched to RX mode
+sleep_ms(500)  # Increased delay to ensure TX has switched to RX mode
 
 # Send corruption list
+print("Sending corruption list...")
 corruption_list_len, status = sx.send(corruption_list_bytes)
 
 if status == 0:
-    print(f"Corruption list sent: {len(all_corrupted_seqs)} corrupted/missing packet(s)")
+    print(f"Corruption list sent successfully: {len(all_corrupted_seqs)} corrupted/missing packet(s)")
     if len(all_corrupted_seqs) > 0:
         print(f"Sequence numbers: {sorted(all_corrupted_seqs)}")
+    else:
+        print("No corrupted packets - all packets received successfully!")
 else:
     print(f"Error sending corruption list: {status}")
 
 # After sending corruption list, ensure we're ready to receive retransmissions
-print("Switching to RX mode to receive retransmissions...")
-sleep_ms(200)  # Brief delay to ensure we're in RX mode before retransmissions start
+if len(all_corrupted_seqs) > 0:
+    print("Switching to RX mode to receive retransmissions...")
+    sleep_ms(200)  # Brief delay to ensure we're in RX mode before retransmissions start
 
 print()
 

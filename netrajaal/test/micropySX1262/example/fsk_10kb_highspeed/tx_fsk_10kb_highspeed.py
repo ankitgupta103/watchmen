@@ -199,13 +199,29 @@ print("=" * 60)
 print("PHASE 2: Waiting for corruption list from RX device...")
 print("=" * 60)
 
+# Ensure we're ready to receive by calling recv once to put device in RX mode
+# This helps ensure the device is in the correct state
+print("Switching to RX mode...")
+dummy_msg, dummy_status = sx.recv(timeout_en=True, timeout_ms=100)  # Quick call to ensure RX mode
+sleep_ms(100)  # Brief delay after switching to RX mode
+
 corrupted_seqs = set()
 corruption_list_received = False
 corruption_list_start_time = ticks_ms()
+receive_attempts = 0
 
 while ticks_diff(ticks_ms(), corruption_list_start_time) < CORRUPTION_LIST_TIMEOUT_MS:
     # Wait for corruption list packet
     msg, status = sx.recv(timeout_en=True, timeout_ms=2000)
+    receive_attempts += 1
+    
+    # Debug: Log every 10th attempt to see what we're receiving
+    if receive_attempts % 10 == 0:
+        if len(msg) > 0:
+            print(f"DEBUG: Received packet (attempt {receive_attempts}): len={len(msg)}, status={status}, "
+                  f"first_bytes={[hex(b) for b in msg[:min(5, len(msg))]]}")
+        elif status != -6:  # Not a timeout
+            print(f"DEBUG: Receive attempt {receive_attempts}: status={status}, msg_len={len(msg)}")
     
     if status == 0 and len(msg) > 0:
         # In FSK variable length mode, first byte may be length byte added by chip
@@ -243,10 +259,11 @@ while ticks_diff(ticks_ms(), corruption_list_start_time) < CORRUPTION_LIST_TIMEO
             else:
                 print(f"Warning: Corruption list packet too short (got {len(msg)} bytes, need at least {header_pos + 2})")
         else:
-            # Not a corruption list packet, continue waiting
-            # Log occasionally for debugging
-            if ticks_diff(ticks_ms(), corruption_list_start_time) % 5000 < 2000:
-                continue  # Don't spam logs
+            # Not a corruption list packet, log for debugging
+            if receive_attempts <= 5 or receive_attempts % 10 == 0:
+                print(f"DEBUG: Received non-corruption-list packet: len={len(msg)}, "
+                      f"first_bytes={[hex(b) for b in msg[:min(5, len(msg))]]}")
+            continue
     elif status == -6:  # RX_TIMEOUT
         # Continue waiting
         continue
