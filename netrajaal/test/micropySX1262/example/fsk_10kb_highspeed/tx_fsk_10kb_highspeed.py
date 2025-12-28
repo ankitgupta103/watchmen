@@ -49,7 +49,7 @@ SEQ_NUM_SIZE = 1  # Sequence number size in bytes
 MAX_PAYLOAD_SIZE = 200  # Reduced to 200 bytes for better reliability (was 254)
 
 # Protocol constants
-CORRUPTION_LIST_TIMEOUT_MS = 10000  # Timeout for waiting for corruption list (10 seconds)
+CORRUPTION_LIST_TIMEOUT_MS = 5000  # Timeout for waiting for corruption list (5 seconds, reduced from 10)
 CORRUPTION_LIST_HEADER = 0xFF  # Header byte to identify corruption list packet
 RETRANSMISSION_TIMEOUT_MS = 30000  # Timeout for retransmission phase (30 seconds)
 
@@ -211,8 +211,8 @@ corruption_list_start_time = ticks_ms()
 receive_attempts = 0
 
 while ticks_diff(ticks_ms(), corruption_list_start_time) < CORRUPTION_LIST_TIMEOUT_MS:
-    # Wait for corruption list packet
-    msg, status = sx.recv(timeout_en=True, timeout_ms=2000)
+    # Wait for corruption list packet with shorter timeout for faster response
+    msg, status = sx.recv(timeout_en=True, timeout_ms=500)  # 500ms timeout for faster response
     receive_attempts += 1
     
     # Debug: Log every 10th attempt to see what we're receiving
