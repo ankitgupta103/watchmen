@@ -42,7 +42,7 @@ ACK_TIMEOUT_MS = 3000
 # Initialize camera
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.QVGA)  # 320x240
+sensor.set_framesize(sensor.HD)  # 320x240
 sensor.skip_frames(time=2000)
 print("Camera initialized")
 

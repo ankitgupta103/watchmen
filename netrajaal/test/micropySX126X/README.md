@@ -556,6 +556,770 @@ Default SPI settings for OpenMV RT1062:
 | Asia | Varies | Check local regulations |
 | Global | 433.05 - 434.79 MHz | Amateur radio band (license required) |
 
+## Channels and Multi-Stream Communication
+
+Channels in LoRa refer to different operating frequencies. By using multiple channels (frequencies), you can create parallel communication streams that reduce packet collisions, improve throughput, and minimize packet loss in dense networks.
+
+### Understanding Channels
+
+A **channel** is simply a specific frequency within the allowed ISM band. In the 868 MHz band (EU), you can use multiple frequencies to create separate channels:
+
+- **Channel 1**: 868.0 MHz
+- **Channel 2**: 868.1 MHz  
+- **Channel 3**: 868.2 MHz
+- **Channel 4**: 868.3 MHz
+- etc.
+
+**Benefits of Multi-Channel Communication**:
+- **Reduced Collisions**: Different nodes can transmit on different channels simultaneously
+- **Higher Throughput**: Parallel data streams increase overall network capacity
+- **Lower Packet Loss**: Fewer collisions mean fewer lost packets
+- **Better Network Performance**: Distributes traffic across multiple frequencies
+
+### Channel Configuration
+
+The SX1262 can switch frequencies dynamically using the `setFrequency()` method. You can change the operating frequency at runtime without re-initializing the entire module.
+
+#### Defining Channels
+
+```python
+# Define multiple channels (frequencies in MHz)
+CHANNELS = {
+    0: 868.0,   # Channel 0
+    1: 868.1,   # Channel 1
+    2: 868.2,   # Channel 2
+    3: 868.3,   # Channel 3
+    4: 868.4,   # Channel 4
+    5: 868.5,   # Channel 5
+}
+
+NUM_CHANNELS = len(CHANNELS)
+
+def get_channel_frequency(channel):
+    """Get frequency for a given channel number"""
+    return CHANNELS.get(channel, 868.0)  # Default to 868.0 if invalid
+```
+
+**Important Considerations**:
+- **Frequency Spacing**: Channels should be separated by at least the bandwidth used (e.g., for 125 kHz BW, use at least 125 kHz spacing)
+- **Regulatory Limits**: Check local regulations for allowed frequencies and duty cycle limits
+- **Bandwidth**: Ensure channels don't overlap (channel spacing >= bandwidth)
+- **EU 868 MHz Band**: Typically allows 868.0-868.6 MHz (6 channels at 125 kHz spacing)
+
+### Switching Channels
+
+#### Basic Channel Switching
+
+```python
+from sx1262 import SX1262
+
+# Initialize SX1262
+sx = SX1262(spi_bus=1, clk='P2', mosi='P0', miso='P1', cs='P3', 
+            irq='P13', rst='P6', gpio='P7', 
+            spi_baudrate=2000000, spi_polarity=0, spi_phase=0)
+
+# Initial configuration
+sx.begin(freq=868.0, bw=125.0, sf=9, cr=7, syncWord=0x12, power=14, blocking=True)
+
+# Switch to a different channel
+def switch_to_channel(channel_num):
+    """Switch to a different channel (frequency)"""
+    freq = get_channel_frequency(channel_num)
+    status = sx.setFrequency(freq, calibrate=True)
+    if status == 0:
+        print(f"Switched to channel {channel_num} ({freq} MHz)")
+    else:
+        print(f"Failed to switch channel: {status}")
+    return status == 0
+
+# Switch to channel 2 (868.2 MHz)
+switch_to_channel(2)
+
+# Now all send/recv operations use this channel
+sx.send(b"Hello on channel 2!")
+```
+
+### Multi-Stream Communication Pattern
+
+Multi-stream communication uses multiple channels to send data in parallel, reducing packet loss and increasing throughput.
+
+#### Round-Robin Channel Allocation
+
+Assign channels to nodes in a round-robin fashion:
+
+```python
+# Channel allocation for multiple nodes
+def get_node_channel(node_address, num_channels):
+    """Assign channel based on node address (round-robin)"""
+    return node_address % num_channels
+
+# Example: Node 0x01 -> Channel 1, Node 0x02 -> Channel 2, Node 0x03 -> Channel 3, etc.
+MY_NODE_ADDRESS = 0x01
+my_channel = get_node_channel(MY_NODE_ADDRESS, NUM_CHANNELS)
+switch_to_channel(my_channel)
+print(f"Node {MY_NODE_ADDRESS:02X} assigned to channel {my_channel}")
+```
+
+#### Time-Sliced Multi-Channel Reception
+
+A receiver can cycle through multiple channels to receive from different streams:
+
+```python
+import time
+from sx1262 import SX1262
+
+# Initialize SX1262
+sx = SX1262(spi_bus=1, clk='P2', mosi='P0', miso='P1', cs='P3', 
+            irq='P13', rst='P6', gpio='P7', 
+            spi_baudrate=2000000, spi_polarity=0, spi_phase=0)
+
+sx.begin(freq=868.0, bw=125.0, sf=9, cr=7, syncWord=0x12, power=14, blocking=True)
+
+# Multi-channel reception
+CHANNEL_DWELL_TIME_MS = 500  # Time to spend on each channel (ms)
+
+current_channel = 0
+last_channel_switch = time.ticks_ms()
+
+print("Starting multi-channel reception...")
+
+while True:
+    # Check if it's time to switch channels
+    now = time.ticks_ms()
+    if time.ticks_diff(now, last_channel_switch) >= CHANNEL_DWELL_TIME_MS:
+        # Switch to next channel
+        current_channel = (current_channel + 1) % NUM_CHANNELS
+        freq = get_channel_frequency(current_channel)
+        sx.setFrequency(freq, calibrate=False)  # Don't recalibrate every time for speed
+        last_channel_switch = now
+        print(f"Switched to channel {current_channel} ({freq} MHz)")
+    
+    # Try to receive on current channel (non-blocking with short timeout)
+    msg, status = sx.recv(timeout_en=True, timeout_ms=100)
+    
+    if status == 0 and len(msg) > 0:
+        print(f"[Channel {current_channel}] Received: {msg}")
+        print(f"RSSI: {sx.getRSSI():.2f} dBm, SNR: {sx.getSNR():.2f} dB")
+```
+
+#### Channel Hopping Pattern
+
+For better coverage, use a channel hopping pattern instead of round-robin:
+
+```python
+# Channel hopping sequence (pseudorandom or predefined)
+CHANNEL_HOP_SEQUENCE = [0, 3, 1, 4, 2, 5, 0, 3, ...]  # Spreads out channel usage
+
+hop_index = 0
+
+def get_next_channel():
+    """Get next channel in hopping sequence"""
+    global hop_index
+    channel = CHANNEL_HOP_SEQUENCE[hop_index]
+    hop_index = (hop_index + 1) % len(CHANNEL_HOP_SEQUENCE)
+    return channel
+```
+
+### Multi-Channel Transmitter Example
+
+Transmitter that uses multiple channels to send data streams in parallel:
+
+```python
+from sx1262 import SX1262
+import time
+
+# Initialize SX1262
+sx = SX1262(spi_bus=1, clk='P2', mosi='P0', miso='P1', cs='P3', 
+            irq='P13', rst='P6', gpio='P7', 
+            spi_baudrate=2000000, spi_polarity=0, spi_phase=0)
+
+sx.begin(freq=868.0, bw=125.0, sf=9, cr=7, syncWord=0x12, power=14, blocking=True)
+
+MY_NODE_ADDRESS = 0x01
+NUM_CHANNELS = 6
+
+def send_on_channel(channel, data):
+    """Send data on a specific channel"""
+    freq = get_channel_frequency(channel)
+    sx.setFrequency(freq, calibrate=False)
+    payload_len, status = sx.send(data)
+    return status == 0
+
+# Example: Send different data streams on different channels
+data_streams = [
+    b"Stream 0 data",
+    b"Stream 1 data",
+    b"Stream 2 data",
+    b"Stream 3 data",
+]
+
+# Send each stream on its corresponding channel
+for channel, data in enumerate(data_streams):
+    if send_on_channel(channel, data):
+        print(f"Sent on channel {channel}: {data}")
+    time.sleep_ms(100)  # Small delay between transmissions
+```
+
+### Complete Multi-Channel Network Example
+
+This example shows a complete multi-channel communication system:
+
+```python
+from sx1262 import SX1262
+import time
+
+# Initialize SX1262
+sx = SX1262(spi_bus=1, clk='P2', mosi='P0', miso='P1', cs='P3', 
+            irq='P13', rst='P6', gpio='P7', 
+            spi_baudrate=2000000, spi_polarity=0, spi_phase=0)
+
+# Channel configuration
+CHANNELS = {
+    0: 868.0, 1: 868.1, 2: 868.2, 3: 868.3, 4: 868.4, 5: 868.5
+}
+NUM_CHANNELS = len(CHANNELS)
+MY_NODE_ADDRESS = 0x01
+BROADCAST_ADDRESS = 0xFF
+
+# Initial configuration
+sx.begin(freq=CHANNELS[0], bw=125.0, sf=9, cr=7, syncWord=0x12, power=14, blocking=True)
+
+def get_channel_frequency(channel):
+    return CHANNELS.get(channel, 868.0)
+
+def switch_channel(channel):
+    """Switch to specified channel"""
+    freq = get_channel_frequency(channel)
+    return sx.setFrequency(freq, calibrate=False) == 0
+
+def get_my_channel():
+    """Determine which channel this node should use"""
+    # Option 1: Round-robin based on node address
+    return MY_NODE_ADDRESS % NUM_CHANNELS
+    
+    # Option 2: Fixed channel assignment
+    # return 1  # Node always uses channel 1
+
+def send_with_channel(dest_addr, data, channel=None):
+    """Send packet on specific channel (or default channel)"""
+    if channel is None:
+        channel = get_my_channel()
+    
+    # Switch to channel
+    if not switch_channel(channel):
+        return False
+    
+    # Create packet: [dest, src, data...]
+    packet = bytes([dest_addr, MY_NODE_ADDRESS]) + data
+    
+    # Send
+    payload_len, status = sx.send(packet)
+    return status == 0
+
+def receive_on_channel(channel, timeout_ms=1000):
+    """Receive packet on specific channel"""
+    if not switch_channel(channel):
+        return None, None
+    
+    msg, status = sx.recv(timeout_en=True, timeout_ms=timeout_ms)
+    
+    if status == 0 and len(msg) >= 2:
+        dest_addr = msg[0]
+        src_addr = msg[1]
+        data = msg[2:]
+        
+        # Check if for this node or broadcast
+        if dest_addr == MY_NODE_ADDRESS or dest_addr == BROADCAST_ADDRESS:
+            return src_addr, data
+    
+    return None, None
+
+# Main loop: Multi-channel operation
+my_channel = get_my_channel()
+print(f"Node {MY_NODE_ADDRESS:02X} operating on channel {my_channel}")
+
+# Option 1: Stay on assigned channel
+switch_channel(my_channel)
+while True:
+    # Receive on my channel
+    src, data = receive_on_channel(my_channel, timeout_ms=1000)
+    if src is not None:
+        print(f"[Ch{my_channel}] From {src:02X}: {data}")
+    
+    # Periodically send data
+    if time.ticks_ms() % 5000 < 100:  # Every 5 seconds
+        send_with_channel(BROADCAST_ADDRESS, b"Heartbeat", my_channel)
+```
+
+### Channel Selection Strategies
+
+#### 1. Static Channel Assignment
+
+Each node is permanently assigned to one channel:
+
+```python
+# Node 0x01 -> Channel 0
+# Node 0x02 -> Channel 1
+# Node 0x03 -> Channel 2
+# etc.
+
+def assign_channel_static(node_addr, num_channels):
+    return node_addr % num_channels
+```
+
+**Pros**: Simple, predictable  
+**Cons**: Uneven load distribution if nodes have different traffic
+
+#### 2. Dynamic Channel Assignment
+
+Nodes negotiate or discover available channels:
+
+```python
+# Broadcast channel request
+def request_channel():
+    # Send discovery on all channels
+    for ch in range(NUM_CHANNELS):
+        switch_channel(ch)
+        sx.send(bytes([BROADCAST_ADDRESS, MY_NODE_ADDRESS, 0x01]))  # 0x01 = channel request
+        time.sleep_ms(50)
+
+# Use least loaded channel
+def select_least_loaded_channel():
+    # Measure RSSI on each channel (lower = less traffic)
+    channel_load = {}
+    for ch in range(NUM_CHANNELS):
+        switch_channel(ch)
+        time.sleep_ms(100)
+        rssi = sx.getRSSI()
+        channel_load[ch] = abs(rssi)  # Lower RSSI = less interference
+    
+    # Return channel with lowest load
+    return min(channel_load, key=channel_load.get)
+```
+
+#### 3. Frequency Hopping
+
+Nodes hop between channels in a synchronized pattern:
+
+```python
+# Synchronized hopping pattern (all nodes use same sequence)
+HOP_SEQUENCE = [0, 2, 4, 1, 3, 5]  # Spreads out usage
+HOP_INTERVAL_MS = 1000  # Hop every second
+
+def get_current_channel_from_time():
+    """Determine current channel based on time"""
+    seconds = time.ticks_ms() // 1000
+    hop_index = (seconds // (HOP_INTERVAL_MS // 1000)) % len(HOP_SEQUENCE)
+    return HOP_SEQUENCE[hop_index]
+
+# Use in main loop
+current_ch = get_current_channel_from_time()
+switch_channel(current_ch)
+```
+
+### Reducing Packet Loss with Multiple Channels
+
+#### Problem: Collisions in Single Channel
+
+In a single-channel network, when multiple nodes transmit simultaneously:
+- Packets collide
+- Packets are lost
+- Network throughput decreases
+
+#### Solution: Multi-Channel Operation
+
+By using multiple channels:
+
+1. **Spatial Separation**: Different nodes use different channels
+2. **Parallel Transmission**: Multiple packets can be in the air simultaneously
+3. **Reduced Collisions**: Fewer nodes per channel = fewer collisions
+4. **Higher Throughput**: Total network capacity = sum of all channels
+
+#### Channel Load Balancing
+
+Distribute nodes evenly across channels:
+
+```python
+def balance_channel_load(nodes, channels):
+    """Assign nodes to channels for balanced load"""
+    nodes_per_channel = len(nodes) // len(channels)
+    assignments = {}
+    
+    for i, node in enumerate(nodes):
+        channel = (i // nodes_per_channel) % len(channels)
+        assignments[node] = channel
+    
+    return assignments
+
+# Example: 12 nodes, 6 channels = 2 nodes per channel
+nodes = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C]
+channels = [0, 1, 2, 3, 4, 5]
+assignments = balance_channel_load(nodes, channels)
+```
+
+### Best Practices for Multi-Channel Networks
+
+1. **Channel Spacing**: Ensure channels are spaced by at least the bandwidth used
+   - For 125 kHz BW: Use at least 125 kHz spacing (868.0, 868.1, 868.2...)
+   - For 500 kHz BW: Use at least 500 kHz spacing (868.0, 868.5, 869.0...)
+
+2. **Frequency Calibration**: Calibrate when switching channels initially, then skip calibration for faster switching:
+   ```python
+   sx.setFrequency(freq, calibrate=True)   # First switch - calibrate
+   sx.setFrequency(freq, calibrate=False)  # Subsequent switches - faster
+   ```
+
+3. **Channel Coordination**: Use a central coordinator or predefined pattern so nodes know which channel to use
+
+4. **Regulatory Compliance**: Ensure all channels are within allowed frequency bands and respect duty cycle limits
+
+5. **Channel Monitoring**: Periodically check channel quality (RSSI, SNR) and switch if channel is noisy
+
+6. **Sync Word**: Can use different sync words per channel for additional isolation:
+   ```python
+   # Channel 0: sync word 0x12
+   # Channel 1: sync word 0x34
+   # Channel 2: sync word 0x56
+   ```
+
+### Channel vs. Sync Word
+
+**Channels (Frequency)**:
+- Physical layer separation
+- Completely independent communication paths
+- Requires frequency switching
+- More effective for reducing collisions
+
+**Sync Words**:
+- Logical separation within same frequency
+- Same physical channel, different logical networks
+- No frequency switching needed
+- Less effective for reducing collisions (same RF medium)
+
+**Combined Approach** (Most Effective):
+```python
+# Different sync words on different channels
+CHANNEL_CONFIG = {
+    0: {'freq': 868.0, 'sync': 0x12},
+    1: {'freq': 868.1, 'sync': 0x34},
+    2: {'freq': 868.2, 'sync': 0x56},
+}
+
+def switch_to_channel_with_sync(channel):
+    config = CHANNEL_CONFIG[channel]
+    sx.setFrequency(config['freq'], calibrate=False)
+    sx.setSyncWord(config['sync'])
+```
+
+This provides both physical (frequency) and logical (sync word) separation for maximum network isolation and reduced packet loss.
+
+## Point-to-Point and Broadcast Communication
+
+LoRa modulation does not have built-in hardware address filtering (unlike FSK mode). Therefore, addressing must be implemented at the application layer by including address information in the packet payload. This section explains how to implement point-to-point and broadcast communication.
+
+### Understanding Addressing in LoRa
+
+**Important**: LoRa mode does not support hardware-level address filtering. All nodes on the same frequency with matching LoRa parameters (SF, BW, CR, sync word) will receive all packets. Address filtering must be done in software by checking addresses in the packet payload.
+
+### Packet Format for Addressing
+
+A typical addressed packet format:
+
+```
+[Destination Address] [Source Address] [Data...]
+```
+
+For example:
+- 1 byte destination address
+- 1 byte source address  
+- Up to 253 bytes of actual data
+
+### Point-to-Point Communication
+
+Point-to-point communication allows sending data to a specific node based on its address.
+
+#### Transmitter (Sending to Specific Node)
+
+```python
+from sx1262 import SX1262
+
+# Initialize and configure SX1262
+sx = SX1262(spi_bus=1, clk='P2', mosi='P0', miso='P1', cs='P3', 
+            irq='P13', rst='P6', gpio='P7', 
+            spi_baudrate=2000000, spi_polarity=0, spi_phase=0)
+
+sx.begin(freq=868.0, bw=125.0, sf=9, cr=7, syncWord=0x12, power=14, blocking=True)
+
+# Define addresses
+MY_NODE_ADDRESS = 0x01  # This node's address
+DESTINATION_ADDRESS = 0x02  # Target node address
+BROADCAST_ADDRESS = 0xFF  # Broadcast address (all nodes)
+
+# Function to send data to a specific node
+def send_to_node(dest_addr, data):
+    # Create packet: [destination, source, data...]
+    packet = bytes([dest_addr, MY_NODE_ADDRESS]) + data
+    
+    # Send the packet
+    payload_len, status = sx.send(packet)
+    if status == 0:
+        print(f"Sent {len(data)} bytes to node {dest_addr:02X}")
+    else:
+        print(f"Send failed: {status}")
+    return status
+
+# Example: Send a message to node 0x02
+message = b"Hello Node 0x02!"
+send_to_node(DESTINATION_ADDRESS, message)
+```
+
+#### Receiver (Filtering by Address)
+
+```python
+from sx1262 import SX1262
+
+# Initialize and configure SX1262
+sx = SX1262(spi_bus=1, clk='P2', mosi='P0', miso='P1', cs='P3', 
+            irq='P13', rst='P6', gpio='P7', 
+            spi_baudrate=2000000, spi_polarity=0, spi_phase=0)
+
+sx.begin(freq=868.0, bw=125.0, sf=9, cr=7, syncWord=0x12, power=14, blocking=True)
+
+# Define this node's address
+MY_NODE_ADDRESS = 0x02
+BROADCAST_ADDRESS = 0xFF
+
+# Receive loop with address filtering
+print(f"Node {MY_NODE_ADDRESS:02X} listening...")
+while True:
+    msg, status = sx.recv()
+    
+    if status == 0 and len(msg) >= 2:
+        # Extract addresses from packet
+        dest_addr = msg[0]
+        src_addr = msg[1]
+        data = msg[2:]  # Rest of the packet is data
+        
+        # Check if packet is for this node or broadcast
+        if dest_addr == MY_NODE_ADDRESS or dest_addr == BROADCAST_ADDRESS:
+            print(f"Received from node {src_addr:02X}: {data}")
+            print(f"RSSI: {sx.getRSSI():.2f} dBm, SNR: {sx.getSNR():.2f} dB")
+            # Process the data here
+        else:
+            # Packet not for this node, ignore it
+            print(f"Ignored packet: dest={dest_addr:02X}, src={src_addr:02X}")
+    elif status == -6:  # RX_TIMEOUT
+        pass  # No message received, continue
+    else:
+        print(f"Receive error: {status}")
+```
+
+### Broadcast Communication
+
+Broadcast allows sending data to all nodes in the network simultaneously. Use a reserved broadcast address (commonly 0xFF).
+
+#### Broadcast Transmitter
+
+```python
+# Broadcast to all nodes
+BROADCAST_ADDRESS = 0xFF
+message = b"Network Announcement: All nodes must update!"
+
+# Create broadcast packet: [0xFF, source, data...]
+packet = bytes([BROADCAST_ADDRESS, MY_NODE_ADDRESS]) + message
+payload_len, status = sx.send(packet)
+
+if status == 0:
+    print(f"Broadcast sent to all nodes")
+```
+
+#### Broadcast Receiver
+
+All nodes receive broadcast packets. The receiver code shown above already handles broadcasts by checking for `dest_addr == BROADCAST_ADDRESS`.
+
+### Complete Network Example
+
+Here's a complete example showing point-to-point and broadcast in one application:
+
+```python
+from sx1262 import SX1262
+import time
+
+# Initialize SX1262
+sx = SX1262(spi_bus=1, clk='P2', mosi='P0', miso='P1', cs='P3', 
+            irq='P13', rst='P6', gpio='P7', 
+            spi_baudrate=2000000, spi_polarity=0, spi_phase=0)
+
+sx.begin(freq=868.0, bw=125.0, sf=9, cr=7, syncWord=0x12, power=14, blocking=True)
+
+# Network configuration
+MY_NODE_ADDRESS = 0x01  # Change this for each node (0x01, 0x02, 0x03, etc.)
+BROADCAST_ADDRESS = 0xFF
+
+def send_packet(dest_addr, data):
+    """Send packet to destination address"""
+    packet = bytes([dest_addr, MY_NODE_ADDRESS]) + data
+    payload_len, status = sx.send(packet)
+    return status == 0
+
+def receive_packet():
+    """Receive and filter packets by address"""
+    msg, status = sx.recv(timeout_en=True, timeout_ms=5000)
+    
+    if status == 0 and len(msg) >= 2:
+        dest_addr = msg[0]
+        src_addr = msg[1]
+        data = msg[2:]
+        
+        # Accept if for this node or broadcast
+        if dest_addr == MY_NODE_ADDRESS or dest_addr == BROADCAST_ADDRESS:
+            return src_addr, data
+    return None, None
+
+# Main loop
+print(f"Node {MY_NODE_ADDRESS:02X} started")
+
+# Example 1: Broadcast a message every 30 seconds
+broadcast_counter = 0
+
+while True:
+    # Try to receive packets (non-blocking with timeout)
+    src, data = receive_packet()
+    if src is not None:
+        print(f"[{MY_NODE_ADDRESS:02X}] Received from {src:02X}: {data}")
+    
+    # Broadcast example (every 30 seconds)
+    broadcast_counter += 1
+    if broadcast_counter >= 30:  # ~30 seconds at 1 second intervals
+        broadcast_counter = 0
+        send_packet(BROADCAST_ADDRESS, b"Network heartbeat from node 0x01")
+        print(f"[{MY_NODE_ADDRESS:02X}] Broadcast sent")
+    
+    time.sleep(1)
+```
+
+### Address Assignment Strategy
+
+1. **Static Addressing**: Assign fixed addresses to each node (e.g., 0x01, 0x02, 0x03...)
+2. **Reserved Addresses**: 
+   - `0x00`: Unassigned/null address
+   - `0xFF`: Broadcast address (all nodes)
+   - `0x01-0xFE`: Available for node addresses (254 nodes max)
+
+3. **Address Discovery**: Implement a protocol for nodes to discover each other:
+   ```python
+   # Discovery request (broadcast)
+   discovery_request = bytes([BROADCAST_ADDRESS, MY_NODE_ADDRESS, 0x01])  # 0x01 = discovery
+   sx.send(discovery_request)
+   
+   # Other nodes respond with their address
+   ```
+
+### Extended Packet Format (Recommended)
+
+For more complex networks, use an extended format:
+
+```
+[Flags] [Destination] [Source] [Data Length] [Data...] [CRC/Checksum]
+```
+
+Example implementation:
+
+```python
+# Extended packet format constants
+PACKET_FLAG_ACK_REQUIRED = 0x01
+PACKET_FLAG_FRAGMENTED = 0x02
+PACKET_TYPE_DATA = 0x10
+PACKET_TYPE_ACK = 0x20
+PACKET_TYPE_DISCOVERY = 0x30
+
+def create_packet(dest_addr, src_addr, packet_type, data, flags=0):
+    """Create packet with extended format"""
+    packet_type_byte = packet_type | flags
+    length = len(data)
+    
+    # Format: [type/flags, dest, src, length, data...]
+    packet = bytes([packet_type_byte, dest_addr, src_addr, length]) + data
+    return packet
+
+def parse_packet(msg):
+    """Parse extended format packet"""
+    if len(msg) < 4:
+        return None
+    
+    packet_type_byte = msg[0]
+    dest_addr = msg[1]
+    src_addr = msg[2]
+    length = msg[3]
+    
+    if len(msg) < 4 + length:
+        return None  # Incomplete packet
+    
+    packet_type = packet_type_byte & 0xF0
+    flags = packet_type_byte & 0x0F
+    data = msg[4:4+length]
+    
+    return {
+        'type': packet_type,
+        'flags': flags,
+        'dest': dest_addr,
+        'src': src_addr,
+        'length': length,
+        'data': data
+    }
+```
+
+### FSK Mode Addressing (Hardware-Level)
+
+**Note**: FSK mode supports hardware-level address filtering, but it's less commonly used than LoRa. If you need hardware filtering, use FSK mode:
+
+```python
+# Initialize in FSK mode
+sx.beginFSK(freq=868.0, br=48.0, freqDev=50.0, rxBw=156.2, power=14, blocking=True)
+
+# Set node address (hardware filtering - only accepts packets with this address)
+sx.setNodeAddress(0x01)
+
+# Set broadcast address (accepts packets with node address OR broadcast address)
+sx.setBroadcastAddress(0xFF)
+
+# Disable address filtering (accept all packets)
+sx.disableAddressFiltering()
+```
+
+**Important**: Hardware address filtering in FSK mode only works for FSK modulation, not LoRa. Most LoRa applications use application-layer addressing as described above.
+
+### Best Practices
+
+1. **Use Reserved Broadcast Address**: Always use `0xFF` for broadcast to avoid conflicts
+2. **Validate Addresses**: Check that source/destination addresses are valid before processing
+3. **Address Length**: Use 1 byte (0-255) for simplicity, or extend to 2 bytes for larger networks
+4. **Error Handling**: Handle cases where received packets are too short or malformed
+5. **Network Size**: With 1-byte addressing, you can have up to 254 nodes (0x01-0xFE)
+6. **Sync Word**: Use different sync words (0x12 private, 0x34 public) to create separate networks
+7. **Security**: For sensitive data, add encryption after addressing layer
+
+### Example: Multi-Node Network
+
+```python
+# Node 1: Coordinator
+NODE_COORDINATOR = 0x01
+
+# Node 2-10: Sensor nodes
+NODE_SENSOR_BASE = 0x02
+
+# Function to send sensor data to coordinator
+def send_sensor_data(sensor_node_addr, sensor_data):
+    packet = bytes([NODE_COORDINATOR, sensor_node_addr]) + sensor_data
+    sx.send(packet)
+
+# Coordinator receives from all sensors
+# Sensors broadcast or send to coordinator
+# Coordinator can send commands to specific sensors
+```
+
+This addressing scheme allows you to build complex multi-node networks where each node knows which messages are intended for it, while still supporting broadcast for network-wide messages.
+
 ## Power Saving and Sleep Mode
 
 Power saving is crucial for battery-powered applications. The SX1262 module and OpenMV RT1062 can be put into sleep mode to minimize power consumption, and can be woken up either by receiving data on SX1262 (via interrupt) or by external wakeup from OpenMV.
