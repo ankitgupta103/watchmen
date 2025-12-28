@@ -70,8 +70,12 @@ if missing:
 total_received = sum(len(data) for data in received.values())
 if first_time and last_time:
     duration = time.ticks_diff(last_time, first_time)
-    print(f"\nDuration: {duration} ms ({duration/1000:.3f} s)")
-    print(f"Rate: {total_received * 1000 / duration:.2f} bytes/s")
+    if duration > 0:
+        print(f"\nDuration: {duration} ms ({duration/1000:.3f} s)")
+        print(f"Rate: {total_received * 1000 / duration:.2f} bytes/s")
+    else:
+        print(f"\nDuration: {duration} ms")
+        print("Rate: N/A (duration too short)")
 else:
     print("\nNo packets received")
 
