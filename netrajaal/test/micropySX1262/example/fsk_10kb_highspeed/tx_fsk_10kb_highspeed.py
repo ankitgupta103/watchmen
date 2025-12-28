@@ -296,6 +296,10 @@ if len(corrupted_seqs) > 0:
     print(f"PHASE 3: Retransmitting {len(corrupted_seqs)} corrupted packet(s)...")
     print("=" * 60)
     
+    # Small delay before starting retransmissions to ensure RX is ready
+    print("Waiting for receiver to be ready...")
+    sleep_ms(300)  # Give receiver time to switch to RX mode after sending corruption list
+    
     for seq in sorted(corrupted_seqs):
         # Find the packet with this sequence number
         packet_found = False

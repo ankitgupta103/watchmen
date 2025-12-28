@@ -174,47 +174,29 @@ while len(received_packets) < expected_num_packets:
                   f"first_bytes={[hex(b) for b in msg[:min(5, len(msg))]]}")
         
         # Extract sequence number and data
-        # For FSK variable length mode: first byte is length, second byte is sequence number
-        # But handle both cases: with length byte and without (fallback)
+        # Based on debug output, the packet structure is: [seq_num, data...]
+        # The chip may add a length byte internally, but it's not in the received message
+        # So we parse: first byte = sequence number, rest = data
         packet_seq = None
         packet_data = None
-        packet_length_byte = None
         
-        if len(msg) >= (1 + SEQ_NUM_SIZE):
-            # Normal case: [length_byte, seq_num, data...]
-            packet_length_byte = msg[0]  # Length byte (automatically added by chip)
-            packet_seq = msg[1]  # Sequence number is in second byte
-            packet_data = msg[2:]  # Data starts from third byte
+        if len(msg) >= SEQ_NUM_SIZE:
+            # Packet structure: [seq_num, data...]
+            packet_seq = msg[0]  # First byte is sequence number
+            packet_data = msg[1:]  # Data starts from second byte
             
-            # Verify length byte matches actual packet length (should be len(msg))
             if packet_count < 5:
-                print(f"DEBUG: Packet {packet_count + 1} - len={len(msg)}, length_byte={packet_length_byte}, "
-                      f"seq={packet_seq}, first_bytes={[hex(b) for b in msg[:min(5, len(msg))]]}")
+                print(f"DEBUG: Packet {packet_count + 1} - len={len(msg)}, seq={packet_seq}, "
+                      f"data_len={len(packet_data)}, first_bytes={[hex(b) for b in msg[:min(5, len(msg))]]}")
             
-            if packet_length_byte != len(msg) and packet_count < 10:
-                print(f"WARNING: Length byte mismatch - length_byte={packet_length_byte}, actual_len={len(msg)}")
-            
-            # Sanity check: If sequence number seems wrong, try alternative parsing
-            if packet_count == 0 and packet_seq > 200:
+            # Sanity check: If sequence number seems wrong for first packet, log it
+            if packet_count == 0 and packet_seq != 0 and packet_seq > expected_num_packets:
                 print(f"WARNING: First packet has seq {packet_seq}, expected 0.")
-                print(f"  -> Length byte: {packet_length_byte}, First 10 bytes: {[hex(b) for b in msg[:min(10, len(msg))]]}")
-                # Check if maybe the length byte is being interpreted as seq
-                if packet_length_byte == 0 or packet_length_byte == 1:
-                    print(f"  -> Length byte ({packet_length_byte}) looks like a valid seq, checking if packet is misaligned...")
-                # Try alternative: maybe length byte is not included?
-                if len(msg) >= SEQ_NUM_SIZE:
-                    alt_seq = msg[0]
-                    if alt_seq <= expected_num_packets:
-                        print(f"  -> Trying alternative: first byte as seq = {alt_seq}")
-                        packet_seq = alt_seq
-                        packet_data = msg[1:]
-                        packet_length_byte = None
+                print(f"  -> First 10 bytes: {[hex(b) for b in msg[:min(10, len(msg))]]}")
         else:
-            # Fallback: maybe length byte is not included? Try first byte as seq
-            print(f"WARNING: Short packet (len={len(msg)}), trying first byte as sequence number")
-            packet_length_byte = None
-            packet_seq = msg[0]
-            packet_data = msg[1:] if len(msg) > 1 else b''
+            # Very short packet, can't extract sequence number
+            print(f"WARNING: Packet too short (len={len(msg)}), skipping")
+            continue
         
         # Validate sequence number
         if packet_seq is None:
@@ -272,8 +254,18 @@ for seq in range(expected_num_packets):
     if seq not in received_packets:
         missing_seqs.add(seq)
 
-# Combine corrupted and missing packets
-all_corrupted_seqs = corrupted_seqs | missing_seqs
+# Filter out invalid sequence numbers (should be 0 to expected_num_packets-1)
+# Sometimes we might receive packets with wrong sequence numbers due to corruption
+valid_corrupted_seqs = {seq for seq in corrupted_seqs if 0 <= seq < expected_num_packets}
+valid_missing_seqs = {seq for seq in missing_seqs if 0 <= seq < expected_num_packets}
+
+# Combine corrupted and missing packets (only valid sequence numbers)
+all_corrupted_seqs = valid_corrupted_seqs | valid_missing_seqs
+
+# Log any invalid sequence numbers that were filtered out
+invalid_seqs = (corrupted_seqs | missing_seqs) - all_corrupted_seqs
+if len(invalid_seqs) > 0:
+    print(f"Warning: Filtered out invalid sequence numbers: {sorted(invalid_seqs)}")
 
 print()
 print(f"Phase 1 complete: Received {len(received_packets)}/{expected_num_packets} packets in {phase1_duration_ms} ms ({phase1_duration_s:.3f} seconds)")
@@ -298,7 +290,7 @@ if len(all_corrupted_seqs) > 0:
     corruption_list_bytes += bytes(sorted(all_corrupted_seqs))
 
 # Small delay before sending to ensure TX is ready to receive
-sleep_ms(200)  # Increased delay to ensure TX has switched to RX mode
+sleep_ms(300)  # Increased delay to ensure TX has switched to RX mode
 
 # Send corruption list
 corruption_list_len, status = sx.send(corruption_list_bytes)
@@ -309,6 +301,10 @@ if status == 0:
         print(f"Sequence numbers: {sorted(all_corrupted_seqs)}")
 else:
     print(f"Error sending corruption list: {status}")
+
+# After sending corruption list, ensure we're ready to receive retransmissions
+print("Switching to RX mode to receive retransmissions...")
+sleep_ms(200)  # Brief delay to ensure we're in RX mode before retransmissions start
 
 print()
 
@@ -347,24 +343,11 @@ if len(all_corrupted_seqs) > 0:
         
         if (status == 0 or status == ERR_CRC_MISMATCH) and len(msg) >= SEQ_NUM_SIZE:
             # Extract sequence number using same logic as Phase 1
-            packet_seq = None
-            packet_data = None
+            # Packet structure: [seq_num, data...]
+            packet_seq = msg[0]  # First byte is sequence number
+            packet_data = msg[1:]  # Data starts from second byte
             
-            if len(msg) >= (1 + SEQ_NUM_SIZE):
-                first_byte = msg[0]
-                if abs(first_byte - len(msg)) <= 2:
-                    # Format: [length_byte, seq_num, data...]
-                    packet_seq = msg[1]
-                    packet_data = msg[2:]
-                else:
-                    # Format: [seq_num, data...]
-                    packet_seq = msg[0]
-                    packet_data = msg[1:]
-            else:
-                packet_seq = msg[0]
-                packet_data = msg[1:] if len(msg) > 1 else b''
-            
-            if packet_seq is None or packet_seq > 255:
+            if packet_seq > 255:
                 continue
             
             # Check if this is a corrupted packet we're waiting for
