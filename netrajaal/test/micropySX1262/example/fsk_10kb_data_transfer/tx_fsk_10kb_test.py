@@ -172,8 +172,17 @@ for packet_num in range(num_packets):
             ack_attempts += 1
             
             if ack_status == 0 and len(ack_msg) >= ACK_SIZE:
-                # Check if ACK matches our sequence number
-                ack_seq = ack_msg[0]
+                # In FSK variable length mode, ACK structure is: [length_byte, seq_num]
+                # First byte is length, second byte is sequence number
+                # But handle both cases: with length byte and without (fallback)
+                if len(ack_msg) >= (1 + ACK_SIZE):
+                    # Normal case: [length_byte, seq_num]
+                    ack_length_byte = ack_msg[0]
+                    ack_seq = ack_msg[1]
+                else:
+                    # Fallback: maybe length byte not included? Try first byte as seq
+                    ack_seq = ack_msg[0]
+                
                 if ack_seq == packet_seq:
                     ack_received = True
                     total_sent += len(chunk)
@@ -183,7 +192,7 @@ for packet_num in range(num_packets):
                 else:
                     # Wrong sequence number, log but continue waiting
                     if ack_attempts % 10 == 0:  # Log every 10th attempt to avoid spam
-                        print(f"  Received ACK with wrong seq: {ack_seq}, expected: {packet_seq} (attempt {ack_attempts})")
+                        print(f"  Received ACK with wrong seq: {ack_seq}, expected: {packet_seq} (attempt {ack_attempts}, ack_len={len(ack_msg)})")
             elif ack_status == -6:  # RX_TIMEOUT
                 # Continue waiting, log periodically
                 if ack_attempts % 20 == 0:  # Log every 20th timeout

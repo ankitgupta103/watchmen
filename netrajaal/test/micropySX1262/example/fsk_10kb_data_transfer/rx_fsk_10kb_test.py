@@ -145,10 +145,44 @@ while len(received_data) < EXPECTED_DATA_SIZE:
     msg, status = sx.recv(timeout_en=True, timeout_ms=2000)  # 2 second timeout per packet
     
     # Accept packets with status 0 (OK) or -7 (CRC_MISMATCH but data still provided)
+    # In FSK variable length mode, the packet structure is: [length_byte, seq_num, data...]
+    # The length byte is automatically added by the chip
     if (status == 0 or status == ERR_CRC_MISMATCH) and len(msg) >= SEQ_NUM_SIZE:
+        # Debug: Print raw packet info for first few packets or when we see issues
+        if packet_count < 3 or (len(msg) > 0 and ((len(msg) > 1 and msg[1] != expected_seq) or (len(msg) == 1 and msg[0] != expected_seq))):
+            print(f"DEBUG: Received packet - len={len(msg)}, status={status}, first_bytes={[hex(b) for b in msg[:min(5, len(msg))]]}")
+        
         # Extract sequence number and data
-        packet_seq = msg[0]
-        packet_data = msg[SEQ_NUM_SIZE:]
+        # For FSK variable length mode: first byte is length, second byte is sequence number
+        # But handle both cases: with length byte and without (fallback)
+        if len(msg) >= (1 + SEQ_NUM_SIZE):
+            # Normal case: [length_byte, seq_num, data...]
+            packet_length_byte = msg[0]  # Length byte (automatically added by chip)
+            packet_seq = msg[1]  # Sequence number is in second byte
+            packet_data = msg[2:]  # Data starts from third byte
+            
+            # Verify length byte matches actual packet length (should be len(msg))
+            if packet_length_byte != len(msg) and packet_count < 3:
+                print(f"WARNING: Length byte mismatch - length_byte={packet_length_byte}, actual_len={len(msg)}")
+        else:
+            # Fallback: maybe length byte is not included? Try first byte as seq
+            print(f"WARNING: Short packet (len={len(msg)}), trying first byte as sequence number")
+            packet_length_byte = None
+            packet_seq = msg[0]
+            packet_data = msg[1:] if len(msg) > 1 else b''
+        
+        # Sanity check: If we're at the start and seq is way off, might be a sync issue
+        # In FSK variable length mode, the first byte should be the length
+        if packet_count == 0 and packet_seq > 200:
+            print(f"WARNING: First packet has seq {packet_seq}, expected 0.")
+            print(f"  -> Length byte: {packet_length_byte}, First 10 bytes: {[hex(b) for b in msg[:min(10, len(msg))]]}")
+            # Check if maybe the length byte is being interpreted as seq
+            if packet_length_byte == 0 or packet_length_byte == 1:
+                print(f"  -> Length byte ({packet_length_byte}) looks like a valid seq, checking if packet is misaligned...")
+            # Reject if clearly wrong
+            if packet_seq > 250:  # Very unlikely to be valid
+                print(f"  -> Rejecting packet due to invalid sequence number ({packet_seq})")
+                continue
         
         # Update last packet received time
         last_packet_received_time = ticks_ms()
@@ -203,9 +237,18 @@ while len(received_data) < EXPECTED_DATA_SIZE:
                 print(f"  -> ACK send failed: {ack_status}")
         else:
             # Out-of-order packet (future sequence)
-            # Accept it if we've been waiting too long (skip missing packets)
             seq_diff = (packet_seq - expected_seq) & 0xFF
-            if seq_diff <= 5:  # Accept packets up to 5 ahead
+            
+            # Special handling for first packet sync issues
+            if packet_count == 0 and packet_seq > 200:
+                # If first packet has invalid seq, try to resync
+                print(f"SYNC ISSUE: First packet seq={packet_seq}, expected 0. Attempting resync...")
+                # Reject this packet and wait for a valid one
+                print(f"  -> Rejecting packet, will wait for seq 0")
+                continue
+            
+            # Accept it if we've been waiting too long (skip missing packets)
+            if seq_diff <= 10:  # Accept packets up to 10 ahead (increased tolerance)
                 print(f"Received out-of-order packet (seq {packet_seq}, expected {expected_seq}) [{status_str}]")
                 print(f"  -> Accepting and skipping {seq_diff} missing packet(s)")
                 # Fill in missing data with zeros (or we could buffer this packet)
@@ -229,8 +272,9 @@ while len(received_data) < EXPECTED_DATA_SIZE:
                 
                 print(f"  -> Now at seq {expected_seq}, total: {len(received_data)}/{EXPECTED_DATA_SIZE} bytes")
             else:
-                # Too far ahead, just send ACK
-                print(f"Received out-of-order packet (seq {packet_seq}, expected {expected_seq}) [{status_str}], too far ahead, sending ACK...")
+                # Too far ahead, log and send ACK anyway
+                print(f"Received out-of-order packet (seq {packet_seq}, expected {expected_seq}) [{status_str}], too far ahead (diff={seq_diff})")
+                print(f"  -> Sending ACK but not processing")
             
             # Send ACK for this packet
             sleep_ms(50)
@@ -238,6 +282,8 @@ while len(received_data) < EXPECTED_DATA_SIZE:
             ack_len, ack_status = sx.send(ack_packet)
             if ack_status == 0:
                 acks_sent += 1
+                if seq_diff > 10:
+                    print(f"  -> ACK sent for seq {packet_seq} (but packet too far ahead)")
             else:
                 print(f"  -> ACK send failed: {ack_status}")
     elif status == ERR_RX_TIMEOUT:  # RX_TIMEOUT
