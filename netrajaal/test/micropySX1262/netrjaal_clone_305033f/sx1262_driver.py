@@ -227,7 +227,19 @@ class SX1262(SX126X):
     def _readData(self, len_=0):
         state = ERR_NONE
 
-        length = super().getPacketLength()
+        try:
+            length = super().getPacketLength()
+            if length == 0 or length > SX126X_MAX_PACKET_LENGTH:
+                # No valid packet or invalid length, restart receive
+                super().startReceive()
+                return b'', ERR_RX_TIMEOUT
+        except Exception as e:
+            # getPacketLength failed, restart receive
+            try:
+                super().startReceive()
+            except:
+                pass
+            return b'', ERR_RX_TIMEOUT
 
         if len_ < length and len_ != 0:
             length = len_
@@ -386,13 +398,37 @@ try:
                 
                 self.is_connected = True
                 
+                # Start receive mode - critical for receiving packets
+                # Add small delay to ensure module is ready
+                time.sleep_ms(10)
                 try:
                     state = self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
                     if state != ERR_NONE:
-                        logger.warning(f"startReceive returned status: {state}, but continuing...")
-                    logger.info(f"SX1262 initialized successfully! LoRa mode: SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}")
+                        logger.warning(f"startReceive returned status: {state}, retrying...")
+                        # Retry starting receive mode
+                        time.sleep_ms(20)
+                        state = self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                        if state != ERR_NONE:
+                            logger.error(f"startReceive failed after retry: {state}")
+                        else:
+                            logger.info(f"SX1262 initialized successfully! LoRa mode: SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, receive mode active")
+                    else:
+                        logger.info(f"SX1262 initialized successfully! LoRa mode: SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, receive mode active")
                 except Exception as e2:
-                    logger.warning(f"Failed to start receive mode: {e2}, will retry on first receive() call")
+                    logger.error(f"Failed to start receive mode: {e2}")
+                    # Try one more time
+                    try:
+                        time.sleep_ms(50)
+                        state = self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                        if state == ERR_NONE:
+                            logger.info(f"Receive mode started after retry")
+                        else:
+                            logger.error(f"Receive mode start failed after retry, status: {state}")
+                    except Exception as e3:
+                        logger.error(f"Receive mode start failed after retry: {e3}")
+                
+                # Initialize receive check counter
+                self._receive_check_counter = 0
                 
             except Exception as e:
                 logger.error(f"SX1262 initialization error: {e}")
@@ -428,20 +464,30 @@ try:
                         pass
                 else:
                     # Wait for transmission to complete (TX_DONE interrupt)
-                    max_wait = 100  # Maximum wait time in ms
+                    # For SF5/BW500kHz, transmission is very fast (~2-3ms for 200 bytes)
+                    max_wait = 50  # Maximum wait time in ms (reduced for fast LoRa)
                     wait_count = 0
+                    tx_complete = False
                     while wait_count < max_wait:
                         irq_status = self.sx1262.getIrqStatus()
                         if irq_status & SX126X_IRQ_TX_DONE:
                             # Clear TX_DONE interrupt
                             self.sx1262.clearIrqStatus(SX126X_IRQ_TX_DONE)
+                            tx_complete = True
                             break
                         time.sleep_ms(1)
                         wait_count += 1
                     
-                    # Restart receive mode after transmission
+                    if not tx_complete:
+                        logger.warning(f"TX_DONE not received within {max_wait}ms, clearing IRQ and continuing")
+                        # Clear any pending TX interrupts
+                        self.sx1262.clearIrqStatus(SX126X_IRQ_TX_DONE)
+                    
+                    # Restart receive mode after transmission (critical!)
                     try:
-                        self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                        state = self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                        if state != ERR_NONE:
+                            logger.warning(f"Failed to restart receive after send, status: {state}")
                     except Exception as e:
                         logger.warning(f"Failed to restart receive after send: {e}")
             except Exception as e:
@@ -458,15 +504,25 @@ try:
                 return None, None
             
             try:
+                # Periodically ensure receive mode is active (every 100 calls)
+                self._receive_check_counter += 1
+                if self._receive_check_counter >= 100:
+                    self._receive_check_counter = 0
+                    # Ensure receive mode is still active
+                    try:
+                        self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                    except:
+                        pass
+                
                 # Check IRQ status to see if RX_DONE is set
                 irq_status = self.sx1262.getIrqStatus()
                 
                 # Check for RX_DONE interrupt (packet received)
                 if irq_status & SX126X_IRQ_RX_DONE:
-                    # Read packet first (this will also clear some IRQ flags internally)
-                    # _readData() automatically calls startReceive() after reading
+                    # Read packet - _readData() will handle packet length and restart receive
                     data, status = self.sx1262.recv(len=0, timeout_en=False, timeout_ms=0)
                     
+                    # Note: readData() already clears IRQ internally, but we clear again to be sure
                     # Clear all IRQ flags after reading to ensure clean state
                     self.sx1262.clearIrqStatus(
                         SX126X_IRQ_RX_DONE | SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_TIMEOUT | 
