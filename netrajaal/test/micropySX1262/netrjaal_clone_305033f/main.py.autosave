@@ -142,7 +142,7 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 # COMMAND CENTERS, OTHER NODES
-if uid == b'e076465dd7194025':
+if uid == b'e076465dd7194211':
     my_addr = 219
 elif uid == b'e076465dd7193a09':
     my_addr = 225
@@ -2098,8 +2098,8 @@ async def main():
     if running_as_cc():
         logger.info(f"[INIT] ===> Starting command center node <===")
         # Initialize WiFi if enabled
-        if WIFI_ENABLED:
-            await init_wifi()
+        # if WIFI_ENABLED:
+        #     await init_wifi()
 
         # await init_sim()
         asyncio.create_task(neighbour_scan())
