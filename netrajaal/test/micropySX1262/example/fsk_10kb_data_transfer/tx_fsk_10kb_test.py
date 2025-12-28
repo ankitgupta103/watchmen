@@ -157,16 +157,19 @@ for packet_num in range(num_packets):
             retry_count += 1
             continue
         
-        # Small delay to allow RX module to process and prepare to send ACK
-        sleep_ms(50)
+        # Longer delay to allow RX module to process and prepare to send ACK
+        # FSK at high speed needs more time for processing
+        sleep_ms(100)
         
         # Switch to RX mode to receive ACK
         ack_received = False
         ack_start_time = ticks_ms()
+        ack_attempts = 0
         
         while ticks_diff(ticks_ms(), ack_start_time) < ACK_TIMEOUT_MS:
-            # Wait for ACK
-            ack_msg, ack_status = sx.recv(timeout_en=True, timeout_ms=1000)
+            # Wait for ACK with shorter timeout to allow multiple attempts
+            ack_msg, ack_status = sx.recv(timeout_en=True, timeout_ms=500)
+            ack_attempts += 1
             
             if ack_status == 0 and len(ack_msg) >= ACK_SIZE:
                 # Check if ACK matches our sequence number
@@ -178,13 +181,19 @@ for packet_num in range(num_packets):
                           f"(Total: {total_sent}/{DATA_SIZE} bytes)")
                     break
                 else:
-                    # Wrong sequence number, continue waiting
-                    print(f"  Received ACK with wrong seq: {ack_seq}, expected: {packet_seq}")
+                    # Wrong sequence number, log but continue waiting
+                    if ack_attempts % 10 == 0:  # Log every 10th attempt to avoid spam
+                        print(f"  Received ACK with wrong seq: {ack_seq}, expected: {packet_seq} (attempt {ack_attempts})")
             elif ack_status == -6:  # RX_TIMEOUT
-                # Continue waiting
+                # Continue waiting, log periodically
+                if ack_attempts % 20 == 0:  # Log every 20th timeout
+                    elapsed = ticks_diff(ticks_ms(), ack_start_time)
+                    print(f"  Still waiting for ACK... ({elapsed} ms elapsed, attempt {ack_attempts})")
                 continue
             else:
-                # Error receiving, continue waiting
+                # Error receiving, log and continue waiting
+                if ack_attempts % 10 == 0:
+                    print(f"  ACK receive error: {ack_status} (attempt {ack_attempts})")
                 continue
         
         if not ack_received:

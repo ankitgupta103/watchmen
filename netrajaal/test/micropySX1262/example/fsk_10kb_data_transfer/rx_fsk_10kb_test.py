@@ -124,6 +124,8 @@ print("=" * 60)
 # Receive packets until we have 10KB or timeout
 timeout_ms = 300000  # 5 minute timeout (longer due to ACK protocol)
 receive_start_time = ticks_ms()
+last_packet_received_time = None
+PACKET_STUCK_TIMEOUT_MS = 10000  # If we haven't received any packet for 10 seconds, log a warning
 
 while len(received_data) < EXPECTED_DATA_SIZE:
     # Check for timeout
@@ -132,14 +134,28 @@ while len(received_data) < EXPECTED_DATA_SIZE:
         print(f"\nTimeout waiting for data (waited {elapsed} ms)")
         break
     
-    # Receive a packet
-    msg, status = sx.recv(timeout_en=True, timeout_ms=30000)  # 30 second timeout per packet
+    # Check if we're stuck waiting for a packet
+    if last_packet_received_time is not None:
+        time_since_last_packet = ticks_diff(ticks_ms(), last_packet_received_time)
+        if time_since_last_packet > PACKET_STUCK_TIMEOUT_MS:
+            print(f"Warning: Haven't received any packet for {time_since_last_packet} ms (waiting for seq {expected_seq})")
+            last_packet_received_time = ticks_ms()  # Reset to avoid spam
+    
+    # Receive a packet with shorter timeout to allow more frequent checks
+    msg, status = sx.recv(timeout_en=True, timeout_ms=2000)  # 2 second timeout per packet
     
     # Accept packets with status 0 (OK) or -7 (CRC_MISMATCH but data still provided)
     if (status == 0 or status == ERR_CRC_MISMATCH) and len(msg) >= SEQ_NUM_SIZE:
         # Extract sequence number and data
         packet_seq = msg[0]
         packet_data = msg[SEQ_NUM_SIZE:]
+        
+        # Update last packet received time
+        last_packet_received_time = ticks_ms()
+        
+        # Log all received packets for debugging
+        rssi = sx.getRSSI()
+        status_str = "CRC_ERROR" if status == ERR_CRC_MISMATCH else "OK"
         
         # Check if this is the expected packet (handle out-of-order or duplicates)
         if packet_seq == expected_seq:
@@ -157,9 +173,6 @@ while len(received_data) < EXPECTED_DATA_SIZE:
             if status == ERR_CRC_MISMATCH:
                 crc_error_count += 1
             
-            rssi = sx.getRSSI()
-            # Note: FSK mode doesn't provide SNR, only RSSI
-            status_str = "CRC_ERROR" if status == ERR_CRC_MISMATCH else "OK"
             print(f"Packet {packet_count} (seq {packet_seq}): Received {len(packet_data)} bytes [{status_str}] "
                   f"(Total: {len(received_data)}/{EXPECTED_DATA_SIZE} bytes) "
                   f"RSSI: {rssi:.1f} dBm")
@@ -181,22 +194,57 @@ while len(received_data) < EXPECTED_DATA_SIZE:
                 break
         elif packet_seq < expected_seq:
             # Old/duplicate packet, send ACK anyway but don't process data
-            print(f"Received duplicate/old packet (seq {packet_seq}, expected {expected_seq}), sending ACK...")
+            print(f"Received duplicate/old packet (seq {packet_seq}, expected {expected_seq}) [{status_str}], sending ACK...")
             ack_packet = bytes([packet_seq])
-            sx.send(ack_packet)
-            acks_sent += 1
+            ack_len, ack_status = sx.send(ack_packet)
+            if ack_status == 0:
+                acks_sent += 1
+            else:
+                print(f"  -> ACK send failed: {ack_status}")
         else:
-            # Out-of-order packet (future sequence), send ACK but don't process yet
-            # Note: This simple implementation doesn't buffer out-of-order packets
-            print(f"Received out-of-order packet (seq {packet_seq}, expected {expected_seq}), sending ACK...")
+            # Out-of-order packet (future sequence)
+            # Accept it if we've been waiting too long (skip missing packets)
+            seq_diff = (packet_seq - expected_seq) & 0xFF
+            if seq_diff <= 5:  # Accept packets up to 5 ahead
+                print(f"Received out-of-order packet (seq {packet_seq}, expected {expected_seq}) [{status_str}]")
+                print(f"  -> Accepting and skipping {seq_diff} missing packet(s)")
+                # Fill in missing data with zeros (or we could buffer this packet)
+                missing_bytes = seq_diff * MAX_PAYLOAD_SIZE
+                if len(received_data) + missing_bytes <= EXPECTED_DATA_SIZE:
+                    received_data.extend(bytes(missing_bytes))
+                    packet_count += seq_diff
+                
+                # Process this packet
+                current_time = ticks_ms()
+                if first_packet_time is None:
+                    first_packet_time = current_time
+                last_packet_time = current_time
+                
+                received_data.extend(packet_data)
+                packet_count += 1
+                expected_seq = (packet_seq + 1) & 0xFF
+                
+                if status == ERR_CRC_MISMATCH:
+                    crc_error_count += 1
+                
+                print(f"  -> Now at seq {expected_seq}, total: {len(received_data)}/{EXPECTED_DATA_SIZE} bytes")
+            else:
+                # Too far ahead, just send ACK
+                print(f"Received out-of-order packet (seq {packet_seq}, expected {expected_seq}) [{status_str}], too far ahead, sending ACK...")
+            
+            # Send ACK for this packet
+            sleep_ms(50)
             ack_packet = bytes([packet_seq])
-            sx.send(ack_packet)
-            acks_sent += 1
+            ack_len, ack_status = sx.send(ack_packet)
+            if ack_status == 0:
+                acks_sent += 1
+            else:
+                print(f"  -> ACK send failed: {ack_status}")
     elif status == ERR_RX_TIMEOUT:  # RX_TIMEOUT
         # No packet received, continue waiting
         continue
     else:
-        print(f"Error receiving packet: {status}")
+        print(f"Error receiving packet: status={status}, msg_len={len(msg) if msg else 0}")
         if len(received_data) == 0:
             # If we haven't received anything yet, continue waiting
             continue
