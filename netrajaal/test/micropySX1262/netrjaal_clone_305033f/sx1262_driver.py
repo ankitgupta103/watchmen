@@ -421,10 +421,36 @@ try:
                 bytes_sent, status = self.sx1262.send(data)
                 if status != ERR_NONE:
                     logger.warning(f"Send failed with status: {status}")
+                    # Restart receive mode even on failure
+                    try:
+                        self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                    except:
+                        pass
                 else:
-                    time.sleep_ms(TX_DELAY_MS)
+                    # Wait for transmission to complete (TX_DONE interrupt)
+                    max_wait = 100  # Maximum wait time in ms
+                    wait_count = 0
+                    while wait_count < max_wait:
+                        irq_status = self.sx1262.getIrqStatus()
+                        if irq_status & SX126X_IRQ_TX_DONE:
+                            # Clear TX_DONE interrupt
+                            self.sx1262.clearIrqStatus(SX126X_IRQ_TX_DONE)
+                            break
+                        time.sleep_ms(1)
+                        wait_count += 1
+                    
+                    # Restart receive mode after transmission
+                    try:
+                        self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                    except Exception as e:
+                        logger.warning(f"Failed to restart receive after send: {e}")
             except Exception as e:
                 logger.error(f"Error sending message: {e}")
+                # Restart receive mode on error
+                try:
+                    self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                except:
+                    pass
         
         def receive(self):
             """Receive a message from the LoRa module (non-blocking)."""
@@ -435,40 +461,73 @@ try:
                 # Check IRQ status to see if RX_DONE is set
                 irq_status = self.sx1262.getIrqStatus()
                 
-                if not (irq_status & SX126X_IRQ_RX_DONE):
-                    return None, None
+                # Check for RX_DONE interrupt (packet received)
+                if irq_status & SX126X_IRQ_RX_DONE:
+                    # Read packet first (this will also clear some IRQ flags internally)
+                    # _readData() automatically calls startReceive() after reading
+                    data, status = self.sx1262.recv(len=0, timeout_en=False, timeout_ms=0)
+                    
+                    # Clear all IRQ flags after reading to ensure clean state
+                    self.sx1262.clearIrqStatus(
+                        SX126X_IRQ_RX_DONE | SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_TIMEOUT | 
+                        SX126X_IRQ_CRC_ERR | SX126X_IRQ_HEADER_ERR
+                    )
+                    
+                    if status == ERR_NONE or status == ERR_CRC_MISMATCH:
+                        if data and len(data) >= 7:
+                            # Extract message payload (skip first 6 bytes: addressing header)
+                            msg = data[6:]
+                            
+                            if len(msg) == 0:
+                                return None, None
+                            
+                            # Get RSSI if enabled
+                            rssi_value = None
+                            if self.rssi:
+                                try:
+                                    rssi_value = self.sx1262.getRSSI()
+                                except:
+                                    pass
+                            
+                            return msg, rssi_value
+                    else:
+                        # Packet read failed, ensure receive mode is restarted
+                        try:
+                            self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                        except:
+                            pass
                 
-                # Clear IRQ status before reading data
-                self.sx1262.clearIrqStatus(
-                    SX126X_IRQ_RX_DONE | SX126X_IRQ_TX_DONE | SX126X_IRQ_RX_TIMEOUT | 
-                    SX126X_IRQ_CRC_ERR | SX126X_IRQ_HEADER_ERR
-                )
+                # Check for RX_TIMEOUT - restart receive mode (normal in continuous receive)
+                elif irq_status & SX126X_IRQ_RX_TIMEOUT:
+                    self.sx1262.clearIrqStatus(SX126X_IRQ_RX_TIMEOUT)
+                    # Restart receive mode to continue listening
+                    try:
+                        self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                    except:
+                        pass
                 
-                # Read packet
-                data, status = self.sx1262.recv(len=0, timeout_en=False, timeout_ms=0)
+                # Check for CRC error - still read and restart
+                elif irq_status & SX126X_IRQ_CRC_ERR:
+                    # Read the packet even with CRC error (might be useful for debugging)
+                    data, status = self.sx1262.recv(len=0, timeout_en=False, timeout_ms=0)
+                    self.sx1262.clearIrqStatus(SX126X_IRQ_CRC_ERR | SX126X_IRQ_RX_DONE)
+                    # Restart receive mode
+                    try:
+                        self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                    except:
+                        pass
                 
-                if status == ERR_NONE or status == ERR_CRC_MISMATCH:
-                    if data and len(data) >= 7:
-                        # Extract message payload (skip first 6 bytes: addressing header)
-                        msg = data[6:]
-                        
-                        if len(msg) == 0:
-                            return None, None
-                        
-                        # Get RSSI if enabled
-                        rssi_value = None
-                        if self.rssi:
-                            try:
-                                rssi_value = self.sx1262.getRSSI()
-                            except:
-                                pass
-                        
-                        return msg, rssi_value
-                
+                # No relevant IRQ set - return None (normal polling case)
+                # Receive mode should already be active from initialization
                 return None, None
                     
             except Exception as e:
                 logger.debug(f"Receive error: {e}")
+                # Ensure receive mode is restarted on error
+                try:
+                    self.sx1262.startReceive(SX126X_RX_TIMEOUT_INF)
+                except:
+                    pass
                 return None, None
 
 except ImportError:
