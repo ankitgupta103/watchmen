@@ -167,8 +167,12 @@ for packet_num in range(num_packets):
             print(f"Packet {packet_num + 1}/{num_packets} (seq {packet_seq}): Sent {len(chunk)} bytes "
                   f"(Total: {total_sent}/{DATA_SIZE} bytes)")
     
-    # Small delay between packets to avoid overwhelming the receiver
-    sleep_ms(10)
+    # Delay between packets to allow receiver to process
+    # Longer delay after first packet to ensure receiver is fully ready
+    if packet_num == 0:
+        sleep_ms(50)  # Extra delay after first packet for receiver initialization
+    else:
+        sleep_ms(20)  # Increased delay between subsequent packets for reliability
 
 phase1_end_time = ticks_ms()
 phase1_duration_ms = ticks_diff(phase1_end_time, phase1_start_time)
@@ -177,6 +181,10 @@ phase1_duration_s = phase1_duration_ms / 1000.0
 print()
 print(f"Phase 1 complete: Sent {num_packets} packets in {phase1_duration_ms} ms ({phase1_duration_s:.3f} seconds)")
 print()
+
+# Give receiver time to finish processing all packets before switching to RX mode
+print("Waiting for receiver to process all packets...")
+sleep_ms(500)  # Allow receiver to finish processing and prepare corruption list
 
 # ============================================================================
 # PHASE 2: Receive corruption list from RX device
@@ -296,8 +304,8 @@ if len(corrupted_seqs) > 0:
                     retransmitted_count += 1
                     print(f"Retransmitted packet seq {seq} ({len(chunk)} bytes)")
                 
-                # Small delay between retransmissions
-                sleep_ms(10)
+                # Delay between retransmissions to allow receiver to process
+                sleep_ms(20)  # Increased delay for retransmissions
                 packet_found = True
                 break
         

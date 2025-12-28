@@ -53,7 +53,7 @@ MAX_PAYLOAD_SIZE = MAX_PACKET_SIZE - SEQ_NUM_SIZE  # Max data per packet
 CORRUPTION_LIST_HEADER = 0xFF  # Header byte to identify corruption list packet
 INITIAL_RECEIVE_TIMEOUT_MS = 60000  # Timeout for initial receive phase (60 seconds)
 RETRANSMISSION_TIMEOUT_MS = 30000  # Timeout for retransmission phase (30 seconds)
-PACKET_STUCK_TIMEOUT_MS = 5000  # If we haven't received any packet for 5 seconds, consider phase complete
+PACKET_STUCK_TIMEOUT_MS = 3000  # If we haven't received any packet for 3 seconds, consider phase complete (reduced for faster response)
 
 # Initialize SX1262
 print("Initializing SX1262...")
@@ -159,7 +159,8 @@ while len(received_packets) < expected_num_packets:
             break
     
     # Receive a packet with shorter timeout to allow more frequent checks
-    msg, status = sx.recv(timeout_en=True, timeout_ms=2000)  # 2 second timeout per packet
+    # Reduced timeout to be more responsive to incoming packets
+    msg, status = sx.recv(timeout_en=True, timeout_ms=1000)  # 1 second timeout per packet for faster response
     
     # Accept packets with status 0 (OK) or -7 (CRC_MISMATCH but data still provided)
     # In FSK variable length mode, the packet structure depends on chip implementation
@@ -294,8 +295,8 @@ corruption_list_bytes = bytes([CORRUPTION_LIST_HEADER, len(all_corrupted_seqs)])
 if len(all_corrupted_seqs) > 0:
     corruption_list_bytes += bytes(sorted(all_corrupted_seqs))
 
-# Small delay before sending
-sleep_ms(100)
+# Small delay before sending to ensure TX is ready to receive
+sleep_ms(200)  # Increased delay to ensure TX has switched to RX mode
 
 # Send corruption list
 corruption_list_len, status = sx.send(corruption_list_bytes)
@@ -339,8 +340,8 @@ if len(all_corrupted_seqs) > 0:
                 print(f"Still missing: {sorted(remaining_corrupted)}")
                 break
         
-        # Receive a retransmitted packet
-        msg, status = sx.recv(timeout_en=True, timeout_ms=2000)
+        # Receive a retransmitted packet with shorter timeout for faster response
+        msg, status = sx.recv(timeout_en=True, timeout_ms=1000)  # 1 second timeout for faster response
         
         if (status == 0 or status == ERR_CRC_MISMATCH) and len(msg) >= SEQ_NUM_SIZE:
             # Extract sequence number using same logic as Phase 1
