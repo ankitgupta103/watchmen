@@ -53,6 +53,10 @@ CORRUPTION_LIST_TIMEOUT_MS = 10000  # Timeout for waiting for corruption list (1
 CORRUPTION_LIST_HEADER = 0xFF  # Header byte to identify corruption list packet
 RETRANSMISSION_TIMEOUT_MS = 30000  # Timeout for retransmission phase (30 seconds)
 
+# Error code constants
+ERR_CRC_MISMATCH = -7
+ERR_RX_TIMEOUT = -6
+
 # Initialize SX1262
 print("Initializing SX1262...")
 sx = SX1262(
@@ -190,31 +194,71 @@ while ticks_diff(ticks_ms(), corruption_list_start_time) < CORRUPTION_LIST_TIMEO
     msg, status = sx.recv(timeout_en=True, timeout_ms=2000)
     
     if status == 0 and len(msg) > 0:
-        # In FSK variable length mode, first byte is length byte added by chip
-        # Corruption list format: [length_byte, 0xFF, count, seq1, seq2, ...]
-        # Check if this is a corruption list packet (second byte should be header)
-        if len(msg) >= 2 and msg[1] == CORRUPTION_LIST_HEADER:
-            # Parse corruption list: [length_byte, 0xFF, count, seq1, seq2, ...]
-            if len(msg) >= 3:
-                count = msg[2]
-                if len(msg) >= (3 + count):
-                    corrupted_seqs = set(msg[3:3+count])
+        # In FSK variable length mode, first byte may be length byte added by chip
+        # Corruption list format could be:
+        # Option 1: [length_byte, 0xFF, count, seq1, seq2, ...] (with length byte)
+        # Option 2: [0xFF, count, seq1, seq2, ...] (without length byte)
+        
+        # Check if this is a corruption list packet
+        header_pos = -1
+        if len(msg) >= 1 and msg[0] == CORRUPTION_LIST_HEADER:
+            # Format without length byte: [0xFF, count, seq1, seq2, ...]
+            header_pos = 0
+        elif len(msg) >= 2 and msg[1] == CORRUPTION_LIST_HEADER:
+            # Format with length byte: [length_byte, 0xFF, count, seq1, seq2, ...]
+            header_pos = 1
+        
+        if header_pos >= 0:
+            # Parse corruption list
+            if len(msg) >= (header_pos + 2):
+                count = msg[header_pos + 1]
+                if count == 0:
+                    # No corrupted packets
+                    corrupted_seqs = set()
+                    corruption_list_received = True
+                    print("Received corruption list: No corrupted packets! All packets received successfully.")
+                    break
+                elif len(msg) >= (header_pos + 2 + count):
+                    corrupted_seqs = set(msg[header_pos + 2:header_pos + 2 + count])
                     corruption_list_received = True
                     print(f"Received corruption list: {count} corrupted packet(s)")
-                    if count > 0:
-                        print(f"Corrupted sequence numbers: {sorted(corrupted_seqs)}")
-                    else:
-                        print("No corrupted packets! All packets received successfully.")
+                    print(f"Corrupted sequence numbers: {sorted(corrupted_seqs)}")
                     break
                 else:
-                    print(f"Warning: Corruption list packet too short (expected {3+count} bytes, got {len(msg)})")
+                    print(f"Warning: Corruption list packet too short (expected {header_pos + 2 + count} bytes, got {len(msg)})")
             else:
-                print(f"Warning: Corruption list packet too short (got {len(msg)} bytes)")
+                print(f"Warning: Corruption list packet too short (got {len(msg)} bytes, need at least {header_pos + 2})")
         else:
             # Not a corruption list packet, continue waiting
-            continue
+            # Log occasionally for debugging
+            if ticks_diff(ticks_ms(), corruption_list_start_time) % 5000 < 2000:
+                continue  # Don't spam logs
     elif status == -6:  # RX_TIMEOUT
         # Continue waiting
+        continue
+    elif status == ERR_CRC_MISMATCH:
+        # CRC error, but might still be readable - try to parse
+        if len(msg) > 0:
+            # Try same parsing logic
+            header_pos = -1
+            if len(msg) >= 1 and msg[0] == CORRUPTION_LIST_HEADER:
+                header_pos = 0
+            elif len(msg) >= 2 and msg[1] == CORRUPTION_LIST_HEADER:
+                header_pos = 1
+            
+            if header_pos >= 0 and len(msg) >= (header_pos + 2):
+                count = msg[header_pos + 1]
+                if count == 0:
+                    corrupted_seqs = set()
+                    corruption_list_received = True
+                    print("Received corruption list (with CRC error): No corrupted packets")
+                    break
+                elif len(msg) >= (header_pos + 2 + count):
+                    corrupted_seqs = set(msg[header_pos + 2:header_pos + 2 + count])
+                    corruption_list_received = True
+                    print(f"Received corruption list (with CRC error): {count} corrupted packet(s)")
+                    print(f"Corrupted sequence numbers: {sorted(corrupted_seqs)}")
+                    break
         continue
     else:
         # Error receiving, continue waiting

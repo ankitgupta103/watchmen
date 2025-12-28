@@ -162,19 +162,65 @@ while len(received_packets) < expected_num_packets:
     msg, status = sx.recv(timeout_en=True, timeout_ms=2000)  # 2 second timeout per packet
     
     # Accept packets with status 0 (OK) or -7 (CRC_MISMATCH but data still provided)
-    # In FSK variable length mode, the packet structure is: [length_byte, seq_num, data...]
+    # In FSK variable length mode, the packet structure depends on chip implementation
+    # It could be: [length_byte, seq_num, data...] or [seq_num, data...]
     if (status == 0 or status == ERR_CRC_MISMATCH) and len(msg) >= SEQ_NUM_SIZE:
+        # Debug: Print raw packet info for first few packets to understand structure
+        if packet_count < 5:
+            print(f"DEBUG: Packet {packet_count + 1} - len={len(msg)}, status={status}, "
+                  f"first_bytes={[hex(b) for b in msg[:min(5, len(msg))]]}")
+        
         # Extract sequence number and data
         # For FSK variable length mode: first byte is length, second byte is sequence number
+        # But handle both cases: with length byte and without (fallback)
+        packet_seq = None
+        packet_data = None
+        packet_length_byte = None
+        
         if len(msg) >= (1 + SEQ_NUM_SIZE):
             # Normal case: [length_byte, seq_num, data...]
             packet_length_byte = msg[0]  # Length byte (automatically added by chip)
             packet_seq = msg[1]  # Sequence number is in second byte
             packet_data = msg[2:]  # Data starts from third byte
+            
+            # Verify length byte matches actual packet length (should be len(msg))
+            if packet_count < 5:
+                print(f"DEBUG: Packet {packet_count + 1} - len={len(msg)}, length_byte={packet_length_byte}, "
+                      f"seq={packet_seq}, first_bytes={[hex(b) for b in msg[:min(5, len(msg))]]}")
+            
+            if packet_length_byte != len(msg) and packet_count < 10:
+                print(f"WARNING: Length byte mismatch - length_byte={packet_length_byte}, actual_len={len(msg)}")
+            
+            # Sanity check: If sequence number seems wrong, try alternative parsing
+            if packet_count == 0 and packet_seq > 200:
+                print(f"WARNING: First packet has seq {packet_seq}, expected 0.")
+                print(f"  -> Length byte: {packet_length_byte}, First 10 bytes: {[hex(b) for b in msg[:min(10, len(msg))]]}")
+                # Check if maybe the length byte is being interpreted as seq
+                if packet_length_byte == 0 or packet_length_byte == 1:
+                    print(f"  -> Length byte ({packet_length_byte}) looks like a valid seq, checking if packet is misaligned...")
+                # Try alternative: maybe length byte is not included?
+                if len(msg) >= SEQ_NUM_SIZE:
+                    alt_seq = msg[0]
+                    if alt_seq <= expected_num_packets:
+                        print(f"  -> Trying alternative: first byte as seq = {alt_seq}")
+                        packet_seq = alt_seq
+                        packet_data = msg[1:]
+                        packet_length_byte = None
         else:
-            # Fallback: maybe length byte not included? Try first byte as seq
+            # Fallback: maybe length byte is not included? Try first byte as seq
+            print(f"WARNING: Short packet (len={len(msg)}), trying first byte as sequence number")
+            packet_length_byte = None
             packet_seq = msg[0]
             packet_data = msg[1:] if len(msg) > 1 else b''
+        
+        # Validate sequence number
+        if packet_seq is None:
+            print(f"WARNING: Could not extract sequence number, skipping packet")
+            continue
+        
+        if packet_seq > 255:
+            print(f"WARNING: Invalid sequence number {packet_seq} (>255), skipping packet")
+            continue
         
         # Update last packet received time
         last_packet_received_time = ticks_ms()
@@ -243,14 +289,16 @@ print("PHASE 2: Sending corruption list to TX device...")
 print("=" * 60)
 
 # Create corruption list packet: [0xFF, count, seq1, seq2, ...]
-corruption_list = bytearray([CORRUPTION_LIST_HEADER, len(all_corrupted_seqs)])
-corruption_list.extend(sorted(all_corrupted_seqs))
+# Convert to bytes immediately to avoid buffer protocol issues
+corruption_list_bytes = bytes([CORRUPTION_LIST_HEADER, len(all_corrupted_seqs)])
+if len(all_corrupted_seqs) > 0:
+    corruption_list_bytes += bytes(sorted(all_corrupted_seqs))
 
 # Small delay before sending
 sleep_ms(100)
 
 # Send corruption list
-corruption_list_len, status = sx.send(bytes(corruption_list))
+corruption_list_len, status = sx.send(corruption_list_bytes)
 
 if status == 0:
     print(f"Corruption list sent: {len(all_corrupted_seqs)} corrupted/missing packet(s)")
@@ -295,13 +343,26 @@ if len(all_corrupted_seqs) > 0:
         msg, status = sx.recv(timeout_en=True, timeout_ms=2000)
         
         if (status == 0 or status == ERR_CRC_MISMATCH) and len(msg) >= SEQ_NUM_SIZE:
-            # Extract sequence number
+            # Extract sequence number using same logic as Phase 1
+            packet_seq = None
+            packet_data = None
+            
             if len(msg) >= (1 + SEQ_NUM_SIZE):
-                packet_seq = msg[1]
-                packet_data = msg[2:]
+                first_byte = msg[0]
+                if abs(first_byte - len(msg)) <= 2:
+                    # Format: [length_byte, seq_num, data...]
+                    packet_seq = msg[1]
+                    packet_data = msg[2:]
+                else:
+                    # Format: [seq_num, data...]
+                    packet_seq = msg[0]
+                    packet_data = msg[1:]
             else:
                 packet_seq = msg[0]
                 packet_data = msg[1:] if len(msg) > 1 else b''
+            
+            if packet_seq is None or packet_seq > 255:
+                continue
             
             # Check if this is a corrupted packet we're waiting for
             if packet_seq in remaining_corrupted:
