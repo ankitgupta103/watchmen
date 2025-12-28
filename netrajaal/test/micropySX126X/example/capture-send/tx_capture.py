@@ -42,7 +42,7 @@ ACK_TIMEOUT_MS = 3000
 # Initialize camera
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.HD)  # 320x240
+sensor.set_framesize(sensor.QVGA)  # 320x240
 sensor.skip_frames(time=2000)
 print("Camera initialized")
 
@@ -127,42 +127,52 @@ for packet_num in range(num_packets):
     start_idx = packet_num * MAX_PAYLOAD_SIZE
     end_idx = min(start_idx + MAX_PAYLOAD_SIZE, img_size)
     chunk = img_bytes[start_idx:end_idx]
-    
+
     packet_seq = packet_num & 0xFF
     packet = bytes([packet_seq]) + chunk
-    
+
     ack_received = False
-    retries = 0
-    
-    while not ack_received and retries <= MAX_RETRIES:
-        if retries > 0:
-            print(f"  Retry {retries}/{MAX_RETRIES}")
+    packet_retry_count = 0
+
+    while not ack_received and packet_retry_count <= MAX_RETRIES:
+        if packet_retry_count > 0:
+            print(f"  Retry {packet_retry_count}/{MAX_RETRIES}")
             retry_count += 1
-        
+
         # Send packet
         payload_len, send_status = sx.send(packet)
         if send_status != 0:
-            retries += 1
+            packet_retry_count += 1
+            if packet_retry_count <= MAX_RETRIES:
+                sleep_ms(100)
             continue
-        
+
         sleep_ms(50)
-        
-        # Wait for ACK
+
+        # Wait for ACK with timeout
         ack_timeout_start = ticks_ms()
         while ticks_diff(ticks_ms(), ack_timeout_start) < ACK_TIMEOUT_MS:
-            ack_msg, ack_status = sx.recv(timeout_en=True, timeout_ms=500)
+            ack_msg, ack_status = sx.recv(timeout_en=True, timeout_ms=1000)
             if ack_status == 0 and len(ack_msg) >= 1:
-                if ack_msg[0] == packet_seq:
+                ack_seq = ack_msg[0]
+                if ack_seq == packet_seq:
                     ack_received = True
                     total_sent += len(chunk)
                     print(f"Packet {packet_num + 1}/{num_packets}: {len(chunk)} bytes OK")
                     break
+                # Wrong sequence - might be ACK from previous attempt, continue waiting
             elif ack_status == -6:  # RX_TIMEOUT
+                # Continue waiting until overall timeout expires
                 continue
-        
+            # Other errors - continue waiting
+
+        # If no ACK received, increment retry counter
         if not ack_received:
-            retries += 1
-    
+            packet_retry_count += 1
+            if packet_retry_count <= MAX_RETRIES:
+                print(f"  ACK timeout, retrying...")
+                sleep_ms(100)  # Brief delay before retry
+
     if not ack_received:
         print(f"Packet {packet_num + 1} failed after {MAX_RETRIES} retries")
         break

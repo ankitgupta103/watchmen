@@ -136,9 +136,13 @@ else:
                 
                 if len(received_data) >= img_size:
                     break
-            elif packet_seq < expected_seq:
-                # Duplicate, send ACK anyway
-                sx.send(bytes([packet_seq]))
+            else:
+                # Out-of-order or duplicate packet - always send ACK to keep communication alive
+                sleep_ms(50)
+                ack = bytes([packet_seq])
+                sx.send(ack)
+                if packet_seq < expected_seq:
+                    print(f"  Duplicate packet seq {packet_seq}, ACK sent")
     
     elapsed_ms = ticks_diff(ticks_ms(), start_time)
     elapsed_s = elapsed_ms / 1000.0
