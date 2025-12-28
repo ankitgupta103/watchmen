@@ -53,21 +53,18 @@ while len(received_packets) < expected_num_packets:
     if last_packet_time and ticks_diff(ticks_ms(), last_packet_time) > PACKET_STUCK_TIMEOUT_MS:
         break
     
-    msg, status = sx.recv(timeout_en=True, timeout_ms=500)
+    msg, status = sx.recv(timeout_en=True, timeout_ms=300)  # Shorter timeout
     
     if (status == 0 or status == -7) and len(msg) >= SEQ_NUM_SIZE:
         packet_seq = msg[0]
-        packet_data = msg[1:]
-        
         if 0 <= packet_seq < expected_num_packets:
-            received_packets[packet_seq] = (packet_data, status)
+            received_packets[packet_seq] = msg[1:]  # Store only data
             last_packet_time = ticks_ms()
-            
-            if status == -7:  # CRC error
+            if status == -7:
                 corrupted_seqs.add(packet_seq)
 
 phase1_time = ticks_diff(ticks_ms(), start_time)
-print(f"Phase 1: Received {len(received_packets)}/{expected_num_packets} packets in {phase1_time} ms")
+print(f"Phase 1: {len(received_packets)}/{expected_num_packets} packets in {phase1_time} ms")
 
 # Identify missing packets
 missing_seqs = {seq for seq in range(expected_num_packets) if seq not in received_packets}
@@ -75,25 +72,25 @@ all_corrupted_seqs = (corrupted_seqs | missing_seqs) & {seq for seq in range(exp
 
 # Phase 2: Send corruption list
 print(f"\nPHASE 2: Sending corruption list ({len(all_corrupted_seqs)} packets)...")
-sleep_ms(200)  # Reduced delay
+sleep_ms(100)  # Minimal delay
 
 corruption_list = bytes([CORRUPTION_LIST_HEADER, len(all_corrupted_seqs)]) + bytes(sorted(all_corrupted_seqs))
-sx.send(corruption_list)  # Send once - faster
+sx.send(corruption_list)
 
 # Phase 3: Receive retransmissions
 if len(all_corrupted_seqs) > 0:
     print(f"\nPHASE 3: Receiving {len(all_corrupted_seqs)} retransmissions...")
-    sleep_ms(100)  # Reduced delay
+    sleep_ms(50)  # Minimal delay
     remaining = all_corrupted_seqs.copy()
     retransmit_start = ticks_ms()
     
-    while len(remaining) > 0 and ticks_diff(ticks_ms(), retransmit_start) < 10000:
-        msg, status = sx.recv(timeout_en=True, timeout_ms=500)
+    while len(remaining) > 0 and ticks_diff(ticks_ms(), retransmit_start) < 5000:
+        msg, status = sx.recv(timeout_en=True, timeout_ms=300)
         
         if (status == 0 or status == -7) and len(msg) >= SEQ_NUM_SIZE:
             packet_seq = msg[0]
             if packet_seq in remaining:
-                received_packets[packet_seq] = (msg[1:], status)
+                received_packets[packet_seq] = msg[1:]
                 remaining.remove(packet_seq)
     
     retransmit_time = ticks_diff(ticks_ms(), retransmit_start)
@@ -103,7 +100,7 @@ if len(all_corrupted_seqs) > 0:
 received_data = bytearray()
 for seq in range(expected_num_packets):
     if seq in received_packets:
-        received_data.extend(received_packets[seq][0])
+        received_data.extend(received_packets[seq])
     else:
         # Fill missing with zeros
         missing_bytes = MAX_PAYLOAD_SIZE if seq < expected_num_packets - 1 else (EXPECTED_DATA_SIZE - len(received_data))

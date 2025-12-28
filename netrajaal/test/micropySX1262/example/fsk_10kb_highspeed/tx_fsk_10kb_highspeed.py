@@ -44,61 +44,55 @@ test_data = bytes([i % 256 for i in range(DATA_SIZE)])
 num_packets = (DATA_SIZE + MAX_PAYLOAD_SIZE - 1) // MAX_PAYLOAD_SIZE
 print(f"Sending {DATA_SIZE} bytes in {num_packets} packets\n")
 
-# Phase 1: Send all packets
+# Phase 1: Send all packets (back-to-back for maximum speed)
 print("PHASE 1: Sending packets...")
 start_time = ticks_ms()
 packets = []
 
+# Pre-build all packets to minimize processing during send
 for packet_num in range(num_packets):
     start_idx = packet_num * MAX_PAYLOAD_SIZE
     end_idx = min(start_idx + MAX_PAYLOAD_SIZE, DATA_SIZE)
     chunk = test_data[start_idx:end_idx]
     packet = bytes([packet_num & 0xFF]) + chunk
-    packets.append((packet_num & 0xFF, packet, chunk))
-    sx.send(packet)  # No delays - maximum speed
+    packets.append(packet)
+
+# Send all packets back-to-back
+for packet in packets:
+    sx.send(packet)
 
 phase1_time = ticks_diff(ticks_ms(), start_time)
 print(f"Phase 1: {phase1_time} ms\n")
 
 # Phase 2: Receive corruption list
 print("PHASE 2: Waiting for corruption list...")
-sleep_ms(100)  # Minimal delay for receiver processing
+sleep_ms(50)  # Minimal delay
 corrupted_seqs = set()
-corruption_list_received = False
 timeout_start = ticks_ms()
 
 while ticks_diff(ticks_ms(), timeout_start) < CORRUPTION_LIST_TIMEOUT_MS:
-    msg, status = sx.recv(timeout_en=True, timeout_ms=500)
+    msg, status = sx.recv(timeout_en=True, timeout_ms=300)
     
-    if status == 0 and len(msg) > 0 and msg[0] == CORRUPTION_LIST_HEADER:
-        if len(msg) >= 2:
-            count = msg[1]
-            if count == 0:
-                corrupted_seqs = set()
-                corruption_list_received = True
-                print("All packets received successfully")
-                break
-            elif len(msg) >= (2 + count):
-                corrupted_seqs = set(msg[2:2+count])
-                corruption_list_received = True
-                print(f"Corrupted packets: {sorted(corrupted_seqs)}")
-                break
-
-if not corruption_list_received:
-    print("No corruption list received, assuming success")
-    corrupted_seqs = set()
+    if status == 0 and len(msg) > 0 and msg[0] == CORRUPTION_LIST_HEADER and len(msg) >= 2:
+        count = msg[1]
+        if count == 0:
+            print("All packets OK")
+            break
+        elif len(msg) >= (2 + count):
+            corrupted_seqs = set(msg[2:2+count])
+            print(f"Corrupted: {sorted(corrupted_seqs)}")
+            break
 
 # Phase 3: Retransmit corrupted packets
 if len(corrupted_seqs) > 0:
     print(f"\nPHASE 3: Retransmitting {len(corrupted_seqs)} packets...")
-    sleep_ms(100)  # Minimal delay for receiver
+    sleep_ms(50)  # Minimal delay
     retransmit_start = ticks_ms()
     
+    # Direct access by index for speed
     for seq in sorted(corrupted_seqs):
-        for stored_seq, packet, chunk in packets:
-            if stored_seq == seq:
-                sx.send(packet)  # No delays - maximum speed
-                break
+        if seq < len(packets):
+            sx.send(packets[seq])
     
     retransmit_time = ticks_diff(ticks_ms(), retransmit_start)
     print(f"Phase 3: {retransmit_time} ms")
