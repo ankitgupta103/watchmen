@@ -25,21 +25,28 @@ received = {}
 first_time = None
 last_time = None
 timeout_start = time.ticks_ms()
+last_packet_time = None
+NO_PACKET_TIMEOUT = 3000
 
 print("Receiving packets...")
-while len(received) < num_packets and time.ticks_diff(time.ticks_ms(), timeout_start) < 60000:
-    msg, status = sx.recv(timeout_en=True, timeout_ms=5000)
+while len(received) < num_packets:
+    msg, status = sx.recv(timeout_en=True, timeout_ms=2000)
     
-    if len(msg) >= 1:
+    if len(msg) >= 1 and status == 0:
         seq = msg[0]
-        if status == 0:
-            if seq not in received:
-                received[seq] = msg[1:]
-                if first_time is None:
-                    first_time = time.ticks_ms()
-                last_time = time.ticks_ms()
-                if len(received) % 10 == 0:
-                    print(f"Received {len(received)}/{num_packets}")
+        if seq not in received:
+            received[seq] = msg[1:]
+            if first_time is None:
+                first_time = time.ticks_ms()
+            last_time = time.ticks_ms()
+            last_packet_time = time.ticks_ms()
+            if len(received) % 10 == 0:
+                print(f"Received {len(received)}/{num_packets}")
+    else:
+        if last_packet_time and time.ticks_diff(time.ticks_ms(), last_packet_time) > NO_PACKET_TIMEOUT:
+            break
+        if not last_packet_time and time.ticks_diff(time.ticks_ms(), timeout_start) > 10000:
+            break
 
 missing = [i for i in range(num_packets) if i not in received]
 print(f"\nReceived: {len(received)}/{num_packets}, Missing: {len(missing)}")
