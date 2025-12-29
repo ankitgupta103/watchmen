@@ -43,9 +43,9 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.05  # Reduced for high-speed communication (SF5, BW500kHz)
-ACK_SLEEP = 0.15  # Reduced for faster ACK checking at high data rates
-CHUNK_SLEEP = 0.05  # Reduced for faster chunk transmission at high data rates
+MIN_SLEEP = 0.02  # Minimal delay for high-speed communication (SF5, BW500kHz)
+ACK_SLEEP = 0.05  # Reduced ACK sleep for faster checking at high data rates  
+CHUNK_SLEEP = 0.01  # Minimal delay between chunks for fastest transmission
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -796,7 +796,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 end_succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count=5)
                 if not end_succ:
                     logger.warning(f"[IMG TX] Failed to send end packet, retry {end_retry+1}/{max_end_retries}")
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.05)  # Brief delay before retry
                     continue
                 
                 # Parse missing chunks from ACK response
@@ -831,8 +831,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     if not retry_succ:
                         logger.warning(f"[IMG TX] Failed to retry missing chunk {mis_chunk_idx}")
                 
-                # Brief delay before checking again
-                await asyncio.sleep(0.2)
+                # No delay needed - ACK already waited for in send_single_packet
             
             # If we exhausted retries, transmission failed
             logger.error(f"[IMG TX] Failed to complete transmission after {max_end_retries} end packet retries")
@@ -898,17 +897,21 @@ def begin_chunk(msg):
     epoch_ms = int(parts[1])
     numchunks = int(parts[2])
     # Only initialize if not already present (handle duplicate B packets)
+    # Use list instead of tuple for chunk_map entry to allow modification
     if img_id not in chunk_map:
-        chunk_map[img_id] = ("B", numchunks, [])
+        chunk_map[img_id] = ["B", numchunks, []]  # Changed from tuple to list for mutability
+        logger.info(f"[IMG RX] Initialized chunk_map for img_id={img_id}, expected_chunks={numchunks}")
     return (img_id, epoch_ms, numchunks)
 
 
 def get_missing_chunks(img_id):
     # Input: img_id: str chunk identifier; Output: list of int missing chunk indices
     if img_id not in chunk_map:
-        #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
+        logger.warning(f"[CHUNK] get_missing_chunks: no entry for img_id={img_id}")
         return []
-    msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
+    entry = chunk_map[img_id]
+    expected_chunks = entry[1]
+    list_chunks = entry[2]
     missing_chunks = []
     for i in range(expected_chunks):
         if not get_data_for_iter(list_chunks, i):
@@ -918,20 +921,25 @@ def get_missing_chunks(img_id):
 def add_chunk(msgbytes):
     # Input: msgbytes: bytes containing chunk id + index + payload; Output: None (stores chunk data)
     if len(msgbytes) < 5:
-        logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
+        logger.error(f"[CHUNK RX] not enough bytes {len(msgbytes)}")
         return
-    img_id = msgbytes[0:3].decode()
-    citer = int.from_bytes(msgbytes[3:5], 'big')  # Consistent with sender's to_bytes(2, 'big')
-    #logger.info(f"Got chunk id {citer}")
-    cdata = msgbytes[5:]
-    if img_id not in chunk_map:
-        logger.error(f"[CHUNK] no entry yet for {img_id}")
-        return
-    chunk_map[img_id][2].append((citer, cdata))
-    _, expected_chunks, _ = chunk_map[img_id]
-    missing = get_missing_chunks(img_id)
-    received = expected_chunks - len(missing)
-    #logger.info(f" ===== Got {received} / {expected_chunks} chunks ====")
+    try:
+        img_id = msgbytes[0:3].decode()
+        citer = int.from_bytes(msgbytes[3:5], 'big')  # Consistent with sender's to_bytes(2, 'big')
+        cdata = msgbytes[5:]
+        if img_id not in chunk_map:
+            logger.error(f"[CHUNK RX] no entry yet for img_id={img_id}, chunk_index={citer}")
+            return
+        # Store chunk (list structure allows direct modification)
+        chunk_map[img_id][2].append((citer, cdata))
+        expected_chunks = chunk_map[img_id][1]
+        missing = get_missing_chunks(img_id)
+        received = expected_chunks - len(missing)
+        # Log progress every 20 chunks for debugging
+        if received % 20 == 0 or received == expected_chunks:
+            logger.info(f"[IMG RX] Received chunk {citer}: {received}/{expected_chunks} chunks complete")
+    except Exception as e:
+        logger.error(f"[CHUNK RX] Error adding chunk: {e}")
 
 def get_data_for_iter(list_chunks, chunkiter):
     # Input: list_chunks: list of tuples(iter:int, data:bytes), chunkiter: int; Output: bytes or None for specific chunk
@@ -945,13 +953,18 @@ def recompile_msg(img_id):
     if len(get_missing_chunks(img_id)) > 0:
         return None
     if img_id not in chunk_map:
-        #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
-        return []
-    msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
+        logger.warning(f"[CHUNK] recompile_msg: no entry for img_id={img_id}")
+        return None
+    entry = chunk_map[img_id]
+    expected_chunks = entry[1]
+    list_chunks = entry[2]
     recompiled = b""
     for i in range(expected_chunks):
-        recompiled += get_data_for_iter(list_chunks, i)
-    # Ignoring message type for now
+        chunk_data = get_data_for_iter(list_chunks, i)
+        if chunk_data is None:
+            logger.error(f"[CHUNK] recompile_msg: missing chunk {i} for img_id={img_id}")
+            return None
+        recompiled += chunk_data
     return recompiled
 
 def clear_chunkid(img_id):
@@ -981,11 +994,20 @@ def end_chunk(msg_uid, msg):
     creator = int(msg_uid[1])
     missing = get_missing_chunks(img_id)
     if len(missing) > 0:
-        logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
+        logger.info(f"[CHUNK] I am missing {len(missing)} chunks: first 20 = {missing[:20]}, last 20 = {missing[-20:]}")
+        # Build missing chunk list string, ensuring it fits in payload (account for msg_uid + ":" separator)
+        # Format: msg_uid:missing_chunk_ids (e.g., "msg_uid:0,1,2,3")
+        # Reserve space for msg_uid (MIDLEN) + ":" + some safety margin
+        max_payload_size = PACKET_PAYLOAD_LIMIT - MIDLEN - 5  # Reserve space for msg_uid + ":" + safety
         missing_str = str(missing[0])
         for i in range(1, len(missing)):
-            if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < PACKET_PAYLOAD_LIMIT:
-                missing_str += "," + str(missing[i])
+            candidate = missing_str + "," + str(missing[i])
+            if len(candidate) <= max_payload_size:
+                missing_str = candidate
+            else:
+                # Truncate - sender will send remaining chunks after getting this list
+                logger.warning(f"[CHUNK] Missing chunk list truncated at {i}/{len(missing)} chunks due to payload limit")
+                break
         return (False, missing_str, img_id, None, epoch_ms)
     else:
         if img_id not in chunk_map:
