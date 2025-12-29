@@ -672,14 +672,9 @@ def radio_send(dest, data, msg_uid):
         # Small delay to ensure transmission completes
         # With SF8+BW250kHz, packets take longer to transmit than SF7+BW500
         utime.sleep_ms(5)  # 5ms delay for transmission to complete
-        
-        # CRITICAL: Return radio to RX mode after transmission to receive ACKs
-        # The transmit() method leaves radio in STANDBY mode, so we must explicitly
-        # put it back in RX mode to enable bidirectional communication
-        try:
-            loranode.startReceive()
-        except Exception as e:
-            logger.warning(f"[LORA] Failed to start receive after send: {e}")
+        # Note: In blocking mode, the receive loop (radio_read) manages radio state
+        # The next recv() call will automatically put radio back in RX mode
+        # No need to call startReceive() here as it conflicts with blocking mode
     except Exception as e:
         logger.error(f"[LORA] Send exception: {e}")
 
