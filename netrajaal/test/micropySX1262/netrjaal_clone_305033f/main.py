@@ -43,9 +43,9 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.01  # Minimal delay for maximum speed communication (reduced from 0.02s to 0.01s)
-ACK_SLEEP = 0.03  # Reduced ACK sleep for faster checking (reduced from 0.05s to 0.03s)
-CHUNK_SLEEP = 0.005  # Minimal delay between chunks (reduced from 0.01s to 0.005s for fastest transmission)
+MIN_SLEEP = 0.005  # Minimal delay for maximum speed (reduced from 0.01s to 0.005s - near zero for maximum throughput)
+ACK_SLEEP = 0.02  # Reduced ACK sleep for faster checking (reduced from 0.03s to 0.02s)
+CHUNK_SLEEP = 0.002  # Minimal delay between chunks (reduced from 0.005s to 0.002s for fastest transmission)
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -80,7 +80,7 @@ GC_COLLECT_INTERVAL_SEC = 60    # Run garbage collection every minute
 
 MIDLEN = 7
 FLAKINESS = 0
-PACKET_PAYLOAD_LIMIT = 195 # bytes
+PACKET_PAYLOAD_LIMIT = 240 # bytes (increased from 195 to 240 to maximize payload size, accounting for msg_uid overhead)
 
 AIR_SPEED = 19200
 
@@ -88,10 +88,10 @@ AIR_SPEED = 19200
 LORA_FREQ = 868.0
 LORA_SF = 5  # Spreading Factor 5 (highest data rate ~38 kbps)
 LORA_BW = 500.0  # Bandwidth 500 kHz (highest bandwidth for maximum speed)
-LORA_CR = 5  # Coding Rate 4/5 (good balance of speed and error correction)
+LORA_CR = 5  # Coding Rate 4/5 (fastest valid CR - valid range is 5-8, where CR5=4/5 is fastest)
 LORA_PREAMBLE = 6  # Preamble length (reduced from 8 to 6 for maximum speed - minimum safe value)
 LORA_POWER = 14  # TX power in dBm
-LORA_RX_TIMEOUT_MS = 100  # Receive timeout for async loop (reduced from 200ms to 100ms for faster polling)
+LORA_RX_TIMEOUT_MS = 50  # Receive timeout for async loop (reduced from 100ms to 50ms for fastest polling)
 
 
 # WiFi Configuration
@@ -511,7 +511,7 @@ async def init_lora():
             logger.error(f"[LORA] Failed to initialize SX1262, status: {status}")
             loranode = None
         else:
-            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, Preamble{LORA_PREAMBLE} (maximum speed configuration)")
+            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, Preamble{LORA_PREAMBLE} (maximum speed configuration with optimized chunk size and timing)")
     except Exception as e:
         logger.error(f"[LORA] Exception during LoRa initialization: {e}")
         loranode = None
@@ -679,7 +679,7 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     
-    ack_msg_recheck_count = 16 # Increased from 12 to 16 for more frequent ACK detection at maximum speed
+    ack_msg_recheck_count = 20 # Increased from 16 to 20 for maximum frequency ACK detection
     for retry_i in range(retry_count):
             radio_send(dest, databytes, msg_uid)
             await asyncio.sleep(ACK_SLEEP)  # Initial wait after sending
@@ -696,20 +696,23 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                         first_log_flag = False
                     else:
                         logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                    # Faster ACK checking: use smaller sleep for quicker detection
+                    # Maximum speed ACK checking: minimal sleep for instant detection
                     await asyncio.sleep(
-                        ACK_SLEEP * 0.5  # Reduced from progressive to fixed 0.5x for faster checking
+                        ACK_SLEEP * 0.3  # Reduced from 0.5x to 0.3x for fastest possible ACK detection
                     )
             logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
 
 def make_chunks(msg):
-    # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each
+    # Input: msg: bytes; Output: list of bytes chunks up to 240 bytes each (increased from 200 for maximum efficiency)
+    # Calculation: Max LoRa packet (255) - msg_uid+separator (8) - chunk_header (5) = 242 bytes available
+    # Using 240 bytes per chunk to leave small safety margin
+    CHUNK_DATA_SIZE = 240
     chunks = []
-    while len(msg) > 200:
-        chunks.append(msg[0:200])
-        msg = msg[200:]
+    while len(msg) > CHUNK_DATA_SIZE:
+        chunks.append(msg[0:CHUNK_DATA_SIZE])
+        msg = msg[CHUNK_DATA_SIZE:]
     if len(msg) > 0:
         chunks.append(msg)
     return chunks
@@ -810,7 +813,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 end_succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count=5)
                 if not end_succ:
                     logger.warning(f"[IMG TX] Failed to send end packet, retry {end_retry+1}/{max_end_retries}")
-                    await asyncio.sleep(0.02)  # Reduced delay from 0.05s to 0.02s for faster retry
+                    await asyncio.sleep(0.01)  # Reduced delay from 0.02s to 0.01s for fastest retry
                     continue
                 
                 # Parse missing chunks from ACK response
@@ -1869,10 +1872,10 @@ async def radio_read():
             loop_count += 1
             if loop_count == 1:
                 logger.info(f"[LORA] Starting receive loop, loranode={loranode is not None}")
-            elif loop_count % 100 == 0:  # Log every 100 iterations (~20 seconds with 200ms timeout)
+            elif loop_count % 200 == 0:  # Log every 200 iterations (~10 seconds with 50ms timeout)
                 logger.info(f"[LORA] Receive loop running (iteration {loop_count})...")
             
-            # This call will block for up to LORA_RX_TIMEOUT_MS (200ms)
+            # This call will block for up to LORA_RX_TIMEOUT_MS (50ms)
             # During this time, the async event loop is blocked, but it will return after timeout
             # Note: recv() uses blocking sleep_ms() internally, which blocks the async event loop
             # This is acceptable as the timeout ensures it returns after LORA_RX_TIMEOUT_MS
@@ -1910,7 +1913,7 @@ async def radio_read():
 
         # Small async sleep to yield to event loop (recv() uses blocking sleeps internally)
         # This prevents blocking the entire async event loop
-        await asyncio.sleep(0.005)  # Reduced from 0.01s to 0.005s (5ms) for faster polling
+        await asyncio.sleep(0.002)  # Reduced from 0.005s to 0.002s (2ms) for maximum polling speed
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
