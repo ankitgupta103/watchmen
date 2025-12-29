@@ -42,11 +42,12 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.01  # Minimal sleep after non-ACK messages for maximum speed
-ACK_SLEEP = 0.05  # Initial ACK wait for faster response
-CHUNK_SLEEP = 0.01  # Minimal sleep between chunks for fast transmission
-CHUNK_BATCH_SIZE = 50  # Larger batches for faster transmission
-CHUNK_BATCH_DELAY = 0.02  # Minimal delay after batches to allow receiver catchup
+# Timing constants optimized for SF8 + BW250kHz (robust configuration)
+MIN_SLEEP = 0.03  # Sleep after non-ACK messages for reliable transmission
+ACK_SLEEP = 0.1   # Initial ACK wait - allows time for transmission and ACK processing
+CHUNK_SLEEP = 0.05  # Sleep between chunks for reliable reception
+CHUNK_BATCH_SIZE = 30  # Smaller batches for more reliable transmission
+CHUNK_BATCH_DELAY = 0.1  # Delay after batches to allow receiver to process
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -468,14 +469,15 @@ SPI_BAUDRATE = 2000000
 SPI_POLARITY = 0
 SPI_PHASE = 0
 
-# LoRa Configuration - Highest Data Rate Settings
+# LoRa Configuration - Second Highest Speed with Robust Settings
+# SF8 + BW250kHz provides good balance of speed and reliability
 LORA_FREQ = 868.0      # Frequency in MHz
-LORA_BW = 500.0        # Bandwidth 500kHz (highest)
-LORA_SF = 7            # Spreading Factor 7 (highest data rate)
-LORA_CR = 5            # Coding Rate 4/5 (fastest)
+LORA_BW = 250.0        # Bandwidth 250kHz (robust, second highest speed)
+LORA_SF = 8            # Spreading Factor 8 (robust, second highest speed)
+LORA_CR = 7            # Coding Rate 4/7 (better error correction than 4/5)
 LORA_SYNC_WORD = 0x12  # Private sync word
 LORA_POWER = 22        # Transmission power in dBm
-LORA_PREAMBLE = 8      # Preamble length
+LORA_PREAMBLE = 12     # Longer preamble for better synchronization
 
 loranode = None
 loranode_rssi = None  # Store last RSSI value
@@ -667,9 +669,9 @@ def radio_send(dest, data, msg_uid):
         payload_len, status = loranode.send(data)
         if status != 0:
             logger.warning(f"[LORA] Send returned status: {status}")
-        # Small delay to ensure transmission starts before returning
-        # This helps with timing, especially for ACK reception
-        utime.sleep_us(500)  # 0.5ms delay for transmission to start
+        # Small delay to ensure transmission completes
+        # With SF8+BW250kHz, packets take longer to transmit than SF7+BW500
+        utime.sleep_ms(5)  # 5ms delay for transmission to complete
     except Exception as e:
         logger.error(f"[LORA] Send exception: {e}")
 
@@ -700,15 +702,15 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         # For non-ACK messages (like chunk "I" type), minimal sleep to allow transmission
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-    ack_msg_recheck_count = 10 # More checks for better ACK reception
+    # ACK checking with robust timing for SF8+BW250kHz
+    ack_msg_recheck_count = 12 # More checks for robust ACK reception
     for retry_i in range(retry_count):
         radio_send(dest, databytes, msg_uid)
-        # Small delay to ensure transmission completes before checking for ACK
-        await asyncio.sleep(0.02)  # 20ms for transmission to complete
+        # Allow time for transmission to complete (SF8+BW250kHz needs more time than SF7+BW500)
+        await asyncio.sleep(ACK_SLEEP)  # Initial wait for transmission to complete
         
         first_log_flag = True
         for i in range(ack_msg_recheck_count): # ack_msg recheck
-            # Check immediately - ACK might have arrived already
             at, missing_chunks = ack_time(msg_uid)
             if at > 0:
                 logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
@@ -720,14 +722,12 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                     first_log_flag = False
                 else:
                     logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                # Progressive sleep: start very small, increase gradually
-                # First checks are fast to catch immediate ACKs
-                if i == 0:
-                    await asyncio.sleep(0.01)  # 10ms first check
-                elif i < 3:
-                    await asyncio.sleep(0.02)  # 20ms for next few checks
+                # Progressive sleep: start reasonable, increase gradually
+                # With SF8+BW250kHz, packets take longer to transmit/receive
+                if i < 4:
+                    await asyncio.sleep(ACK_SLEEP)  # 100ms for first few checks
                 else:
-                    await asyncio.sleep(ACK_SLEEP * (0.5 + (i-3) * 0.2))  # Progressive increase
+                    await asyncio.sleep(ACK_SLEEP * 1.5)  # Slightly longer for later checks
         logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
@@ -790,23 +790,23 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 delete_transmode_lock(dest, img_id)
                 return False
 
-            # Send chunks as fast as possible with minimal delays
+            # Send chunks with robust timing for SF8+BW250kHz configuration
             for i in range(len(chunks)):
-                if i % 50 == 0:
+                if i % 30 == 0:
                     logger.info(f"[CHUNK] Sending chunk {i}/{len(chunks)}")
                 
                 chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
                 _ = await send_single_packet("I", creator, chunkbytes, dest)
                 
-                # Minimal flow control: only pause briefly after large batches
+                # Flow control: pause after batches and between chunks for reliable reception
                 if (i + 1) % CHUNK_BATCH_SIZE == 0 and i < len(chunks) - 1:
-                    await asyncio.sleep(CHUNK_BATCH_DELAY)
+                    await asyncio.sleep(CHUNK_BATCH_DELAY)  # Longer pause after batches
                 elif i < len(chunks) - 1:
-                    await asyncio.sleep(CHUNK_SLEEP)
+                    await asyncio.sleep(CHUNK_SLEEP)  # Pause between chunks
             
-            # Wait a bit longer before end chunk check to ensure all chunks are received
-            # This gives receiver time to process all chunks from first transmission
-            await asyncio.sleep(0.1)
+            # Wait longer before end chunk check with SF8+BW250kHz (slower than SF7+BW500)
+            # This gives receiver adequate time to process all chunks from first transmission
+            await asyncio.sleep(0.2)
             
             for retry_i in range(20):
                 succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 10)
@@ -832,10 +832,10 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
                     logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
                     return False
-                # Retransmit missing chunks quickly
+                # Retransmit missing chunks with robust timing
                 for idx, mis_chunk in enumerate(missing_chunks):
-                    if idx > 0 and idx % 20 == 0:
-                        # Minimal pause after every 20 retransmissions
+                    if idx > 0 and idx % 15 == 0:
+                        # Pause after every 15 retransmissions for reliable reception
                         await asyncio.sleep(CHUNK_BATCH_DELAY)
                     elif idx > 0:
                         await asyncio.sleep(CHUNK_SLEEP)
@@ -1757,10 +1757,10 @@ async def radio_read():
     
     while True:
         try:
-            # Blocking mode with very short timeout (20ms) for fast packet reception
-            # Short timeout ensures we check frequently to catch ACKs and packets immediately
-            # This is critical for fast ACK reception and image chunk processing
-            msg, err = loranode.recv(timeout_en=True, timeout_ms=20)
+            # Blocking mode with robust timeout (100ms) for reliable packet reception
+            # Longer timeout allows radio to properly receive packets with SF8+BW250kHz
+            # This configuration is more reliable than shorter timeouts
+            msg, err = loranode.recv(timeout_en=True, timeout_ms=100)
             
             if len(msg) > 0 and err == 0:
                 # Packet received successfully - process immediately
@@ -1775,9 +1775,9 @@ async def radio_read():
                 process_message(message, rssi)
                 # No sleep - immediately check for next packet for maximum throughput
             elif err == -6:  # RX_TIMEOUT - no packet received in timeout period
-                # No packet received - yield briefly then immediately check again
-                # Tiny yield prevents CPU spinning while maintaining maximum responsiveness
-                await asyncio.sleep(0)  # Yield to other tasks without delay
+                # No packet received - small yield then check again
+                # Brief yield prevents CPU spinning while maintaining good responsiveness
+                await asyncio.sleep(0.01)  # Small yield to allow other tasks
             elif err != 0:
                 # Other error - log and continue
                 logger.debug(f"[LORA] Receive error: {err}")
