@@ -761,12 +761,15 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
             asyncio.create_task(keep_transmode_lock(dest, img_id))
             chunks = make_chunks(msgbytes)
             num_chunks = len(chunks)
+            tx_start_time = utime.ticks_ms()  # Track start time for total transmission time
             logger.info(f"[IMG TX] Starting image transmission: dest={dest}, len={len(msgbytes)} bytes, img_id={img_id}, chunks={num_chunks}")
             
             # Step 1: Send begin packet and wait for ACK
             begin_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{num_chunks}", dest)
             if not begin_succ:
-                logger.error(f"[IMG TX] Failed to send begin packet for img_id={img_id}")
+                total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
+                total_time_sec = total_time_ms / 1000.0
+                logger.error(f"[IMG TX] Failed to send begin packet for img_id={img_id}. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                 delete_transmode_lock(dest, img_id)
                 return False
             logger.info(f"[IMG TX] Begin packet ACKed, starting chunk transmission...")
@@ -776,7 +779,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
             sent_chunks = set()
             for i in range(num_chunks):
                 if not check_transmode_lock(dest, img_id):
-                    logger.error(f"[IMG TX] TRANS MODE ended, transmission failed")
+                    total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
+                    total_time_sec = total_time_ms / 1000.0
+                    logger.error(f"[IMG TX] TRANS MODE ended, transmission failed. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                     delete_transmode_lock(dest, img_id)
                     return False
                     
@@ -796,7 +801,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
             max_end_retries = 15  # Increased retries for robust transmission
             for end_retry in range(max_end_retries):
                 if not check_transmode_lock(dest, img_id):
-                    logger.error(f"[IMG TX] TRANS MODE ended during end packet phase")
+                    total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
+                    total_time_sec = total_time_ms / 1000.0
+                    logger.error(f"[IMG TX] TRANS MODE ended during end packet phase. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                     delete_transmode_lock(dest, img_id)
                     return False
                 
@@ -809,13 +816,17 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 # Parse missing chunks from ACK response
                 if missing_chunks is None or len(missing_chunks) == 0:
                     # All chunks received successfully
-                    logger.info(f"[IMG TX] All chunks received successfully! Transmission complete.")
+                    total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
+                    total_time_sec = total_time_ms / 1000.0
+                    logger.info(f"[IMG TX] All chunks received successfully! Transmission complete. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                     delete_transmode_lock(dest, img_id)
                     return True
                 
                 # Check if receiver explicitly confirmed completion
                 if len(missing_chunks) == 1 and missing_chunks[0] == -1:
-                    logger.info(f"[IMG TX] Receiver confirmed all chunks received (ACK with -1)")
+                    total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
+                    total_time_sec = total_time_ms / 1000.0
+                    logger.info(f"[IMG TX] Receiver confirmed all chunks received (ACK with -1). Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                     delete_transmode_lock(dest, img_id)
                     return True
                 
@@ -826,7 +837,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 
                 for mis_chunk_idx in missing_list:
                     if not check_transmode_lock(dest, img_id):
-                        logger.error(f"[IMG TX] TRANS MODE ended during missing chunk retransmission")
+                        total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
+                        total_time_sec = total_time_ms / 1000.0
+                        logger.error(f"[IMG TX] TRANS MODE ended during missing chunk retransmission. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                         delete_transmode_lock(dest, img_id)
                         return False
                     
@@ -845,7 +858,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 # No delay needed - ACK already waited for in send_single_packet
             
             # If we exhausted retries, transmission failed
-            logger.error(f"[IMG TX] Failed to complete transmission after {max_end_retries} end packet retries")
+            total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
+            total_time_sec = total_time_ms / 1000.0
+            logger.error(f"[IMG TX] Failed to complete transmission after {max_end_retries} end packet retries. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
             delete_transmode_lock(dest, img_id)
             return False
         else:
