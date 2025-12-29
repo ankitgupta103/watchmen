@@ -3,6 +3,7 @@ import gc
 import utime
 import machine
 import sensor
+import random
 
 #- Initialize RTC
 rtc = machine.RTC()
@@ -38,6 +39,14 @@ sensor.set_framesize(sensor.HD)
 def get_epoch_ms():
     return utime.time_ns() // 1_000_000
 
+def get_rand_str(len=3):
+    # Input: None; Output: str random 3-letter uppercase identifier
+    rstr = ""
+    for i in range(len):
+        rstr += chr(65+random.randint(0,25))
+    return rstr
+
+
 # Main capture loop
 def main():
     capture_count = 0
@@ -51,10 +60,10 @@ def main():
             print(f"Capturing image #{capture_count}")
             
             img = sensor.snapshot()
-            raw_path = f"{MY_IMAGE_DIR}/{get_epoch_ms()}_raw.jpg"
+            raw_path = f"{MY_IMAGE_DIR}/{get_epoch_ms()}_{get_rand_str()}_raw.jpg"
             img.save(raw_path)
             utime.sleep_ms(1600)
-            os.sync()
+            # os.sync()
             utime.sleep_ms(1600)
             print(f"Saved: {raw_path}")
             
