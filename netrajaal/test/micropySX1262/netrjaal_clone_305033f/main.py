@@ -508,6 +508,7 @@ async def init_lora():
         )
 
         # Configure LoRa for highest data rate
+        # Use non-blocking mode for interrupt-based fast packet reception
         state = loranode.begin(
             freq=LORA_FREQ,
             bw=LORA_BW,
@@ -521,7 +522,7 @@ async def init_lora():
             crcOn=True,
             tcxoVoltage=1.6,
             useRegulatorLDO=False,
-            blocking=True
+            blocking=False  # Non-blocking mode for interrupt-based fast reception
         )
 
         if state != 0:
@@ -1735,18 +1736,22 @@ def process_message(data, rssi=None):
 # ---------------------------------------------------------------------------
 
 async def radio_read():
-    logger.info(f"===> Radio Read, LoRa receive loop started... <===\n")
+    logger.info(f"===> Radio Read, LoRa receive loop started (non-blocking/interrupt mode)... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
     global loranode, loranode_rssi
+    consecutive_empty_reads = 0
+    max_empty_reads = 100  # After this many empty reads, yield briefly to other tasks
+    
     while True:
         try:
-            # New driver: recv() returns (msg, err)
-            # err == 0 means success, err == -6 means RX_TIMEOUT
-            # Use shorter timeout (100ms) for faster packet reception - check frequently
-            # This ensures we catch packets quickly as they arrive during fast transmission
-            msg, err = loranode.recv(timeout_en=True, timeout_ms=100)
-
+            # Non-blocking mode: recv() calls _readData() which is immediate
+            # It checks if packet is ready without waiting - much faster than timeout-based polling
+            msg, err = loranode.recv()
+            
             if len(msg) > 0 and err == 0:
+                # Packet received successfully
+                consecutive_empty_reads = 0
+                
                 # Get RSSI from the driver
                 try:
                     rssi = loranode.getRSSI()
@@ -1757,18 +1762,23 @@ async def radio_read():
 
                 message = msg.replace(b"{}[]", b"\n")
                 process_message(message, rssi)
-                # No sleep after processing message - immediately check for next message
-                # This ensures fast ACK processing and high throughput
-            elif err == -6:  # RX_TIMEOUT
-                # No message received, immediately check again for fast packet reception
-                # Tiny yield to prevent CPU spinning while maintaining maximum responsiveness
-                await asyncio.sleep(0)  # Yield to other tasks without adding delay
-            elif err != 0:
-                logger.debug(f"[LORA] Receive error: {err}")
-                await asyncio.sleep(0.01)  # Small sleep on error to prevent tight loop
+                # No sleep - immediately check for next packet (interrupt-based, very fast)
+            else:
+                # No packet ready yet (err != 0 or empty message)
+                consecutive_empty_reads += 1
+                
+                # Only yield occasionally to prevent CPU spinning
+                # Most of the time, we loop immediately for maximum responsiveness
+                if consecutive_empty_reads >= max_empty_reads:
+                    await asyncio.sleep(0.001)  # Brief yield every ~100 empty checks
+                    consecutive_empty_reads = 0
+                else:
+                    # Immediately check again - interrupt will signal when packet arrives
+                    await asyncio.sleep(0)  # Yield without delay to allow interrupt handling
+                    
         except Exception as e:
             logger.error(f"[LORA] Receive exception: {e}")
-            await asyncio.sleep(0.1)  # Longer sleep on exception to allow recovery
+            await asyncio.sleep(0.01)  # Brief pause on exception to allow recovery
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
