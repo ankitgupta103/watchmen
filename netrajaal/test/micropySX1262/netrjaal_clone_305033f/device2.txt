@@ -1,3 +1,4 @@
+
 info - SD card available
 info - Singleton Logger class Initiated, __new__
 Starting fake network with the following neighbours
@@ -5,70 +6,51 @@ Starting fake network with the following neighbours
 (222, 221)
 (221, 225)
 (223, 219)
-00:00:00,596 - INFO - [FS] Using FS_ROOT : /sdcard
-00:00:00,604 - INFO - [FS] /sdcard/netimages directory already exists
-00:00:00,614 - INFO - [FS] /sdcard/myimages directory already exists
-00:00:00,623 - INFO - [FS] /sdcard/myevents directory already exists
-00:00:00,700 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7193a09 <===
+00:00:00,198 - INFO - [FS] Using FS_ROOT : /sdcard
+00:00:00,205 - INFO - [FS] /sdcard/netimages directory already exists
+00:00:00,216 - INFO - [FS] /sdcard/myimages directory already exists
+00:00:00,224 - INFO - [FS] /sdcard/myevents directory already exists
+00:00:00,302 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7193a09 <===
 
-00:00:03,888 - INFO - [LORA] Initializing LoRa SX1262 module (SPI)... my lora addr = 219
-00:00:03,889 - INFO - [LORA] Config: SF8, BW250.0kHz, CR7, 868.0MHz, 22dBm
-00:00:03,954 - INFO - [LORA] LoRa initialized successfully
-00:00:03,991 - INFO - [MEM] Memory management tasks started (free: 8159.4KB)
+00:00:03,490 - INFO - [LORA] Initializing LoRa SX1262 module (SPI)... my lora addr = 219
+00:00:03,491 - INFO - [LORA] Config: SF8, BW250.0kHz, CR7, 868.0MHz, 22dBm
+00:00:03,555 - INFO - [LORA] LoRa initialized successfully
+00:00:03,593 - INFO - [MEM] Memory management tasks started (free: 8159.6KB)
 
-00:00:03,992 - INFO - [INIT] ===> Starting command center node <===
-00:00:03,992 - INFO - [WIFI] Initializing WiFi connection to SSID: Lifestyle 6th floor-2.4G
-00:00:03,550 - INFO - [WIFI] Connecting to WiFi network: Lifestyle 6th floor-2.4G
-00:00:03,556 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
-00:00:03,557 - INFO - ===> Radio Read, LoRa receive loop started... <===
+00:00:03,593 - INFO - [INIT] ===> Starting command center node <===
+00:00:03,593 - INFO - [WIFI] Initializing WiFi connection to SSID: Lifestyle 6th floor-2.4G
+00:00:03,154 - INFO - [WIFI] Connecting to WiFi network: Lifestyle 6th floor-2.4G
+00:00:03,161 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
+00:00:03,162 - INFO - ===> Radio Read, LoRa receive loop started... <===
 
-00:00:04,623 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+00:00:04,226 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
 
-00:00:04,590 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
-00:00:06,630 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
-00:00:07,642 - INFO - [WIFI] Connecting... (status: 2, wait: 3s)
-00:00:08,648 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.40, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 205.254.187.17
-00:00:08,649 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:08,727 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*JHZ'
-00:00:11,696 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
-00:00:14,812 - INFO - H : Len msg = 23, len msgbytes = 128
-00:00:14,812 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:14:0:0::-1:[]:[219]
-00:00:14,813 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
-00:00:15,050 - INFO - msg_typ:heartbeat from node 219 uploaded via WiFi successfully
-00:00:15,115 - INFO - [HB] HB SUCCESS, shortest path = [219]
-00:00:34,673 - INFO - sent: 1 Recd: 0 Unacked: 0, Free: 8157.5KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:00:38,833 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 1, Received messages = {}
-00:00:38,833 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:38,910 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*NJT'
-00:01:04,781 - INFO - sent: 2 Recd: 0 Unacked: 0, Free: 8157.2KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:01:08,015 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 2, Received messages = {}
-00:01:08,015 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:01:08,092 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*PAB'
-00:01:34,822 - INFO - sent: 3 Recd: 0 Unacked: 0, Free: 8157.1KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:01:38,207 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 3, Received messages = {}
-00:01:38,207 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:01:38,285 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*RWP'
-00:02:04,862 - INFO - sent: 4 Recd: 0 Unacked: 0, Free: 8157.0KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:02:08,397 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 4, Received messages = {}
-00:02:08,397 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:02:08,475 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*LPO'
-00:02:34,951 - INFO - sent: 5 Recd: 0 Unacked: 0, Free: 8156.9KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:02:38,563 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 5, Received messages = {}
-00:02:38,563 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:02:39,640 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*XHX'
-00:03:04,991 - INFO - sent: 6 Recd: 0 Unacked: 0, Free: 8156.8KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:03:09,751 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 6, Received messages = {}
-00:03:09,751 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:03:09,828 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*XFO'
-00:03:34,032 - INFO - sent: 7 Recd: 0 Unacked: 0, Free: 8156.8KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:03:39,938 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 7, Received messages = {}
-00:03:39,938 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:03:39,016 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*LZQ'
-00:04:04,078 - INFO - sent: 8 Recd: 0 Unacked: 0, Free: 8156.7KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:04:09,143 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 8, Received messages = {}
-00:04:09,143 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:04:09,221 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*TRX'
-00:04:34,130 - INFO - sent: 9 Recd: 0 Unacked: 0, Free: 8156.5KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:04:39,338 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 9, Received messages = {}
-00:04:39,338 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:04:39,416 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*SKS'
+00:00:04,191 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
+00:00:06,235 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
+00:00:07,237 - INFO - [WIFI] Connecting... (status: 2, wait: 3s)
+00:00:08,238 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.40, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 205.254.187.17
+00:00:08,239 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:08,304 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*EPL'
+00:00:11,278 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
+00:00:14,395 - INFO - H : Len msg = 23, len msgbytes = 128
+00:00:14,396 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:14:0:0::-1:[]:[219]
+00:00:14,396 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
+00:00:16,309 - INFO - msg_typ:heartbeat from node 219 uploaded via WiFi successfully
+00:00:16,375 - INFO - [HB] HB SUCCESS, shortest path = [219]
+00:00:34,268 - INFO - sent: 1 Recd: 0 Unacked: 0, Free: 8157.7KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:00:38,429 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 1, Received messages = {}
+00:00:38,429 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:38,496 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*PVI'
+00:01:04,347 - INFO - sent: 2 Recd: 0 Unacked: 0, Free: 8157.2KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:01:08,574 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 2, Received messages = {}
+00:01:08,574 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:01:08,640 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*UXN'
+00:01:34,426 - INFO - sent: 3 Recd: 0 Unacked: 0, Free: 8157.1KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:01:38,733 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 3, Received messages = {}
+00:01:38,733 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:01:38,800 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*VXG'
+00:01:40,210 - INFO - stopped by user via keyboard interrupt
+00:01:40,210 - INFO - logger closed successfully
+OpenMV 805a279; MicroPython 46b10ee2; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
+Type "help()" for more information.
+>>> 
