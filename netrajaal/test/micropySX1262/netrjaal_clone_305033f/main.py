@@ -42,9 +42,11 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.03  # Minimal sleep after non-ACK messages for high-speed LoRa
+MIN_SLEEP = 0.02  # Minimal sleep after non-ACK messages for high-speed LoRa
 ACK_SLEEP = 0.05  # Reduced initial ACK wait for faster response
-CHUNK_SLEEP = 0.03  # Minimal sleep between chunks for faster image transmission
+CHUNK_SLEEP = 0.05  # Sleep between chunks to allow receiver processing time
+CHUNK_BATCH_SIZE = 20  # Send chunks in batches, then yield to receiver
+CHUNK_BATCH_DELAY = 0.1  # Delay after each batch to allow receiver to process
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -691,6 +693,7 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         msgs_sent.append((msg_uid, msgbytes, timesent))
     if not ackneeded:
         radio_send(dest, databytes, msg_uid)
+        # For non-ACK messages (like chunk "I" type), minimal sleep to allow transmission
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     ack_msg_recheck_count = 8 # Increased checks for better ACK reception with longer recv timeout
@@ -775,19 +778,23 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 delete_transmode_lock(dest, img_id)
                 return False
 
+            # Send chunks in batches with flow control for better reliability
             for i in range(len(chunks)):
                 if i % 10 == 0:
                     logger.info(f"[CHUNK] Sending chunk {i}/{len(chunks)}")
-                # Minimal sleep between chunks for high-speed transmission
-                if i > 0:  # No sleep before first chunk
-                    await asyncio.sleep(CHUNK_SLEEP)
+                
                 chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
                 _ = await send_single_packet("I", creator, chunkbytes, dest)
+                
+                # Flow control: after every batch, allow receiver time to process
+                if (i + 1) % CHUNK_BATCH_SIZE == 0:
+                    await asyncio.sleep(CHUNK_BATCH_DELAY)
+                elif i < len(chunks) - 1:  # Don't sleep after last chunk
+                    await asyncio.sleep(CHUNK_SLEEP)
+            # Wait a bit longer before first end chunk check to ensure all chunks are processed
+            await asyncio.sleep(CHUNK_BATCH_DELAY * 2)
+            
             for retry_i in range(20):
-                if retry_i == 0:
-                    await asyncio.sleep(ACK_SLEEP)  # Initial wait for receiver to process chunks
-                else:
-                    await asyncio.sleep(ACK_SLEEP * 2)  # Longer wait between end chunk retries
                 succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 10)
                 if not succ:
                     logger.error(f"[CHUNK] Failed sending chunk end")
@@ -811,9 +818,13 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
                     logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
                     return False
-                for mis_chunk in missing_chunks:
-                    # Minimal sleep for retransmission
-                    if mis_chunk != missing_chunks[0]:  # No sleep before first retransmission
+                # Retransmit missing chunks with flow control
+                # Send retransmissions in smaller batches to avoid overwhelming receiver
+                for idx, mis_chunk in enumerate(missing_chunks):
+                    if idx > 0 and idx % 10 == 0:
+                        # After every 10 retransmissions, give receiver time to process
+                        await asyncio.sleep(CHUNK_BATCH_DELAY)
+                    elif idx > 0:
                         await asyncio.sleep(CHUNK_SLEEP)
                     chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
                     _ = await send_single_packet("I", creator, chunkbytes, dest)
