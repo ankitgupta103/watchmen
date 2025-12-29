@@ -86,8 +86,8 @@ AIR_SPEED = 19200
 
 
 # WiFi Configuration
-WIFI_SSID = "Airtel_anki_3363_2.4G"
-WIFI_PASSWORD = "air34854"
+WIFI_SSID = "Lifestyle 6th floor-2.4G"
+WIFI_PASSWORD = "9821992096"
 WIFI_ENABLED = True
 
 cellular_system = None
@@ -141,9 +141,9 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 # COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7194025':
-    my_addr = 219
-elif uid == b'e076465dd7193a09':
     my_addr = 225
+elif uid == b'e076465dd7193a09':
+    my_addr = 219
     if not DYNAMIC_SPATH:
         shortest_path_to_cc = [219]
 elif uid ==  b'e076465dd7090d1c':
@@ -353,7 +353,7 @@ def get_transmode_lock(device_id, img_id): # check and just lock for image
     data_id = img_id
     logger.info(f"[IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:{device_id}, img_id:{img_id} ❮❮●●●●●●●●●●")
     return True
-    
+
 async def keep_transmode_lock(device_id, img_id):
     # Input: None; Output: None (sets image_in_progress flag with auto release after timeout)
     global image_in_progress, paired_device, data_id
@@ -397,14 +397,14 @@ def is_device_free(device_id):
     if device_id in busy_devices:
         return False
     return True
-    
+
 def is_device_busy(device_id):
     global busy_devices
     # return device_id in busy_devices
     if device_id in busy_devices:
         return True
     return False
-    
+
 async def device_busy_life(device_id): # device_busy_cycle
     # Input: device_id: int; Output: None (sets image_in_progress flag with auto release after timeout)
     global busy_devices
@@ -489,7 +489,7 @@ async def init_lora():
         lora_init_count += 1
         logger.info(f"[LORA] Initializing LoRa SX1262 module (SPI)... my lora addr = {my_addr}")
         logger.info(f"[LORA] Config: SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, {LORA_FREQ}MHz, {LORA_POWER}dBm")
-        
+
         # Initialize SX1262 with SPI
         loranode = SX1262(
             spi_bus=SPI_BUS,
@@ -504,7 +504,7 @@ async def init_lora():
             spi_polarity=SPI_POLARITY,
             spi_phase=SPI_PHASE
         )
-        
+
         # Configure LoRa for highest data rate
         state = loranode.begin(
             freq=LORA_FREQ,
@@ -521,7 +521,7 @@ async def init_lora():
             useRegulatorLDO=False,
             blocking=True
         )
-        
+
         if state != 0:
             logger.error(f"[LORA] Initialization failed with state: {state}")
             loranode = None
@@ -625,7 +625,7 @@ async def periodic_memory_cleanup():
 
             # Clean up chunk map
             cleanup_chunk_map()
-            
+
             # Run garbage collection
             gc.collect()
 
@@ -657,7 +657,7 @@ def radio_send(dest, data, msg_uid):
         logger.error(f"[LORA] msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
-    
+
     # New driver: send() returns (payload_len, status)
     # Note: LoRa doesn't have built-in addressing, dest is in packet payload
     try:
@@ -666,7 +666,7 @@ def radio_send(dest, data, msg_uid):
             logger.warning(f"[LORA] Send returned status: {status}")
     except Exception as e:
         logger.error(f"[LORA] Send exception: {e}")
-    
+
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
@@ -758,7 +758,7 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest): # all messages ex
     else:
         logger.warning(f"msgbtyes size exceeds the packet payload limit, {len(msgbytes)} bytes > {PACKET_PAYLOAD_LIMIT} bytes")
         return False
-        
+
 async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image sending
     if not is_lora_ready():
         return False
@@ -774,7 +774,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 logger.info(f"[CHUNK] Failed sending chunk begin")
                 delete_transmode_lock(dest, img_id)
                 return False
-            
+
             for i in range(len(chunks)):
                 if i % 10 == 0:
                     logger.info(f"[CHUNK] Sending chunk {i}/{len(chunks)}")
@@ -819,7 +819,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     _ = await send_single_packet("I", creator, chunkbytes, dest)
             delete_transmode_lock(dest, img_id)
             return False
-        else: 
+        else:
             logger.warning(f"TRANS MODE already in use, could not get lock...")
             return False
     else:
@@ -880,7 +880,7 @@ def begin_chunk(msg):
     numchunks = int(parts[2])
     chunk_map[img_id] = ("B", numchunks, [])
     return (img_id, epoch_ms, numchunks)
-    
+
 
 def get_missing_chunks(img_id):
     # Input: img_id: str chunk identifier; Output: list of int missing chunk indices
@@ -956,7 +956,7 @@ def end_chunk(msg_uid, msg):
         return
     img_id = parts[0]
     epoch_ms = int(parts[1])
-    
+
     creator = int(msg_uid[1])
     missing = get_missing_chunks(img_id)
     if len(missing) > 0:
@@ -989,7 +989,7 @@ async def init_sim():
     logger.info("[CELL] Cellular system ready")
     return True
 
-async def sim_upload_hb(heartbeat_data): # TODO will be replaced by sim_upload_payload later 
+async def sim_upload_hb(heartbeat_data): # TODO will be replaced by sim_upload_payload later
     # Input: heartbeat_data: dict payload; Output: bool indicating upload success
     """Send heartbeat data via cellular (for command center)"""
     global cellular_system
@@ -1179,7 +1179,7 @@ async def event_text_process(creator, msgbytes):
                 logger.error(f"[TXT] forwarding event text to {next_dst} failed")
         else:
             logger.error(f"[TXT] can't forward event text because I dont have next device in spath yet")
-      
+
 # ---------------------------------------------------------------------------
 # Sensor Capture and Image Transmission
 # ---------------------------------------------------------------------------
@@ -1225,7 +1225,7 @@ async def person_detection_loop():
     last_capture_time = None
     next_capture_wait = None # max value is 16
     MAX_CAPTURE_WAIT = 10
-    FRESH_MOTION_LAP = 16 
+    FRESH_MOTION_LAP = 16
     while True:
         # Wait for PIR interrupt event (blocks until PIR detects motion)
         # Task is suspended here - uses minimal CPU until interrupt fires
@@ -1233,7 +1233,7 @@ async def person_detection_loop():
         # Clear the event for next trigger
         pir_trigger_event.clear()
         await asyncio.sleep(0.5) # DEFAULT wait after every motion
-        
+
         # Exponential backoff sleep logic to prevent rapid-fire triggers
         curr_time = utime.time()  # Get current time in seconds
         if last_capture_time is None:
@@ -1275,7 +1275,7 @@ async def person_detection_loop():
                 center_captured_image_count += 1
             # imgbytes = img.bytearray() # this was bigger # TODO
             # logger.info(f"[OLD] Captured image, size: {len(imgbytes)} bytes")
-            
+
             try:
                 raw_path = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}_raw.jpg"
                 logger.debug(f"Saving raw image to {raw_path} : imbytesize = {len(img.bytearray())}")
@@ -1287,16 +1287,16 @@ async def person_detection_loop():
             except Exception as e:
                 logger.warning(f"[PIR] Failed to save raw image: {e}")
                 continue
-            
+
             # read raw file
             try:
                 img = image.Image(raw_path)
-                imgbytes = img.bytearray() # updated 
+                imgbytes = img.bytearray() # updated
                 logger.info(f"[PIR] Captured image, size: {len(imgbytes)} bytes")
             except Exception as e:
                 logger.error(f"[PIR] Failed read image file: {e}")
                 continue
-                
+
             # Encrypt image immediately
             try:
                 enc_msgbytes = encrypt_if_needed("P", imgbytes)
@@ -1320,7 +1320,7 @@ async def person_detection_loop():
                 # Remove oldest entry
                 oldest = imgpaths_to_send.pop(0)
                 logger.info(f"[PIR] Queue full, removing oldest image: {oldest['enc_filepath']}")
-                
+
             # Save JSON file for the event
             event_filepath = f"{MY_EVENT_DIR}/{event_epoch_ms}.json"
             try:
@@ -1333,7 +1333,7 @@ async def person_detection_loop():
             except Exception as e:
                 logger.error(f"[PIR] Failed to save event file {event_filepath}: {e}")
             events_to_send.append({"creator": my_addr, "epoch_ms": event_epoch_ms})
-            
+
             # logger.info(f"Saved image: {raw_path}")
             # logger.info(f"Person detected Image count: {person_image_count}")
             # if running_as_cc():
@@ -1348,7 +1348,7 @@ async def person_detection_loop():
 
 
 async def send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes):
-    # Input: enc_msgbytes: bytes already encrypted image; 
+    # Input: enc_msgbytes: bytes already encrypted image;
     # Output: bool indicating if image was forwarded successfully to next_node of spath
     logger.info(f"[IMG] Sending image of creator={creator}, size={len(enc_msgbytes)} bytes, to the network")
     try:
@@ -1382,7 +1382,7 @@ async def image_sending_loop():
         if not running_as_cc() and not next_dst:
             logger.warning("[IMG] No shortest path yet so cant send")
             continue
-        
+
         if is_device_busy(next_dst):
             logger.debug(f"[IMG] Device {next_dst} is busy, skipping sending...")
             continue
@@ -1400,7 +1400,7 @@ async def image_sending_loop():
             enc_filepath = img_entry["enc_filepath"]
             creator = img_entry["creator"]
             epoch_ms = img_entry["epoch_ms"]
-            
+
             logger.debug(f"[IMG] Processing: {enc_filepath}")
             enc_msgbytes = None
             try:
@@ -1414,7 +1414,7 @@ async def image_sending_loop():
                     logger.error(f"[IMG] Failed to read encrypted image from file, image re-queued {enc_filepath}, e: {e}")
                     imgpaths_to_send.append(img_entry) # pushed to back of queue
                     break
-                
+
                 transmission_start = time_msec()
                 if running_as_cc():
                     # Upload encrypted image directly (already encrypted)
@@ -1455,7 +1455,7 @@ async def image_sending_loop():
                 logger.error(f"[IMG] unexpected error processing image event {enc_filepath}: {e}, re-queued")
                 # import sys
                 # sys.print_exception(e)
-                
+
                 # Re-queue image on error
                 imgpaths_to_send.append(img_entry) # TODO check this logic later
                 break
@@ -1472,7 +1472,7 @@ async def image_sending_loop():
                         if enc_msgbytes is not None: # imgbytes is None
                             del enc_msgbytes
                 except NameError:
-                    pass 
+                    pass
                 except:
                     pass
                 # Help GC reclaim memory
@@ -1486,7 +1486,7 @@ async def image_sending_loop():
         if len(imgpaths_to_send) > 0:
             # Queue still has items (from failed uploads), check again soon
             await asyncio.sleep(PHOTO_SENDING_FAILED_PAUSE)
-            
+
 
 async def event_text_sending_loop():
     # Input: None; Output: None (periodically sends queued images across mesh)
@@ -1517,7 +1517,7 @@ async def event_text_sending_loop():
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
                 logger.info(f"[TXT] ✔✔✔ Event transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
-  
+
                 if len(events_to_send) > 0:
                     await asyncio.sleep(EVENT_SENDING_INTERVAL)
                 else:
@@ -1560,7 +1560,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
     if my_addr in spath_received:
         logger.debug(f"[cyclic, ignoring {my_addr} already in {spath_received}")
         return
-    
+
     if len(shortest_path_to_cc) == 0:
         if len(seen_neighbours)>0:
             logger.debug(f"spath_recived for first time, saving and forwarding:{spath_received}")
@@ -1573,7 +1573,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
             new_spath_msg = ",".join([str(x) for x in new_spath])
             logger.debug(f"propogating new_spath:{new_spath_msg}, to dst:{n}")
             asyncio.create_task(send_msg("S", int(msg_uid[1]), new_spath_msg.encode(), n))
-        
+
     elif len(shortest_path_to_cc) > len(spath_received):
         if len(seen_neighbours)>0:
             logger.debug(f"smaller spath received, so updating and forwarding:{spath_received}")
@@ -1603,7 +1603,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
 
 def process_message(data, rssi=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
-        
+
     parsed = parse_header(data)
     if not parsed:
         logger.error(f"[LORA] failure parsing incoming data : {data}")
@@ -1624,13 +1624,13 @@ def process_message(data, rssi=None):
         recv_log = "⬇ BCAST"
     else:
         recv_log = "⬇ RECV"
-        
+
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     if rssi is not None:
         logger.info(f"[{recv_log} from {sender}, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     else:
         logger.info(f"[{recv_log} from {sender}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
-    
+
     # logger.info(f"[PARSED HEADER] msg_uid:{msg_uid}, msg_typ:{msg_typ}, creator:{creator}, sender:{sender}, receiver:{receiver}, len-msg:{len(msg)}")
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
@@ -1678,7 +1678,7 @@ def process_message(data, rssi=None):
             return False
     elif msg_typ == "I":
         add_chunk(msg)  # optional to check check_transmode_lock
-    elif msg_typ == "E": # 
+    elif msg_typ == "E": #
         alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
         if alldone:
             delete_transmode_lock(sender, img_id)
@@ -1733,7 +1733,7 @@ async def radio_read():
             # err == 0 means success, err == -6 means RX_TIMEOUT
             # Use timeout to prevent blocking indefinitely
             msg, err = loranode.recv(timeout_en=True, timeout_ms=100)
-            
+
             if len(msg) > 0 and err == 0:
                 # Get RSSI and SNR from the driver
                 try:
@@ -1742,7 +1742,7 @@ async def radio_read():
                 except:
                     rssi = None
                     loranode_rssi = None
-                
+
                 message = msg.replace(b"{}[]", b"\n")
                 process_message(message, rssi)
             elif err == -6:  # RX_TIMEOUT
@@ -1753,7 +1753,7 @@ async def radio_read():
         except Exception as e:
             logger.error(f"[LORA] Receive exception: {e}")
             await asyncio.sleep(0.1)
-        
+
         # Small sleep to yield to other tasks
         await asyncio.sleep(0.01)
 
@@ -1801,7 +1801,7 @@ async def send_heartbeat():
     msgbytes = encrypt_if_needed("H", hbmsg)
     sent_succ = False
     if running_as_cc():
-        
+
         # Convert bytes to base64 for JSON transmission, same as hb_process()
         if isinstance(msgbytes, bytes):
             hb_data = ubinascii.b2a_base64(msgbytes)
@@ -1856,7 +1856,7 @@ async def send_event_text(epoch_ms):
         logger.info(f"[TXT] sending raw event text to cloud, len={len(msgbytes)}, msg:{event_msgstr}")
         sent_succ = await upload_payload_to_server(event_payload, "event_text", my_addr)
         return sent_succ
-    else:        
+    else:
         next_dst = next_device_in_spath()
         if next_dst:
             sent_succ = await send_msg("T", my_addr, msgbytes, next_dst)
@@ -1944,7 +1944,7 @@ async def validate_and_remove_neighbours():
         logger.debug(f"starting neighbours validation: {seen_neighbours}")
         to_be_removed = []
         for n in seen_neighbours:
-            
+
             # ---- waiting, just to not abort partial validation ----
             global image_in_progress
             waiting_retry = 5
@@ -1955,7 +1955,7 @@ async def validate_and_remove_neighbours():
                     break
                 await asyncio.sleep(10)
             # ---- * -----
-                
+
             msgbytes = b"Nothing"
             success = await send_msg("V", my_addr, msgbytes, n)
             if success:
@@ -2182,7 +2182,7 @@ async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
     global image_in_progress
     image_in_progress = False
-    
+
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
@@ -2194,8 +2194,8 @@ async def main():
     if running_as_cc():
         logger.info(f"[INIT] ===> Starting command center node <===")
         # Initialize WiFi if enabled
-        # if WIFI_ENABLED:
-        #     await init_wifi()
+        if WIFI_ENABLED:
+            await init_wifi()
 
         # await init_sim()
         asyncio.create_task(neighbour_scan())
