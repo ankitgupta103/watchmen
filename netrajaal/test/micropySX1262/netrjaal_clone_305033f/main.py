@@ -44,7 +44,9 @@ led = LED("LED_BLUE")
 
 MIN_SLEEP = 0.02  # Reduced for faster transmission
 ACK_SLEEP = 0.05  # Reduced for faster ACK handling
-CHUNK_SLEEP = 0.01  # Minimal delay between chunks for fastest transmission
+# CHUNK_SLEEP calculated dynamically based on packet transmission time
+# For SF5, BW500kHz: ~200 byte packet takes ~3-5ms, add 10ms buffer for reliability
+CHUNK_SLEEP_BASE = 0.015  # Base delay (15ms) - accounts for radio state transitions
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -636,7 +638,7 @@ async def periodic_gc():
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
 def radio_send(dest, data, msg_uid):
-    # Input: dest: int, data: bytes; Output: None (sends bytes via LoRa, logs send)
+    # Input: dest: int, data: bytes; Output: tuple(payload_len, status, transmission_time_ms)
     global sent_count
     sent_count = sent_count + 1
     lendata = len(data)
@@ -644,12 +646,16 @@ def radio_send(dest, data, msg_uid):
         logger.error(f"[LORA] msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
+    start_time = utime.ticks_us()
     payload_len, status = loranode.send(data)
+    end_time = utime.ticks_us()
+    transmission_time_ms = utime.ticks_diff(end_time, start_time) / 1000.0
     if status != 0:
         logger.warning(f"[LORA] Send status: {status} for msg {msg_uid}")
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+    logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}, TX_time={transmission_time_ms:.2f}ms")
+    return payload_len, status, transmission_time_ms
 
 def pop_and_get(msg_uid):
     # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
@@ -670,13 +676,15 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     else:
         msgs_sent.append((msg_uid, msgbytes, timesent))
     if not ackneeded:
-        radio_send(dest, databytes, msg_uid)
-        await asyncio.sleep(MIN_SLEEP)
+        _, _, tx_time = radio_send(dest, databytes, msg_uid)
+        # Small delay after transmission for radio to return to RX mode
+        await asyncio.sleep(max(0.01, tx_time / 1000.0 + 0.005))  # At least 10ms, or tx_time + 5ms buffer
         return (True, [])
     ack_msg_recheck_count = 8 # Increased for more robust ACK checking
     for retry_i in range(retry_count):
-        radio_send(dest, databytes, msg_uid)
-        await asyncio.sleep(ACK_SLEEP)
+        _, _, tx_time = radio_send(dest, databytes, msg_uid)
+        # Wait for transmission to complete plus small buffer
+        await asyncio.sleep(max(ACK_SLEEP, tx_time / 1000.0 + 0.01))  # At least ACK_SLEEP, or tx_time + 10ms
         first_log_flag = True
         for i in range(ack_msg_recheck_count): # ack_msg recheck
             at, missing_chunks = ack_time(msg_uid)
@@ -755,6 +763,8 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 delete_transmode_lock(dest, img_id)
                 return False
 
+            # Track transmission times for adaptive delay
+            last_tx_time = 0
             for i in range(len(chunks)):
                 if i % 10 == 0:
                     logger.info(f"[CHUNK] Sending chunk {i}/{len(chunks)}")
@@ -762,22 +772,34 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 # I messages don't need ACK, send directly without ACK waiting
                 msg_uid = get_msg_uid("I", creator, dest)
                 databytes = msg_uid + b";" + chunkbytes
-                radio_send(dest, databytes, msg_uid)
-                # Minimal delay between chunks to prevent overwhelming the radio
+                _, _, tx_time = radio_send(dest, databytes, msg_uid)
+                last_tx_time = tx_time
+                
+                # Calculate optimal delay: transmission time + buffer for radio state + receiver processing
+                # For SF5, BW500kHz: ~200 bytes = ~3-5ms transmission, add 15ms buffer for reliability
+                optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.012)  # tx_time + 12ms buffer
+                
+                # Minimal delay between chunks to prevent overwhelming the radio/receiver
                 if i < len(chunks) - 1:  # No delay after last chunk
-                    await asyncio.sleep(CHUNK_SLEEP)
+                    await asyncio.sleep(optimal_delay)
             
-            # Wait a bit for receiver to process all chunks before sending End
-            await asyncio.sleep(ACK_SLEEP * 2)  # Small delay before End message
+            # Wait for receiver to process all chunks before sending End
+            # Use last transmission time + buffer to ensure receiver is ready
+            # For SF5, BW500kHz: receiver needs time to process all chunks
+            wait_time = max(0.08, (last_tx_time / 1000.0) + 0.05)  # At least 80ms, or tx_time + 50ms
+            await asyncio.sleep(wait_time)
             
             # Send End message and wait for ACK with missing chunks
-            for retry_i in range(15):  # Reduced from 20, but more efficient
+            # Use fewer retries but with better timing
+            for retry_i in range(12):  # Optimized retry count
                 if retry_i == 0:
-                    await asyncio.sleep(ACK_SLEEP)  # Minimal delay before first check
+                    # First attempt: already waited above, just small additional delay
+                    await asyncio.sleep(0.02)  # Small delay before first End transmission
                 else:
-                    await asyncio.sleep(ACK_SLEEP * 1.5)  # Slightly longer between retries
+                    # Subsequent retries: shorter delay since receiver is already processing
+                    await asyncio.sleep(ACK_SLEEP * 1.2)  # 60ms between retries
                 
-                succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 5)
+                succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 4)
                 if not succ:
                     logger.error(f"[CHUNK] Failed sending chunk end, retry {retry_i+1}")
                     continue  # Try again instead of breaking
@@ -801,19 +823,25 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
                     return False
                 
-                # Retransmit missing chunks rapidly (no ACK needed for I messages)
+                # Retransmit missing chunks with proper timing (no ACK needed for I messages)
+                retx_last_tx_time = 0
                 for mis_chunk in missing_chunks:
                     chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
                     # Send directly without ACK waiting for faster retransmission
                     msg_uid = get_msg_uid("I", creator, dest)
                     databytes = msg_uid + b";" + chunkbytes
-                    radio_send(dest, databytes, msg_uid)
-                    # Minimal delay between retransmissions
+                    _, _, tx_time = radio_send(dest, databytes, msg_uid)
+                    retx_last_tx_time = tx_time
+                    # Calculate optimal delay for retransmission
+                    optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.012)
+                    # Proper delay between retransmissions to ensure reliability
                     if mis_chunk != missing_chunks[-1]:  # No delay after last chunk
-                        await asyncio.sleep(CHUNK_SLEEP)
+                        await asyncio.sleep(optimal_delay)
                 
-                # Small delay before retrying End message
-                await asyncio.sleep(ACK_SLEEP)
+                # Small delay before retrying End message to allow retransmitted chunks to arrive
+                # Use retransmission time if available, otherwise use last chunk time
+                wait_tx_time = retx_last_tx_time if retx_last_tx_time > 0 else last_tx_time
+                await asyncio.sleep(max(0.06, (wait_tx_time / 1000.0) + 0.04))  # At least 60ms
             delete_transmode_lock(dest, img_id)
             return False
         else:
@@ -1680,6 +1708,7 @@ def process_message(data, rssi=None):
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
+        # Process chunk immediately - no delay needed as receiver is already in RX mode
         add_chunk(msg)  # optional to check check_transmode_lock
     elif msg_typ == "E": #
         alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
