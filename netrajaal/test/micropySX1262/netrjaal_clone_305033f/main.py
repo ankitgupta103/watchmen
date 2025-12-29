@@ -330,9 +330,10 @@ def ellepsis(msg):
 
 def ack_needed(msg_typ): # msg_type P is devided in (B,I,E)
     # Input: msg_typ: str; Output: bool indicating if acknowledgement required
-    if msg_typ in ["A", "I", "S", "W", "N"]:
+    # "I" chunks now require ACK for reliable transmission (like example/capture-send pattern)
+    if msg_typ in ["A", "S", "W", "N"]:
         return False
-    if msg_typ in ["H", "B", "E", "V", "C", "T"]:
+    if msg_typ in ["H", "B", "E", "V", "C", "T", "I"]:  # Added "I" for chunk ACKs
         return True
     return False
 
@@ -670,8 +671,9 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-        ack_msg_recheck_count = 8 # Increased from 5 for better ACK detection at high speed
-        for retry_i in range(retry_count):
+    
+    ack_msg_recheck_count = 8 # Increased from 5 for better ACK detection at high speed
+    for retry_i in range(retry_count):
             radio_send(dest, databytes, msg_uid)
             await asyncio.sleep(ACK_SLEEP)
             first_log_flag = True
@@ -738,63 +740,106 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest): # all messages ex
         return False
 
 async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image sending
+    # Redesigned based on example/capture-send pattern:
+    # 1. Send begin packet, wait for ACK
+    # 2. Send chunks sequentially, wait for ACK after each chunk
+    # 3. Send end packet, wait for ACK with missing chunks list
+    # 4. Send missing chunks sequentially, wait for ACK after each
+    # 5. Only after all chunks ACKed, transmission complete
     if not is_lora_ready():
         return False
     if msg_typ == "P":
         img_id = get_rand()
         if get_transmode_lock(dest, img_id):
             asyncio.create_task(keep_transmode_lock(dest, img_id))
-            # sending start
             chunks = make_chunks(msgbytes)
-            logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
-            big_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{len(chunks)}", dest)
-            if not big_succ:
-                logger.info(f"[CHUNK] Failed sending chunk begin")
+            num_chunks = len(chunks)
+            logger.info(f"[IMG TX] Starting image transmission: dest={dest}, len={len(msgbytes)} bytes, img_id={img_id}, chunks={num_chunks}")
+            
+            # Step 1: Send begin packet and wait for ACK
+            begin_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{num_chunks}", dest)
+            if not begin_succ:
+                logger.error(f"[IMG TX] Failed to send begin packet for img_id={img_id}")
                 delete_transmode_lock(dest, img_id)
                 return False
-
-            for i in range(len(chunks)):
+            logger.info(f"[IMG TX] Begin packet ACKed, starting chunk transmission...")
+            
+            # Step 2: Send all chunks sequentially, waiting for ACK after each chunk
+            # This ensures receiver stays in receive mode and processes chunks in order
+            sent_chunks = set()
+            for i in range(num_chunks):
+                if not check_transmode_lock(dest, img_id):
+                    logger.error(f"[IMG TX] TRANS MODE ended, transmission failed")
+                    delete_transmode_lock(dest, img_id)
+                    return False
+                    
                 if i % 10 == 0:
-                    logger.info(f"[CHUNK] Sending chunk {i}")
-                await asyncio.sleep(CHUNK_SLEEP)
-                chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
-                _ = await send_single_packet("I", creator, chunkbytes, dest)
-            for retry_i in range(20):
-                if retry_i == 0:
-                    await asyncio.sleep(0.1)  # Faster first check
+                    logger.info(f"[IMG TX] Sending chunk {i+1}/{num_chunks}")
+                
+                chunkbytes = img_id.encode() + i.to_bytes(2, 'big') + chunks[i]
+                chunk_succ, _ = await send_single_packet("I", creator, chunkbytes, dest, retry_count=5)
+                if not chunk_succ:
+                    logger.warning(f"[IMG TX] Failed to send chunk {i}, will retry in end phase")
                 else:
-                    await asyncio.sleep(CHUNK_SLEEP)
-                succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 10)
-                if not succ:
-                    logger.error(f"[CHUNK] Failed sending chunk end")
-                    break
-
-                # Treat various ACK forms as success:
-                # - [-1]   : explicit "all done" from receiver
-                # - []/None: truncated or minimal ACK with no missing list (we assume success)
-                if (
-                    missing_chunks is None
-                    or len(missing_chunks) == 0
-                    or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
-                ):
-                    logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
+                    sent_chunks.add(i)
+            
+            logger.info(f"[IMG TX] Initial chunk transmission complete: {len(sent_chunks)}/{num_chunks} chunks sent successfully")
+            
+            # Step 3: Send end packet and get missing chunks list
+            max_end_retries = 10
+            for end_retry in range(max_end_retries):
+                if not check_transmode_lock(dest, img_id):
+                    logger.error(f"[IMG TX] TRANS MODE ended during end packet phase")
+                    delete_transmode_lock(dest, img_id)
+                    return False
+                
+                end_succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count=5)
+                if not end_succ:
+                    logger.warning(f"[IMG TX] Failed to send end packet, retry {end_retry+1}/{max_end_retries}")
+                    await asyncio.sleep(0.2)
+                    continue
+                
+                # Parse missing chunks from ACK response
+                if missing_chunks is None or len(missing_chunks) == 0:
+                    # All chunks received successfully
+                    logger.info(f"[IMG TX] All chunks received successfully! Transmission complete.")
                     delete_transmode_lock(dest, img_id)
                     return True
-
-                logger.info(
-                    f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
-                )
-                if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
-                    logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
-                    return False
-                for mis_chunk in missing_chunks:
-                    await asyncio.sleep(CHUNK_SLEEP)
-                    chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
-                    _ = await send_single_packet("I", creator, chunkbytes, dest)
+                
+                # Check if receiver explicitly confirmed completion
+                if len(missing_chunks) == 1 and missing_chunks[0] == -1:
+                    logger.info(f"[IMG TX] Receiver confirmed all chunks received (ACK with -1)")
+                    delete_transmode_lock(dest, img_id)
+                    return True
+                
+                # Step 4: Send missing chunks sequentially
+                logger.info(f"[IMG TX] Receiver missing {len(missing_chunks)} chunks: {missing_chunks}")
+                missing_list = missing_chunks[:]  # Copy list
+                
+                for mis_chunk_idx in missing_list:
+                    if not check_transmode_lock(dest, img_id):
+                        logger.error(f"[IMG TX] TRANS MODE ended during missing chunk retransmission")
+                        delete_transmode_lock(dest, img_id)
+                        return False
+                    
+                    if mis_chunk_idx < 0 or mis_chunk_idx >= num_chunks:
+                        logger.warning(f"[IMG TX] Invalid missing chunk index {mis_chunk_idx}, skipping")
+                        continue
+                    
+                    chunkbytes = img_id.encode() + mis_chunk_idx.to_bytes(2, 'big') + chunks[mis_chunk_idx]
+                    retry_succ, _ = await send_single_packet("I", creator, chunkbytes, dest, retry_count=5)
+                    if not retry_succ:
+                        logger.warning(f"[IMG TX] Failed to retry missing chunk {mis_chunk_idx}")
+                
+                # Brief delay before checking again
+                await asyncio.sleep(0.2)
+            
+            # If we exhausted retries, transmission failed
+            logger.error(f"[IMG TX] Failed to complete transmission after {max_end_retries} end packet retries")
             delete_transmode_lock(dest, img_id)
             return False
         else:
-            logger.warning(f"TRANS MODE already in use, could not get lock...")
+            logger.warning(f"[IMG TX] TRANS MODE already in use, could not get lock...")
             return False
     else:
         logger.warning(f"Invalid message type: {msg_typ}")
@@ -876,7 +921,7 @@ def add_chunk(msgbytes):
         logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
         return
     img_id = msgbytes[0:3].decode()
-    citer = int.from_bytes(msgbytes[3:5])
+    citer = int.from_bytes(msgbytes[3:5], 'big')  # Consistent with sender's to_bytes(2, 'big')
     #logger.info(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
     if img_id not in chunk_map:
@@ -1658,37 +1703,48 @@ def process_message(data, rssi=None):
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
-        add_chunk(msg)  # optional to check check_transmode_lock
+        # Process chunk immediately and send ACK (receiver stays in receive mode)
+        # This ensures sender can wait for ACK before sending next chunk (like example/capture-send pattern)
+        if not check_transmode_lock(sender, None):
+            # No active transfer mode - might be stale chunk, send ACK anyway to unblock sender
+            logger.debug(f"[IMG RX] Received chunk I but no active transfer mode, sending ACK anyway")
+            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+        else:
+            # Active transfer - process chunk and send ACK immediately
+            add_chunk(msg)
+            # Send ACK immediately (non-blocking) so sender can proceed
+            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "E": #
+        # Process end chunk and respond with missing chunks list or completion confirmation
         alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
         if alldone:
             delete_transmode_lock(sender, img_id)
-            # also when it fails
+            # All chunks received - send completion ACK with -1 marker
             ackmessage += b":-1"
-            # asyncio.create_task(send_msg("A", creator, ackmessage, sender))
+            # Send ACK multiple times for reliability
             async def send_ack_multiple(): # send ACK 2 times
                 msg_count = 2
                 for i in range(msg_count):
                     await send_msg("A", creator, ackmessage, sender)
                     if i < msg_count-1:
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(0.2)  # Reduced delay for faster response
             asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
                 try:
                     enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
-                    logger.debug(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
+                    logger.info(f"[IMG RX] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
                     with open(enc_filepath, "wb") as f:
                         f.write(recompiled_msgbytes)
                     os.sync()  # Force filesystem sync to SD card
                     utime.sleep_ms(500)
                     imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
-                    logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
+                    logger.info(f"[IMG RX] Image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
-                    logger.error(f"[CHUNK] error saving image to {enc_filepath}: {e}")
-                # asyncio.create_task(img_process(img_id, recompiled_msgbytes, creator, sender))
+                    logger.error(f"[IMG RX] Error saving image to {enc_filepath}: {e}")
             else:
-                logger.warning(f"[CHUNK] img not recompiled, so not sending")
+                logger.warning(f"[IMG RX] Image not recompiled, skipping save")
         else:
+            # Missing chunks - send ACK with missing chunks list immediately so sender can retransmit
             ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "A":
