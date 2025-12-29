@@ -43,7 +43,7 @@ ENCRYPTION_ENABLED = True
 led = LED("LED_BLUE")
 
 MIN_SLEEP = 0.02  # Reduced for faster transmission
-ACK_SLEEP = 0.05  # Reduced for faster ACK handling
+ACK_SLEEP = 0.04  # Optimized for hybrid mode (blocking TX + non-blocking RX)
 # CHUNK_SLEEP calculated dynamically based on packet transmission time
 # For SF5, BW500kHz: ~200 byte packet takes ~3-5ms
 # Hybrid mode: blocking TX (reliable) + non-blocking RX (always in RX)
@@ -673,6 +673,8 @@ async def radio_send(dest, data, msg_uid):
     # In blocking mode, send() automatically waits for TX_DONE
     # Switch back to non-blocking mode for RX if we were in non-blocking
     if was_non_blocking:
+        # Small delay to prevent self-reception (radio needs time to switch from TX to RX)
+        await asyncio.sleep(0.003)  # 3ms delay to prevent receiving own transmission
         loranode.setBlockingCallback(blocking=False)
         # Receiver automatically goes to RX mode in non-blocking mode
     
@@ -708,11 +710,12 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         # Small delay after transmission for radio to return to RX mode
         await asyncio.sleep(max(0.01, tx_time / 1000.0 + 0.005))  # At least 10ms, or tx_time + 5ms buffer
         return (True, [])
-    ack_msg_recheck_count = 8 # Increased for more robust ACK checking
+    ack_msg_recheck_count = 10 # Increased for more robust ACK checking in hybrid mode
     for retry_i in range(retry_count):
         _, _, tx_time = await radio_send(dest, databytes, msg_uid)
-        # Wait for transmission to complete plus small buffer
-        await asyncio.sleep(max(ACK_SLEEP, tx_time / 1000.0 + 0.01))  # At least ACK_SLEEP, or tx_time + 10ms
+        # Wait for transmission to complete - blocking TX ensures TX_DONE
+        # Reduced delay since blocking TX is reliable and receiver is always in RX
+        await asyncio.sleep(max(ACK_SLEEP, tx_time / 1000.0 + 0.008))  # At least ACK_SLEEP, or tx_time + 8ms
         first_log_flag = True
         for i in range(ack_msg_recheck_count): # ack_msg recheck
             at, missing_chunks = ack_time(msg_uid)
@@ -727,7 +730,7 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                 else:
                     logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
                 # Faster progressive sleep: start small, increase gradually
-                sleep_time = ACK_SLEEP * (1 + i * 0.5)  # 0.05, 0.075, 0.1, 0.125...
+                sleep_time = ACK_SLEEP * (1 + i * 0.4)  # 0.04, 0.056, 0.072, 0.088...
                 await asyncio.sleep(min(sleep_time, 0.15))  # Cap at 150ms
         logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
@@ -825,14 +828,14 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
             await asyncio.sleep(wait_time)
             
             # Send End message and wait for ACK with missing chunks
-            # Use fewer retries but with better timing
-            for retry_i in range(12):  # Optimized retry count
+            # Optimized retries for hybrid mode
+            for retry_i in range(10):  # Optimized retry count
                 if retry_i == 0:
                     # First attempt: already waited above, just small additional delay
-                    await asyncio.sleep(0.02)  # Small delay before first End transmission
+                    await asyncio.sleep(0.015)  # Small delay before first End transmission
                 else:
-                    # Subsequent retries: shorter delay since receiver is already processing
-                    await asyncio.sleep(ACK_SLEEP * 1.2)  # 60ms between retries
+                    # Subsequent retries: shorter delay since receiver is always in RX
+                    await asyncio.sleep(ACK_SLEEP * 1.0)  # 40ms between retries
                 
                 succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 4)
                 if not succ:
@@ -878,8 +881,8 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 # Wait before retrying End message to allow retransmitted chunks to arrive and be processed
                 # Use retransmission time if available, otherwise use last chunk time
                 wait_tx_time = retx_last_tx_time if retx_last_tx_time > 0 else last_tx_time
-                # Reduced wait time - receiver is always in RX mode
-                await asyncio.sleep(max(0.05, (wait_tx_time / 1000.0) + 0.03))  # At least 50ms
+                # Reduced wait time - receiver is always in RX mode (hybrid mode)
+                await asyncio.sleep(max(0.04, (wait_tx_time / 1000.0) + 0.025))  # At least 40ms
             delete_transmode_lock(dest, img_id)
             return False
         else:
@@ -933,16 +936,20 @@ chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
 # ---------------------------------------------------------------------------
 
 def begin_chunk(msg):
-    # Input: msg: str formatted as "<type>:<chunk_id>:<num_chunks>"; Output: None (initializes chunk tracking)
-    parts = msg.split(":")
-    if len(parts) != 3:
-        logger.error(f"[CHUNK] begin message unparsable {msg}")
-        return
-    img_id = parts[0]
-    epoch_ms = int(parts[1])
-    numchunks = int(parts[2])
-    chunk_map[img_id] = ("B", numchunks, [])
-    return (img_id, epoch_ms, numchunks)
+    # Input: msg: str formatted as "<type>:<chunk_id>:<num_chunks>"; Output: tuple(img_id, epoch_ms, numchunks) or None
+    try:
+        parts = msg.split(":")
+        if len(parts) != 3:
+            logger.error(f"[CHUNK] begin message unparsable {msg}")
+            return None
+        img_id = parts[0]
+        epoch_ms = int(parts[1])
+        numchunks = int(parts[2])
+        chunk_map[img_id] = ("B", numchunks, [])
+        return (img_id, epoch_ms, numchunks)
+    except Exception as e:
+        logger.error(f"[CHUNK] begin_chunk error: {e}, msg: {msg}")
+        return None
 
 
 def get_missing_chunks(img_id):
@@ -1752,14 +1759,19 @@ def process_message(data, rssi=None, snr=None):
                 msg_str = msg.decode('utf-8', errors='ignore')  # Ignore decode errors for corrupted data
             else:
                 msg_str = str(msg)
-            img_id, epoch_ms, numchunks = begin_chunk(msg_str)
+            result = begin_chunk(msg_str)
+            if result is None:
+                logger.error(f"[CHUNK] begin_chunk returned None for msg: {msg_str[:50]}")
+                return False
+            img_id, epoch_ms, numchunks = result
             if get_transmode_lock(sender, img_id):
                 asyncio.create_task(keep_transmode_lock(sender, img_id))
-                # Send ACK immediately for faster response
+                # Send ACK immediately for faster response - critical for image transmission
+                # Use blocking TX for reliable ACK delivery
                 asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-                # Send duplicate ACK quickly for reliability
+                # Send duplicate ACK quickly for reliability (reduced delay for hybrid mode)
                 async def send_ack_duplicate_begin():
-                    await asyncio.sleep(0.03)  # Very short delay
+                    await asyncio.sleep(0.015)  # Very short delay for duplicate ACK
                     await send_msg("A", my_addr, ackmessage, sender)
                 asyncio.create_task(send_ack_duplicate_begin())
             else:
@@ -1767,7 +1779,7 @@ def process_message(data, rssi=None, snr=None):
                 asyncio.create_task(send_msg("W", my_addr, WAIT_MESSAGE, sender))
                 return False
         except Exception as e:
-            logger.error(f"[CHUNK] decoding error {e} : msg_len={len(msg) if msg else 0}, msg_preview={str(msg)[:50] if msg else 'None'}")
+            logger.error(f"[CHUNK] decoding error: {str(e)}, msg_len={len(msg) if msg else 0}, msg_preview={str(msg)[:50] if msg else 'None'}")
             return False
     elif msg_typ == "I":
         # Process chunk immediately - no delay needed as receiver is already in RX mode
@@ -1885,9 +1897,9 @@ async def radio_read():
             except:
                 pass
         
-        # Optimized polling for non-blocking mode - receiver is always in RX
-        # Faster polling for highest data rate while maintaining reliability
-        await asyncio.sleep(0.02)  # 20ms polling - balanced for non-blocking mode
+        # Optimized polling for hybrid mode - receiver is always in RX
+        # Balanced polling for highest data rate while maintaining reliability
+        await asyncio.sleep(0.015)  # 15ms polling - optimized for hybrid mode
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
