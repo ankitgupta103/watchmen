@@ -34,6 +34,7 @@ start_time = time.ticks_ms()
 
 for i, packet in enumerate(packets):
     sx.send(packet)
+    print(f"packet: {packet}")
     if (i + 1) % 10 == 0:
         print(f"Sent {i + 1}/{num_packets}")
 
@@ -47,6 +48,7 @@ missing = []
 timeout_start = time.ticks_ms()
 while time.ticks_diff(time.ticks_ms(), timeout_start) < 10000:
     msg, status = sx.recv(timeout_en=True, timeout_ms=2000)
+    print(f"msg: {msg}")
     if status == 0 and len(msg) > 0:
         if msg[0] == 0xFF:
             missing = list(msg[1:])

@@ -481,7 +481,6 @@ LORA_PREAMBLE = 12     # Longer preamble for better synchronization
 
 loranode = None
 loranode_rssi = None  # Store last RSSI value
-radio_lock = asyncio.Lock()  # Serialize radio access to prevent send/receive conflicts
 
 async def init_lora():
     # Input: None; Output: None (initializes global loranode, updates lora_reinit_count)
@@ -654,7 +653,7 @@ async def periodic_gc():
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
-async def radio_send(dest, data, msg_uid):
+def radio_send(dest, data, msg_uid):
     # Input: dest: int, data: bytes; Output: None (sends bytes via LoRa, logs send)
     global sent_count, loranode
     sent_count = sent_count + 1
@@ -664,22 +663,21 @@ async def radio_send(dest, data, msg_uid):
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
 
-    # Serialize radio access to prevent conflicts with receive loop
-    async with radio_lock:
-        # New driver: send() returns (payload_len, status)
-        # Note: LoRa doesn't have built-in addressing, dest is in packet payload
-        try:
-            payload_len, status = loranode.send(data)
-            if status != 0:
-                logger.warning(f"[LORA] Send returned status: {status}")
-            # Small delay to ensure transmission completes
-            # With SF8+BW250kHz, packets take longer to transmit than SF7+BW500
-            utime.sleep_ms(5)  # 5ms delay for transmission to complete
-            # Note: In blocking mode, the receive loop (radio_read) manages radio state
-            # The next recv() call will automatically put radio back in RX mode
-            # No need to call startReceive() here as it conflicts with blocking mode
-        except Exception as e:
-            logger.error(f"[LORA] Send exception: {e}")
+    # New driver: send() returns (payload_len, status)
+    # Note: LoRa doesn't have built-in addressing, dest is in packet payload
+    # Blocking operations naturally serialize - no lock needed
+    try:
+        payload_len, status = loranode.send(data)
+        if status != 0:
+            logger.warning(f"[LORA] Send returned status: {status}")
+        # Small delay to ensure transmission completes
+        # With SF8+BW250kHz, packets take longer to transmit than SF7+BW500
+        utime.sleep_ms(5)  # 5ms delay for transmission to complete
+        # Note: In blocking mode, the receive loop (radio_read) manages radio state
+        # The next recv() call will automatically put radio back in RX mode
+        # No need to call startReceive() here as it conflicts with blocking mode
+    except Exception as e:
+        logger.error(f"[LORA] Send exception: {e}")
 
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
@@ -704,14 +702,14 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     else:
         msgs_sent.append((msg_uid, msgbytes, timesent))
     if not ackneeded:
-        await radio_send(dest, databytes, msg_uid)
+        radio_send(dest, databytes, msg_uid)
         # For non-ACK messages (like chunk "I" type), minimal sleep to allow transmission
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     # ACK checking with robust timing for SF8+BW250kHz
     ack_msg_recheck_count = 12 # More checks for robust ACK reception
     for retry_i in range(retry_count):
-        await radio_send(dest, databytes, msg_uid)
+        radio_send(dest, databytes, msg_uid)
         # Allow time for transmission to complete (SF8+BW250kHz needs more time than SF7+BW500)
         await asyncio.sleep(ACK_SLEEP)  # Initial wait for transmission to complete
         
@@ -1763,12 +1761,11 @@ async def radio_read():
     
     while True:
         try:
-            # Serialize radio access to prevent conflicts with send operations
-            async with radio_lock:
-                # Blocking mode with optimized timeout (50ms) for faster ACK detection
-                # Shorter timeout allows faster responsiveness while still allowing proper
-                # packet reception with SF8+BW250kHz configuration
-                msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
+            # Blocking mode with optimized timeout (50ms) for faster ACK detection
+            # Shorter timeout allows faster responsiveness while still allowing proper
+            # packet reception with SF8+BW250kHz configuration
+            # Blocking operations naturally serialize - no lock needed
+            msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
             
             if len(msg) > 0 and err == 0:
                 # Packet received successfully - process immediately
