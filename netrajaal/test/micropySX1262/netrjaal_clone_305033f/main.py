@@ -45,8 +45,9 @@ led = LED("LED_BLUE")
 MIN_SLEEP = 0.02  # Reduced for faster transmission
 ACK_SLEEP = 0.05  # Reduced for faster ACK handling
 # CHUNK_SLEEP calculated dynamically based on packet transmission time
-# For SF5, BW500kHz: ~200 byte packet takes ~3-5ms, add 10ms buffer for reliability
-CHUNK_SLEEP_BASE = 0.015  # Base delay (15ms) - accounts for radio state transitions
+# For SF5, BW500kHz: ~200 byte packet takes ~3-5ms, but receiver needs more time to process
+# Increased delays to reduce packet loss - receiver needs time to store chunks in memory
+CHUNK_SLEEP_BASE = 0.035  # Base delay (35ms) - ensures receiver can process each chunk reliably
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -765,6 +766,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
 
             # Track transmission times for adaptive delay
             last_tx_time = 0
+            BATCH_SIZE = 20  # Send chunks in batches with longer pause between batches
+            BATCH_PAUSE = 0.05  # 50ms pause between batches to give receiver breathing room
+            
             for i in range(len(chunks)):
                 if i % 10 == 0:
                     logger.info(f"[CHUNK] Sending chunk {i}/{len(chunks)}")
@@ -775,18 +779,28 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 _, _, tx_time = radio_send(dest, databytes, msg_uid)
                 last_tx_time = tx_time
                 
-                # Calculate optimal delay: transmission time + buffer for radio state + receiver processing
-                # For SF5, BW500kHz: ~200 bytes = ~3-5ms transmission, add 15ms buffer for reliability
-                optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.012)  # tx_time + 12ms buffer
+                # Small delay immediately after transmission to ensure radio completes TX->RX transition
+                await asyncio.sleep(0.005)  # 5ms for radio state transition
                 
-                # Minimal delay between chunks to prevent overwhelming the radio/receiver
+                # Calculate optimal delay: transmission time + buffer for radio state + receiver processing
+                # For SF5, BW500kHz: ~200 bytes = ~3-5ms transmission, but receiver needs significant time
+                # Increased buffer to 25ms to ensure receiver can process and store each chunk
+                optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.025)  # tx_time + 25ms buffer
+                
+                # Delay between chunks to prevent overwhelming the radio/receiver
                 if i < len(chunks) - 1:  # No delay after last chunk
                     await asyncio.sleep(optimal_delay)
+                    
+                    # Add longer pause every BATCH_SIZE chunks to give receiver more processing time
+                    if (i + 1) % BATCH_SIZE == 0:
+                        await asyncio.sleep(BATCH_PAUSE)
+                        logger.debug(f"[CHUNK] Batch pause after chunk {i+1}")
             
             # Wait for receiver to process all chunks before sending End
             # Use last transmission time + buffer to ensure receiver is ready
-            # For SF5, BW500kHz: receiver needs time to process all chunks
-            wait_time = max(0.08, (last_tx_time / 1000.0) + 0.05)  # At least 80ms, or tx_time + 50ms
+            # For SF5, BW500kHz: receiver needs significant time to process all chunks
+            # Increased wait time to ensure all chunks are stored before End message
+            wait_time = max(0.15, (last_tx_time / 1000.0) + 0.10)  # At least 150ms, or tx_time + 100ms
             await asyncio.sleep(wait_time)
             
             # Send End message and wait for ACK with missing chunks
@@ -832,16 +846,21 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     databytes = msg_uid + b";" + chunkbytes
                     _, _, tx_time = radio_send(dest, databytes, msg_uid)
                     retx_last_tx_time = tx_time
-                    # Calculate optimal delay for retransmission
-                    optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.012)
+                    
+                    # Small delay immediately after transmission for radio state transition
+                    await asyncio.sleep(0.005)  # 5ms for radio state transition
+                    
+                    # Calculate optimal delay for retransmission - same as initial transmission
+                    optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.025)
                     # Proper delay between retransmissions to ensure reliability
                     if mis_chunk != missing_chunks[-1]:  # No delay after last chunk
                         await asyncio.sleep(optimal_delay)
                 
-                # Small delay before retrying End message to allow retransmitted chunks to arrive
+                # Wait before retrying End message to allow retransmitted chunks to arrive and be processed
                 # Use retransmission time if available, otherwise use last chunk time
                 wait_tx_time = retx_last_tx_time if retx_last_tx_time > 0 else last_tx_time
-                await asyncio.sleep(max(0.06, (wait_tx_time / 1000.0) + 0.04))  # At least 60ms
+                # Increased wait time to ensure retransmitted chunks are fully processed
+                await asyncio.sleep(max(0.12, (wait_tx_time / 1000.0) + 0.08))  # At least 120ms
             delete_transmode_lock(dest, img_id)
             return False
         else:
@@ -1626,8 +1645,8 @@ async def sync_and_transfer_spath(msg_uid, msg):
     else:
         logger.info(f"larger spath received, so ignoring it: {spath_received}")
 
-def process_message(data, rssi=None):
-    # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
+def process_message(data, rssi=None, snr=None):
+    # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; snr: float or None SNR value in dB; Output: bool indicating if message was processed
 
     parsed = parse_header(data)
     if not parsed:
@@ -1651,8 +1670,10 @@ def process_message(data, rssi=None):
         recv_log = "⬇ RECV"
 
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    if rssi is not None:
-        logger.info(f"[{recv_log} from {sender}, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+    if rssi is not None and snr is not None:
+        logger.info(f"[{recv_log} from {sender}, rssi: {rssi:.1f}dBm, snr: {snr:.1f}dB] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+    elif rssi is not None:
+        logger.info(f"[{recv_log} from {sender}, rssi: {rssi:.1f}dBm] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     else:
         logger.info(f"[{recv_log} from {sender}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
 
@@ -1770,21 +1791,25 @@ async def radio_read():
             continue
         msg, err = loranode.recv(timeout_en=True, timeout_ms=100)
         if err == 0 and len(msg) > 0:  # ERR_NONE = 0
-            # Extract RSSI if available
+            # Extract RSSI and SNR if available
             rssi = None
+            snr = None
             try:
                 rssi = loranode.getRSSI()
+                snr = loranode.getSNR()
             except:
                 pass
             message = msg.replace(b"{}[]", b"\n")
-            process_message(message, rssi)
+            process_message(message, rssi, snr)
         elif err == -6:  # ERR_RX_TIMEOUT - normal, no message
             pass
         elif err == -7:  # ERR_CRC_MISMATCH - corrupted packet
             logger.warning(f"[LORA] CRC mismatch, packet corrupted")
         elif err != 0:
             logger.debug(f"[LORA] Receive error: {err}")
-        await asyncio.sleep(0.02)  # Faster polling for highest data rate (SF5, BW500kHz)
+        # Slightly longer polling to give receiver more time to process packets
+        # Balance between responsiveness and allowing receiver to process chunks
+        await asyncio.sleep(0.03)  # 30ms polling for reliable chunk reception
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
