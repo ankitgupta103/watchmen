@@ -44,7 +44,7 @@ led = LED("LED_BLUE")
 
 # Timing constants optimized for SF8 + BW250kHz (robust configuration)
 MIN_SLEEP = 0.03  # Sleep after non-ACK messages for reliable transmission
-ACK_SLEEP = 0.1   # Initial ACK wait - allows time for transmission and ACK processing
+ACK_SLEEP = 0.05  # Initial ACK wait - reduced for faster ACK response (50ms)
 CHUNK_SLEEP = 0.05  # Sleep between chunks for reliable reception
 CHUNK_BATCH_SIZE = 30  # Smaller batches for more reliable transmission
 CHUNK_BATCH_DELAY = 0.1  # Delay after batches to allow receiver to process
@@ -672,6 +672,14 @@ def radio_send(dest, data, msg_uid):
         # Small delay to ensure transmission completes
         # With SF8+BW250kHz, packets take longer to transmit than SF7+BW500
         utime.sleep_ms(5)  # 5ms delay for transmission to complete
+        
+        # CRITICAL: Return radio to RX mode after transmission to receive ACKs
+        # The transmit() method leaves radio in STANDBY mode, so we must explicitly
+        # put it back in RX mode to enable bidirectional communication
+        try:
+            loranode.startReceive()
+        except Exception as e:
+            logger.warning(f"[LORA] Failed to start receive after send: {e}")
     except Exception as e:
         logger.error(f"[LORA] Send exception: {e}")
 
@@ -1757,10 +1765,10 @@ async def radio_read():
     
     while True:
         try:
-            # Blocking mode with robust timeout (100ms) for reliable packet reception
-            # Longer timeout allows radio to properly receive packets with SF8+BW250kHz
-            # This configuration is more reliable than shorter timeouts
-            msg, err = loranode.recv(timeout_en=True, timeout_ms=100)
+            # Blocking mode with optimized timeout (50ms) for faster ACK detection
+            # Shorter timeout allows faster responsiveness while still allowing proper
+            # packet reception with SF8+BW250kHz configuration
+            msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
             
             if len(msg) > 0 and err == 0:
                 # Packet received successfully - process immediately
