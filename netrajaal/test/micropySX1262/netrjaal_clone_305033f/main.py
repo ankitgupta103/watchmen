@@ -644,12 +644,15 @@ def radio_send(dest, data, msg_uid):
     data = data.replace(b"\n", b"{}[]")
     # SX1262 send() doesn't take dest parameter - addressing is in the data payload
     try:
+        # Calculate airtime before sending (more accurate for logging)
+        airtime_us = loranode.getTimeOnAir(len(data))
         len_sent, status = loranode.send(data)
         if status != ERR_NONE:
             logger.error(f"[LORA] Send failed with status {status}, MSG_UID = {msg_uid}, dest={dest}")
         # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
         data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-        logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+        airtime_ms = airtime_us / 1000.0
+        logger.info(f"[⮕ SENT to {dest}, airtime: {airtime_ms:.2f}ms] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     except Exception as e:
         logger.error(f"[LORA] Exception in radio_send: {e}, MSG_UID = {msg_uid}")
 
@@ -1674,8 +1677,8 @@ async def sync_and_transfer_spath(msg_uid, msg):
     else:
         logger.info(f"larger spath received, so ignoring it: {spath_received}")
 
-def process_message(data, rssi=None):
-    # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
+def process_message(data, rssi=None, snr=None, airtime_us=None):
+    # Input: data: bytes raw LoRa payload; rssi: float or None RSSI value in dBm; snr: float or None SNR value in dB; airtime_us: int or None airtime in microseconds; Output: bool indicating if message was processed
 
     parsed = parse_header(data)
     if not parsed:
@@ -1699,8 +1702,19 @@ def process_message(data, rssi=None):
         recv_log = "⬇ RECV"
 
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
+    # Build log string with RSSI, SNR, and airtime if available
+    log_extra = []
     if rssi is not None:
-        logger.info(f"[{recv_log} from {sender}, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+        log_extra.append(f"rssi: {rssi:.1f}")
+    if snr is not None:
+        log_extra.append(f"snr: {snr:.1f}")
+    if airtime_us is not None:
+        airtime_ms = airtime_us / 1000.0
+        log_extra.append(f"airtime: {airtime_ms:.2f}ms")
+    
+    if log_extra:
+        extra_str = ", ".join(log_extra)
+        logger.info(f"[{recv_log} from {sender}, {extra_str}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     else:
         logger.info(f"[{recv_log} from {sender}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
 
@@ -1854,7 +1868,9 @@ async def radio_read():
                 if len(msg) > 0:
                     message = msg.replace(b"{}[]", b"\n")
                     rssi = loranode.getRSSI()  # Get RSSI after successful receive
-                    process_message(message, rssi)
+                    snr = loranode.getSNR()  # Get SNR after successful receive
+                    airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime for received packet
+                    process_message(message, rssi, snr, airtime_us)
                 else:
                     logger.debug(f"[LORA] Empty packet received")
             elif status == ERR_RX_TIMEOUT:
@@ -1866,8 +1882,10 @@ async def radio_read():
                 if len(msg) > 0:
                     message = msg.replace(b"{}[]", b"\n")
                     rssi = loranode.getRSSI()
+                    snr = loranode.getSNR()  # Get SNR even for CRC error packets
+                    airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime
                     # Try to process even with CRC error - some protocols can handle it
-                    process_message(message, rssi)
+                    process_message(message, rssi, snr, airtime_us)
             else:
                 # Other error - log and continue
                 logger.warning(f"[LORA] Receive error status: {status}")
