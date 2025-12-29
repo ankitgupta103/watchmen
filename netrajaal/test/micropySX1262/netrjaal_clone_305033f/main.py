@@ -46,9 +46,9 @@ MIN_SLEEP = 0.02  # Reduced for faster transmission
 ACK_SLEEP = 0.05  # Reduced for faster ACK handling
 # CHUNK_SLEEP calculated dynamically based on packet transmission time
 # For SF5, BW500kHz: ~200 byte packet takes ~3-5ms
-# With non-blocking mode: receiver is always in RX, so we can reduce delays
-# Reduced delays for highest data rate while maintaining reliability
-CHUNK_SLEEP_BASE = 0.015  # Base delay (15ms) - optimized for non-blocking mode
+# Hybrid mode: blocking TX (reliable) + non-blocking RX (always in RX)
+# Optimized delays for highest data rate while maintaining reliability
+CHUNK_SLEEP_BASE = 0.010  # Base delay (10ms) - optimized for hybrid mode
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -519,11 +519,11 @@ async def init_lora():
             loranode = None
         else:
             logger.info(f"[LORA] LoRa SX1262 initialized successfully (SF5, BW500kHz, CR5)")
-            # Switch to non-blocking mode for more robust transmission
-            # Non-blocking allows receiver to always be in RX mode and sender to check TX_DONE
+            # Use hybrid approach: blocking for TX (reliable), non-blocking for RX (always in RX mode)
+            # This ensures reliable transmission while keeping receiver always ready
             status = loranode.setBlockingCallback(blocking=False)
             if status == 0:
-                logger.info(f"[LORA] Switched to non-blocking mode for robust transmission")
+                logger.info(f"[LORA] Switched to non-blocking RX mode - receiver always in RX, TX uses blocking")
             else:
                 logger.warning(f"[LORA] Failed to set non-blocking mode: {status}, using blocking mode")
     except Exception as e:
@@ -659,51 +659,22 @@ async def radio_send(dest, data, msg_uid):
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
     start_time = utime.ticks_us()
+    
+    # Use blocking mode for TX (reliable) - temporarily switch if in non-blocking mode
+    # This ensures TX_DONE is properly detected while keeping RX in non-blocking mode
+    was_non_blocking = False
+    if not loranode.blocking:
+        was_non_blocking = True
+        # Temporarily switch to blocking for reliable TX
+        loranode.setBlockingCallback(blocking=True)
+    
     payload_len, status = loranode.send(data)
     
-    # In non-blocking mode, wait for TX_DONE event
-    if status == 0 and not loranode.blocking:
-        # Poll for TX_DONE event (non-blocking mode) - allows receiver to stay in RX
-        # Increased timeout for larger packets and clear IRQ flags properly
-        max_wait_ms = 200  # Increased timeout for larger packets (was 100ms)
-        wait_start = utime.ticks_ms()
-        tx_done = False
-        poll_count = 0
-        while utime.ticks_diff(utime.ticks_ms(), wait_start) < max_wait_ms:
-            events = loranode._events()
-            if events & loranode.TX_DONE:
-                tx_done = True
-                # Clear TX_DONE IRQ flag to prevent stuck state
-                try:
-                    # clearIrqStatus is inherited from SX126X parent class
-                    loranode.clearIrqStatus(loranode.TX_DONE)
-                except Exception as e:
-                    logger.debug(f"[LORA] Failed to clear TX_DONE IRQ: {e}")
-                break
-            # Adaptive polling: faster at start, slower later
-            if poll_count < 10:
-                await asyncio.sleep(0.002)  # 2ms for first 10 polls
-            else:
-                await asyncio.sleep(0.005)  # 5ms after initial checks
-            poll_count += 1
-        
-        if not tx_done:
-            logger.warning(f"[LORA] TX_DONE not received within {max_wait_ms}ms for msg {msg_uid}, polled {poll_count} times")
-            # Clear any stuck IRQ flags
-            try:
-                loranode.clearIrqStatus()
-            except Exception as e:
-                logger.debug(f"[LORA] Failed to clear IRQ flags: {e}")
-            status = -1  # Indicate timeout
-        else:
-            # Ensure radio returns to RX mode after TX (non-blocking mode should do this automatically)
-            # The _onIRQ callback in sx1262.py should handle this, but we ensure it here
-            try:
-                # In non-blocking mode, startReceive should be called automatically via callback
-                # But we ensure RX mode is active
-                pass  # Non-blocking mode handles this via callback
-            except:
-                pass
+    # In blocking mode, send() automatically waits for TX_DONE
+    # Switch back to non-blocking mode for RX if we were in non-blocking
+    if was_non_blocking:
+        loranode.setBlockingCallback(blocking=False)
+        # Receiver automatically goes to RX mode in non-blocking mode
     
     end_time = utime.ticks_us()
     transmission_time_ms = utime.ticks_diff(end_time, start_time) / 1000.0
@@ -822,8 +793,8 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
 
             # Track transmission times for adaptive delay
             last_tx_time = 0
-            BATCH_SIZE = 30  # Larger batches since non-blocking mode is more efficient
-            BATCH_PAUSE = 0.03  # Reduced pause (30ms) - receiver is always in RX mode
+            BATCH_SIZE = 40  # Larger batches for hybrid mode (blocking TX + non-blocking RX)
+            BATCH_PAUSE = 0.02  # Short pause (20ms) - receiver is always in RX mode
             
             for i in range(len(chunks)):
                 if i % 10 == 0:
@@ -835,10 +806,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 _, _, tx_time = await radio_send(dest, databytes, msg_uid)
                 last_tx_time = tx_time
                 
-                # In non-blocking mode, TX_DONE already ensures transmission is complete
-                # Small delay for receiver to process chunk (receiver is always in RX mode)
-                # Reduced delay since receiver doesn't need to switch modes
-                optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.008)  # tx_time + 8ms buffer
+                # Blocking TX ensures transmission is complete, receiver is always in RX mode
+                # Small delay for receiver to process chunk
+                optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.005)  # tx_time + 5ms buffer
                 
                 # Delay between chunks to prevent overwhelming the radio/receiver
                 if i < len(chunks) - 1:  # No delay after last chunk
@@ -850,9 +820,8 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                         logger.debug(f"[CHUNK] Batch pause after chunk {i+1}")
             
             # Wait for receiver to process all chunks before sending End
-            # In non-blocking mode, receiver is always in RX, so reduced wait time
-            # Still need buffer to ensure all chunks are processed
-            wait_time = max(0.08, (last_tx_time / 1000.0) + 0.05)  # At least 80ms, or tx_time + 50ms
+            # Receiver is always in RX mode, so reduced wait time
+            wait_time = max(0.06, (last_tx_time / 1000.0) + 0.04)  # At least 60ms, or tx_time + 40ms
             await asyncio.sleep(wait_time)
             
             # Send End message and wait for ACK with missing chunks
@@ -899,9 +868,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     _, _, tx_time = await radio_send(dest, databytes, msg_uid)
                     retx_last_tx_time = tx_time
                     
-                    # In non-blocking mode, TX_DONE ensures transmission complete
+                    # Blocking TX ensures transmission complete
                     # Reduced delay for retransmission - same as initial transmission
-                    optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.008)
+                    optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.005)
                     # Proper delay between retransmissions to ensure reliability
                     if mis_chunk != missing_chunks[-1]:  # No delay after last chunk
                         await asyncio.sleep(optimal_delay)
@@ -909,8 +878,8 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 # Wait before retrying End message to allow retransmitted chunks to arrive and be processed
                 # Use retransmission time if available, otherwise use last chunk time
                 wait_tx_time = retx_last_tx_time if retx_last_tx_time > 0 else last_tx_time
-                # Reduced wait time in non-blocking mode - receiver is always in RX
-                await asyncio.sleep(max(0.06, (wait_tx_time / 1000.0) + 0.04))  # At least 60ms
+                # Reduced wait time - receiver is always in RX mode
+                await asyncio.sleep(max(0.05, (wait_tx_time / 1000.0) + 0.03))  # At least 50ms
             delete_transmode_lock(dest, img_id)
             return False
         else:
@@ -1697,6 +1666,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
 
 def process_message(data, rssi=None, snr=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; snr: float or None SNR value in dB; Output: bool indicating if message was processed
+    global recent_msg_uids  # Declare as global to fix NameError
 
     parsed = parse_header(data)
     if not parsed:
@@ -1854,53 +1824,67 @@ def process_message(data, rssi=None, snr=None):
 # ---------------------------------------------------------------------------
 
 async def radio_read():
-    logger.info(f"===> Radio Read, LoRa receive loop started (non-blocking mode)... <===\n")
+    logger.info(f"===> Radio Read, LoRa receive loop started (non-blocking RX mode)... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
     # In non-blocking mode, receiver is always in RX mode for highest data rate
     while True:
         if loranode is None:
             await asyncio.sleep(1)
             continue
-        # In non-blocking mode, recv() checks for available data without blocking
-        # Shorter timeout for faster polling in non-blocking mode
-        msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
-        if err == 0 and len(msg) > 0:  # ERR_NONE = 0
-            # Clear RX_DONE IRQ flag to prevent duplicate reads
+        
+        # In non-blocking mode, receiver should always be in RX mode
+        # The _readData() method automatically calls startReceive() after reading
+        # No need to manually ensure RX mode here
+        
+        try:
+            # In non-blocking mode, recv() checks for available data without blocking
+            # Shorter timeout for faster polling in non-blocking mode
+            msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
+            if err == 0 and len(msg) > 0:  # ERR_NONE = 0
+                # Clear RX_DONE IRQ flag to prevent duplicate reads
+                try:
+                    loranode.clearIrqStatus(loranode.RX_DONE)
+                except Exception as e:
+                    logger.debug(f"[LORA] Failed to clear RX_DONE IRQ: {e}")
+                
+                # Extract RSSI and SNR if available
+                rssi = None
+                snr = None
+                try:
+                    rssi = loranode.getRSSI()
+                    snr = loranode.getSNR()
+                except:
+                    pass
+                message = msg.replace(b"{}[]", b"\n")
+                process_message(message, rssi, snr)
+                
+                # In non-blocking mode, _readData() automatically calls startReceive()
+                # No need to manually call it here
+            elif err == -6:  # ERR_RX_TIMEOUT - normal, no message
+                pass
+            elif err == -7:  # ERR_CRC_MISMATCH - corrupted packet
+                logger.warning(f"[LORA] CRC mismatch, packet corrupted")
+                # Clear CRC error IRQ flag
+                try:
+                    loranode.clearIrqStatus()
+                except Exception as e:
+                    logger.debug(f"[LORA] Failed to clear CRC error IRQ: {e}")
+            elif err != 0:
+                logger.debug(f"[LORA] Receive error: {err}")
+                # Clear any error IRQ flags
+                try:
+                    loranode.clearIrqStatus()
+                except Exception as e:
+                    logger.debug(f"[LORA] Failed to clear error IRQ: {e}")
+        except Exception as e:
+            logger.error(f"[LORA] Error in radio_read loop: {e}")
+            # Ensure receiver is still in RX mode after error
             try:
-                # clearIrqStatus is inherited from SX126X parent class
-                loranode.clearIrqStatus(loranode.RX_DONE)
-            except Exception as e:
-                logger.debug(f"[LORA] Failed to clear RX_DONE IRQ: {e}")
-            
-            # Extract RSSI and SNR if available
-            rssi = None
-            snr = None
-            try:
-                rssi = loranode.getRSSI()
-                snr = loranode.getSNR()
+                if not loranode.blocking:
+                    loranode.startReceive()
             except:
                 pass
-            message = msg.replace(b"{}[]", b"\n")
-            process_message(message, rssi, snr)
-            
-            # In non-blocking mode, _readData() automatically calls startReceive()
-            # No need to manually call it here
-        elif err == -6:  # ERR_RX_TIMEOUT - normal, no message
-            pass
-        elif err == -7:  # ERR_CRC_MISMATCH - corrupted packet
-            logger.warning(f"[LORA] CRC mismatch, packet corrupted")
-            # Clear CRC error IRQ flag
-            try:
-                loranode.clearIrqStatus()
-            except Exception as e:
-                logger.debug(f"[LORA] Failed to clear CRC error IRQ: {e}")
-        elif err != 0:
-            logger.debug(f"[LORA] Receive error: {err}")
-            # Clear any error IRQ flags
-            try:
-                loranode.clearIrqStatus()
-            except Exception as e:
-                logger.debug(f"[LORA] Failed to clear error IRQ: {e}")
+        
         # Optimized polling for non-blocking mode - receiver is always in RX
         # Faster polling for highest data rate while maintaining reliability
         await asyncio.sleep(0.02)  # 20ms polling - balanced for non-blocking mode
