@@ -43,9 +43,9 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.02  # Minimal delay for high-speed communication (SF5, BW500kHz)
-ACK_SLEEP = 0.05  # Reduced ACK sleep for faster checking at high data rates  
-CHUNK_SLEEP = 0.01  # Minimal delay between chunks for fastest transmission
+MIN_SLEEP = 0.01  # Minimal delay for maximum speed communication (reduced from 0.02s to 0.01s)
+ACK_SLEEP = 0.03  # Reduced ACK sleep for faster checking (reduced from 0.05s to 0.03s)
+CHUNK_SLEEP = 0.005  # Minimal delay between chunks (reduced from 0.01s to 0.005s for fastest transmission)
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -84,14 +84,14 @@ PACKET_PAYLOAD_LIMIT = 195 # bytes
 
 AIR_SPEED = 19200
 
-# LoRa Configuration Constants - Highest Data Rate (SF5, BW500kHz, CR5) for fast robust communication
+# LoRa Configuration Constants - Maximum Speed (SF5, BW500kHz, CR5, Preamble 6) for fastest communication
 LORA_FREQ = 868.0
 LORA_SF = 5  # Spreading Factor 5 (highest data rate ~38 kbps)
 LORA_BW = 500.0  # Bandwidth 500 kHz (highest bandwidth for maximum speed)
 LORA_CR = 5  # Coding Rate 4/5 (good balance of speed and error correction)
-LORA_PREAMBLE = 8  # Preamble length (as used in high-speed examples)
+LORA_PREAMBLE = 6  # Preamble length (reduced from 8 to 6 for maximum speed - minimum safe value)
 LORA_POWER = 14  # TX power in dBm
-LORA_RX_TIMEOUT_MS = 200  # Receive timeout for async loop (optimized for high-speed communication)
+LORA_RX_TIMEOUT_MS = 100  # Receive timeout for async loop (reduced from 200ms to 100ms for faster polling)
 
 
 # WiFi Configuration
@@ -511,7 +511,7 @@ async def init_lora():
             logger.error(f"[LORA] Failed to initialize SX1262, status: {status}")
             loranode = None
         else:
-            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR} (highest data rate)")
+            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, Preamble{LORA_PREAMBLE} (maximum speed configuration)")
     except Exception as e:
         logger.error(f"[LORA] Exception during LoRa initialization: {e}")
         loranode = None
@@ -679,10 +679,10 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     
-    ack_msg_recheck_count = 12 # Increased for better ACK detection at high speed
+    ack_msg_recheck_count = 16 # Increased from 12 to 16 for more frequent ACK detection at maximum speed
     for retry_i in range(retry_count):
             radio_send(dest, databytes, msg_uid)
-            await asyncio.sleep(ACK_SLEEP)
+            await asyncio.sleep(ACK_SLEEP)  # Initial wait after sending
             first_log_flag = True
             for i in range(ack_msg_recheck_count): # ack_msg recheck
                 at, missing_chunks = ack_time(msg_uid)
@@ -696,9 +696,9 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                         first_log_flag = False
                     else:
                         logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                    # Reduced sleep for faster ACK checking at high data rates
+                    # Faster ACK checking: use smaller sleep for quicker detection
                     await asyncio.sleep(
-                        ACK_SLEEP * min(i + 1, 2) / 2  # Faster checking: progressive but capped at 2x
+                        ACK_SLEEP * 0.5  # Reduced from progressive to fixed 0.5x for faster checking
                     )
             logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
@@ -810,7 +810,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 end_succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count=5)
                 if not end_succ:
                     logger.warning(f"[IMG TX] Failed to send end packet, retry {end_retry+1}/{max_end_retries}")
-                    await asyncio.sleep(0.05)  # Brief delay before retry
+                    await asyncio.sleep(0.02)  # Reduced delay from 0.05s to 0.02s for faster retry
                     continue
                 
                 # Parse missing chunks from ACK response
@@ -1817,7 +1817,7 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
                 for i in range(msg_count):
                     await send_msg("A", creator, ackmessage, sender)
                     if i < msg_count-1:
-                        await asyncio.sleep(0.2)  # Reduced delay for faster response
+                        await asyncio.sleep(0.1)  # Reduced delay from 0.2s to 0.1s for faster response
             asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
                 try:
@@ -1910,7 +1910,7 @@ async def radio_read():
 
         # Small async sleep to yield to event loop (recv() uses blocking sleeps internally)
         # This prevents blocking the entire async event loop
-        await asyncio.sleep(0.01)  # 10ms yield for async compatibility
+        await asyncio.sleep(0.005)  # Reduced from 0.01s to 0.005s (5ms) for faster polling
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
