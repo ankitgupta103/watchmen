@@ -154,7 +154,7 @@ elif uid == b'e076465dd7091027':
     my_addr = 222
 elif uid == b'e076465dd7091843':
     my_addr = 223
-        if not DYNAMIC_SPATH:
+    if not DYNAMIC_SPATH:
         shortest_path_to_cc = [219]
 else:
     logger.error("error in main.py: Unknown device ID for " + omv.board_id())
@@ -1731,7 +1731,8 @@ async def radio_read():
         try:
             # New driver: recv() returns (msg, err)
             # err == 0 means success, err == -6 means RX_TIMEOUT
-            msg, err = loranode.recv()
+            # Use timeout to prevent blocking indefinitely
+            msg, err = loranode.recv(timeout_en=True, timeout_ms=100)
             
             if len(msg) > 0 and err == 0:
                 # Get RSSI and SNR from the driver
@@ -1753,8 +1754,8 @@ async def radio_read():
             logger.error(f"[LORA] Receive exception: {e}")
             await asyncio.sleep(0.1)
         
-        # Reduced sleep time for faster reception with high data rate
-        await asyncio.sleep(0.05)  # Reduced from 0.15 to 0.05 for high-speed LoRa
+        # Small sleep to yield to other tasks
+        await asyncio.sleep(0.01)
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
@@ -2216,10 +2217,10 @@ async def main():
         await asyncio.sleep(2)
         asyncio.create_task(person_detection_loop())
         #asyncio.create_task(keep_updating_gps())
-        if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
-            asyncio.create_task(person_detection_loop())
-        else:
-            logger.warning(f"[INIT] ===> Unit node {my_addr} is not enabled to capture images")
+        # if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
+        #     asyncio.create_task(person_detection_loop())
+        # else:
+        #     logger.warning(f"[INIT] ===> Unit node {my_addr} is not enabled to capture images")
         asyncio.create_task(event_text_sending_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
