@@ -45,9 +45,10 @@ led = LED("LED_BLUE")
 MIN_SLEEP = 0.02  # Reduced for faster transmission
 ACK_SLEEP = 0.05  # Reduced for faster ACK handling
 # CHUNK_SLEEP calculated dynamically based on packet transmission time
-# For SF5, BW500kHz: ~200 byte packet takes ~3-5ms, but receiver needs more time to process
-# Increased delays to reduce packet loss - receiver needs time to store chunks in memory
-CHUNK_SLEEP_BASE = 0.035  # Base delay (35ms) - ensures receiver can process each chunk reliably
+# For SF5, BW500kHz: ~200 byte packet takes ~3-5ms
+# With non-blocking mode: receiver is always in RX, so we can reduce delays
+# Reduced delays for highest data rate while maintaining reliability
+CHUNK_SLEEP_BASE = 0.015  # Base delay (15ms) - optimized for non-blocking mode
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -518,6 +519,13 @@ async def init_lora():
             loranode = None
         else:
             logger.info(f"[LORA] LoRa SX1262 initialized successfully (SF5, BW500kHz, CR5)")
+            # Switch to non-blocking mode for more robust transmission
+            # Non-blocking allows receiver to always be in RX mode and sender to check TX_DONE
+            status = loranode.setBlockingCallback(blocking=False)
+            if status == 0:
+                logger.info(f"[LORA] Switched to non-blocking mode for robust transmission")
+            else:
+                logger.warning(f"[LORA] Failed to set non-blocking mode: {status}, using blocking mode")
     except Exception as e:
         logger.error(f"[LORA] Error initializing LoRa: {e}")
         loranode = None
@@ -638,7 +646,7 @@ async def periodic_gc():
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
-def radio_send(dest, data, msg_uid):
+async def radio_send(dest, data, msg_uid):
     # Input: dest: int, data: bytes; Output: tuple(payload_len, status, transmission_time_ms)
     global sent_count
     sent_count = sent_count + 1
@@ -649,6 +657,24 @@ def radio_send(dest, data, msg_uid):
     data = data.replace(b"\n", b"{}[]")
     start_time = utime.ticks_us()
     payload_len, status = loranode.send(data)
+    
+    # In non-blocking mode, wait for TX_DONE event
+    if status == 0 and not loranode.blocking:
+        # Poll for TX_DONE event (non-blocking mode) - allows receiver to stay in RX
+        max_wait_ms = 100  # Maximum wait time for TX_DONE
+        wait_start = utime.ticks_ms()
+        tx_done = False
+        while utime.ticks_diff(utime.ticks_ms(), wait_start) < max_wait_ms:
+            events = loranode._events()
+            if events & loranode.TX_DONE:
+                tx_done = True
+                break
+            await asyncio.sleep(0.001)  # 1ms polling - very short to keep receiver responsive
+    
+        if not tx_done:
+            logger.warning(f"[LORA] TX_DONE not received within {max_wait_ms}ms for msg {msg_uid}")
+            status = -1  # Indicate timeout
+    
     end_time = utime.ticks_us()
     transmission_time_ms = utime.ticks_diff(end_time, start_time) / 1000.0
     if status != 0:
@@ -677,13 +703,13 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     else:
         msgs_sent.append((msg_uid, msgbytes, timesent))
     if not ackneeded:
-        _, _, tx_time = radio_send(dest, databytes, msg_uid)
+        _, _, tx_time = await radio_send(dest, databytes, msg_uid)
         # Small delay after transmission for radio to return to RX mode
         await asyncio.sleep(max(0.01, tx_time / 1000.0 + 0.005))  # At least 10ms, or tx_time + 5ms buffer
         return (True, [])
     ack_msg_recheck_count = 8 # Increased for more robust ACK checking
     for retry_i in range(retry_count):
-        _, _, tx_time = radio_send(dest, databytes, msg_uid)
+        _, _, tx_time = await radio_send(dest, databytes, msg_uid)
         # Wait for transmission to complete plus small buffer
         await asyncio.sleep(max(ACK_SLEEP, tx_time / 1000.0 + 0.01))  # At least ACK_SLEEP, or tx_time + 10ms
         first_log_flag = True
@@ -766,8 +792,8 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
 
             # Track transmission times for adaptive delay
             last_tx_time = 0
-            BATCH_SIZE = 20  # Send chunks in batches with longer pause between batches
-            BATCH_PAUSE = 0.05  # 50ms pause between batches to give receiver breathing room
+            BATCH_SIZE = 30  # Larger batches since non-blocking mode is more efficient
+            BATCH_PAUSE = 0.03  # Reduced pause (30ms) - receiver is always in RX mode
             
             for i in range(len(chunks)):
                 if i % 10 == 0:
@@ -776,16 +802,13 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 # I messages don't need ACK, send directly without ACK waiting
                 msg_uid = get_msg_uid("I", creator, dest)
                 databytes = msg_uid + b";" + chunkbytes
-                _, _, tx_time = radio_send(dest, databytes, msg_uid)
+                _, _, tx_time = await radio_send(dest, databytes, msg_uid)
                 last_tx_time = tx_time
                 
-                # Small delay immediately after transmission to ensure radio completes TX->RX transition
-                await asyncio.sleep(0.005)  # 5ms for radio state transition
-                
-                # Calculate optimal delay: transmission time + buffer for radio state + receiver processing
-                # For SF5, BW500kHz: ~200 bytes = ~3-5ms transmission, but receiver needs significant time
-                # Increased buffer to 25ms to ensure receiver can process and store each chunk
-                optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.025)  # tx_time + 25ms buffer
+                # In non-blocking mode, TX_DONE already ensures transmission is complete
+                # Small delay for receiver to process chunk (receiver is always in RX mode)
+                # Reduced delay since receiver doesn't need to switch modes
+                optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.008)  # tx_time + 8ms buffer
                 
                 # Delay between chunks to prevent overwhelming the radio/receiver
                 if i < len(chunks) - 1:  # No delay after last chunk
@@ -797,10 +820,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                         logger.debug(f"[CHUNK] Batch pause after chunk {i+1}")
             
             # Wait for receiver to process all chunks before sending End
-            # Use last transmission time + buffer to ensure receiver is ready
-            # For SF5, BW500kHz: receiver needs significant time to process all chunks
-            # Increased wait time to ensure all chunks are stored before End message
-            wait_time = max(0.15, (last_tx_time / 1000.0) + 0.10)  # At least 150ms, or tx_time + 100ms
+            # In non-blocking mode, receiver is always in RX, so reduced wait time
+            # Still need buffer to ensure all chunks are processed
+            wait_time = max(0.08, (last_tx_time / 1000.0) + 0.05)  # At least 80ms, or tx_time + 50ms
             await asyncio.sleep(wait_time)
             
             # Send End message and wait for ACK with missing chunks
@@ -844,14 +866,12 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     # Send directly without ACK waiting for faster retransmission
                     msg_uid = get_msg_uid("I", creator, dest)
                     databytes = msg_uid + b";" + chunkbytes
-                    _, _, tx_time = radio_send(dest, databytes, msg_uid)
+                    _, _, tx_time = await radio_send(dest, databytes, msg_uid)
                     retx_last_tx_time = tx_time
                     
-                    # Small delay immediately after transmission for radio state transition
-                    await asyncio.sleep(0.005)  # 5ms for radio state transition
-                    
-                    # Calculate optimal delay for retransmission - same as initial transmission
-                    optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.025)
+                    # In non-blocking mode, TX_DONE ensures transmission complete
+                    # Reduced delay for retransmission - same as initial transmission
+                    optimal_delay = max(CHUNK_SLEEP_BASE, (tx_time / 1000.0) + 0.008)
                     # Proper delay between retransmissions to ensure reliability
                     if mis_chunk != missing_chunks[-1]:  # No delay after last chunk
                         await asyncio.sleep(optimal_delay)
@@ -859,8 +879,8 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 # Wait before retrying End message to allow retransmitted chunks to arrive and be processed
                 # Use retransmission time if available, otherwise use last chunk time
                 wait_tx_time = retx_last_tx_time if retx_last_tx_time > 0 else last_tx_time
-                # Increased wait time to ensure retransmitted chunks are fully processed
-                await asyncio.sleep(max(0.12, (wait_tx_time / 1000.0) + 0.08))  # At least 120ms
+                # Reduced wait time in non-blocking mode - receiver is always in RX
+                await asyncio.sleep(max(0.06, (wait_tx_time / 1000.0) + 0.04))  # At least 60ms
             delete_transmode_lock(dest, img_id)
             return False
         else:
@@ -1783,13 +1803,16 @@ def process_message(data, rssi=None, snr=None):
 # ---------------------------------------------------------------------------
 
 async def radio_read():
-    logger.info(f"===> Radio Read, LoRa receive loop started... <===\n")
+    logger.info(f"===> Radio Read, LoRa receive loop started (non-blocking mode)... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
+    # In non-blocking mode, receiver is always in RX mode for highest data rate
     while True:
         if loranode is None:
             await asyncio.sleep(1)
             continue
-        msg, err = loranode.recv(timeout_en=True, timeout_ms=100)
+        # In non-blocking mode, recv() checks for available data without blocking
+        # Shorter timeout for faster polling in non-blocking mode
+        msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
         if err == 0 and len(msg) > 0:  # ERR_NONE = 0
             # Extract RSSI and SNR if available
             rssi = None
@@ -1807,9 +1830,9 @@ async def radio_read():
             logger.warning(f"[LORA] CRC mismatch, packet corrupted")
         elif err != 0:
             logger.debug(f"[LORA] Receive error: {err}")
-        # Slightly longer polling to give receiver more time to process packets
-        # Balance between responsiveness and allowing receiver to process chunks
-        await asyncio.sleep(0.03)  # 30ms polling for reliable chunk reception
+        # Optimized polling for non-blocking mode - receiver is always in RX
+        # Faster polling for highest data rate while maintaining reliability
+        await asyncio.sleep(0.02)  # 20ms polling - balanced for non-blocking mode
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
