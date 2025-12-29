@@ -1,4 +1,3 @@
-
 info - SD card available
 info - Singleton Logger class Initiated, __new__
 Starting fake network with the following neighbours
@@ -6,48 +5,301 @@ Starting fake network with the following neighbours
 (222, 221)
 (221, 225)
 (223, 219)
-00:00:00,530 - INFO - [FS] Using FS_ROOT : /sdcard
-00:00:00,538 - INFO - [FS] /sdcard/netimages directory already exists
-00:00:00,548 - INFO - [FS] /sdcard/myimages directory already exists
-00:00:00,556 - INFO - [FS] /sdcard/myevents directory already exists
-00:00:00,634 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7193a09 <===
+00:00:00,711 - INFO - [FS] Using FS_ROOT : /sdcard
+00:00:00,718 - INFO - [FS] /sdcard/netimages directory already exists
+00:00:00,729 - INFO - [FS] /sdcard/myimages directory already exists
+00:00:00,737 - INFO - [FS] /sdcard/myevents directory already exists
+00:00:00,814 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7193a09 <===
 
-00:00:03,822 - INFO - [LORA] Initializing LoRa SX1262 SPI module... my lora addr = 219
-00:00:03,887 - INFO - [LORA] LoRa SX1262 initialized successfully (SF5, BW500kHz, CR5)
-00:00:03,899 - INFO - [LORA] Switched to non-blocking mode for robust transmission
-00:00:03,936 - INFO - [MEM] Memory management tasks started (free: 8157.6KB)
+00:00:03,001 - INFO - [LORA] Initializing LoRa SX1262 SPI module... my lora addr = 219
+00:00:03,063 - INFO - [LORA] LoRa SX1262 initialized successfully (SF5, BW500kHz, CR5)
+00:00:03,075 - INFO - [LORA] Switched to non-blocking RX mode - receiver always in RX, TX uses blocking
+00:00:03,113 - INFO - [MEM] Memory management tasks started (free: 8157.7KB)
 
-00:00:03,937 - INFO - [INIT] ===> Starting command center node <===
-00:00:03,937 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
-00:00:03,499 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
-00:00:03,506 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
-00:00:03,506 - INFO - ===> Radio Read, LoRa receive loop started (non-blocking mode)... <===
+00:00:03,113 - INFO - [INIT] ===> Starting command center node <===
+00:00:03,113 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
+00:00:03,674 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
+00:00:03,680 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
+00:00:03,681 - INFO - ===> Radio Read, LoRa receive loop started (non-blocking RX mode)... <===
 
-00:00:03,522 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+00:00:03,695 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
 
+00:00:04,680 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
+00:00:05,683 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
+00:00:06,694 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
+00:00:07,695 - INFO - [WIFI] Connecting... (status: 2, wait: 4s)
+00:00:08,697 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.3, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 192.168.1.1
+00:00:08,698 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:09,729 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*BGM', TX_time=29.91ms
+00:00:11,700 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
+00:00:15,763 - INFO - H : Len msg = 20, len msgbytes = 128
+00:00:15,764 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:15:0:0::-1:[]:[]
+00:00:15,764 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
+00:00:17,217 - INFO - msg_typ:heartbeat from node 219 uploaded via WiFi successfully
+00:00:17,232 - INFO - [HB] HB SUCCESS, shortest path = []
+00:00:30,760 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:00:31,109 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:00:31,146 - INFO - [⬇ RECV from 223, rssi: -50.0dBm, snr: 9.0dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbNRP'
+00:00:31,146 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'YOL:1735689624000:179'
+00:00:32,172 - INFO - [⬇ RECV from 223, rssi: -50.0dBm, snr: 9.0dB] [**] 29 bytes, MSG_UID = b'T\xdf\xdf\xdbJWT'
+00:00:32,173 - INFO - [TXT] Sending event text data of length 21 bytes
+00:00:32,173 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:32,204 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfODT', TX_time=29.91ms
+00:00:32,205 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:33,221 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:00:34,742 - INFO - sent: 2 Recd: 2 Unacked: 0, Free: 8155.1KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:00:36,175 - INFO - [⬇ RECV from 223, rssi: -53.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbNRP'
+00:00:36,175 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'YOL:1735689624000:179'
+00:00:37,344 - INFO - [⬇ RECV from 223, rssi: -52.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbIAI'
+00:00:37,345 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:37,346 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:37,377 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNZB', TX_time=29.86ms
+00:00:37,378 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:38,327 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:00:38,345 - INFO - [⬇ RECV from 219, rssi: -52.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'A\xdb\xdb\xdfNZB'
+00:00:38,346 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfNZB'
+00:00:39,763 - INFO - seen neighbours = [], Shortest path = [], Sent messages = 3, Received messages = {219: 1, 223: 4}
+00:00:39,764 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:39,793 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*QIC', TX_time=27.90ms
+00:00:39,809 - INFO - [⬇ BCAST from 219, rssi: -52.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*QIC'
+00:00:39,811 - INFO - adding nodeaddr 154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225 to seen_neighbours
+00:00:40,701 - INFO - [NET] Sending shortest path to 154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225
+00:00:40,702 - INFO - [⋙ sending....] dest=154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, msg_typ:S, len:3 bytes, single packet
+00:00:40,703 - ERROR - [LORA] node id 154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225 out of range (0-255)
 Task exception wasn't retrieved
-future: <Task> coro= <generator object 'radio_read' at 800e6b10>
+future: <Task> coro= <generator object 'initiate_spath_pings' at 80176020>
 
 Traceback (most recent call last):
   File "asyncio/core.py", line 1, in run_until_complete
-  File "<stdin>", line 1884, in radio_read
-  File "<stdin>", line 1713, in process_message
-NameError: local variable referenced before assignment
-00:00:04,506 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
-00:00:05,507 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
-00:00:06,508 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
-00:00:07,509 - INFO - [WIFI] Connecting... (status: 1, wait: 4s)
-00:00:08,510 - INFO - [WIFI] Connecting... (status: 2, wait: 5s)
-00:00:09,512 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.3, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 192.168.1.1
-00:00:09,512 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:09,525 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*NRM', TX_time=11.27ms
-00:00:12,512 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
-00:00:16,577 - INFO - H : Len msg = 20, len msgbytes = 128
-00:00:16,577 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:15:0:0::-1:[]:[]
-00:00:16,578 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
-00:00:18,116 - INFO - msg_typ:heartbeat from node 219 uploaded via WiFi successfully
-00:00:18,117 - INFO - [HB] HB SUCCESS, shortest path = []
-00:00:34,559 - INFO - sent: 1 Recd: 0 Unacked: 0, Free: 8155.9KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:00:40,541 - INFO - seen neighbours = [], Shortest path = [], Sent messages = 1, Received messages = {}
-00:00:40,542 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:40,557 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*KNA', TX_time=13.95ms
+  File "<stdin>", line 2118, in initiate_spath_pings
+  File "<stdin>", line 894, in send_msg
+  File "<stdin>", line 772, in send_msg_internal
+  File "<stdin>", line 698, in send_single_packet
+  File "<stdin>", line 291, in get_msg_uid
+  File "<stdin>", line 275, in encode_dest
+  File "<stdin>", line 268, in encode_node_id
+ValueError: node id 154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225 out of range (0-255)
+00:00:44,812 - INFO - [⬇ BCAST from 219, rssi: -52.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*QIC'
+00:00:49,839 - INFO - [⬇ BCAST from 219, rssi: -52.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*QIC'
+00:00:54,866 - INFO - [⬇ BCAST from 219, rssi: -52.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*QIC'
+00:00:57,521 - INFO - [⬇ RECV from 223, rssi: -52.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'B\xdf\xdf\xdbBIC'
+00:00:57,522 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=128, msg_preview=b'\xdb\xdf\xdf\xdbIAI\xea\xd5cV&\xda\xb8W\x93\xedf
+00:00:58,590 - INFO - [⬇ RECV from 223, rssi: -53.0dBm, snr: 8.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbBDP'
+00:00:58,590 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'LRI:1735689624000:179'
+00:01:03,621 - INFO - [⬇ RECV from 223, rssi: -52.0dBm, snr: 8.0dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbBDP'
+00:01:03,621 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'LRI:1735689624000:179'
+00:01:04,789 - INFO - sent: 4 Recd: 11 Unacked: 0, Free: 8152.3KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:01:07,787 - INFO - [⬇ RECV from 223, rssi: -52.0dBm, snr: 8.0dB] [**] 29 bytes, MSG_UID = b'N\xdf\xdf\xdbBDP'
+00:01:07,787 - INFO - adding nodeaddr 111543894704015462807348173149525546477939709785913 to seen_neighbours
+00:01:09,826 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913], Shortest path = [], Sent messages = 4, Received messages = {219: 5, 223: 8}
+00:01:09,827 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:01:09,858 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*QCW', TX_time=29.38ms
+00:01:09,874 - INFO - [⬇ BCAST from 219, rssi: -52.0dBm, snr: 8.0dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*QCW'
+00:01:09,875 - INFO - adding nodeaddr 320538628842334580110475104227954018288738063431481 to seen_neighbours
+00:01:14,889 - INFO - [⬇ BCAST from 219, rssi: -52.0dBm, snr: 8.0dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*QCW'
+00:01:19,918 - INFO - [⬇ BCAST from 219, rssi: -52.0dBm, snr: 8.0dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*QCW'
+00:01:24,951 - INFO - [⬇ BCAST from 219, rssi: -52.0dBm, snr: 8.0dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*QCW'
+00:01:26,015 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbNBK'
+00:01:26,017 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'RSK:1735689624000:179'
+00:01:31,042 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbNBK'
+00:01:31,042 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'RSK:1735689624000:179'
+00:01:34,837 - INFO - sent: 5 Recd: 18 Unacked: 0, Free: 8151.2KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:01:36,062 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbNBK'
+00:01:36,063 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'RSK:1735689624000:179'
+00:01:37,866 - INFO - [⬇ BCAST from 223, rssi: -45.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*JNZ'
+00:01:37,867 - INFO - adding nodeaddr 223 to seen_neighbours
+00:01:39,893 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223], Shortest path = [], Sent messages = 5, Received messages = {219: 9, 223: 12}
+00:01:39,894 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:01:39,925 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*WLU', TX_time=29.97ms
+00:01:39,941 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*WLU'
+00:01:39,941 - INFO - adding nodeaddr 219 to seen_neighbours
+00:01:44,950 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*WLU'
+00:01:48,373 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:01:49,965 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*WLU'
+00:01:52,384 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.0dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbOVU'
+00:01:52,385 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'PMU:1735689624000:179'
+00:01:57,412 - INFO - [⬇ RECV from 223, rssi: -46.0dBm, snr: 8.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbOVU'
+00:01:57,412 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'PMU:1735689624000:179'
+00:02:02,438 - INFO - [⬇ RECV from 223, rssi: -46.0dBm, snr: 8.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbOVU'
+00:02:02,438 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'PMU:1735689624000:179'
+00:02:04,886 - INFO - sent: 6 Recd: 26 Unacked: 0, Free: 8150.2KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:02:04,901 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:02:07,930 - INFO - [⬇ BCAST from 223, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*YST'
+00:02:09,961 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223, 219], Shortest path = [], Sent messages = 6, Received messages = {219: 12, 223: 16}
+00:02:09,962 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:02:09,992 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*YLL', TX_time=28.86ms
+00:02:09,008 - INFO - [⬇ BCAST from 219, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*YLL'
+00:02:14,007 - INFO - [⬇ BCAST from 219, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*YLL'
+00:02:19,022 - INFO - [⬇ BCAST from 219, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*YLL'
+00:02:20,826 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'B\xdf\xdf\xdbVAI'
+00:02:20,827 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=1, msg_preview=b'L'
+00:02:25,855 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'B\xdf\xdf\xdbVAI'
+00:02:25,856 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=1, msg_preview=b'L'
+00:02:30,873 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'B\xdf\xdf\xdbVAI'
+00:02:30,874 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=1, msg_preview=b'L'
+00:02:34,936 - INFO - sent: 7 Recd: 33 Unacked: 0, Free: 8149.4KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:02:35,891 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'B\xdf\xdf\xdbVAI'
+00:02:35,892 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=1, msg_preview=b'L'
+00:02:39,026 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223, 219], Shortest path = [], Sent messages = 7, Received messages = {219: 15, 223: 20}
+00:02:39,027 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:02:39,058 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*HCV', TX_time=29.80ms
+00:02:39,073 - INFO - [⬇ BCAST from 219, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*HCV'
+00:02:39,179 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'T\xdf\xdf\xdbJWZ'
+00:02:39,180 - INFO - [TXT] Sending event text data of length 1 bytes
+00:02:39,181 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:02:39,212 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTLR', TX_time=30.12ms
+00:02:39,213 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:02:40,243 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:02:40,259 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'A\xdb\xdb\xdfTLR'
+00:02:40,260 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfTLR'
+00:02:45,273 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 8.5dB] [*] 9 bytes, MSG_UID = b'A\xdb\xdb\xdfTLR'
+00:02:45,273 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfTLR'
+00:02:47,293 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 9.0dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbNBY'
+00:02:47,294 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'WLK:1735689624000:179'
+00:02:49,365 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:02:50,424 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 9.0dB] [**] 29 bytes, MSG_UID = b'T\xdf\xdf\xdbELL'
+00:02:50,425 - INFO - [TXT] Sending event text data of length 21 bytes
+00:02:50,425 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:02:50,457 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfICB', TX_time=30.96ms
+00:02:50,458 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:02:51,422 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:02:51,438 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 9.0dB] [**] 29 bytes, MSG_UID = b'A\xdb\xdb\xdfICB'
+00:02:51,438 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfICB'
+00:02:55,445 - INFO - [⬇ RECV from 223, rssi: -48.0dBm, snr: 8.8dB] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbELL'
+00:02:55,446 - INFO - [TXT] Sending event text data of length 128 bytes
+00:02:55,446 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:02:55,479 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGAL', TX_time=31.17ms
+00:02:55,479 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:02:56,476 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:02:56,494 - INFO - [⬇ RECV from 219, rssi: -48.0dBm, snr: 8.8dB] [*******] 136 bytes, MSG_UID = b'A\xdb\xdb\xdfGAL'
+00:02:56,494 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfGAL'
+00:02:56,679 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:02:58,754 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbDTK'
+00:02:58,757 - INFO - [TXT] Sending event text data of length 128 bytes
+00:02:58,758 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:02:58,789 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKUU', TX_time=30.19ms
+00:02:58,790 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:02:59,780 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:02:59,797 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'A\xdb\xdb\xdfKUU'
+00:02:59,797 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfKUU'
+00:02:59,834 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:03:04,827 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 8.0dB] [*******] 136 bytes, MSG_UID = b'A\xdb\xdb\xdfKUU'
+00:03:04,827 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfKUU'
+00:03:04,985 - INFO - sent: 12 Recd: 40 Unacked: 0, Free: 8147.5KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:03:04,002 - INFO - [⬇ RECV from 223, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbGQG'
+00:03:04,003 - INFO - [TXT] Sending event text data of length 128 bytes
+00:03:04,004 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:03:04,035 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPDB', TX_time=29.72ms
+00:03:04,035 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:03:05,986 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:03:05,003 - INFO - [⬇ RECV from 219, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'A\xdb\xdb\xdfPDB'
+00:03:05,004 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfPDB'
+00:03:09,093 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223, 219], Shortest path = [], Sent messages = 13, Received messages = {219: 23, 223: 26}
+00:03:09,094 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:03:09,125 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*SVG', TX_time=29.90ms
+00:03:09,141 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*SVG'
+00:03:09,142 - INFO - adding nodeaddr 154401131372370846356032917935202893086992681704256475699188030977014750350026804128191722345152353206653577594027679192013040621952576886646685473555630459808137402001556465395747591653024501898758113851416662053345615428907767756536390239932783361184509778394338509784553618043971808289800094654794269937788 to seen_neighbours
+00:03:09,250 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:03:14,167 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*SVG'
+00:03:19,197 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*SVG'
+00:03:24,218 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*SVG'
+00:03:29,227 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*SVG'
+00:03:34,034 - INFO - sent: 14 Recd: 46 Unacked: 0, Free: 8146.0KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:03:34,231 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*SVG'
+00:03:39,161 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223, 219, 154401131372370846356032917935202893086992681704256475699188030977014750350026804128191722345152353206653577594027679192013040621952576886646685473555630459808137402001556465395747591653024501898758113851416662053345615428907767756536390239932783361184509778394338509784553618043971808289800094654794269937788], Shortest path = [], Sent messages = 14, Received messages = {219: 29, 223: 26}
+00:03:39,161 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:03:39,191 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*JQT', TX_time=28.84ms
+00:03:39,208 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.3dB] [*******] 136 bytes, MSG_UID = b'N\xdb\xdb*JQT'
+00:03:42,327 - INFO - [⬇ RECV from 223, rssi: -44.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLUP'
+00:03:42,327 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'OSB:1735689753000:188'
+00:03:47,338 - INFO - [⬇ RECV from 223, rssi: -45.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLUP'
+00:03:47,338 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'OSB:1735689753000:188'
+00:03:52,370 - INFO - [⬇ RECV from 223, rssi: -45.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLUP'
+00:03:52,370 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'OSB:1735689753000:188'
+00:03:57,401 - INFO - [⬇ RECV from 223, rssi: -45.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLUP'
+00:03:57,401 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'OSB:1735689753000:188'
+00:04:02,413 - INFO - [⬇ RECV from 223, rssi: -45.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLUP'
+00:04:02,413 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'OSB:1735689753000:188'
+00:04:04,082 - INFO - sent: 15 Recd: 53 Unacked: 0, Free: 8145.0KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:04:07,428 - INFO - [⬇ RECV from 223, rssi: -45.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLUP'
+00:04:07,428 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'OSB:1735689753000:188'
+00:04:09,227 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223, 219, 154401131372370846356032917935202893086992681704256475699188030977014750350026804128191722345152353206653577594027679192013040621952576886646685473555630459808137402001556465395747591653024501898758113851416662053345615428907767756536390239932783361184509778394338509784553618043971808289800094654794269937788], Shortest path = [], Sent messages = 15, Received messages = {219: 30, 223: 32}
+00:04:09,228 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:04:09,259 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*EUA', TX_time=29.66ms
+00:04:09,274 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*EUA'
+00:04:09,274 - INFO - adding nodeaddr 320544181727889014235637346626581542388249788495928 to seen_neighbours
+00:04:12,948 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 7.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbHSR'
+00:04:12,948 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'YGR:1735689624000:179'
+00:04:12,230 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:04:13,315 - INFO - [⬇ RECV from 223, rssi: -47.0dBm, snr: 7.8dB] [**] 29 bytes, MSG_UID = b'T\xdf\xdf\xdbWMC'
+00:04:13,316 - INFO - [TXT] Sending event text data of length 21 bytes
+00:04:13,316 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:04:13,349 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEGQ', TX_time=31.01ms
+00:04:13,350 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:04:14,472 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:04:14,488 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 7.8dB] [**] 29 bytes, MSG_UID = b'A\xdb\xdb\xdfEGQ'
+00:04:14,489 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEGQ'
+00:04:19,492 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 7.8dB] [**] 29 bytes, MSG_UID = b'A\xdb\xdb\xdfEGQ'
+00:04:19,492 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEGQ'
+00:04:24,523 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 7.8dB] [**] 29 bytes, MSG_UID = b'A\xdb\xdb\xdfEGQ'
+00:04:24,523 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEGQ'
+00:04:29,531 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 7.8dB] [**] 29 bytes, MSG_UID = b'A\xdb\xdb\xdfEGQ'
+00:04:29,531 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEGQ'
+00:04:34,131 - INFO - sent: 17 Recd: 57 Unacked: 0, Free: 8144.3KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:04:34,531 - INFO - [⬇ RECV from 219, rssi: -47.0dBm, snr: 7.8dB] [**] 29 bytes, MSG_UID = b'A\xdb\xdb\xdfEGQ'
+00:04:34,532 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEGQ'
+00:04:38,500 - INFO - [⬇ RECV from 223, rssi: -45.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbTQG'
+00:04:38,500 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'HJK:1735689750000:188'
+00:04:39,295 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223, 219, 154401131372370846356032917935202893086992681704256475699188030977014750350026804128191722345152353206653577594027679192013040621952576886646685473555630459808137402001556465395747591653024501898758113851416662053345615428907767756536390239932783361184509778394338509784553618043971808289800094654794269937788, 320544181727889014235637346626581542388249788495928], Shortest path = [], Sent messages = 17, Received messages = {219: 36, 223: 35}
+00:04:39,295 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:04:39,326 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*GYK', TX_time=29.86ms
+00:04:39,343 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*GYK'
+00:04:39,343 - INFO - adding nodeaddr 320493001517658386455527522153145598225811449657400 to seen_neighbours
+00:04:44,344 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*GYK'
+00:04:49,366 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*GYK'
+00:04:54,368 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*GYK'
+00:04:59,391 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*GYK'
+00:05:04,744 - INFO - [MEM] Starting memory cleanup (free: 8143.5KB)
+00:05:04,815 - INFO - [MEM] Cleanup complete (free: 8143.4KB, freed: -0.1KB)
+00:05:04,816 - INFO - [MEM] Buffers - sent:18, recd:63, unacked:0, chunks:0
+00:05:04,179 - INFO - sent: 18 Recd: 63 Unacked: 0, Free: 8143.5KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:05:04,403 - INFO - [⬇ BCAST from 219, rssi: -45.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*GYK'
+00:05:06,979 - INFO - [⬇ RECV from 223, rssi: -45.0dBm, snr: 9.3dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbYAQ'
+00:05:06,980 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'ALV:1735689753000:188'
+00:05:09,364 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223, 219, 154401131372370846356032917935202893086992681704256475699188030977014750350026804128191722345152353206653577594027679192013040621952576886646685473555630459808137402001556465395747591653024501898758113851416662053345615428907767756536390239932783361184509778394338509784553618043971808289800094654794269937788, 320544181727889014235637346626581542388249788495928, 320493001517658386455527522153145598225811449657400], Shortest path = [], Sent messages = 18, Received messages = {219: 42, 223: 36}
+00:05:09,364 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:05:09,394 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*KYN', TX_time=28.79ms
+00:05:09,410 - INFO - [⬇ BCAST from 219, rssi: -46.0dBm, snr: 8.0dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*KYN'
+00:05:09,411 - INFO - adding nodeaddr 320504664807397217971430545333802409491661191198776 to seen_neighbours
+00:05:11,951 - INFO - [⬇ BCAST from 223, rssi: -47.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*TIV'
+00:05:16,968 - INFO - [⬇ BCAST from 223, rssi: -47.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*TIV'
+00:05:21,990 - INFO - [⬇ BCAST from 223, rssi: -47.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*TIV'
+00:05:26,010 - INFO - [⬇ BCAST from 223, rssi: -47.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*TIV'
+00:05:29,557 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:05:30,636 - WARNING - [LORA] CRC mismatch, packet corrupted
+00:05:31,019 - INFO - [⬇ BCAST from 223, rssi: -47.0dBm, snr: 8.3dB] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*TIV'
+00:05:31,718 - INFO - [⬇ RECV from 223, rssi: -43.0dBm, snr: 8.5dB] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbQQR'
+00:05:31,719 - INFO - [TXT] Sending event text data of length 128 bytes
+00:05:31,719 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:05:32,750 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJMA', TX_time=30.01ms
+00:05:32,751 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:05:32,689 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:05:32,706 - INFO - [⬇ RECV from 219, rssi: -43.0dBm, snr: 8.5dB] [*******] 136 bytes, MSG_UID = b'A\xdb\xdb\xdfJMA'
+00:05:32,707 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfJMA'
+00:05:33,555 - INFO - [⬇ RECV from 223, rssi: -43.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbFAI'
+00:05:33,555 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'ROZ:1735689844000:188'
+00:05:34,228 - INFO - sent: 20 Recd: 73 Unacked: 0, Free: 8141.8KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:05:38,558 - INFO - [⬇ RECV from 223, rssi: -43.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbFAI'
+00:05:38,558 - ERROR - [CHUNK] decoding error function doesn't take keyword arguments : msg_len=21, msg_preview=b'ROZ:1735689844000:188'
+00:05:39,439 - INFO - seen neighbours = [154401131372687633144970752269443297467648315660480861798922597719615776354578329417298392698265361463564256989779812576998758754798847420314635644682582639957942870217203767677720682313156788196607907945552661901338252868625287221435422021642431890415559859845365148787752310269923544771437678489396514853225, 111543894704015462807348173149525546477939709785913, 320538628842334580110475104227954018288738063431481, 223, 219, 154401131372370846356032917935202893086992681704256475699188030977014750350026804128191722345152353206653577594027679192013040621952576886646685473555630459808137402001556465395747591653024501898758113851416662053345615428907767756536390239932783361184509778394338509784553618043971808289800094654794269937788, 320544181727889014235637346626581542388249788495928, 320493001517658386455527522153145598225811449657400, 320504664807397217971430545333802409491661191198776], Shortest path = [], Sent messages = 20, Received messages = {219: 44, 223: 44}
+00:05:39,440 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:05:39,470 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*VKR', TX_time=29.10ms
+00:05:39,485 - INFO - [⬇ BCAST from 219, rssi: -43.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*VKR'
+00:05:39,486 - INFO - adding nodeaddr 320521880982690483612495810913012885823133781669944 to seen_neighbours
+00:05:44,505 - INFO - [⬇ BCAST from 219, rssi: -43.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*VKR'
+00:05:49,531 - INFO - [⬇ BCAST from 219, rssi: -43.0dBm, snr: 8.8dB] [**] 29 bytes, MSG_UID = b'N\xdb\xdb*VKR'
+00:05:53,204 - INFO - stopped by user via keyboard interrupt
+00:05:53,216 - INFO - logger closed successfully
+OpenMV 805a279; MicroPython 46b10ee2; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
+Type "help()" for more information.
+>>> 
