@@ -667,6 +667,9 @@ def radio_send(dest, data, msg_uid):
         payload_len, status = loranode.send(data)
         if status != 0:
             logger.warning(f"[LORA] Send returned status: {status}")
+        # Small delay to ensure transmission starts before returning
+        # This helps with timing, especially for ACK reception
+        utime.sleep_us(500)  # 0.5ms delay for transmission to start
     except Exception as e:
         logger.error(f"[LORA] Send exception: {e}")
 
@@ -697,12 +700,15 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         # For non-ACK messages (like chunk "I" type), minimal sleep to allow transmission
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-    ack_msg_recheck_count = 8 # Increased checks for better ACK reception with longer recv timeout
+    ack_msg_recheck_count = 10 # More checks for better ACK reception
     for retry_i in range(retry_count):
         radio_send(dest, databytes, msg_uid)
-        await asyncio.sleep(ACK_SLEEP)  # Initial wait for transmission to complete
+        # Small delay to ensure transmission completes before checking for ACK
+        await asyncio.sleep(0.02)  # 20ms for transmission to complete
+        
         first_log_flag = True
         for i in range(ack_msg_recheck_count): # ack_msg recheck
+            # Check immediately - ACK might have arrived already
             at, missing_chunks = ack_time(msg_uid)
             if at > 0:
                 logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
@@ -714,9 +720,14 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                     first_log_flag = False
                 else:
                     logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                # Progressive sleep: start small, increase gradually
-                # This balances between fast ACK reception and not overwhelming the receiver
-                await asyncio.sleep(ACK_SLEEP * (0.5 + i * 0.3))  # 0.05, 0.065, 0.08, 0.095, etc.
+                # Progressive sleep: start very small, increase gradually
+                # First checks are fast to catch immediate ACKs
+                if i == 0:
+                    await asyncio.sleep(0.01)  # 10ms first check
+                elif i < 3:
+                    await asyncio.sleep(0.02)  # 20ms for next few checks
+                else:
+                    await asyncio.sleep(ACK_SLEEP * (0.5 + (i-3) * 0.2))  # Progressive increase
         logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
@@ -793,8 +804,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 elif i < len(chunks) - 1:
                     await asyncio.sleep(CHUNK_SLEEP)
             
-            # Minimal wait before end chunk check - receiver should have processed chunks quickly
-            await asyncio.sleep(0.05)
+            # Wait a bit longer before end chunk check to ensure all chunks are received
+            # This gives receiver time to process all chunks from first transmission
+            await asyncio.sleep(0.1)
             
             for retry_i in range(20):
                 succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 10)
@@ -1655,11 +1667,13 @@ def process_message(data, rssi=None):
     if msg_typ == "N": # N type msg from neighbours
         scan_process(msg_uid, msg)
     elif msg_typ == "V":
+        # Send ACK immediately for validation messages
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "S":
         asyncio.create_task(sync_and_transfer_spath(msg_uid, msg.decode()))
     elif msg_typ == "T":
         asyncio.create_task(event_text_process(creator, msg))
+        # Send ACK immediately for text messages
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "H":
         # Validate HB message payload length for encrypted messages
@@ -1672,14 +1686,16 @@ def process_message(data, rssi=None):
                 )
                 # Still try to process, but log the issue
         asyncio.create_task(hb_process(msg_uid, msg, sender))
+        # Send ACK immediately for heartbeat messages
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "W": # wait message
         asyncio.create_task(device_busy_life(sender))
-    elif msg_typ == "B": # TODO need to ignore buplicate images, and send some response in A itself
+    elif msg_typ == "B": # Begin chunk message
         try:
             img_id, epoch_ms, numchunks = begin_chunk(msg.decode())
             if get_transmode_lock(sender, img_id):
                 asyncio.create_task(keep_transmode_lock(sender, img_id))
+                # Send ACK immediately for begin chunk
                 asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             else:
                 logger.warning(f"TRANS MODE already in use, could not get lock...")
@@ -1689,20 +1705,19 @@ def process_message(data, rssi=None):
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
-        add_chunk(msg)  # optional to check check_transmode_lock
-    elif msg_typ == "E": #
-        alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
+        add_chunk(msg)  # Chunk data - no ACK needed, processed immediately
+    elif msg_typ == "E": # End chunk message
+        alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode())
         if alldone:
             delete_transmode_lock(sender, img_id)
-            # also when it fails
             ackmessage += b":-1"
-            # asyncio.create_task(send_msg("A", creator, ackmessage, sender))
-            async def send_ack_multiple(): # send ACK 2 times
+            # Send ACK immediately and multiple times for reliability
+            async def send_ack_multiple(): # send ACK 2 times quickly
                 msg_count = 2
                 for i in range(msg_count):
                     await send_msg("A", creator, ackmessage, sender)
                     if i < msg_count-1:
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(0.1)  # Reduced from 1s to 100ms for faster ACK
             asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
                 try:
@@ -1716,10 +1731,10 @@ def process_message(data, rssi=None):
                     logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
                     logger.error(f"[CHUNK] error saving image to {enc_filepath}: {e}")
-                # asyncio.create_task(img_process(img_id, recompiled_msgbytes, creator, sender))
             else:
                 logger.warning(f"[CHUNK] img not recompiled, so not sending")
         else:
+            # Send ACK with missing chunks list immediately
             ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "A":
@@ -1742,10 +1757,10 @@ async def radio_read():
     
     while True:
         try:
-            # Blocking mode with short timeout (50ms) for fast packet reception
-            # This allows the radio to wait briefly for packets while still being responsive
-            # The timeout is short enough for responsiveness but long enough to catch packets
-            msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
+            # Blocking mode with very short timeout (20ms) for fast packet reception
+            # Short timeout ensures we check frequently to catch ACKs and packets immediately
+            # This is critical for fast ACK reception and image chunk processing
+            msg, err = loranode.recv(timeout_en=True, timeout_ms=20)
             
             if len(msg) > 0 and err == 0:
                 # Packet received successfully - process immediately
@@ -1760,8 +1775,9 @@ async def radio_read():
                 process_message(message, rssi)
                 # No sleep - immediately check for next packet for maximum throughput
             elif err == -6:  # RX_TIMEOUT - no packet received in timeout period
-                # No packet received - yield briefly to other tasks then check again
-                await asyncio.sleep(0)  # Yield without delay for responsive reception
+                # No packet received - yield briefly then immediately check again
+                # Tiny yield prevents CPU spinning while maintaining maximum responsiveness
+                await asyncio.sleep(0)  # Yield to other tasks without delay
             elif err != 0:
                 # Other error - log and continue
                 logger.debug(f"[LORA] Receive error: {err}")
