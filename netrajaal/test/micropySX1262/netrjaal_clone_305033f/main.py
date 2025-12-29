@@ -1707,15 +1707,29 @@ def process_message(data, rssi=None):
 async def radio_read():
     logger.info(f"===> Radio Read, LoRa receive loop started... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
+    loop_count = 0
     while True:
         # Safety check: wait for loranode to be initialized
         if loranode is None:
+            logger.debug(f"[LORA] Waiting for LoRa initialization...")
             await asyncio.sleep(1)
             continue
 
         try:
             # Use blocking mode with timeout for async compatibility
             # Optimized timeout (200ms) for high-speed communication (SF5, BW500kHz)
+            # Note: recv() internally uses blocking sleeps (sleep_ms), which blocks the async event loop
+            # but the timeout ensures it returns after LORA_RX_TIMEOUT_MS
+            loop_count += 1
+            if loop_count == 1:
+                logger.info(f"[LORA] Starting receive loop, loranode={loranode is not None}")
+            elif loop_count % 100 == 0:  # Log every 100 iterations (~20 seconds with 200ms timeout)
+                logger.info(f"[LORA] Receive loop running (iteration {loop_count})...")
+            
+            # This call will block for up to LORA_RX_TIMEOUT_MS (200ms)
+            # During this time, the async event loop is blocked, but it will return after timeout
+            # Note: recv() uses blocking sleep_ms() internally, which blocks the async event loop
+            # This is acceptable as the timeout ensures it returns after LORA_RX_TIMEOUT_MS
             msg, status = loranode.recv(len=0, timeout_en=True, timeout_ms=LORA_RX_TIMEOUT_MS)
 
             if status == ERR_NONE:
@@ -1744,7 +1758,9 @@ async def radio_read():
             logger.error(f"[LORA] Exception in radio_read: {e}")
             await asyncio.sleep(0.1)  # Brief pause on error
 
-        # No delay - continuous polling for maximum responsiveness at high data rates
+        # Small async sleep to yield to event loop (recv() uses blocking sleeps internally)
+        # This prevents blocking the entire async event loop
+        await asyncio.sleep(0.01)  # 10ms yield for async compatibility
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
