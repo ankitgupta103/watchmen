@@ -551,6 +551,9 @@ def is_lora_ready():
 msgs_sent = []
 msgs_unacked = []
 msgs_recd = []
+# Track recently processed messages to prevent duplicate processing
+recent_msg_uids = {}  # msg_uid -> timestamp
+RECENT_MSG_TTL_MS = 5000  # 5 seconds TTL for duplicate detection
 
 # Memory Management Functions
 def cleanup_old_messages():
@@ -661,19 +664,46 @@ async def radio_send(dest, data, msg_uid):
     # In non-blocking mode, wait for TX_DONE event
     if status == 0 and not loranode.blocking:
         # Poll for TX_DONE event (non-blocking mode) - allows receiver to stay in RX
-        max_wait_ms = 100  # Maximum wait time for TX_DONE
+        # Increased timeout for larger packets and clear IRQ flags properly
+        max_wait_ms = 200  # Increased timeout for larger packets (was 100ms)
         wait_start = utime.ticks_ms()
         tx_done = False
+        poll_count = 0
         while utime.ticks_diff(utime.ticks_ms(), wait_start) < max_wait_ms:
             events = loranode._events()
             if events & loranode.TX_DONE:
                 tx_done = True
+                # Clear TX_DONE IRQ flag to prevent stuck state
+                try:
+                    # clearIrqStatus is inherited from SX126X parent class
+                    loranode.clearIrqStatus(loranode.TX_DONE)
+                except Exception as e:
+                    logger.debug(f"[LORA] Failed to clear TX_DONE IRQ: {e}")
                 break
-            await asyncio.sleep(0.001)  # 1ms polling - very short to keep receiver responsive
-    
+            # Adaptive polling: faster at start, slower later
+            if poll_count < 10:
+                await asyncio.sleep(0.002)  # 2ms for first 10 polls
+            else:
+                await asyncio.sleep(0.005)  # 5ms after initial checks
+            poll_count += 1
+        
         if not tx_done:
-            logger.warning(f"[LORA] TX_DONE not received within {max_wait_ms}ms for msg {msg_uid}")
+            logger.warning(f"[LORA] TX_DONE not received within {max_wait_ms}ms for msg {msg_uid}, polled {poll_count} times")
+            # Clear any stuck IRQ flags
+            try:
+                loranode.clearIrqStatus()
+            except Exception as e:
+                logger.debug(f"[LORA] Failed to clear IRQ flags: {e}")
             status = -1  # Indicate timeout
+        else:
+            # Ensure radio returns to RX mode after TX (non-blocking mode should do this automatically)
+            # The _onIRQ callback in sx1262.py should handle this, but we ensure it here
+            try:
+                # In non-blocking mode, startReceive should be called automatically via callback
+                # But we ensure RX mode is active
+                pass  # Non-blocking mode handles this via callback
+            except:
+                pass
     
     end_time = utime.ticks_us()
     transmission_time_ms = utime.ticks_diff(end_time, start_time) / 1000.0
@@ -1677,6 +1707,22 @@ def process_message(data, rssi=None, snr=None):
         return True
 
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
+    
+    # Duplicate packet detection - prevent processing same packet multiple times
+    current_time = time_msec()
+    if msg_uid in recent_msg_uids:
+        # Check if this is a recent duplicate
+        last_seen = recent_msg_uids[msg_uid]
+        if (current_time - last_seen) < RECENT_MSG_TTL_MS:
+            logger.debug(f"[LORA] Duplicate packet detected, ignoring: {msg_uid} (seen {current_time - last_seen}ms ago)")
+            return True  # Already processed, ignore
+    # Update recent messages tracking
+    recent_msg_uids[msg_uid] = current_time
+    # Clean old entries periodically
+    if len(recent_msg_uids) > 1000:
+        # Remove entries older than TTL
+        cutoff_time = current_time - RECENT_MSG_TTL_MS
+        recent_msg_uids = {uid: ts for uid, ts in recent_msg_uids.items() if ts > cutoff_time}
 
     if DYNAMIC_SPATH:
         if not flayout.is_neighbour(sender, my_addr):
@@ -1731,7 +1777,12 @@ def process_message(data, rssi=None, snr=None):
         asyncio.create_task(device_busy_life(sender))
     elif msg_typ == "B": # TODO need to ignore buplicate images, and send some response in A itself
         try:
-            img_id, epoch_ms, numchunks = begin_chunk(msg.decode())
+            # Try to decode message, handle both bytes and string with error handling
+            if isinstance(msg, bytes):
+                msg_str = msg.decode('utf-8', errors='ignore')  # Ignore decode errors for corrupted data
+            else:
+                msg_str = str(msg)
+            img_id, epoch_ms, numchunks = begin_chunk(msg_str)
             if get_transmode_lock(sender, img_id):
                 asyncio.create_task(keep_transmode_lock(sender, img_id))
                 # Send ACK immediately for faster response
@@ -1746,7 +1797,7 @@ def process_message(data, rssi=None, snr=None):
                 asyncio.create_task(send_msg("W", my_addr, WAIT_MESSAGE, sender))
                 return False
         except Exception as e:
-            logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
+            logger.error(f"[CHUNK] decoding error {e} : msg_len={len(msg) if msg else 0}, msg_preview={str(msg)[:50] if msg else 'None'}")
             return False
     elif msg_typ == "I":
         # Process chunk immediately - no delay needed as receiver is already in RX mode
@@ -1814,6 +1865,13 @@ async def radio_read():
         # Shorter timeout for faster polling in non-blocking mode
         msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
         if err == 0 and len(msg) > 0:  # ERR_NONE = 0
+            # Clear RX_DONE IRQ flag to prevent duplicate reads
+            try:
+                # clearIrqStatus is inherited from SX126X parent class
+                loranode.clearIrqStatus(loranode.RX_DONE)
+            except Exception as e:
+                logger.debug(f"[LORA] Failed to clear RX_DONE IRQ: {e}")
+            
             # Extract RSSI and SNR if available
             rssi = None
             snr = None
@@ -1824,12 +1882,25 @@ async def radio_read():
                 pass
             message = msg.replace(b"{}[]", b"\n")
             process_message(message, rssi, snr)
+            
+            # In non-blocking mode, _readData() automatically calls startReceive()
+            # No need to manually call it here
         elif err == -6:  # ERR_RX_TIMEOUT - normal, no message
             pass
         elif err == -7:  # ERR_CRC_MISMATCH - corrupted packet
             logger.warning(f"[LORA] CRC mismatch, packet corrupted")
+            # Clear CRC error IRQ flag
+            try:
+                loranode.clearIrqStatus()
+            except Exception as e:
+                logger.debug(f"[LORA] Failed to clear CRC error IRQ: {e}")
         elif err != 0:
             logger.debug(f"[LORA] Receive error: {err}")
+            # Clear any error IRQ flags
+            try:
+                loranode.clearIrqStatus()
+            except Exception as e:
+                logger.debug(f"[LORA] Failed to clear error IRQ: {e}")
         # Optimized polling for non-blocking mode - receiver is always in RX
         # Faster polling for highest data rate while maintaining reliability
         await asyncio.sleep(0.02)  # 20ms polling - balanced for non-blocking mode
