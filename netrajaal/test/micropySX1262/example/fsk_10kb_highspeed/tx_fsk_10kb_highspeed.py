@@ -25,7 +25,7 @@ CORRUPTION_LIST_TIMEOUT_MS = 5000
 
 # Initialize
 print("Initializing SX1262...")
-sx = SX1262(SPI_BUS, PINS['sclk'], PINS['mosi'], PINS['miso'], PINS['cs'], 
+sx = SX1262(SPI_BUS, PINS['sclk'], PINS['mosi'], PINS['miso'], PINS['cs'],
             PINS['irq'], PINS['rst'], PINS['busy'])
 
 # Configure FSK for high speed
@@ -40,25 +40,33 @@ if status != 0:
     exit()
 
 print("SX1262 ready. Generating test data...")
-test_data = bytes([i % 256 for i in range(DATA_SIZE)])
+# Generate 200-byte strings for each packet with clear identifiers
 num_packets = (DATA_SIZE + MAX_PAYLOAD_SIZE - 1) // MAX_PAYLOAD_SIZE
+message = b"At 3am my toaster judged my life choices, my WiFi ran away, and my coffee unionized, demanding better beans, shorter mornings, emotional support, and a written apology from the sleepy human. "
+packets = []
+
+# Pre-build all packets with 200-byte identifiable strings
+for packet_num in range(num_packets):
+    # Create packet identifier: "PKT_XXX: " where XXX is zero-padded packet number
+    pkt_header = f"PKT_{packet_num:03d}: ".encode()
+    # Fill remaining bytes with repeating message
+    remaining = MAX_PAYLOAD_SIZE - len(pkt_header)
+    fill_data = (message * ((remaining // len(message)) + 1))[:remaining]
+    # Combine to create exactly 200-byte payload
+    payload = pkt_header + fill_data
+    # Add sequence number byte at the start
+    packet = bytes([packet_num & 0xFF]) + payload
+    packets.append(packet)
+
 print(f"Sending {DATA_SIZE} bytes in {num_packets} packets\n")
 
 # Phase 1: Send all packets (back-to-back for maximum speed)
 print("PHASE 1: Sending packets...")
 start_time = ticks_ms()
-packets = []
-
-# Pre-build all packets to minimize processing during send
-for packet_num in range(num_packets):
-    start_idx = packet_num * MAX_PAYLOAD_SIZE
-    end_idx = min(start_idx + MAX_PAYLOAD_SIZE, DATA_SIZE)
-    chunk = test_data[start_idx:end_idx]
-    packet = bytes([packet_num & 0xFF]) + chunk
-    packets.append(packet)
 
 # Send all packets back-to-back
 for packet in packets:
+    print(f"packet:{packet}")
     sx.send(packet)
 
 phase1_time = ticks_diff(ticks_ms(), start_time)
@@ -72,7 +80,7 @@ timeout_start = ticks_ms()
 
 while ticks_diff(ticks_ms(), timeout_start) < CORRUPTION_LIST_TIMEOUT_MS:
     msg, status = sx.recv(timeout_en=True, timeout_ms=300)
-    
+
     if status == 0 and len(msg) > 0 and msg[0] == CORRUPTION_LIST_HEADER and len(msg) >= 2:
         count = msg[1]
         if count == 0:
@@ -88,12 +96,13 @@ if len(corrupted_seqs) > 0:
     print(f"\nPHASE 3: Retransmitting {len(corrupted_seqs)} packets...")
     sleep_ms(50)  # Minimal delay
     retransmit_start = ticks_ms()
-    
+
     # Direct access by index for speed
     for seq in sorted(corrupted_seqs):
         if seq < len(packets):
             sx.send(packets[seq])
-    
+            print(f"packet:{packet[seq]}")
+
     retransmit_time = ticks_diff(ticks_ms(), retransmit_start)
     print(f"Phase 3: {retransmit_time} ms")
 
