@@ -25,13 +25,14 @@ import gc                   # garbage collection for memory management
 
 import enc
 from sx1262 import SX1262
+from _sx126x import ERR_NONE, ERR_RX_TIMEOUT, ERR_CRC_MISMATCH, SX126X_SYNC_WORD_PRIVATE
 import gps_driver
 from cellular_driver import Cellular
 import detect
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # TESTING VARIABLES
-DYNAMIC_SPATH = False
+DYNAMIC_SPATH = True
 ENCRYPTION_ENABLED = True
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
@@ -42,12 +43,9 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-# Timing constants optimized for SF8 + BW250kHz (robust configuration)
-MIN_SLEEP = 0.03  # Sleep after non-ACK messages for reliable transmission
-ACK_SLEEP = 0.05  # Initial ACK wait - reduced for faster ACK response (50ms)
-CHUNK_SLEEP = 0.05  # Sleep between chunks for reliable reception
-CHUNK_BATCH_SIZE = 30  # Smaller batches for more reliable transmission
-CHUNK_BATCH_DELAY = 0.1  # Delay after batches to allow receiver to process
+MIN_SLEEP = 0.1
+ACK_SLEEP = 0.2
+CHUNK_SLEEP = 0.1  # Increased from 0.2 to 0.3 (300ms) to exceed RX_DELAY_MS (250ms)
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -59,9 +57,9 @@ SCAN_WAIT_2 = 1200
 VALIDATE_WAIT_SEC = 1200
 PHOTO_TAKING_DELAY = 600
 
-PHOTO_SENDING_EMPTY_DELAY = 2  # Reduced for faster processing
-PHOTO_SENDING_TRY_INTERVAL = 5  # Reduced delay between uploads for high-speed LoRa
-PHOTO_SENDING_FAILED_PAUSE = 10  # Reduced pause on failure
+PHOTO_SENDING_EMPTY_DELAY = 4
+PHOTO_SENDING_TRY_INTERVAL = 20  # Delay between uploads when queue has multiple images
+PHOTO_SENDING_FAILED_PAUSE = 20 # TODO earlier it was 120 second
 
 EVENT_SENDING_EMPTY_DELAY = 4
 EVENT_SENDING_INTERVAL = 10  # Delay between uploads when queue has multiple events
@@ -86,11 +84,19 @@ PACKET_PAYLOAD_LIMIT = 195 # bytes
 
 AIR_SPEED = 19200
 
+# LoRa Configuration Constants
+LORA_FREQ = 868.0
+LORA_SF = 7  # Spreading Factor 7 (second highest data rate ~22 kbps)
+LORA_BW = 250.0  # Bandwidth 250 kHz (good balance of speed and robustness)
+LORA_CR = 7  # Coding Rate 4/7 (error correction)
+LORA_PREAMBLE = 12  # Preamble length (better packet detection than 8)
+LORA_POWER = 14  # TX power in dBm
+LORA_RX_TIMEOUT_MS = 150  # Receive timeout for async loop
 
 
 # WiFi Configuration
-WIFI_SSID = "Lifestyle 6th floor-2.4G"
-WIFI_PASSWORD = "9821992096"
+WIFI_SSID = "Airtel_anki_3363_2.4G"
+WIFI_PASSWORD = "air34854"
 WIFI_ENABLED = True
 
 cellular_system = None
@@ -144,9 +150,9 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 # COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7194025':
-    my_addr = 225
-elif uid == b'e076465dd7193a09':
     my_addr = 219
+elif uid == b'e076465dd7193a09':
+    my_addr = 225
     if not DYNAMIC_SPATH:
         shortest_path_to_cc = [219]
 elif uid ==  b'e076465dd7090d1c':
@@ -157,8 +163,6 @@ elif uid == b'e076465dd7091027':
     my_addr = 222
 elif uid == b'e076465dd7091843':
     my_addr = 223
-    if not DYNAMIC_SPATH:
-        shortest_path_to_cc = [219]
 else:
     logger.error("error in main.py: Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -356,7 +360,7 @@ def get_transmode_lock(device_id, img_id): # check and just lock for image
     data_id = img_id
     logger.info(f"[IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:{device_id}, img_id:{img_id} ❮❮●●●●●●●●●●")
     return True
-
+    
 async def keep_transmode_lock(device_id, img_id):
     # Input: None; Output: None (sets image_in_progress flag with auto release after timeout)
     global image_in_progress, paired_device, data_id
@@ -400,14 +404,14 @@ def is_device_free(device_id):
     if device_id in busy_devices:
         return False
     return True
-
+    
 def is_device_busy(device_id):
     global busy_devices
     # return device_id in busy_devices
     if device_id in busy_devices:
         return True
     return False
-
+    
 async def device_busy_life(device_id): # device_busy_cycle
     # Input: device_id: int; Output: None (sets image_in_progress flag with auto release after timeout)
     global busy_devices
@@ -454,69 +458,40 @@ def next_device_in_spath():
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # LoRa Setup and Transmission
 # ---------------------------------------------------------------------------
-# Pin definitions for OpenMV RT1062 + Waveshare Core1262-868M
-SPI_BUS = 1
-P0_MOSI = 'P0'  # MOSI
-P1_MISO = 'P1'  # MISO
-P2_SCLK = 'P2'  # SCLK
-P3_CS = 'P3'    # Chip Select
-P6_RST = 'P6'   # Reset
-P7_BUSY = 'P7'  # Busy (GPIO)
-P13_DIO1 = 'P13'  # DIO1 (IRQ)
-
-# SPI Configuration
-SPI_BAUDRATE = 2000000
-SPI_POLARITY = 0
-SPI_PHASE = 0
-
-# LoRa Configuration - Second Highest Speed with Robust Settings
-# SF8 + BW250kHz provides good balance of speed and reliability
-LORA_FREQ = 868.0      # Frequency in MHz
-LORA_BW = 250.0        # Bandwidth 250kHz (robust, second highest speed)
-LORA_SF = 8            # Spreading Factor 8 (robust, second highest speed)
-LORA_CR = 7            # Coding Rate 4/7 (better error correction than 4/5)
-LORA_SYNC_WORD = 0x12  # Private sync word
-LORA_POWER = 22        # Transmission power in dBm
-LORA_PREAMBLE = 12     # Longer preamble for better synchronization
-
 loranode = None
-loranode_rssi = None  # Store last RSSI value
-
 async def init_lora():
     # Input: None; Output: None (initializes global loranode, updates lora_reinit_count)
-    global loranode, lora_init_count, lora_init_in_progress, loranode_rssi
+    global loranode, lora_init_count, lora_init_in_progress
     if lora_init_in_progress:
         logger.info(f"[LORA] Initialization already in progress, skipping duplicate call")
         return
     lora_init_in_progress = True
     try:
         lora_init_count += 1
-        logger.info(f"[LORA] Initializing LoRa SX1262 module (SPI)... my lora addr = {my_addr}")
-        logger.info(f"[LORA] Config: SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, {LORA_FREQ}MHz, {LORA_POWER}dBm")
-
-        # Initialize SX1262 with SPI
+        logger.info(f"[LORA] Initializing LoRa SX1262 module... my lora addr = {my_addr}")
+        
+        # Initialize SX1262 with SPI pin configuration
         loranode = SX1262(
-            spi_bus=SPI_BUS,
-            clk=P2_SCLK,
-            mosi=P0_MOSI,
-            miso=P1_MISO,
-            cs=P3_CS,
-            irq=P13_DIO1,
-            rst=P6_RST,
-            gpio=P7_BUSY,
-            spi_baudrate=SPI_BAUDRATE,
-            spi_polarity=SPI_POLARITY,
-            spi_phase=SPI_PHASE
+            spi_bus=1,
+            clk='P2',      # SCLK
+            mosi='P0',     # MOSI
+            miso='P1',     # MISO
+            cs='P3',       # Chip Select
+            irq='P13',     # DIO1 (IRQ)
+            rst='P6',      # Reset
+            gpio='P7',     # BUSY
+            spi_baudrate=2000000,
+            spi_polarity=0,
+            spi_phase=0
         )
-
-        # Configure LoRa for highest data rate
-        # Use blocking mode with short timeout for reliable fast packet reception
-        state = loranode.begin(
+        
+        # Configure LoRa with robust settings for second-highest data rate
+        status = loranode.begin(
             freq=LORA_FREQ,
             bw=LORA_BW,
             sf=LORA_SF,
             cr=LORA_CR,
-            syncWord=LORA_SYNC_WORD,
+            syncWord=SX126X_SYNC_WORD_PRIVATE,
             power=LORA_POWER,
             currentLimit=60.0,
             preambleLength=LORA_PREAMBLE,
@@ -524,17 +499,16 @@ async def init_lora():
             crcOn=True,
             tcxoVoltage=1.6,
             useRegulatorLDO=False,
-            blocking=True  # Blocking mode - more reliable for packet reception
+            blocking=True
         )
-
-        if state != 0:
-            logger.error(f"[LORA] Initialization failed with state: {state}")
+        
+        if status != ERR_NONE:
+            logger.error(f"[LORA] Failed to initialize SX1262, status: {status}")
             loranode = None
         else:
-            logger.info(f"[LORA] LoRa initialized successfully")
-            loranode_rssi = None
+            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}")
     except Exception as e:
-        logger.error(f"[LORA] Exception during initialization: {e}")
+        logger.error(f"[LORA] Exception during LoRa initialization: {e}")
         loranode = None
     finally:
         lora_init_in_progress = False
@@ -630,7 +604,7 @@ async def periodic_memory_cleanup():
 
             # Clean up chunk map
             cleanup_chunk_map()
-
+            
             # Run garbage collection
             gc.collect()
 
@@ -653,32 +627,19 @@ async def periodic_gc():
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
-async def radio_send(dest, data, msg_uid):
+def radio_send(dest, data, msg_uid):
     # Input: dest: int, data: bytes; Output: None (sends bytes via LoRa, logs send)
-    global sent_count, loranode
+    global sent_count
     sent_count = sent_count + 1
     lendata = len(data)
     if len(data) > 254:
         logger.error(f"[LORA] msg too large : {len(data)}")
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
-
-    # Yield control to event loop before blocking operation
-    # This allows radio_read() to run concurrently, enabling ACK reception
-    await asyncio.sleep(0)
-    
-    # New driver: send() returns (payload_len, status)
-    # Note: LoRa doesn't have built-in addressing, dest is in packet payload
-    # Blocking send operation - will block but we've yielded control first
-    try:
-        payload_len, status = loranode.send(data)
-        if status != 0:
-            logger.warning(f"[LORA] Send returned status: {status}")
-        # Note: Blocking send() already completes before returning
-        # No need for additional delay - the next recv() call will handle radio state
-    except Exception as e:
-        logger.error(f"[LORA] Send exception: {e}")
-
+    # SX1262 send() doesn't take dest parameter - addressing is in the data payload
+    len_sent, status = loranode.send(data)
+    if status != ERR_NONE:
+        logger.error(f"[LORA] Send failed with status {status}, MSG_UID = {msg_uid}")
     # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
@@ -702,19 +663,15 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     else:
         msgs_sent.append((msg_uid, msgbytes, timesent))
     if not ackneeded:
-        await radio_send(dest, databytes, msg_uid)
-        # For non-ACK messages (like chunk "I" type), minimal sleep to allow transmission
+        radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-    # ACK checking with robust timing for SF8+BW250kHz
-    ack_msg_recheck_count = 12 # More checks for robust ACK reception
+    ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
     for retry_i in range(retry_count):
-        await radio_send(dest, databytes, msg_uid)
-        # Allow time for transmission to complete (SF8+BW250kHz needs more time than SF7+BW500)
-        await asyncio.sleep(ACK_SLEEP)  # Initial wait for transmission to complete
-        
+        radio_send(dest, databytes, msg_uid)
+        await asyncio.sleep(ACK_SLEEP)
         first_log_flag = True
-        for i in range(ack_msg_recheck_count): # ack_msg recheck
+        for i in range(ack_msg_recheck_count): # ack_msk recheck
             at, missing_chunks = ack_time(msg_uid)
             if at > 0:
                 logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
@@ -726,12 +683,9 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                     first_log_flag = False
                 else:
                     logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                # Progressive sleep: start reasonable, increase gradually
-                # With SF8+BW250kHz, packets take longer to transmit/receive
-                if i < 4:
-                    await asyncio.sleep(ACK_SLEEP)  # 100ms for first few checks
-                else:
-                    await asyncio.sleep(ACK_SLEEP * 1.5)  # Slightly longer for later checks
+                await asyncio.sleep(
+                    ACK_SLEEP * min(i + 1, 3)
+                )  # progressively more sleep, capped at 3x
         logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
@@ -777,7 +731,7 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest): # all messages ex
     else:
         logger.warning(f"msgbtyes size exceeds the packet payload limit, {len(msgbytes)} bytes > {PACKET_PAYLOAD_LIMIT} bytes")
         return False
-
+        
 async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image sending
     if not is_lora_ready():
         return False
@@ -793,26 +747,18 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 logger.info(f"[CHUNK] Failed sending chunk begin")
                 delete_transmode_lock(dest, img_id)
                 return False
-
-            # Send chunks with robust timing for SF8+BW250kHz configuration
+            
             for i in range(len(chunks)):
-                if i % 30 == 0:
-                    logger.info(f"[CHUNK] Sending chunk {i}/{len(chunks)}")
-                
+                if i % 10 == 0:
+                    logger.info(f"[CHUNK] Sending chunk {i}")
+                await asyncio.sleep(CHUNK_SLEEP)
                 chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
                 _ = await send_single_packet("I", creator, chunkbytes, dest)
-                
-                # Flow control: pause after batches and between chunks for reliable reception
-                if (i + 1) % CHUNK_BATCH_SIZE == 0 and i < len(chunks) - 1:
-                    await asyncio.sleep(CHUNK_BATCH_DELAY)  # Longer pause after batches
-                elif i < len(chunks) - 1:
-                    await asyncio.sleep(CHUNK_SLEEP)  # Pause between chunks
-            
-            # Wait longer before end chunk check with SF8+BW250kHz (slower than SF7+BW500)
-            # This gives receiver adequate time to process all chunks from first transmission
-            await asyncio.sleep(0.2)
-            
             for retry_i in range(20):
+                if retry_i == 0:
+                    await asyncio.sleep(0.1)  # Faster first check
+                else:
+                    await asyncio.sleep(CHUNK_SLEEP)
                 succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 10)
                 if not succ:
                     logger.error(f"[CHUNK] Failed sending chunk end")
@@ -836,18 +782,13 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
                     logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
                     return False
-                # Retransmit missing chunks with robust timing
-                for idx, mis_chunk in enumerate(missing_chunks):
-                    if idx > 0 and idx % 15 == 0:
-                        # Pause after every 15 retransmissions for reliable reception
-                        await asyncio.sleep(CHUNK_BATCH_DELAY)
-                    elif idx > 0:
-                        await asyncio.sleep(CHUNK_SLEEP)
+                for mis_chunk in missing_chunks:
+                    await asyncio.sleep(CHUNK_SLEEP)
                     chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
                     _ = await send_single_packet("I", creator, chunkbytes, dest)
             delete_transmode_lock(dest, img_id)
             return False
-        else:
+        else: 
             logger.warning(f"TRANS MODE already in use, could not get lock...")
             return False
     else:
@@ -908,7 +849,7 @@ def begin_chunk(msg):
     numchunks = int(parts[2])
     chunk_map[img_id] = ("B", numchunks, [])
     return (img_id, epoch_ms, numchunks)
-
+    
 
 def get_missing_chunks(img_id):
     # Input: img_id: str chunk identifier; Output: list of int missing chunk indices
@@ -984,7 +925,7 @@ def end_chunk(msg_uid, msg):
         return
     img_id = parts[0]
     epoch_ms = int(parts[1])
-
+    
     creator = int(msg_uid[1])
     missing = get_missing_chunks(img_id)
     if len(missing) > 0:
@@ -1017,7 +958,7 @@ async def init_sim():
     logger.info("[CELL] Cellular system ready")
     return True
 
-async def sim_upload_hb(heartbeat_data): # TODO will be replaced by sim_upload_payload later
+async def sim_upload_hb(heartbeat_data): # TODO will be replaced by sim_upload_payload later 
     # Input: heartbeat_data: dict payload; Output: bool indicating upload success
     """Send heartbeat data via cellular (for command center)"""
     global cellular_system
@@ -1207,7 +1148,7 @@ async def event_text_process(creator, msgbytes):
                 logger.error(f"[TXT] forwarding event text to {next_dst} failed")
         else:
             logger.error(f"[TXT] can't forward event text because I dont have next device in spath yet")
-
+      
 # ---------------------------------------------------------------------------
 # Sensor Capture and Image Transmission
 # ---------------------------------------------------------------------------
@@ -1253,7 +1194,7 @@ async def person_detection_loop():
     last_capture_time = None
     next_capture_wait = None # max value is 16
     MAX_CAPTURE_WAIT = 10
-    FRESH_MOTION_LAP = 16
+    FRESH_MOTION_LAP = 16 
     while True:
         # Wait for PIR interrupt event (blocks until PIR detects motion)
         # Task is suspended here - uses minimal CPU until interrupt fires
@@ -1261,7 +1202,7 @@ async def person_detection_loop():
         # Clear the event for next trigger
         pir_trigger_event.clear()
         await asyncio.sleep(0.5) # DEFAULT wait after every motion
-
+        
         # Exponential backoff sleep logic to prevent rapid-fire triggers
         curr_time = utime.time()  # Get current time in seconds
         if last_capture_time is None:
@@ -1303,7 +1244,7 @@ async def person_detection_loop():
                 center_captured_image_count += 1
             # imgbytes = img.bytearray() # this was bigger # TODO
             # logger.info(f"[OLD] Captured image, size: {len(imgbytes)} bytes")
-
+            
             try:
                 raw_path = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}_raw.jpg"
                 logger.debug(f"Saving raw image to {raw_path} : imbytesize = {len(img.bytearray())}")
@@ -1315,16 +1256,16 @@ async def person_detection_loop():
             except Exception as e:
                 logger.warning(f"[PIR] Failed to save raw image: {e}")
                 continue
-
+            
             # read raw file
             try:
                 img = image.Image(raw_path)
-                imgbytes = img.bytearray() # updated
+                imgbytes = img.bytearray() # updated 
                 logger.info(f"[PIR] Captured image, size: {len(imgbytes)} bytes")
             except Exception as e:
                 logger.error(f"[PIR] Failed read image file: {e}")
                 continue
-
+                
             # Encrypt image immediately
             try:
                 enc_msgbytes = encrypt_if_needed("P", imgbytes)
@@ -1348,7 +1289,7 @@ async def person_detection_loop():
                 # Remove oldest entry
                 oldest = imgpaths_to_send.pop(0)
                 logger.info(f"[PIR] Queue full, removing oldest image: {oldest['enc_filepath']}")
-
+                
             # Save JSON file for the event
             event_filepath = f"{MY_EVENT_DIR}/{event_epoch_ms}.json"
             try:
@@ -1361,7 +1302,7 @@ async def person_detection_loop():
             except Exception as e:
                 logger.error(f"[PIR] Failed to save event file {event_filepath}: {e}")
             events_to_send.append({"creator": my_addr, "epoch_ms": event_epoch_ms})
-
+            
             # logger.info(f"Saved image: {raw_path}")
             # logger.info(f"Person detected Image count: {person_image_count}")
             # if running_as_cc():
@@ -1376,7 +1317,7 @@ async def person_detection_loop():
 
 
 async def send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes):
-    # Input: enc_msgbytes: bytes already encrypted image;
+    # Input: enc_msgbytes: bytes already encrypted image; 
     # Output: bool indicating if image was forwarded successfully to next_node of spath
     logger.info(f"[IMG] Sending image of creator={creator}, size={len(enc_msgbytes)} bytes, to the network")
     try:
@@ -1410,7 +1351,7 @@ async def image_sending_loop():
         if not running_as_cc() and not next_dst:
             logger.warning("[IMG] No shortest path yet so cant send")
             continue
-
+        
         if is_device_busy(next_dst):
             logger.debug(f"[IMG] Device {next_dst} is busy, skipping sending...")
             continue
@@ -1428,7 +1369,7 @@ async def image_sending_loop():
             enc_filepath = img_entry["enc_filepath"]
             creator = img_entry["creator"]
             epoch_ms = img_entry["epoch_ms"]
-
+            
             logger.debug(f"[IMG] Processing: {enc_filepath}")
             enc_msgbytes = None
             try:
@@ -1442,7 +1383,7 @@ async def image_sending_loop():
                     logger.error(f"[IMG] Failed to read encrypted image from file, image re-queued {enc_filepath}, e: {e}")
                     imgpaths_to_send.append(img_entry) # pushed to back of queue
                     break
-
+                
                 transmission_start = time_msec()
                 if running_as_cc():
                     # Upload encrypted image directly (already encrypted)
@@ -1483,7 +1424,7 @@ async def image_sending_loop():
                 logger.error(f"[IMG] unexpected error processing image event {enc_filepath}: {e}, re-queued")
                 # import sys
                 # sys.print_exception(e)
-
+                
                 # Re-queue image on error
                 imgpaths_to_send.append(img_entry) # TODO check this logic later
                 break
@@ -1500,7 +1441,7 @@ async def image_sending_loop():
                         if enc_msgbytes is not None: # imgbytes is None
                             del enc_msgbytes
                 except NameError:
-                    pass
+                    pass 
                 except:
                     pass
                 # Help GC reclaim memory
@@ -1514,7 +1455,7 @@ async def image_sending_loop():
         if len(imgpaths_to_send) > 0:
             # Queue still has items (from failed uploads), check again soon
             await asyncio.sleep(PHOTO_SENDING_FAILED_PAUSE)
-
+            
 
 async def event_text_sending_loop():
     # Input: None; Output: None (periodically sends queued images across mesh)
@@ -1545,7 +1486,7 @@ async def event_text_sending_loop():
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
                 logger.info(f"[TXT] ✔✔✔ Event transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
-
+  
                 if len(events_to_send) > 0:
                     await asyncio.sleep(EVENT_SENDING_INTERVAL)
                 else:
@@ -1588,7 +1529,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
     if my_addr in spath_received:
         logger.debug(f"[cyclic, ignoring {my_addr} already in {spath_received}")
         return
-
+    
     if len(shortest_path_to_cc) == 0:
         if len(seen_neighbours)>0:
             logger.debug(f"spath_recived for first time, saving and forwarding:{spath_received}")
@@ -1601,7 +1542,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
             new_spath_msg = ",".join([str(x) for x in new_spath])
             logger.debug(f"propogating new_spath:{new_spath_msg}, to dst:{n}")
             asyncio.create_task(send_msg("S", int(msg_uid[1]), new_spath_msg.encode(), n))
-
+        
     elif len(shortest_path_to_cc) > len(spath_received):
         if len(seen_neighbours)>0:
             logger.debug(f"smaller spath received, so updating and forwarding:{spath_received}")
@@ -1631,7 +1572,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
 
 def process_message(data, rssi=None):
     # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
-
+        
     parsed = parse_header(data)
     if not parsed:
         logger.error(f"[LORA] failure parsing incoming data : {data}")
@@ -1652,13 +1593,13 @@ def process_message(data, rssi=None):
         recv_log = "⬇ BCAST"
     else:
         recv_log = "⬇ RECV"
-
+        
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     if rssi is not None:
         logger.info(f"[{recv_log} from {sender}, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     else:
         logger.info(f"[{recv_log} from {sender}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
-
+    
     # logger.info(f"[PARSED HEADER] msg_uid:{msg_uid}, msg_typ:{msg_typ}, creator:{creator}, sender:{sender}, receiver:{receiver}, len-msg:{len(msg)}")
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
@@ -1671,13 +1612,11 @@ def process_message(data, rssi=None):
     if msg_typ == "N": # N type msg from neighbours
         scan_process(msg_uid, msg)
     elif msg_typ == "V":
-        # Send ACK immediately for validation messages
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "S":
         asyncio.create_task(sync_and_transfer_spath(msg_uid, msg.decode()))
     elif msg_typ == "T":
         asyncio.create_task(event_text_process(creator, msg))
-        # Send ACK immediately for text messages
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "H":
         # Validate HB message payload length for encrypted messages
@@ -1690,16 +1629,14 @@ def process_message(data, rssi=None):
                 )
                 # Still try to process, but log the issue
         asyncio.create_task(hb_process(msg_uid, msg, sender))
-        # Send ACK immediately for heartbeat messages
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "W": # wait message
         asyncio.create_task(device_busy_life(sender))
-    elif msg_typ == "B": # Begin chunk message
+    elif msg_typ == "B": # TODO need to ignore buplicate images, and send some response in A itself
         try:
             img_id, epoch_ms, numchunks = begin_chunk(msg.decode())
             if get_transmode_lock(sender, img_id):
                 asyncio.create_task(keep_transmode_lock(sender, img_id))
-                # Send ACK immediately for begin chunk
                 asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             else:
                 logger.warning(f"TRANS MODE already in use, could not get lock...")
@@ -1709,19 +1646,20 @@ def process_message(data, rssi=None):
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
-        add_chunk(msg)  # Chunk data - no ACK needed, processed immediately
-    elif msg_typ == "E": # End chunk message
-        alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode())
+        add_chunk(msg)  # optional to check check_transmode_lock
+    elif msg_typ == "E": # 
+        alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
         if alldone:
             delete_transmode_lock(sender, img_id)
+            # also when it fails
             ackmessage += b":-1"
-            # Send ACK immediately and multiple times for reliability
-            async def send_ack_multiple(): # send ACK 2 times quickly
+            # asyncio.create_task(send_msg("A", creator, ackmessage, sender))
+            async def send_ack_multiple(): # send ACK 2 times
                 msg_count = 2
                 for i in range(msg_count):
                     await send_msg("A", creator, ackmessage, sender)
                     if i < msg_count-1:
-                        await asyncio.sleep(0.1)  # Reduced from 1s to 100ms for faster ACK
+                        await asyncio.sleep(1)
             asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
                 try:
@@ -1735,10 +1673,10 @@ def process_message(data, rssi=None):
                     logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
                     logger.error(f"[CHUNK] error saving image to {enc_filepath}: {e}")
+                # asyncio.create_task(img_process(img_id, recompiled_msgbytes, creator, sender))
             else:
                 logger.warning(f"[CHUNK] img not recompiled, so not sending")
         else:
-            # Send ACK with missing chunks list immediately
             ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "A":
@@ -1755,41 +1693,33 @@ def process_message(data, rssi=None):
 # ---------------------------------------------------------------------------
 
 async def radio_read():
-    logger.info(f"===> Radio Read, LoRa receive loop started... <===\n")
+    logger.info(f"===> Readio Read, LoRa receive loop started... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
-    global loranode, loranode_rssi
-    
     while True:
-        try:
-            # Blocking mode with optimized timeout (50ms) for faster ACK detection
-            # Shorter timeout allows faster responsiveness while still allowing proper
-            # packet reception with SF8+BW250kHz configuration
-            # Blocking operations naturally serialize - no lock needed
-            msg, err = loranode.recv(timeout_en=True, timeout_ms=50)
-            
-            if len(msg) > 0 and err == 0:
-                # Packet received successfully - process immediately
-                try:
-                    rssi = loranode.getRSSI()
-                    loranode_rssi = rssi
-                except:
-                    rssi = None
-                    loranode_rssi = None
-
-                message = msg.replace(b"{}[]", b"\n")
-                process_message(message, rssi)
-                # No sleep - immediately check for next packet for maximum throughput
-            elif err == -6:  # RX_TIMEOUT - no packet received in timeout period
-                # No packet received - small yield then check again
-                # Brief yield prevents CPU spinning while maintaining good responsiveness
-                await asyncio.sleep(0.01)  # Small yield to allow other tasks
-            elif err != 0:
-                # Other error - log and continue
-                logger.debug(f"[LORA] Receive error: {err}")
-                await asyncio.sleep(0.001)  # Tiny delay on error
-        except Exception as e:
-            logger.error(f"[LORA] Receive exception: {e}")
-            await asyncio.sleep(0.01)  # Brief pause on exception to allow recovery
+        # Safety check: wait for loranode to be initialized
+        if loranode is None:
+            await asyncio.sleep(1)
+            continue
+        
+        # Use blocking mode with short timeout for async compatibility
+        msg, status = loranode.recv(len=0, timeout_en=True, timeout_ms=LORA_RX_TIMEOUT_MS)
+        
+        if status == ERR_NONE:
+            # Valid packet received
+            message = msg.replace(b"{}[]", b"\n")
+            rssi = loranode.getRSSI()  # Get RSSI after successful receive
+            process_message(message, rssi)
+        elif status == ERR_RX_TIMEOUT:
+            # No packet received (expected, continue loop)
+            pass
+        elif status == ERR_CRC_MISMATCH:
+            # Corrupted packet - log and skip
+            logger.debug(f"[LORA] CRC error, packet dropped")
+        else:
+            # Other error - log and continue
+            logger.warning(f"[LORA] Receive error status: {status}")
+        
+        await asyncio.sleep(0.15)  # Increased from 0.1 to 0.15 to give more time between receives
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
@@ -1835,7 +1765,7 @@ async def send_heartbeat():
     msgbytes = encrypt_if_needed("H", hbmsg)
     sent_succ = False
     if running_as_cc():
-
+        
         # Convert bytes to base64 for JSON transmission, same as hb_process()
         if isinstance(msgbytes, bytes):
             hb_data = ubinascii.b2a_base64(msgbytes)
@@ -1890,7 +1820,7 @@ async def send_event_text(epoch_ms):
         logger.info(f"[TXT] sending raw event text to cloud, len={len(msgbytes)}, msg:{event_msgstr}")
         sent_succ = await upload_payload_to_server(event_payload, "event_text", my_addr)
         return sent_succ
-    else:
+    else:        
         next_dst = next_device_in_spath()
         if next_dst:
             sent_succ = await send_msg("T", my_addr, msgbytes, next_dst)
@@ -1978,7 +1908,7 @@ async def validate_and_remove_neighbours():
         logger.debug(f"starting neighbours validation: {seen_neighbours}")
         to_be_removed = []
         for n in seen_neighbours:
-
+            
             # ---- waiting, just to not abort partial validation ----
             global image_in_progress
             waiting_retry = 5
@@ -1989,7 +1919,7 @@ async def validate_and_remove_neighbours():
                     break
                 await asyncio.sleep(10)
             # ---- * -----
-
+                
             msgbytes = b"Nothing"
             success = await send_msg("V", my_addr, msgbytes, n)
             if success:
@@ -2216,7 +2146,7 @@ async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
     global image_in_progress
     image_in_progress = False
-
+    
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
@@ -2249,12 +2179,11 @@ async def main():
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
-        asyncio.create_task(person_detection_loop())
         #asyncio.create_task(keep_updating_gps())
-        # if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
-        #     asyncio.create_task(person_detection_loop())
-        # else:
-        #     logger.warning(f"[INIT] ===> Unit node {my_addr} is not enabled to capture images")
+        if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
+            asyncio.create_task(person_detection_loop())
+        else:
+            logger.warning(f"[INIT] ===> Unit node {my_addr} is not enabled to capture images")
         asyncio.create_task(event_text_sending_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
