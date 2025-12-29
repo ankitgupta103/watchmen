@@ -755,10 +755,6 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 delete_transmode_lock(dest, img_id)
                 return False
 
-<<<<<<< HEAD
-            # Send all chunks rapidly without waiting for ACK (I messages don't need ACK)
-=======
->>>>>>> d4ba139 (netrajaal/test/micropySX1262/netrjaal_clone_305033f/main.py: fix integrate new driver)
             for i in range(len(chunks)):
                 if i % 10 == 0:
                     logger.info(f"[CHUNK] Sending chunk {i}/{len(chunks)}")
