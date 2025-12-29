@@ -653,7 +653,7 @@ async def periodic_gc():
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
-def radio_send(dest, data, msg_uid):
+async def radio_send(dest, data, msg_uid):
     # Input: dest: int, data: bytes; Output: None (sends bytes via LoRa, logs send)
     global sent_count, loranode
     sent_count = sent_count + 1
@@ -663,19 +663,19 @@ def radio_send(dest, data, msg_uid):
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
 
+    # Yield control to event loop before blocking operation
+    # This allows radio_read() to run concurrently, enabling ACK reception
+    await asyncio.sleep(0)
+    
     # New driver: send() returns (payload_len, status)
     # Note: LoRa doesn't have built-in addressing, dest is in packet payload
-    # Blocking operations naturally serialize - no lock needed
+    # Blocking send operation - will block but we've yielded control first
     try:
         payload_len, status = loranode.send(data)
         if status != 0:
             logger.warning(f"[LORA] Send returned status: {status}")
-        # Small delay to ensure transmission completes
-        # With SF8+BW250kHz, packets take longer to transmit than SF7+BW500
-        utime.sleep_ms(5)  # 5ms delay for transmission to complete
-        # Note: In blocking mode, the receive loop (radio_read) manages radio state
-        # The next recv() call will automatically put radio back in RX mode
-        # No need to call startReceive() here as it conflicts with blocking mode
+        # Note: Blocking send() already completes before returning
+        # No need for additional delay - the next recv() call will handle radio state
     except Exception as e:
         logger.error(f"[LORA] Send exception: {e}")
 
@@ -702,14 +702,14 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     else:
         msgs_sent.append((msg_uid, msgbytes, timesent))
     if not ackneeded:
-        radio_send(dest, databytes, msg_uid)
+        await radio_send(dest, databytes, msg_uid)
         # For non-ACK messages (like chunk "I" type), minimal sleep to allow transmission
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     # ACK checking with robust timing for SF8+BW250kHz
     ack_msg_recheck_count = 12 # More checks for robust ACK reception
     for retry_i in range(retry_count):
-        radio_send(dest, databytes, msg_uid)
+        await radio_send(dest, databytes, msg_uid)
         # Allow time for transmission to complete (SF8+BW250kHz needs more time than SF7+BW500)
         await asyncio.sleep(ACK_SLEEP)  # Initial wait for transmission to complete
         
