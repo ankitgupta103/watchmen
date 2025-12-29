@@ -5,161 +5,452 @@ Starting fake network with the following neighbours
 (222, 221)
 (221, 225)
 (223, 219)
-00:00:00,256 - INFO - [FS] Using FS_ROOT : /sdcard
-00:00:00,269 - INFO - [FS] /sdcard/netimages directory already exists
-00:00:00,311 - INFO - [FS] /sdcard/myimages directory already exists
-00:00:00,338 - INFO - [FS] /sdcard/myevents directory already exists
-00:00:00,392 - INFO - [INIT] ===> MyAddr = 223, uid=e076465dd7091843 <===
+00:00:00,667 - INFO - [FS] Using FS_ROOT : /sdcard
+00:00:00,679 - INFO - [FS] /sdcard/netimages directory already exists
+00:00:00,736 - INFO - [FS] /sdcard/myimages directory already exists
+00:00:00,771 - INFO - [FS] /sdcard/myevents directory already exists
+00:00:00,825 - INFO - [INIT] ===> MyAddr = 223, uid=e076465dd7091843 <===
 
-00:00:03,609 - INFO - [LORA] Initializing LoRa SX1262 module (SPI)... my lora addr = 223
-00:00:03,610 - INFO - [LORA] Config: SF8, BW250.0kHz, CR7, 868.0MHz, 22dBm
-00:00:03,670 - INFO - [LORA] LoRa initialized successfully
-00:00:03,711 - INFO - [MEM] Memory management tasks started (free: 8138.1KB)
+00:00:03,046 - INFO - [LORA] Initializing LoRa SX1262 module... my lora addr = 223
+00:00:03,106 - INFO - [LORA] SX1262 initialized successfully with SF5, BW500.0kHz, CR5 (highest data rate)
+00:00:03,146 - INFO - [MEM] Memory management tasks started (free: 8138.1KB)
 
-00:00:03,712 - INFO - [INIT] ===> Starting unit node <===
-00:00:03,712 - INFO - ===> Radio Read, LoRa receive loop started... <===
+00:00:03,147 - INFO - [INIT] ===> Starting unit node <===
+00:00:03,148 - INFO - ===> Radio Read, LoRa receive loop started... <===
 
-00:00:03,777 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+00:00:04,660 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
 
-00:00:03,778 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:03,843 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*FXD'
-00:00:06,807 - INFO - [PIR] Interrupt-driven detection initialized on pin Pin(GPIO_B0_07)
-00:00:07,895 - INFO - H : Len msg = 22, len msgbytes = 128
-00:00:07,895 - INFO - [⋙ sending....] dest=219, msg_typ:H, len:128 bytes, single packet
-00:00:07,200 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'H\xdf\xdf\xdbVSB'
-00:00:08,262 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'H\xdf\xdf\xdbVSB' # 0
-00:00:08,212 - WARNING - [ACK] Failed to get ack, MSG_UID = b'H\xdf\xdf\xdbVSB', retry # 1/3
-00:00:09,515 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'H\xdf\xdf\xdbVSB'
-00:00:09,581 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'H\xdf\xdf\xdbVSB' # 0
-00:00:10,533 - WARNING - [ACK] Failed to get ack, MSG_UID = b'H\xdf\xdf\xdbVSB', retry # 2/3
-00:00:10,836 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'H\xdf\xdf\xdbVSB'
-00:00:10,900 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'H\xdf\xdf\xdbVSB' # 0
-00:00:11,908 - WARNING - [ACK] Failed to get ack, MSG_UID = b'H\xdf\xdf\xdbVSB', retry # 3/3
-00:00:11,908 - ERROR - [LORA] Failed to send message, MSG_UID = b'H\xdf\xdf\xdbVSB'
-00:00:11,909 - WARNING - consecutive heartbeat failures = 1
-00:00:25,442 - INFO - [PIR] First motion detected - next_capture_wait=2
-00:00:25,442 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
-00:00:26,363 - INFO - Saved raw image: /sdcard/myimages/223_1735689625000_raw.jpg: raw size = 1843200 bytes
-00:00:26,453 - INFO - [PIR] Captured image, size: 36056 bytes
-00:00:27,256 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689625000.enc: encrypted size = 36320 bytes
-00:00:27,797 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689625000.json
-00:00:27,877 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689625000 ms
-00:00:27,031 - INFO - T : Len msg = 21, len msgbytes = 128
-00:00:27,031 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
-00:00:28,329 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbVPD'
-00:00:28,372 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689625000.enc
-00:00:28,373 - INFO - [IMG] Sending image of creator=223, size=36320 bytes, to the network
-00:00:28,373 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:JXZ ❮❮●●●●●●●●●●
-00:00:28,618 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36320 bytes, img_id:JXZ, image_payload in 182 chunks
-00:00:28,721 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbVQC'
-00:00:28,784 - INFO - [PIR] consecutive motion detected - next_capture_wait=4
-00:00:28,784 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
-00:00:29,656 - INFO - Saved raw image: /sdcard/myimages/223_1735689628000_raw.jpg: raw size = 1843200 bytes
-00:00:29,687 - INFO - [PIR] Captured image, size: 36056 bytes
-00:00:30,577 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689628000.enc: encrypted size = 36320 bytes
-00:00:30,094 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689628000.json
-00:00:30,116 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbVPD' # 0
-00:00:30,117 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbVQC' # 0
-00:00:31,622 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:4s
-00:00:31,064 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbVPD', retry # 1/3
-00:00:32,359 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbVPD'
-00:00:32,359 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbVQC', retry # 1/3
-00:00:32,459 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbVQC'
-00:00:32,524 - INFO - [PIR] consecutive motion detected - next_capture_wait=8
-00:00:32,524 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
-00:00:33,403 - INFO - Saved raw image: /sdcard/myimages/223_1735689632000_raw.jpg: raw size = 1843200 bytes
-00:00:33,455 - INFO - [PIR] Captured image, size: 36133 bytes
-00:00:33,213 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689632000.enc: encrypted size = 36400 bytes
-00:00:34,735 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689632000.json
-00:00:34,755 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbVPD' # 0
-00:00:34,756 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbVQC' # 0
-00:00:34,820 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 8, Received messages = {}
-00:00:35,260 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:8s
-00:00:35,702 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbVPD', retry # 2/3
-00:00:35,997 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbVPD'
-00:00:35,998 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbVQC', retry # 2/3
-00:00:35,099 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbVQC'
-00:00:35,163 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbVPD' # 0
-00:00:35,164 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbVQC' # 0
-00:00:36,965 - INFO - [PIR] skipping detection - time diff:4 is too small, should be min:8s
-00:00:36,115 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbVPD', retry # 3/3
-00:00:36,116 - ERROR - [LORA] Failed to send message, MSG_UID = b'T\xdf\xdf\xdbVPD'
-00:00:36,116 - WARNING - [TXT] sending failed, event re-queued: 1735689625000
-00:00:36,117 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbVQC', retry # 3/3
-00:00:36,117 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbVQC'
-00:00:36,117 - INFO - [CHUNK] Failed sending chunk begin
-00:00:36,118 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:JXZ, by logic ❮❮●●●●●●●●●●
-00:00:36,118 - ERROR - [IMG] forwarding image to 219 failed
-00:00:36,118 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689625000.enc
-00:00:38,228 - INFO - [PIR] skipping detection - time diff:6 is too small, should be min:8s
-00:00:40,120 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689628000 ms
-00:00:40,187 - INFO - T : Len msg = 21, len msgbytes = 128
-00:00:40,188 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
-00:00:41,490 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'T\xdf\xdf\xdbWLU'
-00:00:41,553 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
-00:00:41,553 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
-00:00:42,475 - INFO - Saved raw image: /sdcard/myimages/223_1735689641000_raw.jpg: raw size = 1843200 bytes
-00:00:42,565 - INFO - [PIR] Captured image, size: 35913 bytes
-00:00:43,361 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689641000.enc: encrypted size = 36176 bytes
-00:00:43,901 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689641000.json
-00:00:43,921 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbWLU' # 0
-00:00:44,423 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:10s
-00:00:44,868 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbWLU', retry # 1/3
-00:00:44,171 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'T\xdf\xdf\xdbWLU'
-00:00:44,236 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbWLU' # 0
-00:00:45,748 - INFO - [PIR] skipping detection - time diff:4 is too small, should be min:10s
-00:00:45,195 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbWLU', retry # 2/3
-00:00:46,498 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'T\xdf\xdf\xdbWLU'
-00:00:46,563 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbWLU' # 0
-00:00:47,516 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbWLU', retry # 3/3
-00:00:47,516 - ERROR - [LORA] Failed to send message, MSG_UID = b'T\xdf\xdf\xdbWLU'
-00:00:47,517 - WARNING - [TXT] sending failed, event re-queued: 1735689628000
-00:00:47,803 - INFO - [PIR] skipping detection - time diff:6 is too small, should be min:10s
-00:00:48,211 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689628000.enc
-00:00:48,212 - INFO - [IMG] Sending image of creator=223, size=36320 bytes, to the network
-00:00:48,212 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:CAI ❮❮●●●●●●●●●●
-00:00:49,456 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36320 bytes, img_id:CAI, image_payload in 182 chunks
-00:00:49,566 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbHJK'
-00:00:49,633 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbHJK' # 0
-00:00:49,139 - INFO - [PIR] skipping detection - time diff:8 is too small, should be min:10s
-00:00:50,649 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbHJK', retry # 1/3
-00:00:50,750 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbHJK'
-00:00:50,812 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbHJK' # 0
-00:00:51,543 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689632000 ms
-00:00:51,613 - INFO - T : Len msg = 21, len msgbytes = 128
-00:00:51,613 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
-00:00:51,917 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbSRI'
-00:00:51,981 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbSRI' # 0
-00:00:51,056 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
-00:00:51,056 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
-00:00:52,936 - INFO - Saved raw image: /sdcard/myimages/223_1735689651000_raw.jpg: raw size = 1843200 bytes
-00:00:52,985 - INFO - [PIR] Captured image, size: 36054 bytes
-00:00:53,741 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689651000.enc: encrypted size = 36320 bytes
-00:00:54,261 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689651000.json
-00:00:54,422 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbHJK', retry # 2/3
-00:00:54,523 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbHJK'
-00:00:54,587 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbHJK' # 0
-00:00:54,806 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:10s
-00:00:54,250 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbSRI', retry # 1/3
-00:00:55,554 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbSRI'
-00:00:55,618 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbSRI' # 0
-00:00:55,842 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbHJK', retry # 3/3
-00:00:55,842 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbHJK'
-00:00:55,843 - INFO - [CHUNK] Failed sending chunk begin
-00:00:55,843 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:CAI, by logic ❮❮●●●●●●●●●●
-00:00:55,843 - ERROR - [IMG] forwarding image to 219 failed
-00:00:55,844 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689628000.enc
-00:00:56,362 - INFO - [PIR] skipping detection - time diff:5 is too small, should be min:10s
-00:00:56,589 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbSRI', retry # 2/3
-00:00:56,893 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbSRI'
-00:00:56,959 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbSRI' # 0
-00:00:57,914 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbSRI', retry # 3/3
-00:00:57,914 - ERROR - [LORA] Failed to send message, MSG_UID = b'T\xdf\xdf\xdbSRI'
-00:00:57,915 - WARNING - [TXT] sending failed, event re-queued: 1735689632000
-00:00:58,491 - INFO - [PIR] skipping detection - time diff:7 is too small, should be min:10s
-00:01:00,589 - INFO - [PIR] skipping detection - time diff:9 is too small, should be min:10s
-00:01:00,108 - INFO - stopped by user via keyboard interrupt
-00:01:00,109 - INFO - logger closed successfully
-OpenMV v4.7.0; MicroPython v1.25.0-r0; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
-Type "help()" for more information.
->>> 
+00:00:04,661 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:04,679 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*VTM'
+00:00:06,477 - INFO - [PIR] Interrupt-driven detection initialized on pin Pin(GPIO_B0_07)
+00:00:07,601 - INFO - [PIR] First motion detected - next_capture_wait=2
+00:00:07,602 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:00:08,481 - INFO - Saved raw image: /sdcard/myimages/223_1735689607000_raw.jpg: raw size = 1843200 bytes
+00:00:08,529 - INFO - [PIR] Captured image, size: 35768 bytes
+00:00:09,414 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689607000.enc: encrypted size = 36032 bytes
+00:00:10,934 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689607000.json
+00:00:10,104 - INFO - H : Len msg = 23, len msgbytes = 128
+00:00:10,105 - INFO - [⋙ sending....] dest=219, msg_typ:H, len:128 bytes, single packet
+00:00:10,139 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'H\xdf\xdf\xdbJWF'
+00:00:10,651 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'H\xdf\xdf\xdbJWF' # 0
+00:00:10,652 - INFO - [PIR] consecutive motion detected - next_capture_wait=4
+00:00:10,653 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:00:11,541 - INFO - Saved raw image: /sdcard/myimages/223_1735689610000_raw.jpg: raw size = 1843200 bytes
+00:00:11,631 - INFO - [PIR] Captured image, size: 35842 bytes
+00:00:12,482 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689610000.enc: encrypted size = 36112 bytes
+00:00:13,008 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689610000.json
+00:00:13,023 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689607000 ms
+00:00:13,089 - INFO - T : Len msg = 21, len msgbytes = 128
+00:00:13,090 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:00:13,125 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'T\xdf\xdf\xdbHOW'
+00:00:13,158 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689607000.enc
+00:00:13,159 - INFO - [IMG] Sending image of creator=223, size=36032 bytes, to the network
+00:00:13,160 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:USO ❮❮●●●●●●●●●●
+00:00:13,402 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36032 bytes, img_id:USO, image_payload in 181 chunks
+00:00:13,423 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbRPC'
+00:00:14,940 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbHOW' # 0
+00:00:14,941 - INFO - [PIR] consecutive motion detected - next_capture_wait=8
+00:00:14,941 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:00:15,829 - INFO - Saved raw image: /sdcard/myimages/223_1735689614000_raw.jpg: raw size = 1843200 bytes
+00:00:15,921 - INFO - [PIR] Captured image, size: 35874 bytes
+00:00:16,781 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689614000.enc: encrypted size = 36144 bytes
+00:00:16,307 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689614000.json
+00:00:16,329 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbRPC' # 0
+00:00:17,844 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:8s
+00:00:18,970 - INFO - [PIR] skipping detection - time diff:4 is too small, should be min:8s
+00:00:19,135 - WARNING - [ACK] Failed to get ack, MSG_UID = b'H\xdf\xdf\xdbJWF', retry # 1/3
+00:00:19,170 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'H\xdf\xdf\xdbJWF'
+00:00:20,685 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'H\xdf\xdf\xdbJWF' # 0
+00:00:20,697 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbHOW', retry # 1/3
+00:00:20,735 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'T\xdf\xdf\xdbHOW'
+00:00:20,736 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbRPC', retry # 1/3
+00:00:20,756 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbRPC'
+00:00:20,270 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbHOW' # 0
+00:00:20,271 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbRPC' # 0
+00:00:20,272 - INFO - [PIR] skipping detection - time diff:6 is too small, should be min:8s
+00:00:22,517 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
+00:00:22,518 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:00:23,442 - INFO - Saved raw image: /sdcard/myimages/223_1735689622000_raw.jpg: raw size = 1843200 bytes
+00:00:23,533 - INFO - [PIR] Captured image, size: 35892 bytes
+00:00:24,306 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689622000.enc: encrypted size = 36160 bytes
+00:00:25,832 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689622000.json
+00:00:25,366 - WARNING - [ACK] Failed to get ack, MSG_UID = b'H\xdf\xdf\xdbJWF', retry # 2/3
+00:00:25,402 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'H\xdf\xdf\xdbJWF'
+00:00:25,403 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:10s
+00:00:26,930 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'H\xdf\xdf\xdbJWF' # 0
+00:00:26,965 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbHOW', retry # 2/3
+00:00:26,999 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'T\xdf\xdf\xdbHOW'
+00:00:26,000 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbRPC', retry # 2/3
+00:00:26,018 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbRPC'
+00:00:26,531 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbHOW' # 0
+00:00:26,532 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbRPC' # 0
+00:00:27,093 - INFO - [PIR] skipping detection - time diff:5 is too small, should be min:10s
+00:00:29,346 - INFO - [PIR] skipping detection - time diff:7 is too small, should be min:10s
+00:00:29,381 - WARNING - [ACK] Failed to get ack, MSG_UID = b'H\xdf\xdf\xdbJWF', retry # 3/3
+00:00:29,381 - ERROR - [LORA] Failed to send message, MSG_UID = b'H\xdf\xdf\xdbJWF'
+00:00:29,382 - WARNING - consecutive heartbeat failures = 1
+00:00:30,945 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbHOW', retry # 3/3
+00:00:30,945 - ERROR - [LORA] Failed to send message, MSG_UID = b'T\xdf\xdf\xdbHOW'
+00:00:30,946 - WARNING - [TXT] sending failed, event re-queued: 1735689607000
+00:00:30,946 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbRPC', retry # 3/3
+00:00:30,947 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbRPC'
+00:00:30,947 - INFO - [CHUNK] Failed sending chunk begin
+00:00:30,947 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:USO, by logic ❮❮●●●●●●●●●●
+00:00:30,948 - ERROR - [IMG] forwarding image to 219 failed
+00:00:30,948 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689607000.enc
+00:00:31,044 - INFO - [PIR] skipping detection - time diff:9 is too small, should be min:10s
+00:00:33,294 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
+00:00:33,295 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:00:34,171 - INFO - Saved raw image: /sdcard/myimages/223_1735689633000_raw.jpg: raw size = 1843200 bytes
+00:00:34,217 - INFO - [PIR] Captured image, size: 35725 bytes
+00:00:35,970 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689633000.enc: encrypted size = 35984 bytes
+00:00:35,490 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689633000.json
+00:00:36,070 - INFO - sent: 1 Recd: 0 Unacked: 3, Free: 8064.5KB, Chunks: 0, Queued images: 5
+00:00:36,071 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689610000 ms
+00:00:36,134 - INFO - T : Len msg = 21, len msgbytes = 128
+00:00:36,134 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:00:36,170 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbIOT'
+00:00:36,171 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 11, Received messages = {}
+00:00:36,172 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:36,188 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*JAW'
+00:00:36,189 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:10s
+00:00:37,702 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbIOT' # 0
+00:00:37,587 - INFO - [⬇ BCAST from 219, rssi: -38.0] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*ZXA'
+00:00:37,588 - INFO - adding nodeaddr 219 to seen_neighbours
+00:00:38,151 - INFO - [PIR] skipping detection - time diff:5 is too small, should be min:10s
+00:00:40,841 - INFO - [PIR] skipping detection - time diff:7 is too small, should be min:10s
+00:00:40,441 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbIOT', retry # 1/3
+00:00:40,475 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbIOT'
+00:00:40,499 - INFO - [⬇ RECV from 219, rssi: -38.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGJC'
+00:00:41,065 - INFO - [ACK] Msg b'T\xdf\xdf\xdbIOT' : was acked in 4364 msecs
+00:00:41,066 - INFO - [TXT] Event text sent successfully to 219
+00:00:41,066 - INFO - [TXT] ✔✔✔ Event transmission completed in 4995 ms (4.9950 seconds)
+00:00:42,191 - INFO - [PIR] skipping detection - time diff:9 is too small, should be min:10s
+00:00:44,440 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
+00:00:44,441 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:00:45,389 - INFO - Saved raw image: /sdcard/myimages/223_1735689644000_raw.jpg: raw size = 1843200 bytes
+00:00:45,515 - INFO - [PIR] Captured image, size: 35781 bytes
+00:00:46,348 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689644000.enc: encrypted size = 36048 bytes
+00:00:47,901 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689644000.json
+00:00:47,434 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:10s
+00:00:48,557 - INFO - [PIR] skipping detection - time diff:4 is too small, should be min:10s
+00:00:51,805 - INFO - [PIR] skipping detection - time diff:7 is too small, should be min:10s
+00:00:51,367 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689614000 ms
+00:00:51,435 - INFO - T : Len msg = 21, len msgbytes = 128
+00:00:51,436 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:00:51,472 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbMCI'
+00:00:51,495 - INFO - [⬇ RECV from 219, rssi: -35.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEYG'
+00:00:52,058 - INFO - [ACK] Msg b'T\xdf\xdf\xdbMCI' : was acked in 59 msecs
+00:00:52,058 - INFO - [TXT] Event text sent successfully to 219
+00:00:52,059 - INFO - [TXT] ✔✔✔ Event transmission completed in 692 ms (0.6920 seconds)
+00:00:52,620 - INFO - [PIR] skipping detection - time diff:8 is too small, should be min:10s
+00:00:54,349 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689610000.enc
+00:00:54,349 - INFO - [IMG] Sending image of creator=223, size=36112 bytes, to the network
+00:00:54,350 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:FEC ❮❮●●●●●●●●●●
+00:00:54,590 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36112 bytes, img_id:FEC, image_payload in 181 chunks
+00:00:54,616 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbAIX'
+00:00:55,135 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
+00:00:55,135 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:00:56,017 - INFO - Saved raw image: /sdcard/myimages/223_1735689655000_raw.jpg: raw size = 1843200 bytes
+00:00:56,048 - INFO - [PIR] Captured image, size: 35813 bytes
+00:00:57,799 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689655000.enc: encrypted size = 36080 bytes
+00:00:57,316 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689655000.json
+00:00:57,339 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbAIX' # 0
+00:00:58,852 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:10s
+00:00:59,980 - INFO - [PIR] skipping detection - time diff:4 is too small, should be min:10s
+00:01:01,702 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbAIX', retry # 1/3
+00:01:01,723 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbAIX'
+00:01:01,743 - INFO - [⬇ RECV from 219, rssi: -35.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfDRH'
+00:01:01,744 - INFO - Device marked busy, device:219
+00:01:01,305 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbAIX' # 0
+00:01:01,306 - INFO - [PIR] skipping detection - time diff:6 is too small, should be min:10s
+00:01:02,431 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689622000 ms
+00:01:02,506 - INFO - T : Len msg = 21, len msgbytes = 128
+00:01:02,507 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:01:02,545 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbWMM'
+00:01:02,568 - INFO - [⬇ RECV from 219, rssi: -38.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAWI'
+00:01:03,132 - INFO - [ACK] Msg b'T\xdf\xdf\xdbWMM' : was acked in 60 msecs
+00:01:03,133 - INFO - [TXT] Event text sent successfully to 219
+00:01:03,133 - INFO - [TXT] ✔✔✔ Event transmission completed in 702 ms (0.7020 seconds)
+00:01:03,134 - INFO - [PIR] skipping detection - time diff:8 is too small, should be min:10s
+00:01:05,857 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbAIX', retry # 2/3
+00:01:05,876 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbAIX'
+00:01:05,898 - INFO - [⬇ RECV from 219, rssi: -38.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfZAL'
+00:01:05,899 - INFO - Device marked busy, device:219
+00:01:05,462 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbAIX' # 0
+00:01:05,463 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
+00:01:05,463 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:01:06,413 - INFO - Saved raw image: /sdcard/myimages/223_1735689665000_raw.jpg: raw size = 1843200 bytes
+00:01:06,537 - INFO - [PIR] Captured image, size: 35778 bytes
+00:01:07,493 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689665000.enc: encrypted size = 36048 bytes
+00:01:08,046 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689665000.json
+00:01:08,581 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 18, Received messages = {219: 6}
+00:01:08,581 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:10s
+00:01:10,705 - INFO - [PIR] skipping detection - time diff:5 is too small, should be min:10s
+00:01:11,430 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbAIX', retry # 3/3
+00:01:11,430 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbAIX'
+00:01:11,431 - INFO - [CHUNK] Failed sending chunk begin
+00:01:11,431 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:FEC, by logic ❮❮●●●●●●●●●●
+00:01:11,431 - ERROR - [IMG] forwarding image to 219 failed
+00:01:11,432 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689610000.enc
+00:01:12,964 - INFO - [PIR] skipping detection - time diff:7 is too small, should be min:10s
+00:01:13,134 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689607000 ms
+00:01:13,202 - INFO - T : Len msg = 21, len msgbytes = 128
+00:01:13,202 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:01:13,236 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbJCP'
+00:01:13,260 - INFO - [⬇ RECV from 219, rssi: -38.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfROD'
+00:01:14,824 - INFO - [ACK] Msg b'T\xdf\xdf\xdbJCP' : was acked in 58 msecs
+00:01:14,824 - INFO - [TXT] Event text sent successfully to 219
+00:01:14,825 - INFO - [TXT] ✔✔✔ Event transmission completed in 689 ms (0.6890 seconds)
+00:01:14,387 - INFO - [PIR] skipping detection - time diff:9 is too small, should be min:10s
+00:01:16,637 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
+00:01:16,638 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:01:17,590 - INFO - Saved raw image: /sdcard/myimages/223_1735689676000_raw.jpg: raw size = 1843200 bytes
+00:01:18,715 - INFO - [PIR] Captured image, size: 35722 bytes
+00:01:18,547 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689676000.enc: encrypted size = 35984 bytes
+00:01:19,100 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689676000.json
+00:01:19,633 - INFO - [PIR] skipping detection - time diff:3 is too small, should be min:10s
+00:01:21,758 - INFO - [PIR] skipping detection - time diff:5 is too small, should be min:10s
+00:01:21,758 - INFO - Device marked free, device:219
+00:01:23,005 - INFO - [PIR] skipping detection - time diff:7 is too small, should be min:10s
+00:01:24,130 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689633000 ms
+00:01:24,199 - INFO - T : Len msg = 21, len msgbytes = 128
+00:01:24,200 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:01:24,235 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'T\xdf\xdf\xdbQFR'
+00:01:25,750 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbQFR' # 0
+00:01:25,751 - INFO - [PIR] skipping detection - time diff:9 is too small, should be min:10s
+00:01:25,313 - INFO - Device marked free, device:219
+00:01:27,004 - INFO - [PIR] consecutive motion detected - next_capture_wait=10
+00:01:27,004 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:01:28,949 - INFO - Saved raw image: /sdcard/myimages/223_1735689687000_raw.jpg: raw size = 1843200 bytes
+00:01:28,073 - INFO - [PIR] Captured image, size: 32317 bytes
+00:01:29,901 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689687000.enc: encrypted size = 32576 bytes
+00:01:29,454 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689687000.json
+00:01:30,589 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbQFR', retry # 1/3
+00:01:30,623 - INFO - [⮕ SENT to 219] [*******] 142 bytes, MSG_UID = b'T\xdf\xdf\xdbQFR'
+00:01:30,648 - INFO - [⬇ RECV from 219, rssi: -36.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZUF'
+00:01:31,212 - INFO - [ACK] Msg b'T\xdf\xdf\xdbQFR' : was acked in 6448 msecs
+00:01:31,212 - INFO - [TXT] Event text sent successfully to 219
+00:01:31,212 - INFO - [TXT] ✔✔✔ Event transmission completed in 7082 ms (7.0820 seconds)
+00:01:36,313 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689614000.enc
+00:01:36,313 - INFO - [IMG] Sending image of creator=223, size=36144 bytes, to the network
+00:01:36,314 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:XEG ❮❮●●●●●●●●●●
+00:01:36,558 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36144 bytes, img_id:XEG, image_payload in 181 chunks
+00:01:36,577 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbOFH'
+00:01:36,599 - INFO - [⬇ RECV from 219, rssi: -34.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfWPC'
+00:01:36,600 - INFO - Device marked busy, device:219
+00:01:37,164 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbOFH' # 0
+00:01:40,586 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbOFH', retry # 1/3
+00:01:40,604 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbOFH'
+00:01:40,624 - INFO - [⬇ RECV from 219, rssi: -35.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfYKC'
+00:01:40,625 - INFO - Device marked busy, device:219
+00:01:41,188 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbOFH' # 0
+00:01:44,602 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbOFH', retry # 2/3
+00:01:44,621 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbOFH'
+00:01:45,137 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbOFH' # 0
+00:01:46,701 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689644000 ms
+00:01:46,768 - INFO - T : Len msg = 21, len msgbytes = 128
+00:01:46,768 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:01:46,802 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbSUM'
+00:01:46,823 - INFO - [⬇ RECV from 219, rssi: -34.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFAK'
+00:01:46,388 - INFO - [ACK] Msg b'T\xdf\xdf\xdbSUM' : was acked in 55 msecs
+00:01:46,388 - INFO - [TXT] Event text sent successfully to 219
+00:01:46,389 - INFO - [TXT] ✔✔✔ Event transmission completed in 688 ms (0.6880 seconds)
+00:01:49,677 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbOFH', retry # 3/3
+00:01:49,677 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbOFH'
+00:01:49,678 - INFO - [CHUNK] Failed sending chunk begin
+00:01:49,678 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:XEG, by logic ❮❮●●●●●●●●●●
+00:01:49,678 - ERROR - [IMG] forwarding image to 219 failed
+00:01:49,679 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689614000.enc
+00:01:56,529 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689655000 ms
+00:01:56,611 - INFO - T : Len msg = 21, len msgbytes = 128
+00:01:56,611 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:01:56,645 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbNTK'
+00:01:57,669 - INFO - [⬇ RECV from 219, rssi: -35.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHSU'
+00:01:57,670 - INFO - Device marked free, device:219
+00:01:57,233 - INFO - [ACK] Msg b'T\xdf\xdf\xdbNTK' : was acked in 57 msecs
+00:01:57,233 - INFO - [TXT] Event text sent successfully to 219
+00:01:57,233 - INFO - [TXT] ✔✔✔ Event transmission completed in 704 ms (0.7040 seconds)
+00:02:00,625 - INFO - Device marked free, device:219
+00:02:07,363 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689665000 ms
+00:02:07,431 - INFO - T : Len msg = 21, len msgbytes = 128
+00:02:07,432 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:02:07,468 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbYOU'
+00:02:07,488 - INFO - [⬇ RECV from 219, rssi: -34.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZVS'
+00:02:08,052 - INFO - [ACK] Msg b'T\xdf\xdf\xdbYOU' : was acked in 55 msecs
+00:02:08,053 - INFO - [TXT] Event text sent successfully to 219
+00:02:08,053 - INFO - [TXT] ✔✔✔ Event transmission completed in 689 ms (0.6890 seconds)
+00:02:09,180 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:02:09,194 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*BBN'
+00:02:14,722 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689622000.enc
+00:02:14,723 - INFO - [IMG] Sending image of creator=223, size=36160 bytes, to the network
+00:02:14,723 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:SKM ❮❮●●●●●●●●●●
+00:02:14,962 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36160 bytes, img_id:SKM, image_payload in 181 chunks
+00:02:14,991 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbWER'
+00:02:14,513 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbWER' # 0
+00:02:18,926 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbWER', retry # 1/3
+00:02:18,946 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbWER'
+00:02:18,463 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689676000 ms
+00:02:18,531 - INFO - T : Len msg = 21, len msgbytes = 128
+00:02:18,532 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:02:18,568 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbZTN'
+00:02:18,569 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbWER' # 0
+00:02:19,085 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbZTN' # 0
+00:02:22,941 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbWER', retry # 2/3
+00:02:22,960 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbWER'
+00:02:22,982 - INFO - [⬇ RECV from 219, rssi: -37.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfNVY'
+00:02:22,983 - INFO - Device marked busy, device:219
+00:02:22,545 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbWER' # 0
+00:02:22,546 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbZTN', retry # 1/3
+00:02:22,582 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbZTN'
+00:02:23,110 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbZTN' # 0
+00:02:26,964 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbWER', retry # 3/3
+00:02:26,964 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbWER'
+00:02:26,965 - INFO - [CHUNK] Failed sending chunk begin
+00:02:26,965 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:SKM, by logic ❮❮●●●●●●●●●●
+00:02:26,965 - ERROR - [IMG] forwarding image to 219 failed
+00:02:26,966 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689622000.enc
+00:02:26,528 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbZTN', retry # 2/3
+00:02:26,563 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbZTN'
+00:02:26,587 - INFO - [⬇ RECV from 219, rssi: -34.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRBD'
+00:02:27,152 - INFO - [ACK] Msg b'T\xdf\xdf\xdbZTN' : was acked in 8055 msecs
+00:02:27,153 - INFO - [TXT] Event text sent successfully to 219
+00:02:27,153 - INFO - [TXT] ✔✔✔ Event transmission completed in 8690 ms (8.6900 seconds)
+00:02:37,281 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689687000 ms
+00:02:37,350 - INFO - T : Len msg = 21, len msgbytes = 128
+00:02:37,350 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:02:37,385 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbCED'
+00:02:37,409 - INFO - [⬇ RECV from 219, rssi: -36.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOFB'
+00:02:38,975 - INFO - [ACK] Msg b'T\xdf\xdf\xdbCED' : was acked in 58 msecs
+00:02:38,975 - INFO - [TXT] Event text sent successfully to 219
+00:02:38,975 - INFO - [TXT] ✔✔✔ Event transmission completed in 693 ms (0.6930 seconds)
+00:02:38,976 - INFO - [TXT] Queue empty, all events uploaded
+00:02:40,219 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 35, Received messages = {219: 16}
+00:02:40,220 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:02:40,236 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*VKM'
+00:02:42,468 - INFO - Device marked free, device:219
+00:02:51,939 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689607000.enc
+00:02:51,940 - INFO - [IMG] Sending image of creator=223, size=36032 bytes, to the network
+00:02:51,940 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:DLF ❮❮●●●●●●●●●●
+00:02:51,180 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36032 bytes, img_id:DLF, image_payload in 181 chunks
+00:02:51,205 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbDWA'
+00:02:51,225 - INFO - [⬇ RECV from 219, rssi: -34.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfAVA'
+00:02:51,228 - INFO - Device marked busy, device:219
+00:02:52,792 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbDWA' # 0
+00:02:55,206 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbDWA', retry # 1/3
+00:02:55,225 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbDWA'
+00:02:55,248 - INFO - [⬇ RECV from 219, rssi: -36.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfWKD'
+00:02:55,248 - INFO - Device marked busy, device:219
+00:02:56,811 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbDWA' # 0
+00:02:59,225 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbDWA', retry # 2/3
+00:02:59,245 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbDWA'
+00:03:00,760 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbDWA' # 0
+00:03:03,171 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbDWA', retry # 3/3
+00:03:03,171 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbDWA'
+00:03:03,172 - INFO - [CHUNK] Failed sending chunk begin
+00:03:03,172 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:DLF, by logic ❮❮●●●●●●●●●●
+00:03:03,172 - ERROR - [IMG] forwarding image to 219 failed
+00:03:03,173 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689607000.enc
+00:03:11,022 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 39, Received messages = {219: 18}
+00:03:11,022 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:03:11,039 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*QJT'
+00:03:11,584 - INFO - Device marked free, device:219
+00:03:15,521 - INFO - Device marked free, device:219
+00:03:28,936 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689633000.enc
+00:03:28,937 - INFO - [IMG] Sending image of creator=223, size=35984 bytes, to the network
+00:03:28,937 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:ZWF ❮❮●●●●●●●●●●
+00:03:28,174 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:35984 bytes, img_id:ZWF, image_payload in 180 chunks
+00:03:28,195 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbKSP'
+00:03:29,720 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbKSP' # 0
+00:03:32,131 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbKSP', retry # 1/3
+00:03:32,152 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbKSP'
+00:03:32,667 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbKSP' # 0
+00:03:36,080 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbKSP', retry # 2/3
+00:03:36,099 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbKSP'
+00:03:36,614 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbKSP' # 0
+00:03:40,023 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbKSP', retry # 3/3
+00:03:40,024 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbKSP'
+00:03:40,024 - INFO - [CHUNK] Failed sending chunk begin
+00:03:40,025 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:ZWF, by logic ❮❮●●●●●●●●●●
+00:03:40,025 - ERROR - [IMG] forwarding image to 219 failed
+00:03:40,025 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689633000.enc
+00:03:42,684 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 43, Received messages = {219: 18}
+00:03:42,685 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:03:42,700 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*IPQ'
+00:04:05,810 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689644000.enc
+00:04:05,811 - INFO - [IMG] Sending image of creator=223, size=36048 bytes, to the network
+00:04:05,811 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:EGZ ❮❮●●●●●●●●●●
+00:04:05,063 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36048 bytes, img_id:EGZ, image_payload in 181 chunks
+00:04:05,090 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbIIQ'
+00:04:05,627 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbIIQ' # 0
+00:04:09,040 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbIIQ', retry # 1/3
+00:04:09,061 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbIIQ'
+00:04:09,576 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbIIQ' # 0
+00:04:12,389 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 46, Received messages = {219: 18}
+00:04:13,989 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbIIQ', retry # 2/3
+00:04:13,007 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbIIQ'
+00:04:13,522 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbIIQ' # 0
+00:04:17,932 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbIIQ', retry # 3/3
+00:04:17,932 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbIIQ'
+00:04:17,933 - INFO - [CHUNK] Failed sending chunk begin
+00:04:17,933 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:EGZ, by logic ❮❮●●●●●●●●●●
+00:04:17,933 - ERROR - [IMG] forwarding image to 219 failed
+00:04:17,934 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689644000.enc
+00:04:42,698 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689655000.enc
+00:04:42,699 - INFO - [IMG] Sending image of creator=223, size=36080 bytes, to the network
+00:04:42,699 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:EZO ❮❮●●●●●●●●●●
+00:04:42,941 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36080 bytes, img_id:EZO, image_payload in 181 chunks
+00:04:42,971 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbMUC'
+00:04:42,493 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbMUC' # 0
+00:04:46,910 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbMUC', retry # 1/3
+00:04:46,930 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbMUC'
+00:04:46,445 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbMUC' # 0
+00:04:50,860 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbMUC', retry # 2/3
+00:04:50,880 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbMUC'
+00:04:50,393 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbMUC' # 0
+00:04:54,804 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbMUC', retry # 3/3
+00:04:54,804 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbMUC'
+00:04:54,805 - INFO - [CHUNK] Failed sending chunk begin
+00:04:54,805 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:EZO, by logic ❮❮●●●●●●●●●●
+00:04:54,805 - ERROR - [IMG] forwarding image to 219 failed
+00:04:54,806 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689655000.enc
+00:04:59,884 - INFO - sent: 16 Recd: 18 Unacked: 10, Free: 8060.9KB, Chunks: 0, Queued images: 10
+00:05:04,950 - INFO - [MEM] Starting memory cleanup (free: 8060.9KB)
+00:05:04,016 - INFO - [MEM] Cleanup complete (free: 8060.8KB, freed: -0.1KB)
+00:05:04,017 - INFO - [MEM] Buffers - sent:16, recd:18, unacked:10, chunks:0
+00:05:13,973 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:05:13,987 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*SVK'
+00:05:18,646 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689665000.enc
+00:05:18,646 - INFO - [IMG] Sending image of creator=223, size=36048 bytes, to the network
+00:05:18,647 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:GDQ ❮❮●●●●●●●●●●
+00:05:19,882 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36048 bytes, img_id:GDQ, image_payload in 181 chunks
+00:05:19,904 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbTJQ'
+00:05:19,924 - INFO - [⬇ RECV from 219, rssi: -41.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfNBC'
+00:05:19,925 - INFO - Device marked busy, device:219
+00:05:19,491 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbTJQ' # 0
+00:05:23,904 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbTJQ', retry # 1/3
+00:05:23,923 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbTJQ'
+00:05:23,437 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbTJQ' # 0
+00:05:27,847 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbTJQ', retry # 2/3
+00:05:27,866 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbTJQ'
+00:05:27,383 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbTJQ' # 0
+00:05:31,795 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbTJQ', retry # 3/3
+00:05:31,795 - ERROR - [LORA] Failed to send message, MSG_UID = b'B\xdf\xdf\xdbTJQ'
+00:05:31,796 - INFO - [CHUNK] Failed sending chunk begin
+00:05:31,796 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended for device:219, img_id:GDQ, by logic ❮❮●●●●●●●●●●
+00:05:31,796 - ERROR - [IMG] forwarding image to 219 failed
+00:05:31,797 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689665000.enc
+00:05:39,208 - INFO - Device marked free, device:219
+00:05:44,706 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 54, Received messages = {219: 19}
+00:05:44,707 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:05:44,722 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*MDP'
+00:05:55,566 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689610000.enc
+00:05:55,566 - INFO - [IMG] Sending image of creator=223, size=36112 bytes, to the network
+00:05:55,567 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:UML ❮❮●●●●●●●●●●
+00:05:56,806 - INFO - [⋙ sending....] dest=219, msg_typ:P, len:36112 bytes, img_id:UML, image_payload in 181 chunks
+00:05:56,836 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbEXN'
+00:05:56,356 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbEXN' # 0
+00:06:00,769 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbEXN', retry # 1/3
+00:06:00,788 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbEXN'
+00:06:00,810 - INFO - [⬇ RECV from 219, rssi: -41.0] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfGUK'
+00:06:00,811 - INFO - Device marked busy, device:219
