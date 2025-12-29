@@ -43,9 +43,9 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.1
-ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.1  # Increased from 0.2 to 0.3 (300ms) to exceed RX_DELAY_MS (250ms)
+MIN_SLEEP = 0.05  # Reduced for high-speed communication (SF5, BW500kHz)
+ACK_SLEEP = 0.15  # Reduced for faster ACK checking at high data rates
+CHUNK_SLEEP = 0.05  # Reduced for faster chunk transmission at high data rates
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -91,7 +91,7 @@ LORA_BW = 500.0  # Bandwidth 500 kHz (highest bandwidth for maximum speed)
 LORA_CR = 5  # Coding Rate 4/5 (good balance of speed and error correction)
 LORA_PREAMBLE = 8  # Preamble length (as used in high-speed examples)
 LORA_POWER = 14  # TX power in dBm
-LORA_RX_TIMEOUT_MS = 500  # Receive timeout for async loop (increased for better reliability)
+LORA_RX_TIMEOUT_MS = 200  # Receive timeout for async loop (optimized for high-speed communication)
 
 
 # WiFi Configuration
@@ -670,27 +670,28 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-    ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
-    for retry_i in range(retry_count):
-        radio_send(dest, databytes, msg_uid)
-        await asyncio.sleep(ACK_SLEEP)
-        first_log_flag = True
-        for i in range(ack_msg_recheck_count): # ack_msk recheck
-            at, missing_chunks = ack_time(msg_uid)
-            if at > 0:
-                logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
-                msgs_sent.append(pop_and_get(msg_uid))
-                return (True, missing_chunks)
-            else:
-                if first_log_flag:
-                    logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
-                    first_log_flag = False
+        ack_msg_recheck_count = 8 # Increased from 5 for better ACK detection at high speed
+        for retry_i in range(retry_count):
+            radio_send(dest, databytes, msg_uid)
+            await asyncio.sleep(ACK_SLEEP)
+            first_log_flag = True
+            for i in range(ack_msg_recheck_count): # ack_msg recheck
+                at, missing_chunks = ack_time(msg_uid)
+                if at > 0:
+                    logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
+                    msgs_sent.append(pop_and_get(msg_uid))
+                    return (True, missing_chunks)
                 else:
-                    logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                await asyncio.sleep(
-                    ACK_SLEEP * min(i + 1, 3)
-                )  # progressively more sleep, capped at 3x
-        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
+                    if first_log_flag:
+                        logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
+                        first_log_flag = False
+                    else:
+                        logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
+                    # Reduced sleep for faster ACK checking at high data rates
+                    await asyncio.sleep(
+                        ACK_SLEEP * min(i + 1, 2) / 2  # Faster checking: progressive but capped at 2x
+                    )
+            logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
 
@@ -851,7 +852,9 @@ def begin_chunk(msg):
     img_id = parts[0]
     epoch_ms = int(parts[1])
     numchunks = int(parts[2])
-    chunk_map[img_id] = ("B", numchunks, [])
+    # Only initialize if not already present (handle duplicate B packets)
+    if img_id not in chunk_map:
+        chunk_map[img_id] = ("B", numchunks, [])
     return (img_id, epoch_ms, numchunks)
 
 
@@ -1636,14 +1639,19 @@ def process_message(data, rssi=None):
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "W": # wait message
         asyncio.create_task(device_busy_life(sender))
-    elif msg_typ == "B": # TODO need to ignore buplicate images, and send some response in A itself
+    elif msg_typ == "B": # TODO need to ignore duplicate images, and send some response in A itself
         try:
             img_id, epoch_ms, numchunks = begin_chunk(msg.decode())
-            if get_transmode_lock(sender, img_id):
+            # Check if this is a duplicate B packet for the same transfer
+            if check_transmode_lock(sender, img_id):
+                # Same sender and img_id - send ACK anyway (duplicate begin packet)
+                logger.debug(f"[CHUNK] Duplicate B packet for same transfer, sending ACK")
+                asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+            elif get_transmode_lock(sender, img_id):
                 asyncio.create_task(keep_transmode_lock(sender, img_id))
                 asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             else:
-                logger.warning(f"TRANS MODE already in use, could not get lock...")
+                logger.warning(f"[CHUNK] TRANS MODE already in use for different transfer, sending W...")
                 asyncio.create_task(send_msg("W", my_addr, WAIT_MESSAGE, sender))
                 return False
         except Exception as e:
@@ -1707,7 +1715,7 @@ async def radio_read():
 
         try:
             # Use blocking mode with timeout for async compatibility
-            # Increased timeout for better reliability with high-speed configuration
+            # Optimized timeout (200ms) for high-speed communication (SF5, BW500kHz)
             msg, status = loranode.recv(len=0, timeout_en=True, timeout_ms=LORA_RX_TIMEOUT_MS)
 
             if status == ERR_NONE:
@@ -1722,8 +1730,13 @@ async def radio_read():
                 # No packet received (expected, continue loop)
                 pass
             elif status == ERR_CRC_MISMATCH:
-                # Corrupted packet - log and skip
-                logger.debug(f"[LORA] CRC error, packet dropped")
+                # Corrupted packet - log but try to process anyway for robustness
+                logger.warning(f"[LORA] CRC error but attempting to process packet (len={len(msg)})")
+                if len(msg) > 0:
+                    message = msg.replace(b"{}[]", b"\n")
+                    rssi = loranode.getRSSI()
+                    # Try to process even with CRC error - some protocols can handle it
+                    process_message(message, rssi)
             else:
                 # Other error - log and continue
                 logger.warning(f"[LORA] Receive error status: {status}")
@@ -1731,8 +1744,7 @@ async def radio_read():
             logger.error(f"[LORA] Exception in radio_read: {e}")
             await asyncio.sleep(0.1)  # Brief pause on error
 
-        # Small delay to allow async scheduling (reduced since we already have timeout)
-        await asyncio.sleep(0.05)
+        # No delay - continuous polling for maximum responsiveness at high data rates
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
