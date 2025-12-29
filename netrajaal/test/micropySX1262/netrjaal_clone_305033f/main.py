@@ -32,7 +32,7 @@ import detect
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # TESTING VARIABLES
-DYNAMIC_SPATH = True
+DYNAMIC_SPATH = False
 ENCRYPTION_ENABLED = True
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
@@ -84,14 +84,14 @@ PACKET_PAYLOAD_LIMIT = 195 # bytes
 
 AIR_SPEED = 19200
 
-# LoRa Configuration Constants
+# LoRa Configuration Constants - Highest Data Rate (SF5, BW500kHz, CR5) for fast robust communication
 LORA_FREQ = 868.0
-LORA_SF = 7  # Spreading Factor 7 (second highest data rate ~22 kbps)
-LORA_BW = 250.0  # Bandwidth 250 kHz (good balance of speed and robustness)
-LORA_CR = 7  # Coding Rate 4/7 (error correction)
-LORA_PREAMBLE = 12  # Preamble length (better packet detection than 8)
+LORA_SF = 5  # Spreading Factor 5 (highest data rate ~38 kbps)
+LORA_BW = 500.0  # Bandwidth 500 kHz (highest bandwidth for maximum speed)
+LORA_CR = 5  # Coding Rate 4/5 (good balance of speed and error correction)
+LORA_PREAMBLE = 8  # Preamble length (as used in high-speed examples)
 LORA_POWER = 14  # TX power in dBm
-LORA_RX_TIMEOUT_MS = 150  # Receive timeout for async loop
+LORA_RX_TIMEOUT_MS = 500  # Receive timeout for async loop (increased for better reliability)
 
 
 # WiFi Configuration
@@ -485,7 +485,7 @@ async def init_lora():
             spi_phase=0
         )
 
-        # Configure LoRa with robust settings for second-highest data rate
+        # Configure LoRa with highest data rate settings (SF5, BW500kHz, CR5) for fast robust communication
         status = loranode.begin(
             freq=LORA_FREQ,
             bw=LORA_BW,
@@ -506,7 +506,7 @@ async def init_lora():
             logger.error(f"[LORA] Failed to initialize SX1262, status: {status}")
             loranode = None
         else:
-            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}")
+            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR} (highest data rate)")
     except Exception as e:
         logger.error(f"[LORA] Exception during LoRa initialization: {e}")
         loranode = None
@@ -634,15 +634,19 @@ def radio_send(dest, data, msg_uid):
     lendata = len(data)
     if len(data) > 254:
         logger.error(f"[LORA] msg too large : {len(data)}")
+        return
     #data = lendata.to_bytes(1) + data
     data = data.replace(b"\n", b"{}[]")
     # SX1262 send() doesn't take dest parameter - addressing is in the data payload
-    len_sent, status = loranode.send(data)
-    if status != ERR_NONE:
-        logger.error(f"[LORA] Send failed with status {status}, MSG_UID = {msg_uid}")
-    # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
-    data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+    try:
+        len_sent, status = loranode.send(data)
+        if status != ERR_NONE:
+            logger.error(f"[LORA] Send failed with status {status}, MSG_UID = {msg_uid}, dest={dest}")
+        # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
+        data_masked_log = min(10, max(1, (len(data) + 20) // 21))
+        logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+    except Exception as e:
+        logger.error(f"[LORA] Exception in radio_send: {e}, MSG_UID = {msg_uid}")
 
 def pop_and_get(msg_uid):
     # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
@@ -1693,7 +1697,7 @@ def process_message(data, rssi=None):
 # ---------------------------------------------------------------------------
 
 async def radio_read():
-    logger.info(f"===> Readio Read, LoRa receive loop started... <===\n")
+    logger.info(f"===> Radio Read, LoRa receive loop started... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
     while True:
         # Safety check: wait for loranode to be initialized
@@ -1701,25 +1705,34 @@ async def radio_read():
             await asyncio.sleep(1)
             continue
 
-        # Use blocking mode with short timeout for async compatibility
-        msg, status = loranode.recv(len=0, timeout_en=True, timeout_ms=LORA_RX_TIMEOUT_MS)
+        try:
+            # Use blocking mode with timeout for async compatibility
+            # Increased timeout for better reliability with high-speed configuration
+            msg, status = loranode.recv(len=0, timeout_en=True, timeout_ms=LORA_RX_TIMEOUT_MS)
 
-        if status == ERR_NONE:
-            # Valid packet received
-            message = msg.replace(b"{}[]", b"\n")
-            rssi = loranode.getRSSI()  # Get RSSI after successful receive
-            process_message(message, rssi)
-        elif status == ERR_RX_TIMEOUT:
-            # No packet received (expected, continue loop)
-            pass
-        elif status == ERR_CRC_MISMATCH:
-            # Corrupted packet - log and skip
-            logger.debug(f"[LORA] CRC error, packet dropped")
-        else:
-            # Other error - log and continue
-            logger.warning(f"[LORA] Receive error status: {status}")
+            if status == ERR_NONE:
+                # Valid packet received
+                if len(msg) > 0:
+                    message = msg.replace(b"{}[]", b"\n")
+                    rssi = loranode.getRSSI()  # Get RSSI after successful receive
+                    process_message(message, rssi)
+                else:
+                    logger.debug(f"[LORA] Empty packet received")
+            elif status == ERR_RX_TIMEOUT:
+                # No packet received (expected, continue loop)
+                pass
+            elif status == ERR_CRC_MISMATCH:
+                # Corrupted packet - log and skip
+                logger.debug(f"[LORA] CRC error, packet dropped")
+            else:
+                # Other error - log and continue
+                logger.warning(f"[LORA] Receive error status: {status}")
+        except Exception as e:
+            logger.error(f"[LORA] Exception in radio_read: {e}")
+            await asyncio.sleep(0.1)  # Brief pause on error
 
-        await asyncio.sleep(0.15)  # Increased from 0.1 to 0.15 to give more time between receives
+        # Small delay to allow async scheduling (reduced since we already have timeout)
+        await asyncio.sleep(0.05)
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
