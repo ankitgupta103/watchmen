@@ -376,6 +376,10 @@ async def keep_transmode_lock(device_id, img_id):
 
 def check_transmode_lock(device_id, img_id): # check if transfer lock is active or not
     global image_in_progress, paired_device, data_id
+    # If img_id is None, only check device_id (for backward compatibility)
+    if img_id is None:
+        return image_in_progress and paired_device == device_id
+    # Otherwise check both device_id and img_id
     if image_in_progress and paired_device == device_id and data_id == img_id:
         return True
     else:
@@ -932,7 +936,7 @@ def add_chunk(msgbytes):
         citer = int.from_bytes(msgbytes[3:5], 'big')  # Consistent with sender's to_bytes(2, 'big')
         cdata = msgbytes[5:]
         if img_id not in chunk_map:
-            logger.error(f"[CHUNK RX] no entry yet for img_id={img_id}, chunk_index={citer}")
+            logger.warning(f"[CHUNK RX] no entry yet for img_id={img_id}, chunk_index={citer} (chunk may have arrived before B packet or chunk_map was cleared)")
             return
         
         # Check if chunk already exists (deduplicate)
@@ -1753,15 +1757,24 @@ def process_message(data, rssi=None):
     elif msg_typ == "I":
         # Process chunk immediately and send ACK (receiver stays in receive mode)
         # This ensures sender can wait for ACK before sending next chunk (like example/capture-send pattern)
-        if not check_transmode_lock(sender, None):
-            # No active transfer mode - might be stale chunk, send ACK anyway to unblock sender
-            logger.debug(f"[IMG RX] Received chunk I but no active transfer mode, sending ACK anyway")
-            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-        else:
-            # Active transfer - process chunk and send ACK immediately
-            add_chunk(msg)
-            # Send ACK immediately (non-blocking) so sender can proceed
-            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+        # Extract img_id from chunk to check transfer mode properly
+        try:
+            if len(msg) >= 3:
+                chunk_img_id = msg[0:3].decode()
+                # Check if there's an active transfer mode for this sender and img_id
+                if check_transmode_lock(sender, chunk_img_id):
+                    # Active transfer - process chunk and send ACK immediately
+                    add_chunk(msg)
+                else:
+                    # No active transfer mode, but still try to store chunk (might be late arrival)
+                    # This handles cases where chunks arrive before B packet or after timeout
+                    add_chunk(msg)  # Will log error if chunk_map entry doesn't exist
+            else:
+                logger.warning(f"[IMG RX] Chunk I message too short ({len(msg)} bytes), cannot extract img_id")
+        except Exception as e:
+            logger.error(f"[IMG RX] Error processing chunk I: {e}")
+        # Always send ACK to unblock sender (chunk storage is best-effort)
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "E": #
         # Process end chunk and respond with missing chunks list or completion confirmation
         alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
