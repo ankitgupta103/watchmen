@@ -1391,11 +1391,17 @@ async def person_detection_loop():
                 async with lock:
                     img.save(raw_path)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(500)
+                    utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
                 logger.info(f"Saved raw image: {raw_path}: raw size = {len(img.bytearray())} bytes")
             except Exception as e:
                 logger.warning(f"[PIR] Failed to save raw image: {e}")
                 continue
+
+            # Delete original image object and force GC before reading to prevent memory allocation failures
+            if img is not None:
+                del img
+                gc.collect()  # Force garbage collection to free memory
+                utime.sleep_ms(100)  # Small delay after GC to let system stabilize
 
             # read raw file
             try:
@@ -1416,7 +1422,7 @@ async def person_detection_loop():
                     with open(enc_filepath, "wb") as f:
                         f.write(enc_msgbytes)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(500)
+                    utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
                 logger.info(f"[PIR] Saved encrypted image: {enc_filepath}: encrypted size = {len(enc_msgbytes)} bytes")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save encrypted image: {e}")
@@ -1437,7 +1443,7 @@ async def person_detection_loop():
                 with open(event_filepath, "w") as f:
                     f.write(json.dumps(event_data))
                 os.sync()  # Force filesystem sync to SD card
-                utime.sleep_ms(500)
+                utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
                 logger.info(f"[PIR] Saved event file: {event_filepath}")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save event file {event_filepath}: {e}")
@@ -1844,7 +1850,7 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
                     with open(enc_filepath, "wb") as f:
                         f.write(recompiled_msgbytes)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(500)
+                    utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
                     
                     # Delete recompiled bytes after saving to free memory (chunks already deleted in end_chunk)
                     del recompiled_msgbytes
