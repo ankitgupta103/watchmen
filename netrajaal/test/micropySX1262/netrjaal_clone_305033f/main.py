@@ -1002,9 +1002,17 @@ def recompile_msg(img_id):
     if img_id not in chunk_map:
         logger.warning(f"[CHUNK] recompile_msg: no entry for img_id={img_id}")
         return None
+    
+    # Force garbage collection before allocating memory for full image
+    gc.collect()
+    
     entry = chunk_map[img_id]
     expected_chunks = entry[1]
     list_chunks = entry[2]
+    
+    # Build recompiled image by concatenating chunks in order
+    # Note: This temporarily requires memory for both chunks and recompiled image
+    # Memory is freed immediately after recompilation in the calling code
     recompiled = b""
     for i in range(expected_chunks):
         chunk_data = get_data_for_iter(list_chunks, i)
@@ -1068,7 +1076,10 @@ def end_chunk(msg_uid, msg):
         if img_id not in chunk_map:
             logger.warning(f"[CHUNK] Ignoring end chunk, we dont have an entry for this img_id.., it might got processed already.")
             return (True, None, img_id, None, epoch_ms)
+        # Recompile message from chunks
         recompiled_msgbytes = recompile_msg(img_id)
+        # Immediately delete chunks from memory to free up space (chunks no longer needed after recompilation)
+        clear_chunkid(img_id)
         return (True, None, img_id, recompiled_msgbytes, epoch_ms)
 
 # ---------------------------------------------------------------------------
@@ -1834,12 +1845,20 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
                         f.write(recompiled_msgbytes)
                     os.sync()  # Force filesystem sync to SD card
                     utime.sleep_ms(500)
+                    
+                    # Delete recompiled bytes after saving to free memory (chunks already deleted in end_chunk)
+                    del recompiled_msgbytes
+                    gc.collect()
+                    
                     imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
                     logger.info(f"[IMG RX] Image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
-                    logger.error(f"[IMG RX] Error saving image to {enc_filepath}: {e}")
+                    logger.error(f"[IMG RX] Error saving image: {e}")
+                    # Ensure recompiled bytes are freed even on error
+                    del recompiled_msgbytes
+                    gc.collect()
             else:
-                logger.warning(f"[IMG RX] Image not recompiled, skipping save")
+                logger.warning(f"[IMG RX] Image not recompiled, skipping save (chunks already cleaned up)")
         else:
             # Missing chunks - send ACK with missing chunks list immediately so sender can retransmit
             ackmessage += b":" + missing_str.encode()
