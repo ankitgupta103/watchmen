@@ -95,8 +95,11 @@ LORA_RX_TIMEOUT_MS = 50  # Receive timeout for async loop (reduced from 100ms to
 
 
 # WiFi Configuration
-WIFI_SSID = "Lifestyle 6th floor-2.4G"
-WIFI_PASSWORD = "9821992096"
+# WIFI_SSID = "Lifestyle 6th floor-2.4G"
+# WIFI_PASSWORD = "9821992096"
+WIFI_SSID = "Airtel_anki_3363_2.4G"
+WIFI_PASSWORD = "air34854"
+
 WIFI_ENABLED = True
 
 cellular_system = None
