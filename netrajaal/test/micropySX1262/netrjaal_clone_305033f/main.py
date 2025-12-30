@@ -43,9 +43,9 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.005  # Minimal delay for maximum speed (reduced from 0.01s to 0.005s - near zero for maximum throughput)
-ACK_SLEEP = 0.02  # Reduced ACK sleep for faster checking (reduced from 0.03s to 0.02s)
-CHUNK_SLEEP = 0.002  # Minimal delay between chunks (reduced from 0.005s to 0.002s for fastest transmission)
+MIN_SLEEP = 0.01  # Minimal delay for reliable high-speed communication
+ACK_SLEEP = 0.03  # ACK sleep for reliable checking at high data rates
+CHUNK_SLEEP = 0.005  # Minimal delay between chunks for fast transmission
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -80,7 +80,7 @@ GC_COLLECT_INTERVAL_SEC = 60    # Run garbage collection every minute
 
 MIDLEN = 7
 FLAKINESS = 0
-PACKET_PAYLOAD_LIMIT = 240 # bytes (increased from 195 to 240 to maximize payload size, accounting for msg_uid overhead)
+PACKET_PAYLOAD_LIMIT = 195 # bytes (safe limit accounting for msg_uid+separator overhead - max packet 255 bytes)
 
 AIR_SPEED = 19200
 
@@ -91,7 +91,7 @@ LORA_BW = 500.0  # Bandwidth 500 kHz (highest bandwidth for maximum speed)
 LORA_CR = 5  # Coding Rate 4/5 (fastest valid CR - valid range is 5-8, where CR5=4/5 is fastest)
 LORA_PREAMBLE = 6  # Preamble length (reduced from 8 to 6 for maximum speed - minimum safe value)
 LORA_POWER = 14  # TX power in dBm
-LORA_RX_TIMEOUT_MS = 50  # Receive timeout for async loop (reduced from 100ms to 50ms for fastest polling)
+LORA_RX_TIMEOUT_MS = 100  # Receive timeout for async loop (balanced for speed and reliability)
 
 
 # WiFi Configuration
@@ -682,7 +682,7 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
     
-    ack_msg_recheck_count = 20 # Increased from 16 to 20 for maximum frequency ACK detection
+    ack_msg_recheck_count = 16 # Increased for frequent ACK detection at high speed
     for retry_i in range(retry_count):
             radio_send(dest, databytes, msg_uid)
             await asyncio.sleep(ACK_SLEEP)  # Initial wait after sending
@@ -699,19 +699,20 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                         first_log_flag = False
                     else:
                         logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                    # Maximum speed ACK checking: minimal sleep for instant detection
+                    # Balanced ACK checking: frequent but reliable
                     await asyncio.sleep(
-                        ACK_SLEEP * 0.3  # Reduced from 0.5x to 0.3x for fastest possible ACK detection
+                        ACK_SLEEP * 0.5  # Progressive sleep for reliable ACK detection
                     )
             logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
 
 def make_chunks(msg):
-    # Input: msg: bytes; Output: list of bytes chunks up to 240 bytes each (increased from 200 for maximum efficiency)
-    # Calculation: Max LoRa packet (255) - msg_uid+separator (8) - chunk_header (5) = 242 bytes available
-    # Using 240 bytes per chunk to leave small safety margin
-    CHUNK_DATA_SIZE = 240
+    # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each (safe size for 255 byte LoRa limit)
+    # Calculation: Max LoRa packet (255) - msg_uid+separator (8) - img_id (3) - chunk_index (2) = 242 bytes available
+    # Using 200 bytes per chunk for safety margin (prevents ERR_PACKET_TOO_LONG errors)
+    # Total packet: 7 (msg_uid) + 1 (;) + 3 (img_id) + 2 (chunk_index) + 200 (data) = 213 bytes (safe)
+    CHUNK_DATA_SIZE = 200
     chunks = []
     while len(msg) > CHUNK_DATA_SIZE:
         chunks.append(msg[0:CHUNK_DATA_SIZE])
@@ -816,7 +817,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 end_succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count=5)
                 if not end_succ:
                     logger.warning(f"[IMG TX] Failed to send end packet, retry {end_retry+1}/{max_end_retries}")
-                    await asyncio.sleep(0.01)  # Reduced delay from 0.02s to 0.01s for fastest retry
+                    await asyncio.sleep(0.05)  # Brief delay before retry for reliability
                     continue
                 
                 # Parse missing chunks from ACK response
@@ -1823,7 +1824,7 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
                 for i in range(msg_count):
                     await send_msg("A", creator, ackmessage, sender)
                     if i < msg_count-1:
-                        await asyncio.sleep(0.1)  # Reduced delay from 0.2s to 0.1s for faster response
+                        await asyncio.sleep(0.2)  # Delay between multiple ACK sends for reliability
             asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
                 try:
@@ -1875,10 +1876,10 @@ async def radio_read():
             loop_count += 1
             if loop_count == 1:
                 logger.info(f"[LORA] Starting receive loop, loranode={loranode is not None}")
-            elif loop_count % 200 == 0:  # Log every 200 iterations (~10 seconds with 50ms timeout)
+            elif loop_count % 100 == 0:  # Log every 100 iterations (~10 seconds with 100ms timeout)
                 logger.info(f"[LORA] Receive loop running (iteration {loop_count})...")
             
-            # This call will block for up to LORA_RX_TIMEOUT_MS (50ms)
+            # This call will block for up to LORA_RX_TIMEOUT_MS (100ms)
             # During this time, the async event loop is blocked, but it will return after timeout
             # Note: recv() uses blocking sleep_ms() internally, which blocks the async event loop
             # This is acceptable as the timeout ensures it returns after LORA_RX_TIMEOUT_MS
@@ -1916,7 +1917,7 @@ async def radio_read():
 
         # Small async sleep to yield to event loop (recv() uses blocking sleeps internally)
         # This prevents blocking the entire async event loop
-        await asyncio.sleep(0.002)  # Reduced from 0.005s to 0.002s (2ms) for maximum polling speed
+        await asyncio.sleep(0.005)  # Balanced yield for reliable async event loop operation
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
