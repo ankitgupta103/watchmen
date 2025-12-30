@@ -624,3 +624,9 @@ Starting fake network with the following neighbours
 OpenMV v4.7.0; MicroPython v1.25.0-r0; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
 Type "help()" for more information.
 >>> 
+
+
+
+[PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:13:05,689 - INFO - Saved raw image: /sdcard/myimages/223_1735690384000_raw.jpg: raw size = 1843200 bytes
+00:13:05,804 - ERROR - [PIR] Failed read image file: memory allocation failed, allocating 35391 bytes
