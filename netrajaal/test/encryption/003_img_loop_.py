@@ -5,7 +5,7 @@ import machine
 import sensor
 import random
 
-#- Initialize RTC
+# Initialize RTC
 rtc = machine.RTC()
 rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 
@@ -49,11 +49,12 @@ def get_rand_str(len=3):
 
 # Main capture loop
 def main():
+    image_limit = 10
     capture_count = 0
     SLEEP_TIME = 2
     print("Starting image capture...")
-    
-    while True:
+
+    for i in range(image_limit):
         img = None
         try:
             capture_count += 1
@@ -62,9 +63,9 @@ def main():
             img = sensor.snapshot()
             raw_path = f"{MY_IMAGE_DIR}/{get_epoch_ms()}_{get_rand_str()}_raw.jpg"
             img.save(raw_path)
-            utime.sleep_ms(1600)
+            utime.sleep_ms(10)
             # os.sync()
-            utime.sleep_ms(1600)
+            utime.sleep_ms(10)
             print(f"Saved: {raw_path}")
             
         except Exception as e:
@@ -73,9 +74,10 @@ def main():
             if img:
                 del img
             gc.collect()
-            utime.sleep_ms(1600)
+            utime.sleep_ms(10)
         
         utime.sleep(SLEEP_TIME)
+        print(i)
 
 if __name__ == "__main__":
     main()
