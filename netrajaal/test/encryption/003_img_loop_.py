@@ -28,7 +28,7 @@ def create_dir(path):
         print(f"Failed to create {path}: {e}")
 
 FS_ROOT = get_fs_root()
-MY_IMAGE_DIR = f"{FS_ROOT}/myimages"
+MY_IMAGE_DIR = f"{FS_ROOT}/myimages1"
 create_dir(MY_IMAGE_DIR)
 
 # Initialize camera
@@ -49,7 +49,7 @@ def get_rand_str(len=3):
 
 # Main capture loop
 def main():
-    image_limit = 10
+    image_limit = 5
     capture_count = 0
     SLEEP_TIME = 2
     print("Starting image capture...")
@@ -64,8 +64,10 @@ def main():
             raw_path = f"{MY_IMAGE_DIR}/{get_epoch_ms()}_{get_rand_str()}_raw.jpg"
             img.save(raw_path)
             utime.sleep_ms(10)
-            # os.sync()
-            utime.sleep_ms(10)
+            # # os.sync()
+            # utime.sleep_ms(10)
+            os.sync()  # Force filesystem sync to SD card
+            utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
             print(f"Saved: {raw_path}")
             
         except Exception as e:
