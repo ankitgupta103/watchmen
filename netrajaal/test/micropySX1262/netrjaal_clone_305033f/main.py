@@ -70,7 +70,6 @@ GPS_WAIT_SEC = 5
 # Memory Management Constants
 MAX_MSGS_SENT = 500          # Maximum messages in sent buffer
 MAX_MSGS_RECD = 500          # Maximum messages in received buffer
-MAX_MSGS_UNACKED = 100       # Maximum unacknowledged messages
 MAX_CHUNK_MAP_SIZE = 50      # Maximum chunk entries (chunk_id to chunks)
 MAX_IMAGES_SAVED_AT_CC = 200 # Maximum image filenames to track at CC
 MAX_IMAGES_TO_SEND = 50      # Maximum images in send queue
@@ -538,24 +537,15 @@ def is_lora_ready():
 
 
 
-msgs_sent = []
-msgs_unacked = []
 msgs_recd = []
 
 # Memory Management Functions
-def cleanup_old_messages():
+def cleanup_old_recd_messages():
     """Remove old messages from buffers based on age and size limits"""
-    global msgs_sent, msgs_recd, msgs_unacked
+    global msgs_recd
     current_time = time_msec()
     age_threshold_ms = MAX_OLD_MSG_AGE_SEC * 1000
 
-    # Clean msgs_sent - remove messages older than threshold
-    msgs_sent = [(msg_uid, msg, t) for msg_uid, msg, t in msgs_sent
-                 if (current_time - t) < age_threshold_ms]
-    # Also limit by size
-    if len(msgs_sent) > MAX_MSGS_SENT:
-        msgs_sent = msgs_sent[-MAX_MSGS_SENT:]
-        logger.info(f"[MEM] Trimmed msgs_sent to {MAX_MSGS_SENT} entries")
 
     # Clean msgs_recd - remove messages older than threshold
     msgs_recd = [(msg_uid, msg, t) for msg_uid, msg, t in msgs_recd
@@ -565,26 +555,6 @@ def cleanup_old_messages():
         msgs_recd = msgs_recd[-MAX_MSGS_RECD:]
         logger.info(f"[MEM] Trimmed msgs_recd to {MAX_MSGS_RECD} entries")
 
-    # Clean msgs_unacked - remove very old unacked messages (they likely failed)
-    old_unacked = []
-    new_unacked = []
-    for msg_uid, msg, t in msgs_unacked:
-        age = current_time - t
-        if age > age_threshold_ms * 2:  # Double threshold for unacked (more lenient)
-            old_unacked.append(msg_uid)
-        else:
-            new_unacked.append((msg_uid, msg, t))
-    msgs_unacked = new_unacked
-
-    if len(old_unacked) > 0:
-        logger.info(f"[MEM] Removed {len(old_unacked)} old unacked messages")
-
-    # Also limit by size
-    if len(msgs_unacked) > MAX_MSGS_UNACKED:
-        # Remove oldest ones
-        msgs_unacked.sort(key=lambda x: x[2])  # Sort by timestamp
-        msgs_unacked = msgs_unacked[-MAX_MSGS_UNACKED:]
-        logger.info(f"[MEM] Trimmed msgs_unacked to {MAX_MSGS_UNACKED} entries")
 
 def cleanup_chunk_map():
     """Clean up old/incomplete chunk entries"""
@@ -598,6 +568,13 @@ def cleanup_chunk_map():
             chunk_map.pop(key)
         logger.info(f"[MEM] Cleaned {entries_to_remove} old chunk_map entries")
 
+def cleanup_chunk_map_by_msg_id(img_id):
+    """Clean up old/incomplete chunk entries"""
+    global chunk_map
+    if img_id in chunk_map.keys():
+        chunk_map.pop(img_id)
+        logger.info(f"[MEM] Cleaned chunks from chun_map for img_id:{img_id}")
+
 
 async def periodic_memory_cleanup():
     """Periodically clean up memory buffers and run garbage collection"""
@@ -609,30 +586,31 @@ async def periodic_memory_cleanup():
             logger.info(f"[MEM] Starting memory cleanup (free: {free_before/1024:.1f}KB)")
 
             # Clean up message buffers
-            cleanup_old_messages()
+            cleanup_old_recd_messages()
 
             # Clean up chunk map
             cleanup_chunk_map()
 
             # Run garbage collection
-            gc.collect()
+            # gc.collect()
+
 
             free_after = get_free_memory()
             freed = free_after - free_before if free_before > 0 and free_after > 0 else 0
             logger.info(f"[MEM] Cleanup complete (free: {free_after/1024:.1f}KB, freed: {freed/1024:.1f}KB)")
-            logger.info(f"[MEM] Buffers - sent:{len(msgs_sent)}, recd:{len(msgs_recd)}, unacked:{len(msgs_unacked)}, chunks:{len(chunk_map)}")
+            logger.info(f"[MEM] Buffers - recd:{len(msgs_recd)}, chunks:{len(chunk_map)}")
 
         except Exception as e:
             logger.error(f"[MEM] error in memory cleanup: {e}")
 
-async def periodic_gc():
-    """Run garbage collection more frequently for aggressive cleanup"""
-    while True:
-        try:
-            await asyncio.sleep(GC_COLLECT_INTERVAL_SEC)
-            gc.collect()
-        except Exception as e:
-            logger.error(f"[MEM] error in periodic GC: {e}")
+# async def periodic_gc():
+#     """Run garbage collection more frequently for aggressive cleanup"""
+#     while True:
+#         try:
+#             await asyncio.sleep(GC_COLLECT_INTERVAL_SEC)
+#             gc.collect()
+#         except Exception as e:
+#             logger.error(f"[MEM] error in periodic GC: {e}")
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
@@ -660,24 +638,13 @@ def radio_send(dest, data, msg_uid):
     except Exception as e:
         logger.error(f"[LORA] Exception in radio_send: {e}, MSG_UID = {msg_uid}")
 
-def pop_and_get(msg_uid):
-    # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
-    for i in range(len(msgs_unacked)):
-        m, d, t = msgs_unacked[i]
-        if m == msg_uid:
-            return msgs_unacked.pop(i)
-    return None
-
 async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
     msg_uid = get_msg_uid(msg_typ, creator, dest) # TODO, msg_uid used anywhere except logging
     databytes = msg_uid + b";" + msgbytes
     ackneeded = ack_needed(msg_typ)
     timesent = time_msec()
-    if ackneeded:
-        msgs_unacked.append((msg_uid, msgbytes, timesent))
-    else:
-        msgs_sent.append((msg_uid, msgbytes, timesent))
+
     if not ackneeded:
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
@@ -692,7 +659,6 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                 at, missing_chunks = ack_time(msg_uid)
                 if at > 0:
                     logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
-                    msgs_sent.append(pop_and_get(msg_uid))
                     return (True, missing_chunks)
                 else:
                     if first_log_flag:
@@ -1841,7 +1807,7 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
             # All chunks received - send completion ACK with -1 marker
             ackmessage += b":-1"
             # Send ACK multiple times for reliability
-            async def send_ack_multiple(): # send ACK 2 times
+            async def send_ack_multiple(): # send ACK 2 times # TODO, move this only if able to save valid image
                 msg_count = 2
                 for i in range(msg_count):
                     await send_msg("A", creator, ackmessage, sender)
@@ -1849,6 +1815,11 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
                         await asyncio.sleep(0.2)  # Delay between multiple ACK sends for reliability
             asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
+                try:
+                    cleanup_chunk_map_by_msg_id(img_id)
+                except Exception as e:
+                    logger.error(f"[IMG RX] Error cleaning up chunk map for img_id {img_id}: {e}")
+                
                 try:
                     enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
                     logger.info(f"[IMG RX] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
@@ -1863,8 +1834,9 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
 
                     imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
                     logger.info(f"[IMG RX] Image saved to {enc_filepath}, adding to send queue")
+                    # TODO send success only if able to save image
                 except Exception as e:
-                    logger.error(f"[IMG RX] Error saving image: {e}")
+                    logger.error(f"[IMG RX] Error saving image: {e}") # TODO, don't send success if can't save
                     # Ensure recompiled bytes are freed even on error
                     del recompiled_msgbytes
                     gc.collect()
@@ -2197,14 +2169,12 @@ async def print_summary_and_flush_logs():
             continue
         free_mem = get_free_memory()
         mem_str = f", Free: {free_mem/1024:.1f}KB" if free_mem > 0 else ""
-        log_str = f"sent: {len(msgs_sent)} Recd: {len(msgs_recd)} Unacked: {len(msgs_unacked)}{mem_str}"
+        log_str = f"Recd: {len(msgs_recd)} {mem_str}"
         if running_as_cc():
             logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Images at CC (received): {len(images_saved_at_cc)}, Center captured: {center_captured_image_count}, Queued: {len(imgpaths_to_send)}")
         else:
             logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Queued images: {len(imgpaths_to_send)}")
-        #logger.info(msgs_sent)
         #logger.info(msgs_recd)
-        #logger.info(msgs_unacked)
 
 # ---------------------------------------------------------------------------
 # GPS Acquisition Loop
@@ -2372,6 +2342,7 @@ async def init_wifi():
 # ---------------------------------------------------------------------------
 async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
+    gc.enable()
     free_before = get_free_memory()
     logger.info(f"[IMG RX] Free mem at init: {free_before/1024:.1f}KB")
     global image_in_progress
@@ -2383,7 +2354,6 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     # Start memory management tasks
     asyncio.create_task(periodic_memory_cleanup())
-    asyncio.create_task(periodic_gc())
     logger.info(f"[MEM] Memory management tasks started (free: {get_free_memory()/1024:.1f}KB)\n")
     if running_as_cc():
         logger.info(f"[INIT] ===> Starting command center node <===")
