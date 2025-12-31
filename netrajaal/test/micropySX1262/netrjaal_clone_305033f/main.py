@@ -139,7 +139,8 @@ seen_neighbours = []
 # --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
 
 COMMAN_CENTER_ADDRS = [219]
-IMAGE_CAPTURING_ADDRS = [221] # [] empty means capture at all device, else on list of devices
+IMAGE_CAPTURING_ADDRS = [221, 223] # [] empty means capture at all device, else on list of devices
+IMAGE_LIMIT = 10 # 10 or None
 import fakelayout
 flayout = fakelayout.Layout()
 
@@ -1335,7 +1336,7 @@ async def person_detection_loop():
     next_capture_wait = None # max value is 16
     MAX_CAPTURE_WAIT = 10
     FRESH_MOTION_LAP = 16
-    while True:
+    while IMAGE_LIMIT is None or person_image_count < IMAGE_LIMIT:
         # Wait for PIR interrupt event (blocks until PIR detects motion)
         # Task is suspended here - uses minimal CPU until interrupt fires
         await pir_trigger_event.wait()
@@ -2402,10 +2403,9 @@ async def main():
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
-        asyncio.create_task(person_detection_loop())
         #asyncio.create_task(keep_updating_gps())
-        # if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
-        #     asyncio.create_task(person_detection_loop())
+        if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
+            asyncio.create_task(person_detection_loop())
         # else:
         #     logger.warning(f"[INIT] ===> Unit node {my_addr} is not enabled to capture images")
         asyncio.create_task(event_text_sending_loop())
