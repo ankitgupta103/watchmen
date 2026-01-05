@@ -1698,7 +1698,7 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
 
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
     if receiver != -1 and my_addr != receiver:
-        logger.warning(f"[LORA] skipping message as it is for dst:{receiver}, not for me (my_addr:{my_addr}), msg_uid:{msg_uid}")
+        logger.debug(f"[LORA] skipping message as it is for dst:{receiver}, not for me (my_addr:{my_addr}), msg_uid:{msg_uid}")
         return
 
     if DYNAMIC_SPATH:
