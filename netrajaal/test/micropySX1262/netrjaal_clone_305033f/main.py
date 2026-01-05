@@ -1697,6 +1697,9 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
         return True
 
     msg_uid, msg_typ, creator, sender, receiver, msg = parsed
+    if receiver != -1 and my_addr != receiver:
+        logger.warning(f"[LORA] skipping message as it is for dst:{receiver}, not for me (my_addr:{my_addr}), msg_uid:{msg_uid}")
+        return
 
     if DYNAMIC_SPATH:
         if not flayout.is_neighbour(sender, my_addr):
@@ -1730,9 +1733,6 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
     recv_msg_count[sender] += 1
-    if receiver != -1 and my_addr != receiver:
-        logger.warning(f"[LORA] skipping message as it is for dst:{receiver}, not for me (my_addr:{my_addr}), msg_uid:{msg_uid}")
-        return
     msgs_recd.append((msg_uid, msg, time_msec()))
     ackmessage = msg_uid
     if msg_typ == "N": # N type msg from neighbours
