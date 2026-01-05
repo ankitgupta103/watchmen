@@ -154,9 +154,11 @@ uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for 
 print(f"{uid}")
 # COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7194025':
-    my_addr = 225
-elif uid == b'e076465dd7193a09':
     my_addr = 219
+elif uid == b'e076465dd7193a09':
+    my_addr = 225
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = [219]
 elif uid ==  b'e076465dd7090d1c':
     my_addr = 221
     if not DYNAMIC_SPATH:
@@ -1892,8 +1894,8 @@ async def radio_read():
                 if len(msg) > 0:
                     rssi = loranode.getRSSI()  # Get RSSI after successful receive
                     snr = loranode.getSNR()  # Get SNR after successful receive
-                    airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime for received packet
-                    process_message(message, rssi, snr, airtime_us)
+                    airtime_us = loranode.getTimeOnAir(len(msg))  # Calculate airtime for received packet
+                    process_message(msg, rssi, snr, airtime_us)
                 else:
                     logger.debug(f"[LORA] Empty packet received")
             elif status == ERR_RX_TIMEOUT:

@@ -10,7 +10,7 @@ class Layout:
         self.neighbours = FakeNeighbours
         print(f"Starting fake network with the following neighbours")
         for n in self.neighbours:
-            print(n)
+            print(f"fake network node: {n}")
 
     def is_neighbour(self, a, b):
         """
