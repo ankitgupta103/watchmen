@@ -24,8 +24,8 @@ import json
 import gc                   # garbage collection for memory management
 
 import enc
-from sx1262 import SX1262
-from _sx126x import ERR_NONE, ERR_RX_TIMEOUT, ERR_CRC_MISMATCH, SX126X_SYNC_WORD_PRIVATE
+from sx1262_wrapper import SX1262
+from sx126x import ERR_NONE, ERR_RX_TIMEOUT, ERR_CRC_MISMATCH, SX126X_SYNC_WORD_PRIVATE
 import gps_driver
 # from cellular_driver import Cellular
 import detect
@@ -151,6 +151,7 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
+print(f"{uid}")
 # COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7194025':
     my_addr = 225
@@ -623,7 +624,6 @@ def radio_send(dest, data, msg_uid):
         logger.error(f"[LORA] msg too large : {len(data)}")
         return
     #data = lendata.to_bytes(1) + data
-    data = data.replace(b"\n", b"{}[]")
     # SX1262 send() doesn't take dest parameter - addressing is in the data payload
     try:
         # Calculate airtime before sending (more accurate for logging)
@@ -1819,7 +1819,7 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
                     cleanup_chunk_map_by_msg_id(img_id)
                 except Exception as e:
                     logger.error(f"[IMG RX] Error cleaning up chunk map for img_id {img_id}: {e}")
-                
+
                 try:
                     enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
                     logger.info(f"[IMG RX] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
@@ -1890,7 +1890,6 @@ async def radio_read():
             if status == ERR_NONE:
                 # Valid packet received
                 if len(msg) > 0:
-                    message = msg.replace(b"{}[]", b"\n")
                     rssi = loranode.getRSSI()  # Get RSSI after successful receive
                     snr = loranode.getSNR()  # Get SNR after successful receive
                     airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime for received packet
@@ -1900,16 +1899,16 @@ async def radio_read():
             elif status == ERR_RX_TIMEOUT:
                 # No packet received (expected, continue loop)
                 pass
-            elif status == ERR_CRC_MISMATCH:
+            elif status == ERR_CRC_MISMATCH:                          # TODO check if this is needed
                 # Corrupted packet - log but try to process anyway for robustness
                 logger.warning(f"[LORA] CRC error but attempting to process packet (len={len(msg)})")
-                if len(msg) > 0:
-                    message = msg.replace(b"{}[]", b"\n")
-                    rssi = loranode.getRSSI()
-                    snr = loranode.getSNR()  # Get SNR even for CRC error packets
-                    airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime
-                    # Try to process even with CRC error - some protocols can handle it
-                    process_message(message, rssi, snr, airtime_us)
+                # if len(msg) > 0:
+                #     rssi = loranode.getRSSI()
+                #     snr = loranode.getSNR()  # Get SNR even for CRC error packets
+                #     airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime
+                #     # Try to process even with CRC error - some protocols can handle it
+                #     process_message(message, rssi, snr, airtime_us)
+                pass
             else:
                 # Other error - log and continue
                 logger.warning(f"[LORA] Receive error status: {status}")
