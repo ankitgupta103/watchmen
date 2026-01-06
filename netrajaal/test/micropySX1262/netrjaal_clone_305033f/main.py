@@ -43,7 +43,7 @@ ENCRYPTION_ENABLED = True
 led = LED("LED_BLUE")
 
 MIN_SLEEP = 0.01  # Minimal delay for reliable high-speed communication
-ACK_SLEEP = 0.1  # ACK sleep for reliable checking at high data rates
+ACK_SLEEP = 0.03  # ACK sleep for reliable checking at high data rates
 CHUNK_SLEEP = 0.005  # Minimal delay between chunks for fast transmission
 
 DISCOVERY_COUNT = 100
@@ -552,9 +552,7 @@ def is_lora_ready():
 msgs_recd = []
 
 # Interrupt-driven LoRa reception variables
-lora_rx_event = asyncio.Event()
-lora_rx_data = None
-lora_rx_status = None
+# Note: Processing is now done directly in lora_event_callback(), no intermediate variables needed
 
 # Memory Management Functions
 def cleanup_old_recd_messages():
@@ -645,8 +643,6 @@ def radio_send(dest, data, msg_uid):
         logger.debug(f"[TX] radio_send called: dest={dest}, len={len(data)}, msg_uid={msg_uid}")
         # Calculate airtime before sending (more accurate for logging)
         airtime_us = loranode.getTimeOnAir(len(data))
-        logger.debug(f"[TX] Calculated airtime: {airtime_us}us ({airtime_us/1000.0:.2f}ms)")
-        logger.debug(f"[TX] Calling loranode.send(), waiting for TX_DONE interrupt...")
         len_sent, status = loranode.send(data)
         logger.debug(f"[TX] send() returned: len_sent={len_sent}, status={status}")
         if status != ERR_NONE:
@@ -697,7 +693,6 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
             logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
-
 
 def make_chunks(msg):
     # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each (safe size for 255 byte LoRa limit)
@@ -1890,7 +1885,7 @@ def lora_event_callback(events):
     Interrupt callback function - called automatically when RX_DONE occurs.
     This runs in interrupt context, so keep it minimal and fast.
     """
-    global lora_rx_data, lora_rx_status, loranode
+    global loranode
     
     events_bin = bin(events)
     logger.debug(f"[CALLBACK] Interrupt callback fired: events={events} ({events_bin})")
@@ -1901,18 +1896,32 @@ def lora_event_callback(events):
         try:
             msg, status = loranode.recv(len=0)
             logger.info(f"[CALLBACK] Packet read: len={len(msg) if msg else 0}, status={status}")
-            lora_rx_data = msg
-            lora_rx_status = status
-            # Signal async task to process the packet
-            lora_rx_event.set()
-            logger.debug(f"[CALLBACK] RX event signaled, data ready for processing")
+            
+            # Process the received packet directly
+            logger.debug(f"[CALLBACK] Processing packet: status={status}, data_len={len(msg) if msg else 0}")
+            
+            if status == ERR_NONE:
+                # Valid packet received
+                if msg and len(msg) > 0:
+                    logger.info(f"[CALLBACK] Valid packet received: {len(msg)} bytes")
+                    rssi = loranode.getRSSI()  # Get RSSI after successful receive
+                    snr = loranode.getSNR()  # Get SNR after successful receive
+                    airtime_us = loranode.getTimeOnAir(len(msg))  # Calculate airtime for received packet
+                    logger.debug(f"[CALLBACK] Packet metrics: RSSI={rssi}, SNR={snr}, airtime={airtime_us}us")
+                    process_message(msg, rssi, snr, airtime_us)
+                else:
+                    logger.warning(f"[CALLBACK] Empty packet received (status=ERR_NONE but no data)")
+            elif status == ERR_CRC_MISMATCH:
+                # Corrupted packet - log but don't process
+                logger.warning(f"[CALLBACK] CRC error detected (len={len(msg) if msg else 0})")
+            else:
+                # Other error - log and continue
+                logger.warning(f"[CALLBACK] Receive error status: {status}, data_len={len(msg) if msg else 0}")
+                
         except Exception as e:
             logger.error(f"[CALLBACK] Error reading packet in interrupt callback: {e}")
             import sys
             sys.print_exception(e)
-            lora_rx_data = None
-            lora_rx_status = ERR_UNKNOWN
-            lora_rx_event.set()
     elif events & SX126X_IRQ_TX_DONE:
         # Transmission complete - radio automatically returns to RX mode
         logger.info(f"[CALLBACK] TX_DONE detected, transmission complete")
@@ -1927,7 +1936,7 @@ def lora_event_callback(events):
         logger.debug(f"[CALLBACK] Other interrupt type: events={events} ({events_bin})")
 
 
-async def radio_read():
+async def radio_read(): # Not in use anymore
     """
     Interrupt-driven LoRa receive loop.
     No polling - waits for interrupt callback to signal packet arrival.
@@ -2431,7 +2440,7 @@ async def main():
     image_in_progress = False
 
     await init_lora()
-    asyncio.create_task(radio_read())
+    # asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
     asyncio.create_task(validate_and_remove_neighbours())
     # Start memory management tasks
