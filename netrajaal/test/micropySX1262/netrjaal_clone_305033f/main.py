@@ -757,11 +757,11 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
 
             # Step 1: Send \"B\" (Begin) message in fire-and-forget mode (no ACK wait)
             # We send it a few times for robustness, then proceed to burst.
-            begin_payload = f\"{img_id}:{epoch_ms}:{len(chunks)}\"
+            begin_payload = f"{img_id}:{epoch_ms}:{len(chunks)}"
             for i in range(BEGIN_RETRY_COUNT):
-                succ = await send_msg(\"B\", creator, begin_payload.encode(), dest)
+                succ = await send_msg("B", creator, begin_payload.encode(), dest)
                 if not succ:
-                    logger.warning(f\"[CHUNK] Failed sending B (begin) attempt {i+1}/{BEGIN_RETRY_COUNT}\")
+                    logger.warning(f"[CHUNK] Failed sending B (begin) attempt {i+1}/{BEGIN_RETRY_COUNT}")
                 # small spacing between B retries
                 await asyncio.sleep(0.05)
 
