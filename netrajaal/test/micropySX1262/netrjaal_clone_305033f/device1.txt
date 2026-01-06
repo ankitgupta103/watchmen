@@ -6,384 +6,99 @@ Starting fake network with the following neighbours
 (221, 225)
 (223, 219)
 b'e076465dd7194211'
-00:00:00,628 - INFO - [FS] Using FS_ROOT : /sdcard
-00:00:00,633 - INFO - [FS] /sdcard/netimages directory already exists
-00:00:00,637 - INFO - [FS] /sdcard/myimages directory already exists
-00:00:00,641 - INFO - [FS] /sdcard/myevents directory already exists
-00:00:00,692 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7194211 <===
+00:00:00,357 - INFO - [FS] Using FS_ROOT : /sdcard
+00:00:00,362 - INFO - [FS] /sdcard/netimages directory already exists
+00:00:00,367 - INFO - [FS] /sdcard/myimages directory already exists
+00:00:00,371 - INFO - [FS] /sdcard/myevents directory already exists
+00:00:00,422 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7194211 <===
 
-00:00:03,881 - INFO - [LORA] Initializing LoRa SX1262 module... my lora addr = 219
-00:00:03,939 - INFO - [LORA] SX1262 initialized successfully with SF5, BW500.0kHz, CR5, Preamble8 (maximum speed configuration)
-00:00:03,979 - INFO - [MEM] Memory management tasks started (free: 8135.9KB)
+00:00:03,614 - INFO - [LORA] Initializing LoRa SX1262 module... my lora addr = 219
+00:00:03,674 - INFO - [LORA] SX1262 initialized successfully with SF5, BW500.0kHz, CR5, Preamble8 (maximum speed configuration)
+00:00:03,715 - INFO - [MEM] Memory management tasks started (free: 8135.7KB)
 
-00:00:03,980 - INFO - [INIT] ===> Starting command center node <===
-00:00:03,980 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
-00:00:03,438 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
-00:00:03,445 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
-00:00:03,445 - INFO - ===> Radio Read, LoRa receive loop started... <===
+00:00:03,715 - INFO - [INIT] ===> Starting command center node <===
+00:00:03,716 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
+00:00:03,174 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
+00:00:03,180 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
+00:00:03,181 - INFO - ===> Radio Read, LoRa receive loop started... <===
 
-00:00:04,460 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+00:00:04,196 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
 
-00:00:04,461 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
-00:00:05,523 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
-00:00:06,584 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
-00:00:08,646 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.13, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 192.168.1.1
-00:00:08,647 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:08,662 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*ODC'
-00:00:11,837 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
-00:00:14,093 - INFO - H : Len msg = 20, len msgbytes = 128
-00:00:14,093 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:14:0:0::-1:[]:[]
-00:00:14,094 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
-00:00:16,709 - INFO - msg_typ:heartbeat from node 219 uploaded via WiFi successfully
-00:00:17,723 - INFO - [HB] HB SUCCESS, shortest path = []
-00:00:22,752 - INFO - [⬇ RECV from 223, rssi: -39.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbZHS'
-00:00:22,753 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:22,754 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:22,771 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCXC'
-00:00:22,772 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:23,978 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:00:28,155 - INFO - [⬇ RECV from 223, rssi: -36.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbZHS'
-00:00:28,156 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:28,157 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:28,175 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWAD'
-00:00:28,175 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:29,287 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:00:29,457 - INFO - [⬇ RECV from 223, rssi: -36.0] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbNCP'
-00:00:29,457 - ERROR - [CHUNK] no entry yet for WFP
-00:00:29,548 - INFO - [⬇ RECV from 219, rssi: -94.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRBT'
-00:00:29,549 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRBT'
-00:00:30,698 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfROF'
-00:00:30,699 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfROF'
-00:00:30,845 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQGL'
-00:00:30,846 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfQGL'
-00:00:30,137 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMCZ'
-00:00:30,137 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMCZ'
-00:00:30,286 - INFO - [⬇ RECV from 219, rssi: -92.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEOO'
-00:00:30,286 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEOO'
-00:00:30,431 - INFO - [⬇ RECV from 219, rssi: -98.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXBE'
-00:00:30,432 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfXBE'
-00:00:30,583 - INFO - [⬇ RECV from 219, rssi: -97.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLQQ'
-00:00:30,583 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfLQQ'
-00:00:31,731 - INFO - [⬇ RECV from 219, rssi: -92.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFPB'
-00:00:31,731 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfFPB'
-00:00:31,875 - INFO - [⬇ RECV from 219, rssi: -94.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEST'
-00:00:31,875 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEST'
-00:00:31,016 - INFO - [⬇ RECV from 219, rssi: -93.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMPQ'
-00:00:31,017 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMPQ'
-00:00:31,160 - INFO - [⬇ RECV from 219, rssi: -94.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQFB'
-00:00:31,160 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfQFB'
-00:00:31,302 - INFO - [⬇ RECV from 219, rssi: -95.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWCF'
-00:00:31,303 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWCF'
-00:00:31,446 - INFO - [⬇ RECV from 219, rssi: -82.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPTV'
-00:00:31,447 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfPTV'
-00:00:31,595 - INFO - [⬇ RECV from 219, rssi: -85.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfACF'
-00:00:31,595 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfACF'
-00:00:32,742 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCXB'
-00:00:32,743 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfCXB'
-00:00:32,893 - INFO - [⬇ RECV from 219, rssi: -82.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfIOZ'
-00:00:32,894 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfIOZ'
-00:00:32,038 - INFO - [⬇ RECV from 219, rssi: -82.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfICY'
-00:00:32,039 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfICY'
-00:00:32,186 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQTH'
-00:00:32,186 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfQTH'
-00:00:32,331 - INFO - [⬇ RECV from 219, rssi: -82.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJKX'
-00:00:32,331 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfJKX'
-00:00:32,481 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWGT'
-00:00:32,481 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWGT'
-00:00:33,631 - INFO - [⬇ RECV from 219, rssi: -81.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRAH'
-00:00:33,631 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRAH'
-00:00:33,781 - INFO - [⬇ RECV from 219, rssi: -83.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVIT'
-00:00:33,781 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfVIT'
-00:00:33,928 - INFO - [⬇ RECV from 219, rssi: -85.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMMR'
-00:00:33,928 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMMR'
-00:00:33,076 - INFO - [⬇ RECV from 219, rssi: -95.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAHX'
-00:00:33,077 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfAHX'
-00:00:33,225 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOUK'
-00:00:33,226 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfOUK'
-00:00:33,375 - INFO - [⬇ RECV from 219, rssi: -98.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSTI'
-00:00:33,375 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfSTI'
-00:00:33,521 - INFO - [⬇ RECV from 219, rssi: -100.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQTB'
-00:00:33,521 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfQTB'
-00:00:34,668 - INFO - [⬇ RECV from 219, rssi: -92.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJQK'
-00:00:34,669 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfJQK'
-00:00:34,811 - INFO - [⬇ RECV from 219, rssi: -95.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGWD'
-00:00:34,812 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfGWD'
-00:00:34,015 - INFO - [⬇ RECV from 223, rssi: -37.0] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbKKC'
-00:00:34,016 - ERROR - [CHUNK] no entry yet for WFP
-00:00:34,116 - INFO - [⬇ RECV from 219, rssi: -101.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKKP'
-00:00:34,116 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfKKP'
-00:00:34,262 - INFO - [⬇ RECV from 219, rssi: -102.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDGR'
-00:00:34,262 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfDGR'
-00:00:34,409 - INFO - [⬇ RECV from 219, rssi: -96.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCVL'
-00:00:34,409 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfCVL'
-00:00:34,501 - INFO - sent: 3 Recd: 4 Unacked: 0, Free: 8133.2KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:00:34,560 - INFO - [⬇ RECV from 219, rssi: -100.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMRI'
-00:00:34,560 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMRI'
-00:00:35,711 - INFO - [⬇ RECV from 219, rssi: -98.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMTK'
-00:00:35,712 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMTK'
-00:00:35,858 - INFO - [⬇ RECV from 219, rssi: -97.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfULS'
-00:00:35,858 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfULS'
-00:00:35,001 - INFO - [⬇ RECV from 219, rssi: -94.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDAX'
-00:00:35,002 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfDAX'
-00:00:35,151 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCZZ'
-00:00:35,152 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfCZZ'
-00:00:35,299 - INFO - [⬇ RECV from 219, rssi: -86.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWKQ'
-00:00:35,300 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWKQ'
-00:00:35,451 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYDB'
-00:00:35,452 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfYDB'
-00:00:35,600 - INFO - [⬇ RECV from 219, rssi: -93.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOVC'
-00:00:35,601 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfOVC'
-00:00:36,748 - INFO - [⬇ RECV from 219, rssi: -99.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGNH'
-00:00:36,749 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfGNH'
-00:00:36,902 - INFO - [⬇ RECV from 219, rssi: -102.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCOT'
-00:00:36,903 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfCOT'
-00:00:36,052 - INFO - [⬇ RECV from 219, rssi: -93.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRZK'
-00:00:36,052 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRZK'
-00:00:36,198 - INFO - [⬇ RECV from 223, rssi: -39.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbRGD'
-00:00:36,198 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:36,199 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:36,217 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKSF'
-00:00:36,218 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:37,322 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:00:37,435 - INFO - [⬇ RECV from 219, rssi: -90.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNSP'
-00:00:37,435 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfNSP'
-00:00:37,582 - INFO - [⬇ RECV from 219, rssi: -103.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfORA'
-00:00:37,583 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfORA'
-00:00:38,735 - INFO - [⬇ RECV from 219, rssi: -90.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTRG'
-00:00:38,736 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfTRG'
-00:00:38,038 - INFO - [⬇ RECV from 219, rssi: -94.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBGX'
-00:00:38,039 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBGX'
-00:00:38,187 - INFO - [⬇ RECV from 219, rssi: -94.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDTI'
-00:00:38,187 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfDTI'
-00:00:38,341 - INFO - [⬇ RECV from 219, rssi: -100.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSNI'
-00:00:38,341 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfSNI'
-00:00:38,494 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUYB'
-00:00:38,494 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfUYB'
-00:00:39,800 - INFO - [⬇ RECV from 219, rssi: -98.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBMF'
-00:00:39,801 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBMF'
-00:00:39,802 - INFO - seen neighbours = [], Shortest path = [], Sent messages = 4, Received messages = {219: 51, 223: 5}
-00:00:39,802 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:39,817 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*RUL'
-00:00:42,147 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYBA'
-00:00:42,148 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfYBA'
-00:00:42,299 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTUV'
-00:00:42,300 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfTUV'
-00:00:42,447 - INFO - [⬇ RECV from 219, rssi: -90.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRGX'
-00:00:42,448 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRGX'
-00:00:42,603 - INFO - [⬇ RECV from 219, rssi: -90.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYZQ'
-00:00:42,604 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfYZQ'
-00:00:43,756 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFEH'
-00:00:43,756 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfFEH'
-00:00:43,907 - INFO - [⬇ RECV from 219, rssi: -92.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAYK'
-00:00:43,908 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfAYK'
-00:00:43,064 - INFO - [⬇ RECV from 219, rssi: -94.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBON'
-00:00:43,064 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBON'
-00:00:43,214 - INFO - [⬇ RECV from 219, rssi: -87.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLLI'
-00:00:43,214 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfLLI'
-00:00:43,365 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJQI'
-00:00:43,366 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfJQI'
-00:00:43,522 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAXQ'
-00:00:43,522 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfAXQ'
-00:00:44,675 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUVH'
-00:00:44,675 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfUVH'
-00:00:44,827 - INFO - [⬇ RECV from 219, rssi: -87.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYYW'
-00:00:44,827 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfYYW'
-00:00:44,984 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQYH'
-00:00:44,984 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfQYH'
-00:00:44,138 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHDA'
-00:00:44,139 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfHDA'
-00:00:44,292 - INFO - [⬇ RECV from 219, rssi: -85.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDUM'
-00:00:44,292 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfDUM'
-00:00:44,444 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKNU'
-00:00:44,445 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfKNU'
-00:00:44,597 - INFO - [⬇ RECV from 219, rssi: -85.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZXC'
-00:00:44,597 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfZXC'
-00:00:45,753 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSIM'
-00:00:45,753 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfSIM'
-00:00:45,906 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFSZ'
-00:00:45,907 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfFSZ'
-00:00:45,058 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSFP'
-00:00:45,059 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfSFP'
-00:00:45,213 - INFO - [⬇ RECV from 219, rssi: -83.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDXS'
-00:00:45,213 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfDXS'
-00:00:45,367 - INFO - [⬇ RECV from 219, rssi: -86.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCTN'
-00:00:45,367 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfCTN'
-00:00:45,523 - INFO - [⬇ RECV from 219, rssi: -86.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBHT'
-00:00:45,523 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBHT'
-00:00:46,680 - INFO - [⬇ RECV from 219, rssi: -86.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWHB'
-00:00:46,680 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWHB'
-00:00:46,832 - INFO - [⬇ RECV from 219, rssi: -82.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPYY'
-00:00:46,832 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfPYY'
-00:00:46,990 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXYE'
-00:00:46,990 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfXYE'
-00:00:46,148 - INFO - [⬇ RECV from 219, rssi: -87.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMRP'
-00:00:46,148 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMRP'
-00:00:46,302 - INFO - [⬇ RECV from 219, rssi: -87.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBAS'
-00:00:46,303 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBAS'
-00:00:46,459 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOWJ'
-00:00:46,459 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfOWJ'
-00:00:46,610 - INFO - [⬇ RECV from 219, rssi: -86.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBWM'
-00:00:46,610 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBWM'
-00:00:47,767 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGZV'
-00:00:47,768 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfGZV'
-00:00:47,923 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVHL'
-00:00:47,923 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfVHL'
-00:00:47,080 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEXH'
-00:00:47,080 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEXH'
-00:00:47,236 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJMV'
-00:00:47,237 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfJMV'
-00:00:47,393 - INFO - [⬇ RECV from 219, rssi: -85.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfULM'
-00:00:47,393 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfULM'
-00:00:47,551 - INFO - [⬇ RECV from 219, rssi: -85.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSHU'
-00:00:47,552 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfSHU'
-00:00:48,704 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBTU'
-00:00:48,704 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBTU'
-00:00:48,858 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRVA'
-00:00:48,858 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRVA'
-00:00:48,013 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBGO'
-00:00:48,013 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBGO'
-00:00:48,167 - INFO - [⬇ RECV from 219, rssi: -84.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSOF'
-00:00:48,167 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfSOF'
-00:00:48,323 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGPC'
-00:00:48,323 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfGPC'
-00:00:48,478 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHTF'
-00:00:48,478 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfHTF'
-00:00:49,636 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYWA'
-00:00:49,636 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfYWA'
-00:00:49,795 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQLV'
-00:00:49,795 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfQLV'
-00:00:49,949 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTWP'
-00:00:49,950 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfTWP'
-00:00:49,103 - INFO - [⬇ RECV from 219, rssi: -100.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWKD'
-00:00:49,104 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWKD'
-00:00:49,262 - INFO - [⬇ RECV from 219, rssi: -95.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRVX'
-00:00:49,263 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRVX'
-00:00:49,420 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKLX'
-00:00:49,420 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfKLX'
-00:00:49,575 - INFO - [⬇ RECV from 219, rssi: -95.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKGA'
-00:00:49,575 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfKGA'
-00:00:50,732 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWLU'
-00:00:50,732 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWLU'
-00:00:50,890 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPVS'
-00:00:50,890 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfPVS'
-00:00:50,048 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVQA'
-00:00:50,048 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfVQA'
-00:00:50,205 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMKX'
-00:00:50,206 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMKX'
-00:00:50,365 - INFO - [⬇ RECV from 219, rssi: -87.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRAB'
-00:00:50,365 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRAB'
-00:00:50,521 - INFO - [⬇ RECV from 219, rssi: -92.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDET'
-00:00:50,521 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfDET'
-00:00:51,681 - INFO - [⬇ RECV from 219, rssi: -92.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTKQ'
-00:00:51,681 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfTKQ'
-00:00:51,839 - INFO - [⬇ RECV from 219, rssi: -92.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNUV'
-00:00:51,839 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfNUV'
-00:00:51,999 - INFO - [⬇ RECV from 219, rssi: -93.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXEE'
-00:00:51,999 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfXEE'
-00:00:51,156 - INFO - [⬇ RECV from 219, rssi: -93.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMYU'
-00:00:51,156 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMYU'
-00:00:51,314 - INFO - [⬇ RECV from 219, rssi: -96.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLYQ'
-00:00:51,315 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfLYQ'
-00:00:51,471 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCZP'
-00:00:51,471 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfCZP'
-00:00:52,632 - INFO - [⬇ RECV from 219, rssi: -90.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYGF'
-00:00:52,632 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfYGF'
-00:00:52,790 - INFO - [⬇ RECV from 219, rssi: -90.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBXB'
-00:00:52,790 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBXB'
-00:00:52,949 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSAX'
-00:00:52,949 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfSAX'
-00:00:52,106 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRCN'
-00:00:52,106 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRCN'
-00:00:52,258 - INFO - [⬇ RECV from 219, rssi: -93.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOUJ'
-00:00:52,258 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfOUJ'
-00:00:52,418 - INFO - [⬇ RECV from 219, rssi: -96.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDVX'
-00:00:52,419 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfDVX'
-00:00:52,576 - INFO - [⬇ RECV from 219, rssi: -87.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEKN'
-00:00:52,577 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfEKN'
-00:00:53,737 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWLN'
-00:00:53,738 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWLN'
-00:00:53,893 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNUP'
-00:00:53,893 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfNUP'
-00:00:53,052 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTCC'
-00:00:53,053 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfTCC'
-00:00:53,209 - INFO - [⬇ RECV from 219, rssi: -85.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMRP'
-00:00:53,209 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfMRP'
-00:00:53,369 - INFO - [⬇ RECV from 219, rssi: -87.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBVC'
-00:00:53,369 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBVC'
-00:00:53,528 - INFO - [⬇ RECV from 219, rssi: -85.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWDO'
-00:00:53,528 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWDO'
-00:00:54,686 - INFO - [⬇ RECV from 219, rssi: -81.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXGS'
-00:00:54,686 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfXGS'
-00:00:54,843 - INFO - [⬇ RECV from 219, rssi: -83.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWTS'
-00:00:54,843 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWTS'
-00:00:54,000 - INFO - [⬇ RECV from 219, rssi: -86.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZLX'
-00:00:54,001 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfZLX'
-00:00:54,153 - INFO - [⬇ RECV from 219, rssi: -93.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWUB'
-00:00:54,154 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfWUB'
-00:00:54,314 - INFO - [⬇ RECV from 219, rssi: -97.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXYN'
-00:00:54,314 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfXYN'
-00:00:54,471 - INFO - [⬇ RECV from 219, rssi: -97.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVQC'
-00:00:54,471 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfVQC'
-00:00:55,631 - INFO - [⬇ RECV from 219, rssi: -100.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfIAX'
-00:00:55,631 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfIAX'
-00:00:55,788 - INFO - [⬇ RECV from 219, rssi: -93.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBXS'
-00:00:55,788 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBXS'
-00:00:55,946 - INFO - [⬇ RECV from 219, rssi: -91.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAQX'
-00:00:55,947 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfAQX'
-00:00:55,104 - INFO - [⬇ RECV from 219, rssi: -90.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBTL'
-00:00:55,104 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfBTL'
-00:00:55,262 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVCY'
-00:00:55,263 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfVCY'
-00:00:55,419 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTJG'
-00:00:55,420 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfTJG'
-00:00:55,581 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNOC'
-00:00:55,581 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfNOC'
-00:00:56,737 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZDF'
-00:00:56,737 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfZDF'
-00:00:56,896 - INFO - [⬇ RECV from 219, rssi: -88.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZHW'
-00:00:56,897 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfZHW'
-00:00:56,055 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNQP'
-00:00:56,055 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfNQP'
-00:00:56,214 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRWD'
-00:00:56,214 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfRWD'
-00:00:56,370 - INFO - [⬇ RECV from 219, rssi: -89.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDDB'
-00:00:56,370 - WARNING - [LORA] skipping message as it is for dst:223, not for me (my_addr:219), msg_uid:b'A\xdb\xdb\xdfDDB'
-00:01:05,929 - INFO - sent: 5 Recd: 5 Unacked: 0, Free: 8132.7KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:01:10,193 - INFO - seen neighbours = [], Shortest path = [], Sent messages = 5, Received messages = {219: 143, 223: 5}
-00:01:10,194 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:01:10,211 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*THN'
-00:01:17,285 - INFO - [⬇ RECV from 225, rssi: -61.0] [*******] 136 bytes, MSG_UID = b'H\xe1\xe1\xdbVTX'
-00:01:17,286 - INFO - [HB] HB Counts = {225: 1}
-00:01:17,286 - INFO - [HB] Sending raw heartbeat data of length 128 bytes
-00:01:19,126 - INFO - [⋙ sending....] dest=225, msg_typ:A, len:7 bytes, single packet
-00:01:19,144 - INFO - [⮕ SENT to 225] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xe1BQA'
-00:01:19,145 - WARNING - msg_typ:heartbeat from node 225 cellular system not initialized, trying WiFi fallback...
-00:01:20,337 - INFO - msg_typ:heartbeat from node 225 uploaded via WiFi successfully
-00:01:22,375 - INFO - [⬇ RECV from 223, rssi: -39.0] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbSFD'
-00:01:22,376 - INFO - [CHUNK] All chunks received for img_id:WFP, responding with completion
-00:01:22,377 - INFO - [⋙ sending....] dest=223, msg_typ:M, len:8 bytes, single packet
-00:01:22,395 - INFO - [⮕ SENT to 223] [*] 16 bytes, MSG_UID = b'M\xdb\xdb\xdfFPH'
-00:01:22,396 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:22,415 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVQO'
-00:01:23,441 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'M\xdb\xdb\xdfFPH' # 0
-00:01:29,757 - WARNING - [ACK] Failed to get ack, MSG_UID = b'M\xdb\xdb\xdfFPH', retry # 1/3
-00:01:29,774 - INFO - [⮕ SENT to 223] [*] 16 bytes, MSG_UID = b'M\xdb\xdb\xdfFPH'
-00:01:30,823 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'M\xdb\xdb\xdfFPH' # 0
-00:01:35,135 - WARNING - [ACK] Failed to get ack, MSG_UID = b'M\xdb\xdb\xdfFPH', retry # 2/3
-00:01:35,150 - INFO - [⮕ SENT to 223] [*] 16 bytes, MSG_UID = b'M\xdb\xdb\xdfFPH'
-00:01:35,193 - INFO - sent: 8 Recd: 7 Unacked: 1, Free: 8131.6KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:01:36,209 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'M\xdb\xdb\xdfFPH' # 0
-00:01:41,522 - WARNING - [ACK] Failed to get ack, MSG_UID = b'M\xdb\xdb\xdfFPH', retry # 3/3
-00:01:41,523 - ERROR - [LORA] Failed to send message, MSG_UID = b'M\xdb\xdb\xdfFPH'
-00:01:41,523 - INFO - seen neighbours = [], Shortest path = [], Sent messages = 11, Received messages = {223: 6, 225: 1, 219: 143}
-00:01:41,524 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:01:41,541 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*BDK'
-00:02:06,012 - INFO - sent: 9 Recd: 7 Unacked: 1, Free: 8131.8KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:02:13,417 - INFO - seen neighbours = [], Shortest path = [], Sent messages = 12, Received messages = {223: 6, 225: 1, 219: 143}
-00:02:13,417 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:02:13,432 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*LED'
-00:02:37,844 - INFO - sent: 10 Recd: 7 Unacked: 1, Free: 8131.7KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
-00:02:45,310 - INFO - seen neighbours = [], Shortest path = [], Sent messages = 13, Received messages = {223: 6, 225: 1, 219: 143}
-00:02:45,311 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:02:45,326 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*GWF'
-00:03:08,682 - INFO - sent: 11 Recd: 7 Unacked: 1, Free: 8131.6KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:00:04,198 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
+00:00:05,260 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
+00:00:06,323 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
+00:00:07,695 - INFO - [⬇ BCAST from 223, rssi: -40.0] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*RPD'
+00:00:07,695 - INFO - adding nodeaddr 223 to seen_neighbours
+00:00:08,757 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.13, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 192.168.1.1
+00:00:08,758 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:08,772 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*ASM'
+00:00:10,883 - INFO - [NET] Sending shortest path to 223
+00:00:10,884 - INFO - [⋙ sending....] dest=223, msg_typ:S, len:3 bytes, single packet
+00:00:10,900 - INFO - [⮕ SENT to 223] [*] 11 bytes, MSG_UID = b'S\xdb\xdb\xdfDLK'
+00:00:11,946 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
+00:00:14,205 - INFO - H : Len msg = 23, len msgbytes = 128
+00:00:14,206 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:14:0:0::-1:[223]:[]
+00:00:14,206 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
+00:00:17,408 - INFO - msg_typ:heartbeat from node 219 uploaded via WiFi successfully
+00:00:18,421 - INFO - [HB] HB SUCCESS, shortest path = []
+00:00:26,736 - INFO - [⬇ RECV from 223, rssi: -36.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbOCW'
+00:00:26,737 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:26,738 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:26,754 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfIAM'
+00:00:26,755 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:27,782 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:00:31,336 - INFO - [⬇ RECV from 223, rssi: -39.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbOCW'
+00:00:31,337 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:31,338 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:31,355 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfIWO'
+00:00:31,356 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:33,532 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:00:35,648 - INFO - sent: 4 Recd: 3 Unacked: 0, Free: 8132.8KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:00:38,717 - INFO - [⬇ RECV from 223, rssi: -38.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbOCW'
+00:00:38,718 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:38,719 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:38,736 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTKV'
+00:00:38,737 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:39,851 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:00:40,865 - INFO - seen neighbours = [223], Shortest path = [], Sent messages = 5, Received messages = {223: 4}
+00:00:40,865 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:40,882 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*QLI'
+00:00:41,946 - INFO - [NET] Sending shortest path to 223
+00:00:41,946 - INFO - [⋙ sending....] dest=223, msg_typ:S, len:3 bytes, single packet
+00:00:41,963 - INFO - [⮕ SENT to 223] [*] 11 bytes, MSG_UID = b'S\xdb\xdb\xdfDYW'
+00:00:49,491 - INFO - [⬇ RECV from 223, rssi: -40.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbSXN'
+00:00:49,492 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:49,493 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:49,510 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHMT'
+00:00:49,510 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:50,817 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:01:05,704 - INFO - sent: 8 Recd: 5 Unacked: 0, Free: 8131.9KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:01:09,760 - INFO - [⬇ BCAST from 223, rssi: -40.0] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*ODJ'
+00:01:10,985 - INFO - [⬇ RECV from 223, rssi: -36.0] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLSJ'
+00:01:10,985 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:223, img_id:LEU ❮❮●●●●●●●●●●
+00:01:10,986 - INFO - [CHUNK] Entering continuous receive mode for image transfer, img_id:LEU, expecting 159 chunks
+00:01:10,987 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:01:10,005 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUDJ'
+00:01:11,048 - INFO - seen neighbours = [223], Shortest path = [], Sent messages = 9, Received messages = {223: 7}
+00:01:12,111 - INFO - [NET] Skipping spath send because image in progress
+00:01:16,346 - INFO - [⬇ RECV from 223, rssi: -36.0] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLSJ'
+00:01:16,347 - WARNING - TRANS MODE already in use, could not get lock...
+00:01:16,348 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
+00:01:17,365 - INFO - [⮕ SENT to 223] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfXEO'
+00:01:23,729 - INFO - [⬇ RECV from 223, rssi: -35.0] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLSJ'
+00:01:23,729 - WARNING - TRANS MODE already in use, could not get lock...
+00:01:23,730 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
+00:01:23,746 - INFO - [⮕ SENT to 223] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfZKO'
+00:01:41,793 - INFO - [⬇ BCAST from 223, rssi: -36.0] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*BUK'
+00:01:54,752 - INFO - [⬇ RECV from 223, rssi: -36.0] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbQVW'
+00:01:54,753 - WARNING - TRANS MODE already in use, could not get lock...
+00:01:54,754 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
+00:01:54,769 - INFO - [⮕ SENT to 223] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfTIM'
+00:02:00,103 - INFO - [⬇ RECV from 223, rssi: -37.0] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbQVW'
+00:02:00,104 - WARNING - TRANS MODE already in use, could not get lock...
+00:02:00,105 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
+00:02:00,120 - INFO - [⮕ SENT to 223] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfAIV'
+00:02:07,482 - INFO - [⬇ RECV from 223, rssi: -40.0] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbQVW'
+00:02:07,482 - WARNING - TRANS MODE already in use, could not get lock...
+00:02:07,483 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
+00:02:07,498 - INFO - [⮕ SENT to 223] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfYGL'
