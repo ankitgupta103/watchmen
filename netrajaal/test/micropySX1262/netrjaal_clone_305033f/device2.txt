@@ -1,226 +1,538 @@
-00:02:27,537 - INFO - stopped by user via keyboard interrupt
-00:02:27,538 - INFO - logger closed successfully
-OpenMV 805a279; MicroPython 46b10ee2; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
-Type "help()" for more information.
->>> 
-
 info - SD card available
 info - Singleton Logger class Initiated, __new__
 Starting fake network with the following neighbours
-(223, 222)
+(225, 222)
 (222, 221)
 (221, 225)
 (223, 219)
-00:00:00,220 - INFO - [FS] Using FS_ROOT : /sdcard
-00:00:00,228 - INFO - [FS] /sdcard/netimages directory already exists
-00:00:00,240 - INFO - [FS] /sdcard/myimages directory already exists
-00:00:00,248 - INFO - [FS] /sdcard/myevents directory already exists
-00:00:00,326 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7193a09 <===
+00:00:00,472 - INFO - [FS] Using FS_ROOT : /sdcard
+00:00:00,478 - INFO - [FS] /sdcard/netimages directory already exists
+00:00:00,485 - INFO - [FS] /sdcard/myimages directory already exists
+00:00:00,491 - INFO - [FS] /sdcard/myevents directory already exists
+00:00:00,542 - INFO - [INIT] ===> MyAddr = 223, uid=e076465dd7091843 <===
 
-00:00:03,514 - INFO - [LORA] Initializing LoRa SX1262 module... my lora addr = 219
-00:00:03,579 - INFO - [LORA] SX1262 initialized successfully with SF5, BW500.0kHz, CR5, Preamble6 (maximum speed configuration with optimized chunk size and timing)
-00:00:03,617 - INFO - [MEM] Memory management tasks started (free: 8155.1KB)
+00:00:03,757 - INFO - [LORA] Initializing LoRa SX1262 module... my lora addr = 223
+00:00:03,819 - INFO - [LORA] SX1262 initialized successfully with SF5, BW500.0kHz, CR5, Preamble8 (maximum speed configuration)
+00:00:03,859 - INFO - [MEM] Memory management tasks started (free: 8135.6KB)
 
-00:00:03,617 - INFO - [INIT] ===> Starting command center node <===
-00:00:03,618 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
-00:00:03,175 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
-00:00:03,182 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
-00:00:03,182 - INFO - ===> Radio Read, LoRa receive loop started... <===
+00:00:03,860 - INFO - [INIT] ===> Starting unit node <===
+00:00:03,861 - INFO - ===> Radio Read, LoRa receive loop started... <===
 
-00:00:03,183 - INFO - [LORA] Starting receive loop, loranode=True
-00:00:04,247 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+00:00:04,874 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
 
-00:00:04,182 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
-00:00:06,244 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
-00:00:07,244 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
-00:00:08,307 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.5, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 192.168.1.1
-00:00:08,308 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:08,326 - INFO - [⮕ SENT to 65535, airtime: 2.90ms] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*GXW'
-00:00:09,643 - INFO - [⬇ BCAST from 223, rssi: -32.0, snr: 7.0, airtime: 2.90ms] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*ZKE'
-00:00:09,643 - INFO - adding nodeaddr 223 to seen_neighbours
-00:00:10,309 - INFO - [NET] Sending shortest path to 223
-00:00:10,309 - INFO - [⋙ sending....] dest=223, msg_typ:S, len:3 bytes, single packet
-00:00:10,327 - INFO - [⮕ SENT to 223, airtime: 3.22ms] [*] 11 bytes, MSG_UID = b'S\xdb\xdb\xdfYTW'
-00:00:11,324 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
-00:00:14,450 - INFO - H : Len msg = 23, len msgbytes = 128
-00:00:14,451 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:14:0:0::-1:[223]:[]
-00:00:14,451 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
-00:00:16,703 - INFO - msg_typ:heartbeat from node 219 uploaded via WiFi successfully
-00:00:16,769 - INFO - [HB] HB SUCCESS, shortest path = []
-00:00:19,759 - INFO - [LORA] Receive loop running (iteration 200)...
-00:00:32,054 - INFO - [LORA] Receive loop running (iteration 400)...
-00:00:32,092 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbSPV'
-00:00:32,093 - INFO - [IMG RX] Initialized chunk_map for img_id=YXC, expected_chunks=144
-00:00:32,093 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:223, img_id:YXC ❮❮●●●●●●●●●●
-00:00:32,094 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:32,113 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXKJ'
-00:00:36,697 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 9.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbMRR'
-00:00:36,698 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:36,699 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:36,717 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEGF'
-00:00:36,718 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:37,060 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:00:37,110 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 9.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbMRR'
-00:00:37,111 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:37,112 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:37,134 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfANL'
-00:00:37,135 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:38,082 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:00:38,147 - INFO - seen neighbours = [223], Shortest path = [], Sent messages = 5, Received messages = {223: 4}
-00:00:40,409 - INFO - [NET] Skipping spath send because image in progress
-00:00:48,654 - INFO - [LORA] Receive loop running (iteration 600)...
-00:00:56,621 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbULP'
-00:00:56,636 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:56,637 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:56,656 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFQK'
-00:00:56,721 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:57,656 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:01:02,908 - INFO - [LORA] Receive loop running (iteration 800)...
-00:01:06,823 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbEBO'
-00:01:06,824 - INFO - [TXT] Sending event text data of length 128 bytes
-00:01:06,824 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:06,842 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHAF'
-00:01:06,842 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:01:07,856 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:01:08,896 - INFO - [⬇ RECV from 223, rssi: -32.0, snr: 8.3, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbFYZ'
-00:01:08,896 - INFO - [IMG RX] Initialized chunk_map for img_id=MVR, expected_chunks=140
-00:01:08,897 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:01:08,897 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:01:08,915 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfOGQ'
-00:01:16,216 - INFO - [LORA] Receive loop running (iteration 1000)...
-00:01:19,780 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbEDO'
-00:01:19,781 - INFO - [TXT] Sending event text data of length 128 bytes
-00:01:19,782 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:19,799 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDDP'
-00:01:19,799 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:01:20,898 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:01:29,918 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 8.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbJSF'
-00:01:29,919 - INFO - [TXT] Sending event text data of length 128 bytes
-00:01:29,920 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:29,937 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLWS'
-00:01:29,938 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:01:30,115 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:01:32,779 - INFO - [LORA] Receive loop running (iteration 1200)...
-00:01:39,069 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 8.0, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbZUL'
-00:01:39,070 - INFO - [IMG RX] Initialized chunk_map for img_id=WHV, expected_chunks=136
-00:01:39,071 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:01:39,071 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:01:39,090 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfECM'
-00:01:41,415 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbZUL'
-00:01:41,416 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:01:41,417 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:01:41,435 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfPPO'
-00:01:45,091 - INFO - [LORA] Receive loop running (iteration 1400)...
-00:01:53,177 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbHLF'
-00:01:53,178 - INFO - [TXT] Sending event text data of length 128 bytes
-00:01:53,179 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:53,197 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHHL'
-00:01:53,198 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:01:54,138 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:00,321 - INFO - [LORA] Receive loop running (iteration 1600)...
-00:02:05,731 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbXBA'
-00:02:05,732 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:05,733 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:05,750 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLHY'
-00:02:05,751 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:06,776 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:08,734 - INFO - [⬇ RECV from 223, rssi: -32.0, snr: 7.8, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbVGM'
-00:02:08,734 - INFO - [IMG RX] Initialized chunk_map for img_id=GKP, expected_chunks=144
-00:02:08,735 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:02:08,735 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:02:08,752 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfSIO'
-00:02:11,473 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbVGM'
-00:02:11,474 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:02:11,474 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:02:11,493 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfWRK'
-00:02:14,684 - INFO - [LORA] Receive loop running (iteration 1800)...
-00:02:18,044 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbQSL'
-00:02:18,045 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:18,046 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:18,064 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQWM'
-00:02:18,065 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:19,040 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:28,929 - INFO - [LORA] Receive loop running (iteration 2000)...
-00:02:28,195 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 7.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbASG'
-00:02:28,196 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:28,197 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:28,214 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYZY'
-00:02:28,215 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:29,155 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:36,063 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.5, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbZNJ'
-00:02:36,064 - INFO - [IMG RX] Initialized chunk_map for img_id=ZIZ, expected_chunks=138
-00:02:36,064 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:02:36,065 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:02:36,083 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfKSJ'
-00:02:39,910 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbZNJ'
-00:02:39,910 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:02:39,911 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:02:39,928 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfJQZ'
-00:02:41,181 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbJPF'
-00:02:41,182 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:41,183 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:41,200 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMXA'
-00:02:41,201 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:43,262 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:44,260 - INFO - [LORA] Receive loop running (iteration 2200)...
-00:02:48,089 - WARNING - [LORA] CRC error but attempting to process packet (len=65)
-00:02:48,090 - ERROR - [LORA] failure parsing incoming data : b"\xce\x8b\xe6\xa9\x8f\xf9\x89\xad_\xa9\xcd\xfb\x9dB\xf9V\xca\rR)\x0f\xe1\xa2\x00\x911\xa9'\x11\x11z\xa6\xe4\x9d\x19\x07\xa0\xc0\x894a\r-\xcb\xd2\x15G\xc12\x0b:d:\x95d\x04q\x08\xfd\xd1'\xd5\xd7\x83\xcc"
-00:02:50,479 - INFO - [⬇ RECV from 223, rssi: -32.0, snr: 8.5, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbECF'
-00:02:50,480 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:50,481 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:50,499 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSEG'
-00:02:50,500 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:51,472 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:58,504 - INFO - [LORA] Receive loop running (iteration 2400)...
-00:03:00,623 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbCGF'
-00:03:00,624 - INFO - [TXT] Sending event text data of length 128 bytes
-00:03:00,625 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:00,642 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUOM'
-00:03:00,643 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:03:01,702 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:03:06,977 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 8.0, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbCKJ'
-00:03:06,978 - INFO - [IMG RX] Initialized chunk_map for img_id=YUG, expected_chunks=138
-00:03:06,978 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:03:06,979 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:03:06,997 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfECZ'
-00:03:10,822 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbKMV'
-00:03:10,823 - INFO - [TXT] Sending event text data of length 128 bytes
-00:03:10,824 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:10,841 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZAM'
-00:03:10,841 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:03:11,808 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:03:13,868 - INFO - [LORA] Receive loop running (iteration 2600)...
-00:03:20,972 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbRNM'
-00:03:20,973 - INFO - [TXT] Sending event text data of length 128 bytes
-00:03:20,974 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:20,991 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDOU'
-00:03:20,992 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:03:21,891 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:03:27,092 - INFO - [LORA] Receive loop running (iteration 2800)...
-00:03:32,518 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 8.5, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbQOP'
-00:03:32,519 - INFO - [TXT] Sending event text data of length 128 bytes
-00:03:32,520 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:32,538 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfROV'
-00:03:32,539 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:03:33,592 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:03:33,659 - WARNING - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended, device:223, img_id:YXC, by TIMEOUT ❮❮●●●●●●●●●●
-00:03:33,972 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.0, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbGUJ'
-00:03:33,972 - INFO - [IMG RX] Initialized chunk_map for img_id=XJW, expected_chunks=139
-00:03:33,973 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:223, img_id:XJW ❮❮●●●●●●●●●●
-00:03:33,974 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:33,991 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNYL'
-00:03:35,364 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.0, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbGUJ'
-00:03:35,365 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:35,382 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMVA'
-00:03:42,296 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 33.94ms] [**********] 253 bytes, MSG_UID = b'I\xdf\xdf\xdbBID'
-00:03:42,297 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:42,315 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXSX'
-00:03:42,450 - INFO - [LORA] Receive loop running (iteration 3000)...
-00:03:55,722 - INFO - [LORA] Receive loop running (iteration 3200)...
-00:04:00,444 - INFO - [NET] Skipping spath send because image in progress
-00:04:08,040 - INFO - [LORA] Receive loop running (iteration 3400)...
-00:04:15,360 - INFO - stopped by user via keyboard interrupt
-00:04:15,361 - INFO - logger closed successfully
-OpenMV 805a279; MicroPython 46b10ee2; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
-Type "help()" for more information.
->>> 
+00:00:04,875 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:04,894 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*DIY'
+00:00:06,003 - INFO - [PIR] Interrupt-driven detection initialized on pin Pin(GPIO_B0_07)
+00:00:07,130 - INFO - H : Len msg = 22, len msgbytes = 128
+00:00:07,131 - INFO - [⋙ sending....] dest=219, msg_typ:H, len:128 bytes, single packet
+00:00:07,165 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'H\xdf\xdf\xdbIQJ'
+00:00:08,181 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'H\xdf\xdf\xdbIQJ' # 0
+00:00:14,497 - WARNING - [ACK] Failed to get ack, MSG_UID = b'H\xdf\xdf\xdbIQJ', retry # 1/3
+00:00:14,533 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'H\xdf\xdf\xdbIQJ'
+00:00:14,067 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVQM'
+00:00:14,068 - INFO - [ACK] Msg b'H\xdf\xdf\xdbIQJ' : was acked in 6936 msecs
+00:00:14,068 - INFO - [HB] Heartbeat sent successfully to 219
+00:00:14,069 - INFO - [HB] HB SUCCESS, shortest path = [219]
+00:00:34,302 - INFO - sent: 2 Recd: 1 Unacked: 0, Free: 8134.0KB, Chunks: 0, Queued images: 0
+00:00:35,325 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 3, Received messages = {219: 1}
+00:00:35,325 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:35,342 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*LGO'
+00:00:54,453 - INFO - [PIR] First motion detected - next_capture_wait=2
+00:00:54,454 - INFO - [PIR] 🅾🅾🅾🅾🅾🅾❯❯ Motion detected - capturing image... ❮❮🅾🅾🅾🅾🅾🅾
+00:00:55,325 - INFO - Saved raw image: /sdcard/myimages/223_1735689654000_raw.jpg: raw size = 1843200 bytes
+00:00:55,343 - INFO - [PIR] Captured image, size: 31520 bytes
+00:00:56,090 - INFO - [PIR] Saved encrypted image: /sdcard/myimages/223_1735689654000.enc: encrypted size = 31792 bytes
+00:00:57,604 - INFO - [PIR] Saved event file: /sdcard/myevents/1735689654000.json
+00:00:58,633 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689654000 ms
+00:00:58,696 - INFO - T : Len msg = 21, len msgbytes = 128
+00:00:58,697 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:00:58,731 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbZHS'
+00:00:58,755 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689654000.enc
+00:00:58,756 - INFO - [IMG] Sending image of creator=223, size=31792 bytes, to the network
+00:00:58,757 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:WFP ❮❮●●●●●●●●●●
+00:00:58,931 - INFO - [⋙ FAST TX] dest=219, msg_typ:P, len:31792 bytes, img_id:WFP, image_payload in 159 chunks
+00:00:58,952 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLMU'
+00:00:59,970 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbZHS' # 0
+00:00:59,971 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbLMU' # 0
+00:01:04,284 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbZHS', retry # 1/3
+00:01:04,319 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbZHS'
+00:01:04,320 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbLMU', retry # 1/3
+00:01:04,337 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLMU'
+00:01:05,371 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbZHS' # 0
+00:01:05,372 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'B\xdf\xdf\xdbLMU' # 0
+00:01:06,432 - INFO - seen neighbours = [], Shortest path = [219], Sent messages = 8, Received messages = {219: 1}
+00:01:11,685 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbZHS', retry # 2/3
+00:01:11,720 - INFO - [⮕ SENT to 219] [*******] 139 bytes, MSG_UID = b'T\xdf\xdf\xdbZHS'
+00:01:11,721 - WARNING - [ACK] Failed to get ack, MSG_UID = b'B\xdf\xdf\xdbLMU', retry # 2/3
+00:01:11,741 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbLMU'
+00:01:11,765 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSMN'
+00:01:12,829 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'T\xdf\xdf\xdbZHS' # 0
+00:01:12,830 - INFO - [ACK] Msg b'B\xdf\xdf\xdbLMU' : was acked in 12833 msecs
+00:01:12,830 - INFO - [CHUNK] Sending 159 chunks in burst mode (no ACKs)...
+00:01:12,830 - INFO - [CHUNK] Burst sending chunk 0/159
+00:01:12,877 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbDZZ'
+00:01:12,973 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVYR'
+00:01:12,020 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbNCP'
+00:01:12,119 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRBT'
+00:01:12,170 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbAXT'
+00:01:12,269 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfROF'
+00:01:12,318 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbBYV'
+00:01:12,416 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQGL'
+00:01:12,464 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbRCJ'
+00:01:13,563 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfIUQ'
+00:01:13,608 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbTJX'
+00:01:13,708 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMCZ'
+00:01:13,756 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbTZS'
+00:01:13,854 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEOO'
+00:01:13,902 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbFAB'
+00:01:13,000 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXBE'
+00:01:13,050 - INFO - [⮕ SENT to 219] [**********] 222 bytes, MSG_UID = b'I\xdf\xdf\xdbXPA'
+00:01:13,152 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLQQ'
+00:01:13,199 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbDYI'
+00:01:13,300 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFPB'
+00:01:13,346 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbDFF'
+00:01:13,446 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEST'
+00:01:14,492 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbZAR'
+00:01:14,586 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMPQ'
+00:01:14,632 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbQMP'
+00:01:14,730 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQFB'
+00:01:14,775 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbPJV'
+00:01:14,872 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWCF'
+00:01:14,919 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbYHG'
+00:01:14,017 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPTV'
+00:01:14,065 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbZSF'
+00:01:14,166 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfACF'
+00:01:14,213 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbFAC'
+00:01:14,312 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCXB'
+00:01:14,361 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbNMA'
+00:01:14,463 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfIOZ'
+00:01:15,510 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbTAC'
+00:01:15,608 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfICY'
+00:01:15,609 - WARNING - [ACK] Failed to get ack, MSG_UID = b'T\xdf\xdf\xdbZHS', retry # 3/3
+00:01:15,610 - ERROR - [LORA] Failed to send message, MSG_UID = b'T\xdf\xdf\xdbZHS'
+00:01:15,610 - WARNING - [TXT] sending failed, event re-queued: 1735689654000
+00:01:15,657 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbRMF'
+00:01:15,754 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQTH'
+00:01:15,755 - INFO - [CHUNK] Burst sending chunk 20/159
+00:01:15,803 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbDCW'
+00:01:15,900 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJKX'
+00:01:15,949 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbNGE'
+00:01:15,051 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWGT'
+00:01:15,099 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbKOZ'
+00:01:15,200 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRAH'
+00:01:15,248 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbEWI'
+00:01:15,350 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVIT'
+00:01:15,398 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbJFF'
+00:01:16,497 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMMR'
+00:01:16,544 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbNGJ'
+00:01:16,646 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAHX'
+00:01:16,693 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbCCH'
+00:01:16,796 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOUK'
+00:01:16,842 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbOJE'
+00:01:16,946 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSTI'
+00:01:16,991 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbVLR'
+00:01:16,091 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQTB'
+00:01:16,138 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbXPY'
+00:01:16,237 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJQK'
+00:01:16,283 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbQAR'
+00:01:16,382 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGWD'
+00:01:16,431 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbVMT'
+00:01:17,535 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGEF'
+00:01:17,582 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbKKC'
+00:01:17,686 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKKP'
+00:01:17,732 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbONP'
+00:01:17,832 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDGR'
+00:01:17,879 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbDHR'
+00:01:17,979 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCVL'
+00:01:17,026 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbXIK'
+00:01:17,130 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMRI'
+00:01:17,179 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbQUN'
+00:01:17,281 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMTK'
+00:01:17,326 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbVEP'
+00:01:17,429 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfULS'
+00:01:17,473 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbJKQ'
+00:01:18,573 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDAX'
+00:01:18,618 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbQRH'
+00:01:18,720 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCZZ'
+00:01:18,721 - INFO - [CHUNK] Burst sending chunk 40/159
+00:01:18,768 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbPOY'
+00:01:18,869 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWKQ'
+00:01:18,917 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbAHB'
+00:01:18,022 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYDB'
+00:01:18,070 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbGHO'
+00:01:18,170 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOVC'
+00:01:18,216 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbQNV'
+00:01:18,317 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGNH'
+00:01:18,367 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbAJB'
+00:01:18,472 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCOT'
+00:01:19,518 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbPQX'
+00:01:19,623 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRZK'
+00:01:19,667 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbJHC'
+00:01:19,667 - INFO - [TXT] ⋙⋙⋙ Processing event: 1735689654000 ms
+00:01:19,733 - INFO - T : Len msg = 21, len msgbytes = 128
+00:01:19,733 - INFO - [⋙ sending....] dest=219, msg_typ:T, len:128 bytes, single packet
+00:01:19,767 - INFO - [⮕ SENT to 219] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbRGD'
+00:01:19,788 - INFO - [⬇ RECV from 219, rssi: -39.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKSF'
+00:01:19,836 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbDTV'
+00:01:19,942 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPAY'
+00:01:19,988 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbTQN'
+00:01:19,992 - INFO - [ACK] Msg b'T\xdf\xdf\xdbRGD' : was acked in 54 msecs
+00:01:19,993 - INFO - [TXT] Event text sent successfully to 219
+00:01:19,993 - INFO - [TXT] ✔✔✔ Event transmission completed in 325 ms (0.3250 seconds)
+00:01:19,994 - INFO - [TXT] Queue empty, all events uploaded
+00:01:19,091 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLZT'
+00:01:19,137 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbTIB'
+00:01:19,241 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFWT'
+00:01:19,292 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbNWK'
+00:01:19,398 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKZP'
+00:01:19,444 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbXZP'
+00:01:20,547 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOJY'
+00:01:20,595 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbJBR'
+00:01:20,701 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEXD'
+00:01:20,749 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbXDG'
+00:01:20,855 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUFF'
+00:01:20,902 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbECE'
+00:01:20,004 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNSP'
+00:01:20,049 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbIYJ'
+00:01:20,151 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfORA'
+00:01:20,198 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbJAK'
+00:01:20,305 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTRG'
+00:01:20,352 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbTRW'
+00:01:20,457 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJJB'
+00:01:21,502 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbASN'
+00:01:21,607 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBGX'
+00:01:21,653 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbQPV'
+00:01:21,757 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDTI'
+00:01:21,758 - INFO - [CHUNK] Burst sending chunk 60/159
+00:01:21,804 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbHTR'
+00:01:21,911 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSNI'
+00:01:21,958 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbSSC'
+00:01:21,064 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUYB'
+00:01:21,110 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbQUS'
+00:01:21,214 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOLB'
+00:01:21,263 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbSZK'
+00:01:21,370 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBMF'
+00:01:21,417 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbFHD'
+00:01:23,483 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbGOZ'
+00:01:24,544 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbTXE'
+00:01:25,610 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbVKU'
+00:01:25,717 - INFO - [⬇ RECV from 219, rssi: -64.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYBA'
+00:01:25,762 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbPCC'
+00:01:25,870 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTUV'
+00:01:25,916 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbMWN'
+00:01:25,017 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRGX'
+00:01:25,064 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbOZG'
+00:01:25,173 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYZQ'
+00:01:25,219 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbRXM'
+00:01:25,326 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFEH'
+00:01:25,373 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbYKZ'
+00:01:26,478 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAYK'
+00:01:26,527 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbHPA'
+00:01:26,633 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBON'
+00:01:26,679 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbXMT'
+00:01:26,784 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLLI'
+00:01:26,831 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbWOL'
+00:01:26,934 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJQI'
+00:01:26,983 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbNTR'
+00:01:26,092 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAXQ'
+00:01:26,138 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbNUJ'
+00:01:26,245 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUVH'
+00:01:26,292 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbDGW'
+00:01:26,396 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYYW'
+00:01:26,443 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbBXI'
+00:01:27,555 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQYH'
+00:01:27,556 - INFO - [CHUNK] Burst sending chunk 80/159
+00:01:27,601 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbCZA'
+00:01:27,707 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHDA'
+00:01:27,756 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbMQU'
+00:01:27,862 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDUM'
+00:01:27,908 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbVRG'
+00:01:27,015 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKNU'
+00:01:27,060 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbLBW'
+00:01:27,166 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZXC'
+00:01:27,216 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbHHL'
+00:01:27,324 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSIM'
+00:01:27,371 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbCVM'
+00:01:28,477 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFSZ'
+00:01:28,522 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbCFR'
+00:01:28,628 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSFP'
+00:01:28,675 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbFTN'
+00:01:28,783 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDXS'
+00:01:28,831 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbAOY'
+00:01:28,937 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCTN'
+00:01:28,985 - INFO - [⮕ SENT to 219] [**********] 225 bytes, MSG_UID = b'I\xdf\xdf\xdbKLB'
+00:01:28,093 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBHT'
+00:01:28,141 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbJCV'
+00:01:28,250 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWHB'
+00:01:28,295 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbHYM'
+00:01:28,403 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPYY'
+00:01:28,451 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbTBA'
+00:01:29,560 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXYE'
+00:01:29,607 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbRBS'
+00:01:29,715 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMRP'
+00:01:29,764 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbUQO'
+00:01:29,872 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBAS'
+00:01:29,920 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbWVD'
+00:01:29,028 - INFO - [⬇ RECV from 219, rssi: -70.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOWJ'
+00:01:29,074 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbRGT'
+00:01:29,180 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBWM'
+00:01:29,229 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbGKL'
+00:01:29,337 - INFO - [⬇ RECV from 219, rssi: -70.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGZV'
+00:01:29,383 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbMQU'
+00:01:30,493 - INFO - [⬇ RECV from 219, rssi: -70.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVHL'
+00:01:30,542 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbALM'
+00:01:30,651 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEXH'
+00:01:30,652 - INFO - [CHUNK] Burst sending chunk 100/159
+00:01:30,700 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbYNJ'
+00:01:30,807 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfJMV'
+00:01:30,853 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbLNL'
+00:01:30,961 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfULM'
+00:01:30,010 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbLKB'
+00:01:30,122 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSHU'
+00:01:30,169 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbGWX'
+00:01:30,274 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBTU'
+00:01:30,319 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbFTV'
+00:01:30,429 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRVA'
+00:01:31,475 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbNIW'
+00:01:31,583 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBGO'
+00:01:31,630 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbPVS'
+00:01:31,736 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSOF'
+00:01:31,785 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbQSX'
+00:01:31,895 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGPC'
+00:01:31,939 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbMIN'
+00:01:31,048 - INFO - [⬇ RECV from 219, rssi: -69.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHTF'
+00:01:31,097 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbWGD'
+00:01:31,206 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYWA'
+00:01:31,253 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbMGN'
+00:01:31,362 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQLV'
+00:01:31,410 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbKUT'
+00:01:32,519 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTWP'
+00:01:32,567 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbZXW'
+00:01:32,673 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWKD'
+00:01:32,721 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbOPA'
+00:01:32,833 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRVX'
+00:01:32,880 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbZQA'
+00:01:32,990 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKLX'
+00:01:32,037 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbIKV'
+00:01:32,145 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKGA'
+00:01:32,193 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbQIF'
+00:01:32,304 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWLU'
+00:01:32,351 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbPFM'
+00:01:32,459 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPVS'
+00:01:33,508 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbYTU'
+00:01:33,618 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVQA'
+00:01:33,663 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbQZP'
+00:01:33,775 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMKX'
+00:01:33,776 - INFO - [CHUNK] Burst sending chunk 120/159
+00:01:33,824 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbLQQ'
+00:01:33,935 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRAB'
+00:01:33,981 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbNKO'
+00:01:33,091 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDET'
+00:01:33,139 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbIUR'
+00:01:33,250 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTKQ'
+00:01:33,295 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbYAD'
+00:01:33,408 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNUV'
+00:01:33,457 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbHWL'
+00:01:34,569 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXEE'
+00:01:34,616 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbEZD'
+00:01:34,725 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMYU'
+00:01:34,774 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbLRC'
+00:01:34,885 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLYQ'
+00:01:34,931 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbCVA'
+00:01:34,041 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfCZP'
+00:01:34,089 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbXIF'
+00:01:34,201 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYGF'
+00:01:34,249 - INFO - [⮕ SENT to 219] [**********] 225 bytes, MSG_UID = b'I\xdf\xdf\xdbJHN'
+00:01:34,360 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBXB'
+00:01:34,410 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbDTL'
+00:01:35,520 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSAX'
+00:01:35,566 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbEII'
+00:01:35,674 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRCN'
+00:01:35,720 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbZPX'
+00:01:35,829 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOUJ'
+00:01:35,877 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbZJA'
+00:01:35,990 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDVX'
+00:01:35,036 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbSSA'
+00:01:35,147 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEKN'
+00:01:35,194 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbQDN'
+00:01:35,306 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWLN'
+00:01:35,353 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbEJL'
+00:01:35,464 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNUP'
+00:01:36,512 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbWEC'
+00:01:36,622 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTCC'
+00:01:36,669 - INFO - [⮕ SENT to 219] [**********] 222 bytes, MSG_UID = b'I\xdf\xdf\xdbTWO'
+00:01:36,779 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMRP'
+00:01:36,828 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbRQQ'
+00:01:36,940 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBVC'
+00:01:36,941 - INFO - [CHUNK] Burst sending chunk 140/159
+00:01:36,988 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbQXX'
+00:01:36,098 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWDO'
+00:01:36,146 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbMMP'
+00:01:36,255 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXGS'
+00:01:36,300 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbMOP'
+00:01:36,412 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWTS'
+00:01:36,459 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbVHD'
+00:01:37,570 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZLX'
+00:01:37,616 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbYDK'
+00:01:37,724 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfWUB'
+00:01:37,773 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbWML'
+00:01:37,885 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXYN'
+00:01:37,930 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbPJM'
+00:01:37,040 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVQC'
+00:01:37,088 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbQFF'
+00:01:37,201 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfIAX'
+00:01:37,246 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbIGH'
+00:01:37,358 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBXS'
+00:01:37,405 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbHBT'
+00:01:38,517 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfAQX'
+00:01:38,562 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbCON'
+00:01:38,675 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfBTL'
+00:01:38,722 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbWHX'
+00:01:38,833 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVCY'
+00:01:38,879 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbTDU'
+00:01:38,989 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTJG'
+00:01:38,036 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbOOG'
+00:01:38,150 - INFO - [⬇ RECV from 219, rssi: -67.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNOC'
+00:01:38,194 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbLGD'
+00:01:38,306 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZDF'
+00:01:38,354 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbSZL'
+00:01:38,466 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZHW'
+00:01:39,513 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbMVJ'
+00:01:39,625 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNQP'
+00:01:39,672 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbRSQ'
+00:01:39,784 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRWD'
+00:01:39,828 - INFO - [⮕ SENT to 219] [**********] 208 bytes, MSG_UID = b'I\xdf\xdf\xdbQZT'
+00:01:39,939 - INFO - [⬇ RECV from 219, rssi: -68.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDDB'
+00:01:39,939 - INFO - [CHUNK] Burst transmission complete, entering query loop...
+00:01:39,960 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbDZZ'
+00:01:40,011 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbDZZ' # 0
+00:01:45,314 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbDZZ', retry # 1/3
+00:01:45,332 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbDZZ'
+00:01:46,387 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbDZZ' # 0
+00:01:52,696 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbDZZ', retry # 2/3
+00:01:52,714 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbDZZ'
+00:01:53,768 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbDZZ' # 0
+00:01:58,076 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbDZZ', retry # 3/3
+00:01:58,076 - ERROR - [LORA] Failed to send message, MSG_UID = b'Q\xdf\xdf\xdbDZZ'
+00:01:58,077 - WARNING - [CHUNK] Failed sending query message, retry 1/10
+00:01:59,156 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbSFD'
+00:02:00,855 - INFO - [⬇ RECV from 225, rssi: -59.0] [*******] 136 bytes, MSG_UID = b'H\xe1\xe1\xdbVTX'
+00:02:00,855 - WARNING - [LORA] skipping message as it is for dst:219, not for me (my_addr:223), msg_uid:b'H\xe1\xe1\xdbVTX'
+00:02:00,864 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbSFD' # 0
+00:02:01,124 - INFO - [⬇ RECV from 219, rssi: -64.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xe1ARG'
+00:02:01,125 - WARNING - [LORA] skipping message as it is for dst:225, not for me (my_addr:223), msg_uid:b'A\xdb\xdb\xe1ARG'
+00:02:02,715 - INFO - [⬇ RECV from 219, rssi: -38.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xe1BQA'
+00:02:02,715 - WARNING - [LORA] skipping message as it is for dst:225, not for me (my_addr:223), msg_uid:b'A\xdb\xdb\xe1BQA'
+00:02:05,925 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbSFD', retry # 1/3
+00:02:05,944 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbSFD'
+00:02:05,986 - INFO - [⬇ RECV from 219, rssi: -39.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVQO'
+00:02:06,058 - INFO - [ACK] Msg b'Q\xdf\xdf\xdbSFD' : was acked in 5849 msecs
+00:02:08,177 - WARNING - [CHUNK] Timeout waiting for missing chunks response, retry 2/10
+00:02:09,258 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbPWY'
+00:02:10,311 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbPWY' # 0
+00:02:11,346 - INFO - [⬇ RECV from 219, rssi: -37.0] [*] 16 bytes, MSG_UID = b'M\xdb\xdb\xdfFPH'
+00:02:11,357 - INFO - [⋙ sending....] dest=219, msg_typ:A, len:7 bytes, single packet
+00:02:11,373 - INFO - [⮕ SENT to 219] [*] 15 bytes, MSG_UID = b'A\xdf\xdf\xdbIAB'
+00:02:16,597 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbPWY', retry # 1/3
+00:02:16,615 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbPWY'
+00:02:17,669 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbPWY' # 0
+00:02:18,722 - INFO - [⬇ RECV from 219, rssi: -36.0] [*] 16 bytes, MSG_UID = b'M\xdb\xdb\xdfFPH'
+00:02:18,732 - INFO - [⋙ sending....] dest=219, msg_typ:A, len:7 bytes, single packet
+00:02:18,750 - INFO - [⮕ SENT to 219] [*] 15 bytes, MSG_UID = b'A\xdf\xdf\xdbYCE'
+00:02:22,974 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbPWY', retry # 2/3
+00:02:22,992 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbPWY'
+00:02:23,045 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbPWY' # 0
+00:02:28,350 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbPWY', retry # 3/3
+00:02:28,351 - ERROR - [LORA] Failed to send message, MSG_UID = b'Q\xdf\xdf\xdbPWY'
+00:02:28,351 - WARNING - [CHUNK] Failed sending query message, retry 3/10
+00:02:29,433 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbWVZ'
+00:02:31,484 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbWVZ' # 0
+00:02:36,792 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbWVZ', retry # 1/3
+00:02:36,809 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbWVZ'
+00:02:37,864 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbWVZ' # 0
+00:02:42,172 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbWVZ', retry # 2/3
+00:02:42,189 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbWVZ'
+00:02:43,246 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbWVZ' # 0
+00:02:49,549 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbWVZ', retry # 3/3
+00:02:49,549 - ERROR - [LORA] Failed to send message, MSG_UID = b'Q\xdf\xdf\xdbWVZ'
+00:02:49,550 - WARNING - [CHUNK] Failed sending query message, retry 4/10
+00:02:50,631 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbYQZ'
+00:02:51,684 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbYQZ' # 0
+00:02:56,991 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbYQZ', retry # 1/3
+00:02:56,009 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbYQZ'
+00:02:57,062 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbYQZ' # 0
+00:03:02,368 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbYQZ', retry # 2/3
+00:03:02,386 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbYQZ'
+00:03:03,439 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbYQZ' # 0
+00:03:09,749 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbYQZ', retry # 3/3
+00:03:09,749 - ERROR - [LORA] Failed to send message, MSG_UID = b'Q\xdf\xdf\xdbYQZ'
+00:03:09,750 - WARNING - [CHUNK] Failed sending query message, retry 5/10
+00:03:10,829 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbCQA'
+00:03:11,881 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbCQA' # 0
+00:03:16,186 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbCQA', retry # 1/3
+00:03:16,205 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbCQA'
+00:03:17,257 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbCQA' # 0
+00:03:23,561 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbCQA', retry # 2/3
+00:03:23,579 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbCQA'
+00:03:24,631 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbCQA' # 0
+00:03:29,938 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbCQA', retry # 3/3
+00:03:29,938 - ERROR - [LORA] Failed to send message, MSG_UID = b'Q\xdf\xdf\xdbCQA'
+00:03:29,939 - WARNING - [CHUNK] Failed sending query message, retry 6/10
+00:03:30,018 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbOHX'
+00:03:31,075 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbOHX' # 0
+00:03:36,382 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbOHX', retry # 1/3
+00:03:36,399 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbOHX'
+00:03:37,452 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbOHX' # 0
+00:03:43,765 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbOHX', retry # 2/3
+00:03:43,783 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbOHX'
+00:03:44,837 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbOHX' # 0
+00:03:49,139 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbOHX', retry # 3/3
+00:03:49,139 - ERROR - [LORA] Failed to send message, MSG_UID = b'Q\xdf\xdf\xdbOHX'
+00:03:49,140 - WARNING - [CHUNK] Failed sending query message, retry 7/10
+00:03:50,220 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbPJP'
+00:03:51,273 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbPJP' # 0
+00:03:57,582 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbPJP', retry # 1/3
+00:03:57,601 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbPJP'
+00:03:58,649 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbPJP' # 0
+00:04:00,766 - WARNING - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended, device:219, img_id:WFP, by TIMEOUT ❮❮●●●●●●●●●●
+00:04:03,955 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbPJP', retry # 2/3
+00:04:03,975 - INFO - [⮕ SENT to 219] [**] 27 bytes, MSG_UID = b'Q\xdf\xdf\xdbPJP'
+00:04:04,026 - INFO - [ACK] Still waiting for ack, MSG_UID =  b'Q\xdf\xdf\xdbPJP' # 0
+00:04:09,330 - WARNING - [ACK] Failed to get ack, MSG_UID = b'Q\xdf\xdf\xdbPJP', retry # 3/3
+00:04:09,330 - ERROR - [LORA] Failed to send message, MSG_UID = b'Q\xdf\xdf\xdbPJP'
+00:04:09,331 - WARNING - [CHUNK] Failed sending query message, retry 8/10
+00:04:10,393 - ERROR - [CHUNK] TRANS MODE ended, marking data send as failed
+00:04:10,393 - ERROR - [IMG] forwarding image to 219 failed
+00:04:10,394 - ERROR - [IMG] sending image failed, re-queued: /sdcard/myimages/223_1735689654000.enc
+00:04:10,415 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:04:10,432 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*FXL'
+00:04:35,873 - INFO - [IMG] ⋙⋙⋙ sending encrypted image to 219, file:/sdcard/myimages/223_1735689654000.enc
+00:04:35,874 - INFO - [IMG] Sending image of creator=223, size=31792 bytes, to the network
+00:04:35,874 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:219, img_id:AOP ❮❮●●●●●●●●●●
+00:04:35,051 - INFO - [⋙ FAST TX] dest=219, msg_typ:P, len:31792 bytes, img_id:AOP, image_payload in 159 chunks
+00:04:35,072 - INFO - [⮕ SENT to 219] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbSWA'
+00:04:35,093 - INFO - [⬇ RECV from 219, rssi: -38.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHVK'
+00:04:36,165 - INFO - [ACK] Msg b'B\xdf\xdf\xdbSWA' : was acked in 41 msecs
+00:04:36,165 - INFO - [CHUNK] Sending 159 chunks in burst mode (no ACKs)...
+00:04:36,166 - INFO - [CHUNK] Burst sending chunk 0/159
+00:04:36,212 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbGMZ'
+00:04:36,312 - INFO - [⬇ RECV from 219, rssi: -63.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfOQJ'
+00:04:36,359 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbCEC'
+00:04:36,461 - INFO - [⬇ RECV from 219, rssi: -64.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfTCQ'
+00:04:37,508 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbOIW'
+00:04:37,612 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQHS'
+00:04:37,659 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbSYL'
+00:04:37,765 - INFO - [⬇ RECV from 219, rssi: -66.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLBE'
+00:04:37,811 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbNGP'
+00:04:37,913 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYMF'
+00:04:37,960 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbXME'
+00:04:37,062 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPML'
+00:04:37,111 - INFO - [⮕ SENT to 219] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbJFS'
+00:04:37,215 - INFO - [⬇ RECV from 219, rssi: -64.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfIWU'
+00:04:37,263 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbJRP'
+00:04:37,367 - INFO - [⬇ RECV from 219, rssi: -65.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfRAH'
+00:04:37,412 - INFO - [⮕ SENT to 219] [**********] 222 bytes, MSG_UID = b'I\xdf\xdf\xdbTOL'
+00:04:38,514 - INFO - [⬇ RECV from 219, rssi: -64.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHQD'
+00:04:38,562 - INFO - [⮕ SENT to 219] [**********] 216 bytes, MSG_UID = b'I\xdf\xdf\xdbDWQ'
+00:04:38,667 - INFO - [⬇ RECV from 219, rssi: -64.0] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPFI'
+00:04:38,716 - INFO - [⮕ SENT to 219] [**********] 219 bytes, MSG_UID = b'I\xdf\xdf\xdbYFJ'

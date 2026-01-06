@@ -47,8 +47,9 @@ MIN_SLEEP = 0.1
 ACK_SLEEP = 0.2
 CHUNK_SLEEP = 0.025  # 25ms between chunks for SF5/BW500kHz (small buffer for reliability)
 CHUNK_BURST_DELAY = 0.025  # Delay between chunks in burst mode (no ACK waiting)
-QUERY_RESPONSE_TIMEOUT = 2.0  # Timeout for "M" response (seconds)
+QUERY_RESPONSE_TIMEOUT = 3.0  # Timeout for "M" response (seconds) - increased for network delays
 MAX_QUERY_RETRIES = 10  # Maximum query cycles before giving up
+BURST_START_DELAY = 0.2  # Delay after "B" ACK before starting burst (ensures receiver is ready)
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -336,9 +337,10 @@ def ellepsis(msg):
 
 def ack_needed(msg_typ): # msg_type P is devided in (B,I,E)
     # Input: msg_typ: str; Output: bool indicating if acknowledgement required
-    if msg_typ in ["A", "I", "S", "W", "N"]:
+    # Q and M are fire-and-forget (no ACK) for fast query/response cycle
+    if msg_typ in ["A", "I", "S", "W", "N", "Q", "M"]:
         return False
-    if msg_typ in ["H", "B", "E", "V", "C", "T", "Q", "M"]:  # Added Q, M for fast image protocol
+    if msg_typ in ["H", "B", "E", "V", "C", "T"]:
         return True
     return False
 
@@ -759,6 +761,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 delete_transmode_lock(dest, img_id)
                 return False
 
+            # Give receiver time to process "B" and initialize chunk_map before chunks arrive
+            await asyncio.sleep(BURST_START_DELAY)
+
             # Step 2: Send ALL "I" chunks back-to-back without ACKs (fast burst mode)
             logger.info(f"[CHUNK] Sending {len(chunks)} chunks in burst mode (no ACKs)...")
             for i in range(len(chunks)):
@@ -784,9 +789,9 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 if img_id in missing_chunks_response:
                     del missing_chunks_response[img_id]
 
-                # Send "Q" (Query) message asking for missing chunks
+                # Send "Q" (Query) message asking for missing chunks (fire-and-forget, no ACK)
                 query_msg = f"Q:{img_id}:{epoch_ms}"
-                query_succ, _ = await send_single_packet("Q", creator, query_msg.encode(), dest, retry_count=3)
+                query_succ = await send_msg("Q", creator, query_msg.encode(), dest)
                 if not query_succ:
                     logger.warning(f"[CHUNK] Failed sending query message, retry {query_retry+1}/{MAX_QUERY_RETRIES}")
                     await asyncio.sleep(0.2)
@@ -917,7 +922,8 @@ def add_chunk(msgbytes):
     #logger.info(f"Got chunk id {citer}")
     cdata = msgbytes[5:]
     if img_id not in chunk_map:
-        logger.error(f"[CHUNK] no entry yet for {img_id}")
+        # Chunk arrived before "B" message was processed - will be re-requested if needed
+        logger.warning(f"[CHUNK] no entry yet for {img_id}, dropping chunk (will be re-requested if needed)")
         return
     chunk_map[img_id][2].append((citer, cdata))
     _, expected_chunks, _ = chunk_map[img_id]
@@ -1744,11 +1750,10 @@ def process_message(data, rssi=None):
                     # Format missing chunks as comma-separated list
                     missing_str = ",".join([str(i) for i in missing])
                     logger.info(f"[CHUNK] Missing {len(missing)} chunks for img_id:{img_id}: {missing[:10]}{'...' if len(missing) > 10 else ''}")
-                # Send "M" response with missing chunks
+                # Send "M" response with missing chunks (fire-and-forget, no ACK)
                 m_msg = f"M:{img_id}:{missing_str}"
                 asyncio.create_task(send_msg("M", my_addr, m_msg.encode(), sender))
-                # Also send ACK for "Q"
-                asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+                # Note: Q and M don't require ACKs for fast protocol
         except Exception as e:
             logger.error(f"[CHUNK] Error processing Q message: {e}")
             import sys
@@ -1762,8 +1767,7 @@ def process_message(data, rssi=None):
                 # Store in global response map for send_msg_big() to retrieve
                 missing_chunks_response[img_id] = missing_chunks
                 logger.debug(f"[CHUNK] Stored missing chunks response for img_id:{img_id}, missing:{len(missing_chunks)} chunks")
-            # Send ACK for "M" message
-            asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+            # Note: M is fire-and-forget, no ACK needed
         except Exception as e:
             logger.error(f"[CHUNK] Error processing M message: {e}")
             import sys
