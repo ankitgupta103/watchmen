@@ -151,8 +151,9 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
+print(f"{uid}")
 # COMMAND CENTERS, OTHER NODES
-if uid == b'e076465dd7194025':
+if uid == b'e076465dd7194211':
     my_addr = 219
 elif uid == b'e076465dd7193a09':
     my_addr = 225
@@ -750,14 +751,14 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
             # sending start
             chunks = make_chunks(msgbytes)
             logger.info(f"[⋙ FAST TX] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
-            
+
             # Step 1: Send "B" (Begin) message and wait for ACK
             big_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{len(chunks)}", dest)
             if not big_succ:
                 logger.error(f"[CHUNK] Failed sending chunk begin")
                 delete_transmode_lock(dest, img_id)
                 return False
-            
+
             # Step 2: Send ALL "I" chunks back-to-back without ACKs (fast burst mode)
             logger.info(f"[CHUNK] Sending {len(chunks)} chunks in burst mode (no ACKs)...")
             for i in range(len(chunks)):
@@ -770,19 +771,19 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                 radio_send(dest, databytes, msg_uid)
                 # Small delay between chunks for SF5/BW500kHz (25ms spacing)
                 await asyncio.sleep(CHUNK_BURST_DELAY)
-            
+
             logger.info(f"[CHUNK] Burst transmission complete, entering query loop...")
-            
+
             # Step 3: Query loop - send "Q" and wait for "M" response
             for query_retry in range(MAX_QUERY_RETRIES):
                 if not check_transmode_lock(dest, img_id):
                     logger.error(f"[CHUNK] TRANS MODE ended, marking data send as failed")
                     return False
-                
+
                 # Clear previous response
                 if img_id in missing_chunks_response:
                     del missing_chunks_response[img_id]
-                
+
                 # Send "Q" (Query) message asking for missing chunks
                 query_msg = f"Q:{img_id}:{epoch_ms}"
                 query_succ, _ = await send_single_packet("Q", creator, query_msg.encode(), dest, retry_count=3)
@@ -790,7 +791,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     logger.warning(f"[CHUNK] Failed sending query message, retry {query_retry+1}/{MAX_QUERY_RETRIES}")
                     await asyncio.sleep(0.2)
                     continue
-                
+
                 # Wait for "M" (Missing chunks) response with timeout
                 query_start = time_msec()
                 missing_chunks = None
@@ -799,18 +800,18 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                         missing_chunks = missing_chunks_response.pop(img_id)
                         break
                     await asyncio.sleep(0.1)  # Check every 100ms
-                
+
                 if missing_chunks is None:
                     logger.warning(f"[CHUNK] Timeout waiting for missing chunks response, retry {query_retry+1}/{MAX_QUERY_RETRIES}")
                     await asyncio.sleep(0.2)
                     continue
-                
+
                 # Check if all chunks received
                 if len(missing_chunks) == 0:
                     logger.info(f"[CHUNK] Successfully sent all chunks! Transmission complete.")
                     delete_transmode_lock(dest, img_id)
                     return True
-                
+
                 # Step 4: Resend missing chunks back-to-back
                 logger.info(f"[CHUNK] Receiver missing {len(missing_chunks)} chunks: {missing_chunks[:10]}{'...' if len(missing_chunks) > 10 else ''}")
                 for mis_chunk in missing_chunks:
@@ -823,10 +824,10 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     databytes = msg_uid + b";" + chunkbytes
                     radio_send(dest, databytes, msg_uid)
                     await asyncio.sleep(CHUNK_BURST_DELAY)
-                
+
                 logger.info(f"[CHUNK] Retransmitted {len(missing_chunks)} missing chunks, querying again...")
                 await asyncio.sleep(0.1)  # Brief pause before next query
-            
+
             # Max retries reached
             logger.error(f"[CHUNK] Failed to complete transmission after {MAX_QUERY_RETRIES} query cycles")
             delete_transmode_lock(dest, img_id)
