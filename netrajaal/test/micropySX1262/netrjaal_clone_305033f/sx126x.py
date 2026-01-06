@@ -768,8 +768,8 @@ class SX126X:
         data = [mode]
         return self.SPIwriteCommand([SX126X_CMD_SET_STANDBY], 1, data, 1)
 
-    def setDio1Action(self, func):
-        self.irq.irq(trigger=Pin.IRQ_RISING, handler=func)
+    def setDio1Action(self, rx_handler): # rx_handler will get pin number as argument
+        self.irq.irq(trigger=Pin.IRQ_RISING, handler=rx_handler)
 
     def clearDio1Action(self):
         self.irq = Pin(self._irq, mode=Pin.IN)

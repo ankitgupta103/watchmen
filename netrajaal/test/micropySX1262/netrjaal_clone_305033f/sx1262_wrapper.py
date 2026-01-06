@@ -160,7 +160,7 @@ class SX1262(SX126X):
             state = super().startReceive()
             ASSERT(state)
             if self.event_callback != None:
-                super().setDio1Action(self._onIRQ)
+                super().setDio1Action(self._rx_interrupt_handler)
             else:
                 super().clearDio1Action()
             return state
@@ -254,7 +254,7 @@ class SX1262(SX126X):
         return len(data), state
 
 
-    def _onIRQ(self):
+    def _rx_interrupt_handler(self, pin):
         events = self._events()
         if events & SX126X_IRQ_TX_DONE:
             super().startReceive()
