@@ -25,7 +25,7 @@ import gc                   # garbage collection for memory management
 
 import enc
 from sx1262_wrapper import SX1262
-from sx126x import ERR_NONE, ERR_RX_TIMEOUT, ERR_CRC_MISMATCH, SX126X_SYNC_WORD_PRIVATE
+from sx126x import ERR_NONE, ERR_RX_TIMEOUT, ERR_CRC_MISMATCH, SX126X_SYNC_WORD_PRIVATE, SX126X_IRQ_RX_DONE, SX126X_IRQ_TX_DONE
 import gps_driver
 # from cellular_driver import Cellular
 import detect
@@ -493,7 +493,9 @@ async def init_lora():
             gpio='P7',     # BUSY
             spi_baudrate=2000000,
             spi_polarity=0,
-            spi_phase=0
+            spi_phase=0,
+            blocking=False,
+            event_callback=lora_event_callback
         )
 
         # Configure LoRa with highest data rate settings (SF5, BW500kHz, CR5) for fast robust communication
@@ -510,14 +512,15 @@ async def init_lora():
             crcOn=True,
             tcxoVoltage=1.6,
             useRegulatorLDO=False,
-            blocking=True
+            
         )
 
         if status != ERR_NONE:
             logger.error(f"[LORA] Failed to initialize SX1262, status: {status}")
             loranode = None
         else:
-            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, Preamble{LORA_PREAMBLE} (maximum speed configuration with optimized chunk size and timing)")
+            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, Preamble{LORA_PREAMBLE} (interrupt-driven mode)")
+            # Set up interrupt-based callback for efficient reception
     except Exception as e:
         logger.error(f"[LORA] Exception during LoRa initialization: {e}")
         loranode = None
@@ -541,6 +544,11 @@ def is_lora_ready():
 
 
 msgs_recd = []
+
+# Interrupt-driven LoRa reception variables
+lora_rx_event = asyncio.Event()
+lora_rx_data = None
+lora_rx_status = None
 
 # Memory Management Functions
 def cleanup_old_recd_messages():
@@ -1861,8 +1869,40 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
 # LoRa Receive Loop
 # ---------------------------------------------------------------------------
 
+
+def lora_event_callback(events):
+    """
+    Interrupt callback function - called automatically when RX_DONE occurs.
+    This runs in interrupt context, so keep it minimal and fast.
+    """
+    global lora_rx_data, lora_rx_status, loranode
+    
+    if events & SX126X_IRQ_RX_DONE:
+        # Packet received - read it immediately
+        try:
+            msg, status = loranode.recv(len=0)
+            lora_rx_data = msg
+            lora_rx_status = status
+            # Signal async task to process the packet
+            lora_rx_event.set()
+        except Exception as e:
+            logger.error(f"[LORA] Error in interrupt callback: {e}")
+            lora_rx_data = None
+            lora_rx_status = ERR_UNKNOWN
+            lora_rx_event.set()
+    elif events & SX126X_IRQ_TX_DONE:
+        # Transmission complete - radio automatically returns to RX mode
+        logger.debug("[LORA] TX_DONE interrupt")
+
+
 async def radio_read():
-    logger.info(f"===> Radio Read, LoRa receive loop started... <===\n")
+    """
+    Interrupt-driven LoRa receive loop.
+    No polling - waits for interrupt callback to signal packet arrival.
+    """
+    global lora_rx_data, lora_rx_status, lora_rx_event
+    
+    logger.info(f"===> Radio Read, LoRa interrupt-driven receive loop started... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
     loop_count = 0
     while True:
@@ -1873,54 +1913,54 @@ async def radio_read():
             continue
 
         try:
-            # Use blocking mode with timeout for async compatibility
-            # Optimized timeout (200ms) for high-speed communication (SF5, BW500kHz)
-            # Note: recv() internally uses blocking sleeps (sleep_ms), which blocks the async event loop
-            # but the timeout ensures it returns after LORA_RX_TIMEOUT_MS
+            # Wait for interrupt event (blocks until callback fires)
+            # This is much more efficient than polling - task is suspended until data arrives
+            await lora_rx_event.wait()
+            
+            # Clear event for next interrupt
+            lora_rx_event.clear()
+            
             loop_count += 1
             if loop_count == 1:
-                logger.info(f"[LORA] Starting receive loop, loranode={loranode is not None}")
-            elif loop_count % 100 == 0:  # Log every 100 iterations (~10 seconds with 100ms timeout)
+                logger.info(f"[LORA] First packet received via interrupt (iteration {loop_count})")
+            elif loop_count % 100 == 0:
                 logger.info(f"[LORA] Receive loop running (iteration {loop_count})...")
 
-            # This call will block for up to LORA_RX_TIMEOUT_MS (100ms)
-            # During this time, the async event loop is blocked, but it will return after timeout
-            # Note: recv() uses blocking sleep_ms() internally, which blocks the async event loop
-            # This is acceptable as the timeout ensures it returns after LORA_RX_TIMEOUT_MS
-            msg, status = loranode.recv(len=0, timeout_en=True, timeout_ms=LORA_RX_TIMEOUT_MS)
-
-            if status == ERR_NONE:
+            # Process the received packet
+            if lora_rx_status == ERR_NONE:
                 # Valid packet received
-                if len(msg) > 0:
+                if lora_rx_data and len(lora_rx_data) > 0:
                     rssi = loranode.getRSSI()  # Get RSSI after successful receive
                     snr = loranode.getSNR()  # Get SNR after successful receive
-                    airtime_us = loranode.getTimeOnAir(len(msg))  # Calculate airtime for received packet
-                    process_message(msg, rssi, snr, airtime_us)
+                    airtime_us = loranode.getTimeOnAir(len(lora_rx_data))  # Calculate airtime for received packet
+                    process_message(lora_rx_data, rssi, snr, airtime_us)
                 else:
                     logger.debug(f"[LORA] Empty packet received")
-            elif status == ERR_RX_TIMEOUT:
-                # No packet received (expected, continue loop)
-                pass
-            elif status == ERR_CRC_MISMATCH:                          # TODO check if this is needed
+            elif lora_rx_status == ERR_CRC_MISMATCH:
                 # Corrupted packet - log but try to process anyway for robustness
-                logger.warning(f"[LORA] CRC error but attempting to process packet (len={len(msg)})")
-                # if len(msg) > 0:
+                logger.warning(f"[LORA] CRC error but attempting to process packet (len={len(lora_rx_data) if lora_rx_data else 0})")
+                # if lora_rx_data and len(lora_rx_data) > 0:
                 #     rssi = loranode.getRSSI()
-                #     snr = loranode.getSNR()  # Get SNR even for CRC error packets
-                #     airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime
-                #     # Try to process even with CRC error - some protocols can handle it
-                #     process_message(message, rssi, snr, airtime_us)
-                pass
+                #     snr = loranode.getSNR()
+                #     airtime_us = loranode.getTimeOnAir(len(lora_rx_data))
+                #     process_message(lora_rx_data, rssi, snr, airtime_us)
             else:
                 # Other error - log and continue
-                logger.warning(f"[LORA] Receive error status: {status}")
+                logger.warning(f"[LORA] Receive error status: {lora_rx_status}")
+            
+            # Clear received data
+            lora_rx_data = None
+            lora_rx_status = None
+            
         except Exception as e:
+            lora_rx_data = None
+            lora_rx_status = None
             logger.error(f"[LORA] Exception in radio_read: {e}")
             await asyncio.sleep(0.1)  # Brief pause on error
 
         # Small async sleep to yield to event loop (recv() uses blocking sleeps internally)
         # This prevents blocking the entire async event loop
-        await asyncio.sleep(0.005)  # Balanced yield for reliable async event loop operation
+        # await asyncio.sleep(0.005)  # Balanced yield for reliable async event loop operation
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers

@@ -15,14 +15,16 @@ class SX1262(SX126X):
     PREAMBLE_DETECT_32 = SX126X_GFSK_PREAMBLE_DETECT_32
     STATUS = ERROR
 
-    def __init__(self, spi_bus, clk, mosi, miso, cs, irq, rst, gpio, spi_baudrate=2000000, spi_polarity=0, spi_phase=0):
+    def __init__(self, spi_bus, clk, mosi, miso, cs, irq, rst, gpio, spi_baudrate=2000000, spi_polarity=0, spi_phase=0, blocking=True, event_callback=None):
         super().__init__(spi_bus, clk, mosi, miso, cs, irq, rst, gpio, spi_baudrate, spi_polarity, spi_phase)
-        self._callbackFunction = self._dummyFunction
+        self.blocking = blocking
+        self.event_callback = event_callback
+        
 
     def begin(self, freq=434.0, bw=125.0, sf=9, cr=7, syncWord=SX126X_SYNC_WORD_PRIVATE,
               power=14, currentLimit=60.0, preambleLength=8, implicit=False, implicitLen=0xFF,
-              crcOn=True, txIq=False, rxIq=False, tcxoVoltage=1.6, useRegulatorLDO=False,
-              blocking=True):
+              crcOn=True, txIq=False, rxIq=False, tcxoVoltage=1.6, useRegulatorLDO=False
+):
         state = super().begin(bw, sf, cr, syncWord, currentLimit, preambleLength, tcxoVoltage, useRegulatorLDO, txIq, rxIq)
         ASSERT(state)
 
@@ -44,7 +46,7 @@ class SX1262(SX126X):
         state = super().fixPaClamping()
         ASSERT(state)
 
-        state = self.setBlockingCallback(blocking)
+        state = self._setBlockingCallback(self.blocking)
 
         return state
 
@@ -53,8 +55,7 @@ class SX1262(SX126X):
                  addrFilter=SX126X_GFSK_ADDRESS_FILT_OFF, addr=0x00, crcLength=2, crcInitial=0x1D0F, crcPolynomial=0x1021,
                  crcInverted=True, whiteningOn=True, whiteningInitial=0x0100,
                  fixedPacketLength=False, packetLength=0xFF, preambleDetectorLength=SX126X_GFSK_PREAMBLE_DETECT_16,
-                 tcxoVoltage=1.6, useRegulatorLDO=False,
-                 blocking=True):
+                 tcxoVoltage=1.6, useRegulatorLDO=False):
         state = super().beginFSK(br, freqDev, rxBw, currentLimit, preambleLength, dataShaping, preambleDetectorLength, tcxoVoltage, useRegulatorLDO)
         ASSERT(state)
 
@@ -92,7 +93,7 @@ class SX1262(SX126X):
         state = super().fixPaClamping()
         ASSERT(state)
 
-        state = self.setBlockingCallback(blocking)
+        state = self._setBlockingCallback(self.blocking)
 
         return state
 
@@ -154,22 +155,18 @@ class SX1262(SX126X):
         if not self.blocking:
             ASSERT(super().startReceive())
 
-    def setBlockingCallback(self, blocking, callback=None):
-        self.blocking = blocking
+    def _setBlockingCallback(self):
         if not self.blocking:
             state = super().startReceive()
             ASSERT(state)
-            if callback != None:
-                self._callbackFunction = callback
+            if self.event_callback != None:
                 super().setDio1Action(self._onIRQ)
             else:
-                self._callbackFunction = self._dummyFunction
                 super().clearDio1Action()
             return state
         else:
             state = super().standby()
             ASSERT(state)
-            self._callbackFunction = self._dummyFunction
             super().clearDio1Action()
             return state
 
@@ -256,11 +253,9 @@ class SX1262(SX126X):
         state = super().startTransmit(data, len(data))
         return len(data), state
 
-    def _dummyFunction(self, *args):
-        pass
 
-    def _onIRQ(self, callback):
+    def _onIRQ(self):
         events = self._events()
         if events & SX126X_IRQ_TX_DONE:
             super().startReceive()
-        self._callbackFunction(events)
+        self.event_callback(events)
