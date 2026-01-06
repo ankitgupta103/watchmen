@@ -49,7 +49,8 @@ CHUNK_SLEEP = 0.025  # 25ms between chunks for SF5/BW500kHz (small buffer for re
 CHUNK_BURST_DELAY = 0.025  # Delay between chunks in burst mode (no ACK waiting)
 QUERY_RESPONSE_TIMEOUT = 3.0  # Timeout for "M" response (seconds) - increased for network delays
 MAX_QUERY_RETRIES = 10  # Maximum query cycles before giving up
-BURST_START_DELAY = 0.2  # Delay after "B" ACK before starting burst (ensures receiver is ready)
+BURST_START_DELAY = 0.2  # Delay after sending \"B\" before starting burst (ensures receiver is ready)
+BEGIN_RETRY_COUNT = 2  # How many times to send initial \"B\" for robustness (fire-and-forget)
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -754,14 +755,17 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
             chunks = make_chunks(msgbytes)
             logger.info(f"[⋙ FAST TX] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
 
-            # Step 1: Send "B" (Begin) message and wait for ACK
-            big_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{len(chunks)}", dest)
-            if not big_succ:
-                logger.error(f"[CHUNK] Failed sending chunk begin")
-                delete_transmode_lock(dest, img_id)
-                return False
+            # Step 1: Send \"B\" (Begin) message in fire-and-forget mode (no ACK wait)
+            # We send it a few times for robustness, then proceed to burst.
+            begin_payload = f\"{img_id}:{epoch_ms}:{len(chunks)}\"
+            for i in range(BEGIN_RETRY_COUNT):
+                succ = await send_msg(\"B\", creator, begin_payload.encode(), dest)
+                if not succ:
+                    logger.warning(f\"[CHUNK] Failed sending B (begin) attempt {i+1}/{BEGIN_RETRY_COUNT}\")
+                # small spacing between B retries
+                await asyncio.sleep(0.05)
 
-            # Give receiver time to process "B" and initialize chunk_map before chunks arrive
+            # Give receiver time to process \"B\" and initialize chunk_map before chunks arrive
             await asyncio.sleep(BURST_START_DELAY)
 
             # Step 2: Send ALL "I" chunks back-to-back without ACKs (fast burst mode)
