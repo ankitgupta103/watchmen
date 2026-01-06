@@ -152,10 +152,11 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
+print(f"uid : {uid}")
 # COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7194025':
     my_addr = 225
-elif uid == b'e076465dd7193a09':
+elif uid == b'e076465dd7194211':
     my_addr = 219
 elif uid ==  b'e076465dd7090d1c':
     my_addr = 221
@@ -1820,7 +1821,7 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
                     cleanup_chunk_map_by_msg_id(img_id)
                 except Exception as e:
                     logger.error(f"[IMG RX] Error cleaning up chunk map for img_id {img_id}: {e}")
-                
+
                 try:
                     enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
                     logger.info(f"[IMG RX] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
