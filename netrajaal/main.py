@@ -126,8 +126,8 @@ seen_neighbours = []
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
 
-COMMAN_CENTER_ADDRS = [219]
-IMAGE_CAPTURING_ADDRS = [221] # [] empty means capture at all device, else on list of devices
+COMMAN_CENTER_ADDRS = [219, 222]
+IMAGE_CAPTURING_ADDRS = [221, 223] # [] empty means capture at all device, else on list of devices
 import fakelayout
 flayout = fakelayout.Layout()
 
