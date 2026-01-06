@@ -25,15 +25,14 @@ import gc                   # garbage collection for memory management
 
 import enc
 from sx1262 import SX1262
-from _sx126x import ERR_NONE, ERR_RX_TIMEOUT, ERR_CRC_MISMATCH, SX126X_SYNC_WORD_PRIVATE
+from _sx126x import ERR_NONE, SX126X_SYNC_WORD_PRIVATE
 import gps_driver
-# from cellular_driver import Cellular
+from cellular_driver import Cellular
 import detect
-# jack
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # TESTING VARIABLES
-DYNAMIC_SPATH = False
+DYNAMIC_SPATH = True
 ENCRYPTION_ENABLED = True
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
@@ -44,9 +43,9 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.01  # Minimal delay for reliable high-speed communication
-ACK_SLEEP = 0.03  # ACK sleep for reliable checking at high data rates
-CHUNK_SLEEP = 0.005  # Minimal delay between chunks for fast transmission
+MIN_SLEEP = 0.1
+ACK_SLEEP = 0.2
+CHUNK_SLEEP = 0.1  # Increased from 0.2 to 0.3 (300ms) to exceed RX_DELAY_MS (250ms)
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -71,6 +70,7 @@ GPS_WAIT_SEC = 5
 # Memory Management Constants
 MAX_MSGS_SENT = 500          # Maximum messages in sent buffer
 MAX_MSGS_RECD = 500          # Maximum messages in received buffer
+MAX_MSGS_UNACKED = 100       # Maximum unacknowledged messages
 MAX_CHUNK_MAP_SIZE = 50      # Maximum chunk entries (chunk_id to chunks)
 MAX_IMAGES_SAVED_AT_CC = 200 # Maximum image filenames to track at CC
 MAX_IMAGES_TO_SEND = 50      # Maximum images in send queue
@@ -80,26 +80,23 @@ GC_COLLECT_INTERVAL_SEC = 60    # Run garbage collection every minute
 
 MIDLEN = 7
 FLAKINESS = 0
-PACKET_PAYLOAD_LIMIT = 195 # bytes (safe limit accounting for msg_uid+separator overhead - max packet 255 bytes)
+PACKET_PAYLOAD_LIMIT = 195 # bytes
 
-AIR_SPEED = 19200
+# LoRa Configuration - Highest Speed Settings (SF5, BW500kHz, CR5)
+LORA_FREQ = 868.0          # Frequency in MHz
+LORA_BW = 500.0            # Bandwidth in kHz (500kHz for maximum speed)
+LORA_SF = 5                # Spreading Factor (5 for maximum speed, range: 5-12)
+LORA_CR = 5                # Coding Rate (5 = 4/5, range: 5-8)
+LORA_POWER = 22            # Transmission power in dBm (range: -9 to 22)
+LORA_PREAMBLE = 8          # Preamble length in symbols
+LORA_SYNC_WORD = SX126X_SYNC_WORD_PRIVATE  # Private sync word (0x12)
+LORA_RX_TIMEOUT_MS = 1000  # RX timeout in milliseconds for blocking recv()
 
-# LoRa Configuration Constants - Maximum Speed (SF5, BW500kHz, CR5, Preamble 6) for fastest communication
-LORA_FREQ = 868.0
-LORA_SF = 5  # Spreading Factor 5 (highest data rate ~38 kbps)
-LORA_BW = 500.0  # Bandwidth 500 kHz (highest bandwidth for maximum speed)
-LORA_CR = 5  # Coding Rate 4/5 (fastest valid CR - valid range is 5-8, where CR5=4/5 is fastest)
-LORA_PREAMBLE = 6  # Preamble length (reduced from 8 to 6 for maximum speed - minimum safe value)
-LORA_POWER = 14  # TX power in dBm
-LORA_RX_TIMEOUT_MS = 100  # Receive timeout for async loop (balanced for speed and reliability)
 
 
 # WiFi Configuration
-# WIFI_SSID = "Lifestyle 6th floor-2.4G"
-# WIFI_PASSWORD = "9821992096"
 WIFI_SSID = "Airtel_anki_3363_2.4G"
 WIFI_PASSWORD = "air34854"
-
 WIFI_ENABLED = True
 
 cellular_system = None
@@ -139,8 +136,7 @@ seen_neighbours = []
 # --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
 
 COMMAN_CENTER_ADDRS = [219]
-IMAGE_CAPTURING_ADDRS = [221, 223] # [] empty means capture at all device, else on list of devices
-IMAGE_LIMIT = 10 # 10 or None
+IMAGE_CAPTURING_ADDRS = [221] # [] empty means capture at all device, else on list of devices
 import fakelayout
 flayout = fakelayout.Layout()
 
@@ -152,12 +148,13 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
-print(f"uid : {uid}")
 # COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7194025':
-    my_addr = 225
-elif uid == b'e076465dd7194211':
     my_addr = 219
+elif uid == b'e076465dd7193a09':
+    my_addr = 225
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = [219]
 elif uid ==  b'e076465dd7090d1c':
     my_addr = 221
     if not DYNAMIC_SPATH:
@@ -166,8 +163,6 @@ elif uid == b'e076465dd7091027':
     my_addr = 222
 elif uid == b'e076465dd7091843':
     my_addr = 223
-    if not DYNAMIC_SPATH:
-        shortest_path_to_cc = [219]
 else:
     logger.error("error in main.py: Unknown device ID for " + omv.board_id())
     sys.exit()
@@ -335,10 +330,9 @@ def ellepsis(msg):
 
 def ack_needed(msg_typ): # msg_type P is devided in (B,I,E)
     # Input: msg_typ: str; Output: bool indicating if acknowledgement required
-    # "I" chunks now require ACK for reliable transmission (like example/capture-send pattern)
-    if msg_typ in ["A", "S", "W", "N"]:
+    if msg_typ in ["A", "I", "S", "W", "N"]:
         return False
-    if msg_typ in ["H", "B", "E", "V", "C", "T", "I"]:  # Added "I" for chunk ACKs
+    if msg_typ in ["H", "B", "E", "V", "C", "T"]:
         return True
     return False
 
@@ -366,7 +360,7 @@ def get_transmode_lock(device_id, img_id): # check and just lock for image
     data_id = img_id
     logger.info(f"[IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:{device_id}, img_id:{img_id} ❮❮●●●●●●●●●●")
     return True
-
+    
 async def keep_transmode_lock(device_id, img_id):
     # Input: None; Output: None (sets image_in_progress flag with auto release after timeout)
     global image_in_progress, paired_device, data_id
@@ -381,10 +375,6 @@ async def keep_transmode_lock(device_id, img_id):
 
 def check_transmode_lock(device_id, img_id): # check if transfer lock is active or not
     global image_in_progress, paired_device, data_id
-    # If img_id is None, only check device_id (for backward compatibility)
-    if img_id is None:
-        return image_in_progress and paired_device == device_id
-    # Otherwise check both device_id and img_id
     if image_in_progress and paired_device == device_id and data_id == img_id:
         return True
     else:
@@ -414,14 +404,14 @@ def is_device_free(device_id):
     if device_id in busy_devices:
         return False
     return True
-
+    
 def is_device_busy(device_id):
     global busy_devices
     # return device_id in busy_devices
     if device_id in busy_devices:
         return True
     return False
-
+    
 async def device_busy_life(device_id): # device_busy_cycle
     # Input: device_id: int; Output: None (sets image_in_progress flag with auto release after timeout)
     global busy_devices
@@ -501,7 +491,7 @@ async def init_lora():
             bw=LORA_BW,
             sf=LORA_SF,
             cr=LORA_CR,
-            syncWord=SX126X_SYNC_WORD_PRIVATE,
+            syncWord=LORA_SYNC_WORD,
             power=LORA_POWER,
             currentLimit=60.0,
             preambleLength=LORA_PREAMBLE,
@@ -516,9 +506,11 @@ async def init_lora():
             logger.error(f"[LORA] Failed to initialize SX1262, status: {status}")
             loranode = None
         else:
-            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, Preamble{LORA_PREAMBLE} (maximum speed configuration with optimized chunk size and timing)")
+            logger.info(f"[LORA] SX1262 initialized successfully with SF{LORA_SF}, BW{LORA_BW}kHz, CR{LORA_CR}, Preamble{LORA_PREAMBLE} (maximum speed configuration)")
     except Exception as e:
         logger.error(f"[LORA] Exception during LoRa initialization: {e}")
+        import sys
+        sys.print_exception(e)
         loranode = None
     finally:
         lora_init_in_progress = False
@@ -539,15 +531,24 @@ def is_lora_ready():
 
 
 
+msgs_sent = []
+msgs_unacked = []
 msgs_recd = []
 
 # Memory Management Functions
-def cleanup_old_recd_messages():
+def cleanup_old_messages():
     """Remove old messages from buffers based on age and size limits"""
-    global msgs_recd
+    global msgs_sent, msgs_recd, msgs_unacked
     current_time = time_msec()
     age_threshold_ms = MAX_OLD_MSG_AGE_SEC * 1000
 
+    # Clean msgs_sent - remove messages older than threshold
+    msgs_sent = [(msg_uid, msg, t) for msg_uid, msg, t in msgs_sent
+                 if (current_time - t) < age_threshold_ms]
+    # Also limit by size
+    if len(msgs_sent) > MAX_MSGS_SENT:
+        msgs_sent = msgs_sent[-MAX_MSGS_SENT:]
+        logger.info(f"[MEM] Trimmed msgs_sent to {MAX_MSGS_SENT} entries")
 
     # Clean msgs_recd - remove messages older than threshold
     msgs_recd = [(msg_uid, msg, t) for msg_uid, msg, t in msgs_recd
@@ -557,6 +558,26 @@ def cleanup_old_recd_messages():
         msgs_recd = msgs_recd[-MAX_MSGS_RECD:]
         logger.info(f"[MEM] Trimmed msgs_recd to {MAX_MSGS_RECD} entries")
 
+    # Clean msgs_unacked - remove very old unacked messages (they likely failed)
+    old_unacked = []
+    new_unacked = []
+    for msg_uid, msg, t in msgs_unacked:
+        age = current_time - t
+        if age > age_threshold_ms * 2:  # Double threshold for unacked (more lenient)
+            old_unacked.append(msg_uid)
+        else:
+            new_unacked.append((msg_uid, msg, t))
+    msgs_unacked = new_unacked
+
+    if len(old_unacked) > 0:
+        logger.info(f"[MEM] Removed {len(old_unacked)} old unacked messages")
+
+    # Also limit by size
+    if len(msgs_unacked) > MAX_MSGS_UNACKED:
+        # Remove oldest ones
+        msgs_unacked.sort(key=lambda x: x[2])  # Sort by timestamp
+        msgs_unacked = msgs_unacked[-MAX_MSGS_UNACKED:]
+        logger.info(f"[MEM] Trimmed msgs_unacked to {MAX_MSGS_UNACKED} entries")
 
 def cleanup_chunk_map():
     """Clean up old/incomplete chunk entries"""
@@ -570,13 +591,6 @@ def cleanup_chunk_map():
             chunk_map.pop(key)
         logger.info(f"[MEM] Cleaned {entries_to_remove} old chunk_map entries")
 
-def cleanup_chunk_map_by_msg_id(img_id):
-    """Clean up old/incomplete chunk entries"""
-    global chunk_map
-    if img_id in chunk_map.keys():
-        chunk_map.pop(img_id)
-        logger.info(f"[MEM] Cleaned chunks from chun_map for img_id:{img_id}")
-
 
 async def periodic_memory_cleanup():
     """Periodically clean up memory buffers and run garbage collection"""
@@ -588,57 +602,58 @@ async def periodic_memory_cleanup():
             logger.info(f"[MEM] Starting memory cleanup (free: {free_before/1024:.1f}KB)")
 
             # Clean up message buffers
-            cleanup_old_recd_messages()
+            cleanup_old_messages()
 
             # Clean up chunk map
             cleanup_chunk_map()
-
+            
             # Run garbage collection
-            # gc.collect()
-
+            gc.collect()
 
             free_after = get_free_memory()
             freed = free_after - free_before if free_before > 0 and free_after > 0 else 0
             logger.info(f"[MEM] Cleanup complete (free: {free_after/1024:.1f}KB, freed: {freed/1024:.1f}KB)")
-            logger.info(f"[MEM] Buffers - recd:{len(msgs_recd)}, chunks:{len(chunk_map)}")
+            logger.info(f"[MEM] Buffers - sent:{len(msgs_sent)}, recd:{len(msgs_recd)}, unacked:{len(msgs_unacked)}, chunks:{len(chunk_map)}")
 
         except Exception as e:
             logger.error(f"[MEM] error in memory cleanup: {e}")
 
-# async def periodic_gc():
-#     """Run garbage collection more frequently for aggressive cleanup"""
-#     while True:
-#         try:
-#             await asyncio.sleep(GC_COLLECT_INTERVAL_SEC)
-#             gc.collect()
-#         except Exception as e:
-#             logger.error(f"[MEM] error in periodic GC: {e}")
+async def periodic_gc():
+    """Run garbage collection more frequently for aggressive cleanup"""
+    while True:
+        try:
+            await asyncio.sleep(GC_COLLECT_INTERVAL_SEC)
+            gc.collect()
+        except Exception as e:
+            logger.error(f"[MEM] error in periodic GC: {e}")
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
 def radio_send(dest, data, msg_uid):
     # Input: dest: int, data: bytes; Output: None (sends bytes via LoRa, logs send)
+    # Note: dest is included in msg_uid header, so we don't need it for the new driver
     global sent_count
     sent_count = sent_count + 1
     lendata = len(data)
     if len(data) > 254:
         logger.error(f"[LORA] msg too large : {len(data)}")
-        return
-    #data = lendata.to_bytes(1) + data
+    # Replace newlines to avoid issues (protocol compatibility)
     data = data.replace(b"\n", b"{}[]")
-    # SX1262 send() doesn't take dest parameter - addressing is in the data payload
-    try:
-        # Calculate airtime before sending (more accurate for logging)
-        airtime_us = loranode.getTimeOnAir(len(data))
-        len_sent, status = loranode.send(data)
-        if status != ERR_NONE:
-            logger.error(f"[LORA] Send failed with status {status}, MSG_UID = {msg_uid}, dest={dest}")
-        # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
-        data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-        airtime_ms = airtime_us / 1000.0
-        logger.info(f"[⮕ SENT to {dest}, airtime: {airtime_ms:.2f}ms] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
-    except Exception as e:
-        logger.error(f"[LORA] Exception in radio_send: {e}, MSG_UID = {msg_uid}")
+    # New driver API: send(data) returns (payload_len, status)
+    payload_len, status = loranode.send(data)
+    if status != ERR_NONE:
+        logger.error(f"[LORA] Send failed with status: {status}, MSG_UID = {msg_uid}")
+    # Map 0-210 bytes to 1-10 asterisks, anything above 210 = 10 asterisks
+    data_masked_log = min(10, max(1, (len(data) + 20) // 21))
+    logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+
+def pop_and_get(msg_uid):
+    # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
+    for i in range(len(msgs_unacked)):
+        m, d, t = msgs_unacked[i]
+        if m == msg_uid:
+            return msgs_unacked.pop(i)
+    return None
 
 async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
@@ -646,46 +661,44 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     databytes = msg_uid + b";" + msgbytes
     ackneeded = ack_needed(msg_typ)
     timesent = time_msec()
-
+    if ackneeded:
+        msgs_unacked.append((msg_uid, msgbytes, timesent))
+    else:
+        msgs_sent.append((msg_uid, msgbytes, timesent))
     if not ackneeded:
         radio_send(dest, databytes, msg_uid)
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
-
-    ack_msg_recheck_count = 16 # Increased for frequent ACK detection at high speed
+    ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
     for retry_i in range(retry_count):
-            radio_send(dest, databytes, msg_uid)
-            await asyncio.sleep(ACK_SLEEP)  # Initial wait after sending
-            first_log_flag = True
-            for i in range(ack_msg_recheck_count): # ack_msg recheck
-                at, missing_chunks = ack_time(msg_uid)
-                if at > 0:
-                    logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
-                    return (True, missing_chunks)
+        radio_send(dest, databytes, msg_uid)
+        await asyncio.sleep(ACK_SLEEP)
+        first_log_flag = True
+        for i in range(ack_msg_recheck_count): # ack_msk recheck
+            at, missing_chunks = ack_time(msg_uid)
+            if at > 0:
+                logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
+                msgs_sent.append(pop_and_get(msg_uid))
+                return (True, missing_chunks)
+            else:
+                if first_log_flag:
+                    logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
+                    first_log_flag = False
                 else:
-                    if first_log_flag:
-                        logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
-                        first_log_flag = False
-                    else:
-                        logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                    # Balanced ACK checking: frequent but reliable
-                    await asyncio.sleep(
-                        ACK_SLEEP * 0.5  # Progressive sleep for reliable ACK detection
-                    )
-            logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
+                    logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
+                await asyncio.sleep(
+                    ACK_SLEEP * min(i + 1, 3)
+                )  # progressively more sleep, capped at 3x
+        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
 
 def make_chunks(msg):
-    # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each (safe size for 255 byte LoRa limit)
-    # Calculation: Max LoRa packet (255) - msg_uid+separator (8) - img_id (3) - chunk_index (2) = 242 bytes available
-    # Using 200 bytes per chunk for safety margin (prevents ERR_PACKET_TOO_LONG errors)
-    # Total packet: 7 (msg_uid) + 1 (;) + 3 (img_id) + 2 (chunk_index) + 200 (data) = 213 bytes (safe)
-    CHUNK_DATA_SIZE = 200
+    # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each
     chunks = []
-    while len(msg) > CHUNK_DATA_SIZE:
-        chunks.append(msg[0:CHUNK_DATA_SIZE])
-        msg = msg[CHUNK_DATA_SIZE:]
+    while len(msg) > 200:
+        chunks.append(msg[0:200])
+        msg = msg[200:]
     if len(msg) > 0:
         chunks.append(msg)
     return chunks
@@ -721,126 +734,65 @@ async def send_msg_internal(msg_typ, creator, msgbytes, dest): # all messages ex
     else:
         logger.warning(f"msgbtyes size exceeds the packet payload limit, {len(msgbytes)} bytes > {PACKET_PAYLOAD_LIMIT} bytes")
         return False
-
+        
 async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image sending
-    # Redesigned based on example/capture-send pattern:
-    # 1. Send begin packet, wait for ACK
-    # 2. Send chunks sequentially, wait for ACK after each chunk
-    # 3. Send end packet, wait for ACK with missing chunks list
-    # 4. Send missing chunks sequentially, wait for ACK after each
-    # 5. Only after all chunks ACKed, transmission complete
     if not is_lora_ready():
         return False
     if msg_typ == "P":
         img_id = get_rand()
         if get_transmode_lock(dest, img_id):
             asyncio.create_task(keep_transmode_lock(dest, img_id))
+            # sending start
             chunks = make_chunks(msgbytes)
-            num_chunks = len(chunks)
-            tx_start_time = utime.ticks_ms()  # Track start time for total transmission time
-            logger.info(f"[IMG TX] Starting image transmission: dest={dest}, len={len(msgbytes)} bytes, img_id={img_id}, chunks={num_chunks}")
-
-            # Step 1: Send begin packet and wait for ACK
-            begin_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{num_chunks}", dest)
-            if not begin_succ:
-                total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
-                total_time_sec = total_time_ms / 1000.0
-                logger.error(f"[IMG TX] Failed to send begin packet for img_id={img_id}. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
+            logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
+            big_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{len(chunks)}", dest)
+            if not big_succ:
+                logger.info(f"[CHUNK] Failed sending chunk begin")
                 delete_transmode_lock(dest, img_id)
                 return False
-            logger.info(f"[IMG TX] Begin packet ACKed, starting chunk transmission...")
-
-            # Step 2: Send all chunks sequentially, waiting for ACK after each chunk
-            # This ensures receiver stays in receive mode and processes chunks in order
-            sent_chunks = set()
-            for i in range(num_chunks):
-                if not check_transmode_lock(dest, img_id):
-                    total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
-                    total_time_sec = total_time_ms / 1000.0
-                    logger.error(f"[IMG TX] TRANS MODE ended, transmission failed. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
-                    delete_transmode_lock(dest, img_id)
-                    return False
-
+            
+            for i in range(len(chunks)):
                 if i % 10 == 0:
-                    logger.info(f"[IMG TX] Sending chunk {i+1}/{num_chunks}")
-
-                chunkbytes = img_id.encode() + i.to_bytes(2, 'big') + chunks[i]
-                chunk_succ, _ = await send_single_packet("I", creator, chunkbytes, dest, retry_count=5)
-                if not chunk_succ:
-                    logger.warning(f"[IMG TX] Failed to send chunk {i}, will retry in end phase")
+                    logger.info(f"[CHUNK] Sending chunk {i}")
+                await asyncio.sleep(CHUNK_SLEEP)
+                chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
+                _ = await send_single_packet("I", creator, chunkbytes, dest)
+            for retry_i in range(20):
+                if retry_i == 0:
+                    await asyncio.sleep(0.1)  # Faster first check
                 else:
-                    sent_chunks.add(i)
+                    await asyncio.sleep(CHUNK_SLEEP)
+                succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count = 10)
+                if not succ:
+                    logger.error(f"[CHUNK] Failed sending chunk end")
+                    break
 
-            logger.info(f"[IMG TX] Initial chunk transmission complete: {len(sent_chunks)}/{num_chunks} chunks sent successfully, {num_chunks - len(sent_chunks)} failed")
-
-            # Step 3: Send end packet and get missing chunks list
-            max_end_retries = 15  # Increased retries for robust transmission
-            for end_retry in range(max_end_retries):
-                if not check_transmode_lock(dest, img_id):
-                    total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
-                    total_time_sec = total_time_ms / 1000.0
-                    logger.error(f"[IMG TX] TRANS MODE ended during end packet phase. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
+                # Treat various ACK forms as success:
+                # - [-1]   : explicit "all done" from receiver
+                # - []/None: truncated or minimal ACK with no missing list (we assume success)
+                if (
+                    missing_chunks is None
+                    or len(missing_chunks) == 0
+                    or (len(missing_chunks) == 1 and missing_chunks[0] == -1)
+                ):
+                    logger.info(f"[CHUNK] Successfully sent all chunks (missing_chunks={missing_chunks})")
                     delete_transmode_lock(dest, img_id)
+                    return True
+
+                logger.info(
+                    f"[CHUNK] Receiver still missing {len(missing_chunks)} chunks after retry {retry_i}: {missing_chunks}"
+                )
+                if not check_transmode_lock(dest, img_id): # check old logs is still in progress or not
+                    logger.error(f"TRANS MODE ended, marking data send as failed, timeout error")
                     return False
-
-                end_succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count=5)
-                if not end_succ:
-                    logger.warning(f"[IMG TX] Failed to send end packet, retry {end_retry+1}/{max_end_retries}")
-                    await asyncio.sleep(0.05)  # Brief delay before retry for reliability
-                    continue
-
-                # Parse missing chunks from ACK response
-                if missing_chunks is None or len(missing_chunks) == 0:
-                    # All chunks received successfully
-                    total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
-                    total_time_sec = total_time_ms / 1000.0
-                    logger.info(f"[IMG TX] All chunks received successfully! Transmission complete. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
-                    delete_transmode_lock(dest, img_id)
-                    return True
-
-                # Check if receiver explicitly confirmed completion
-                if len(missing_chunks) == 1 and missing_chunks[0] == -1:
-                    total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
-                    total_time_sec = total_time_ms / 1000.0
-                    logger.info(f"[IMG TX] Receiver confirmed all chunks received (ACK with -1). Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
-                    delete_transmode_lock(dest, img_id)
-                    return True
-
-                # Step 4: Send missing chunks sequentially
-                logger.info(f"[IMG TX] Receiver missing {len(missing_chunks)} chunks: first 10 = {missing_chunks[:10]}, last 10 = {missing_chunks[-10:]}")
-                missing_list = missing_chunks[:]  # Copy list
-                retransmitted_count = 0
-
-                for mis_chunk_idx in missing_list:
-                    if not check_transmode_lock(dest, img_id):
-                        total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
-                        total_time_sec = total_time_ms / 1000.0
-                        logger.error(f"[IMG TX] TRANS MODE ended during missing chunk retransmission. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
-                        delete_transmode_lock(dest, img_id)
-                        return False
-
-                    if mis_chunk_idx < 0 or mis_chunk_idx >= num_chunks:
-                        logger.warning(f"[IMG TX] Invalid missing chunk index {mis_chunk_idx}, skipping")
-                        continue
-
-                    chunkbytes = img_id.encode() + mis_chunk_idx.to_bytes(2, 'big') + chunks[mis_chunk_idx]
-                    retry_succ, _ = await send_single_packet("I", creator, chunkbytes, dest, retry_count=5)
-                    if retry_succ:
-                        retransmitted_count += 1
-                    else:
-                        logger.warning(f"[IMG TX] Failed to retry missing chunk {mis_chunk_idx}")
-
-                logger.info(f"[IMG TX] Retransmitted {retransmitted_count}/{len(missing_list)} missing chunks")
-                # No delay needed - ACK already waited for in send_single_packet
-
-            # If we exhausted retries, transmission failed
-            total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
-            total_time_sec = total_time_ms / 1000.0
-            logger.error(f"[IMG TX] Failed to complete transmission after {max_end_retries} end packet retries. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
+                for mis_chunk in missing_chunks:
+                    await asyncio.sleep(CHUNK_SLEEP)
+                    chunkbytes = img_id.encode() + mis_chunk.to_bytes(2) + chunks[mis_chunk]
+                    _ = await send_single_packet("I", creator, chunkbytes, dest)
             delete_transmode_lock(dest, img_id)
             return False
-        else:
-            logger.warning(f"[IMG TX] TRANS MODE already in use, could not get lock...")
+        else: 
+            logger.warning(f"TRANS MODE already in use, could not get lock...")
             return False
     else:
         logger.warning(f"Invalid message type: {msg_typ}")
@@ -898,22 +850,16 @@ def begin_chunk(msg):
     img_id = parts[0]
     epoch_ms = int(parts[1])
     numchunks = int(parts[2])
-    # Only initialize if not already present (handle duplicate B packets)
-    # Use list instead of tuple for chunk_map entry to allow modification
-    if img_id not in chunk_map:
-        chunk_map[img_id] = ["B", numchunks, []]  # Changed from tuple to list for mutability
-        logger.info(f"[IMG RX] Initialized chunk_map for img_id={img_id}, expected_chunks={numchunks}")
+    chunk_map[img_id] = ("B", numchunks, [])
     return (img_id, epoch_ms, numchunks)
-
+    
 
 def get_missing_chunks(img_id):
     # Input: img_id: str chunk identifier; Output: list of int missing chunk indices
     if img_id not in chunk_map:
-        logger.warning(f"[CHUNK] get_missing_chunks: no entry for img_id={img_id}")
+        #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
         return []
-    entry = chunk_map[img_id]
-    expected_chunks = entry[1]
-    list_chunks = entry[2]
+    msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
     missing_chunks = []
     for i in range(expected_chunks):
         if not get_data_for_iter(list_chunks, i):
@@ -923,44 +869,20 @@ def get_missing_chunks(img_id):
 def add_chunk(msgbytes):
     # Input: msgbytes: bytes containing chunk id + index + payload; Output: None (stores chunk data)
     if len(msgbytes) < 5:
-        logger.error(f"[CHUNK RX] not enough bytes {len(msgbytes)}")
+        logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
         return
-    try:
-        img_id = msgbytes[0:3].decode()
-        citer = int.from_bytes(msgbytes[3:5], 'big')  # Consistent with sender's to_bytes(2, 'big')
-        cdata = msgbytes[5:]
-        if img_id not in chunk_map:
-            logger.warning(f"[CHUNK RX] no entry yet for img_id={img_id}, chunk_index={citer} (chunk may have arrived before B packet or chunk_map was cleared)")
-            return
-
-        # Check if chunk already exists (deduplicate)
-        chunk_list = chunk_map[img_id][2]
-        chunk_exists = False
-        for idx, (stored_citer, _) in enumerate(chunk_list):
-            if stored_citer == citer:
-                chunk_exists = True
-                # Update existing chunk (replace with new one in case of corruption)
-                chunk_list[idx] = (citer, cdata)
-                break
-
-        if not chunk_exists:
-            # Store new chunk
-            chunk_list.append((citer, cdata))
-
-        entry = chunk_map[img_id]
-        expected_chunks = entry[1]
-        missing = get_missing_chunks(img_id)
-        received = expected_chunks - len(missing)
-        # Log progress every 20 chunks or when complete for debugging (optimized: only log when significant)
-        # Reduced logging frequency to minimize blocking in receive loop
-        if received % 20 == 0 or received == expected_chunks:
-            # Use debug level for frequent updates, info only for milestones
-            if received == expected_chunks:
-                logger.info(f"[IMG RX] Received chunk {citer}: {received}/{expected_chunks} chunks complete (stored {len(chunk_list)} total, missing={len(missing)})")
-            else:
-                logger.debug(f"[IMG RX] Received chunk {citer}: {received}/{expected_chunks} chunks complete (stored {len(chunk_list)} total, missing={len(missing)})")
-    except Exception as e:
-        logger.error(f"[CHUNK RX] Error adding chunk: {e}, msgbytes_len={len(msgbytes)}")
+    img_id = msgbytes[0:3].decode()
+    citer = int.from_bytes(msgbytes[3:5])
+    #logger.info(f"Got chunk id {citer}")
+    cdata = msgbytes[5:]
+    if img_id not in chunk_map:
+        logger.error(f"[CHUNK] no entry yet for {img_id}")
+        return
+    chunk_map[img_id][2].append((citer, cdata))
+    _, expected_chunks, _ = chunk_map[img_id]
+    missing = get_missing_chunks(img_id)
+    received = expected_chunks - len(missing)
+    #logger.info(f" ===== Got {received} / {expected_chunks} chunks ====")
 
 def get_data_for_iter(list_chunks, chunkiter):
     # Input: list_chunks: list of tuples(iter:int, data:bytes), chunkiter: int; Output: bytes or None for specific chunk
@@ -974,26 +896,13 @@ def recompile_msg(img_id):
     if len(get_missing_chunks(img_id)) > 0:
         return None
     if img_id not in chunk_map:
-        logger.warning(f"[CHUNK] recompile_msg: no entry for img_id={img_id}")
-        return None
-
-    # Force garbage collection before allocating memory for full image
-    gc.collect()
-
-    entry = chunk_map[img_id]
-    expected_chunks = entry[1]
-    list_chunks = entry[2]
-
-    # Build recompiled image by concatenating chunks in order
-    # Note: This temporarily requires memory for both chunks and recompiled image
-    # Memory is freed immediately after recompilation in the calling code
+        #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
+        return []
+    msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
     recompiled = b""
     for i in range(expected_chunks):
-        chunk_data = get_data_for_iter(list_chunks, i)
-        if chunk_data is None:
-            logger.error(f"[CHUNK] recompile_msg: missing chunk {i} for img_id={img_id}")
-            return None
-        recompiled += chunk_data
+        recompiled += get_data_for_iter(list_chunks, i)
+    # Ignoring message type for now
     return recompiled
 
 def clear_chunkid(img_id):
@@ -1019,41 +928,21 @@ def end_chunk(msg_uid, msg):
         return
     img_id = parts[0]
     epoch_ms = int(parts[1])
-
+    
     creator = int(msg_uid[1])
-    if img_id not in chunk_map:
-        logger.warning(f"[CHUNK] end_chunk: no entry for img_id={img_id}, cannot determine missing chunks")
-        return (False, "0", img_id, None, epoch_ms)  # Request chunk 0 as starting point
-
-    entry = chunk_map[img_id]
-    expected_chunks = entry[1]
-    chunk_list = entry[2]
     missing = get_missing_chunks(img_id)
-
     if len(missing) > 0:
-        logger.info(f"[CHUNK] I am missing {len(missing)}/{expected_chunks} chunks: first 20 = {missing[:20]}, stored_chunks={len(chunk_list)}, unique_indices={len(set(c for c, _ in chunk_list))}")
-        # Build missing chunk list string, ensuring it fits in payload (account for msg_uid + ":" separator)
-        # Format: msg_uid:missing_chunk_ids (e.g., "msg_uid:0,1,2,3")
-        # Reserve space for msg_uid (MIDLEN) + ":" + some safety margin
-        max_payload_size = PACKET_PAYLOAD_LIMIT - MIDLEN - 5  # Reserve space for msg_uid + ":" + safety
+        logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
         missing_str = str(missing[0])
         for i in range(1, len(missing)):
-            candidate = missing_str + "," + str(missing[i])
-            if len(candidate) <= max_payload_size:
-                missing_str = candidate
-            else:
-                # Truncate - sender will send remaining chunks after getting this list in next round
-                logger.warning(f"[CHUNK] Missing chunk list truncated at {i}/{len(missing)} chunks due to payload limit (will request remaining in next end packet)")
-                break
+            if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < PACKET_PAYLOAD_LIMIT:
+                missing_str += "," + str(missing[i])
         return (False, missing_str, img_id, None, epoch_ms)
     else:
         if img_id not in chunk_map:
             logger.warning(f"[CHUNK] Ignoring end chunk, we dont have an entry for this img_id.., it might got processed already.")
             return (True, None, img_id, None, epoch_ms)
-        # Recompile message from chunks
         recompiled_msgbytes = recompile_msg(img_id)
-        # Immediately delete chunks from memory to free up space (chunks no longer needed after recompilation)
-        clear_chunkid(img_id)
         return (True, None, img_id, recompiled_msgbytes, epoch_ms)
 
 # ---------------------------------------------------------------------------
@@ -1072,7 +961,7 @@ async def init_sim():
     logger.info("[CELL] Cellular system ready")
     return True
 
-async def sim_upload_hb(heartbeat_data): # TODO will be replaced by sim_upload_payload later
+async def sim_upload_hb(heartbeat_data): # TODO will be replaced by sim_upload_payload later 
     # Input: heartbeat_data: dict payload; Output: bool indicating upload success
     """Send heartbeat data via cellular (for command center)"""
     global cellular_system
@@ -1262,7 +1151,7 @@ async def event_text_process(creator, msgbytes):
                 logger.error(f"[TXT] forwarding event text to {next_dst} failed")
         else:
             logger.error(f"[TXT] can't forward event text because I dont have next device in spath yet")
-
+      
 # ---------------------------------------------------------------------------
 # Sensor Capture and Image Transmission
 # ---------------------------------------------------------------------------
@@ -1308,15 +1197,15 @@ async def person_detection_loop():
     last_capture_time = None
     next_capture_wait = None # max value is 16
     MAX_CAPTURE_WAIT = 10
-    FRESH_MOTION_LAP = 16
-    while IMAGE_LIMIT is None or person_image_count < IMAGE_LIMIT:
+    FRESH_MOTION_LAP = 16 
+    while True:
         # Wait for PIR interrupt event (blocks until PIR detects motion)
         # Task is suspended here - uses minimal CPU until interrupt fires
         await pir_trigger_event.wait()
         # Clear the event for next trigger
         pir_trigger_event.clear()
         await asyncio.sleep(0.5) # DEFAULT wait after every motion
-
+        
         # Exponential backoff sleep logic to prevent rapid-fire triggers
         curr_time = utime.time()  # Get current time in seconds
         if last_capture_time is None:
@@ -1358,34 +1247,28 @@ async def person_detection_loop():
                 center_captured_image_count += 1
             # imgbytes = img.bytearray() # this was bigger # TODO
             # logger.info(f"[OLD] Captured image, size: {len(imgbytes)} bytes")
-
+            
             try:
                 raw_path = f"{MY_IMAGE_DIR}/{my_addr}_{event_epoch_ms}_raw.jpg"
                 logger.debug(f"Saving raw image to {raw_path} : imbytesize = {len(img.bytearray())}")
                 async with lock:
                     img.save(raw_path)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
+                    utime.sleep_ms(500)
                 logger.info(f"Saved raw image: {raw_path}: raw size = {len(img.bytearray())} bytes")
             except Exception as e:
                 logger.warning(f"[PIR] Failed to save raw image: {e}")
                 continue
-
-            # Delete original image object and force GC before reading to prevent memory allocation failures
-            if img is not None:
-                del img
-                gc.collect()  # Force garbage collection to free memory
-                utime.sleep_ms(100)  # Small delay after GC to let system stabilize
-
+            
             # read raw file
             try:
                 img = image.Image(raw_path)
-                imgbytes = img.bytearray() # updated
+                imgbytes = img.bytearray() # updated 
                 logger.info(f"[PIR] Captured image, size: {len(imgbytes)} bytes")
             except Exception as e:
                 logger.error(f"[PIR] Failed read image file: {e}")
                 continue
-
+                
             # Encrypt image immediately
             try:
                 enc_msgbytes = encrypt_if_needed("P", imgbytes)
@@ -1396,7 +1279,7 @@ async def person_detection_loop():
                     with open(enc_filepath, "wb") as f:
                         f.write(enc_msgbytes)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
+                    utime.sleep_ms(500)
                 logger.info(f"[PIR] Saved encrypted image: {enc_filepath}: encrypted size = {len(enc_msgbytes)} bytes")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save encrypted image: {e}")
@@ -1409,7 +1292,7 @@ async def person_detection_loop():
                 # Remove oldest entry
                 oldest = imgpaths_to_send.pop(0)
                 logger.info(f"[PIR] Queue full, removing oldest image: {oldest['enc_filepath']}")
-
+                
             # Save JSON file for the event
             event_filepath = f"{MY_EVENT_DIR}/{event_epoch_ms}.json"
             try:
@@ -1417,12 +1300,12 @@ async def person_detection_loop():
                 with open(event_filepath, "w") as f:
                     f.write(json.dumps(event_data))
                 os.sync()  # Force filesystem sync to SD card
-                utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
+                utime.sleep_ms(500)
                 logger.info(f"[PIR] Saved event file: {event_filepath}")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save event file {event_filepath}: {e}")
             events_to_send.append({"creator": my_addr, "epoch_ms": event_epoch_ms})
-
+            
             # logger.info(f"Saved image: {raw_path}")
             # logger.info(f"Person detected Image count: {person_image_count}")
             # if running_as_cc():
@@ -1437,7 +1320,7 @@ async def person_detection_loop():
 
 
 async def send_img_to_nxt_dst(creator, epoch_ms, enc_msgbytes):
-    # Input: enc_msgbytes: bytes already encrypted image;
+    # Input: enc_msgbytes: bytes already encrypted image; 
     # Output: bool indicating if image was forwarded successfully to next_node of spath
     logger.info(f"[IMG] Sending image of creator={creator}, size={len(enc_msgbytes)} bytes, to the network")
     try:
@@ -1471,7 +1354,7 @@ async def image_sending_loop():
         if not running_as_cc() and not next_dst:
             logger.warning("[IMG] No shortest path yet so cant send")
             continue
-
+        
         if is_device_busy(next_dst):
             logger.debug(f"[IMG] Device {next_dst} is busy, skipping sending...")
             continue
@@ -1489,7 +1372,7 @@ async def image_sending_loop():
             enc_filepath = img_entry["enc_filepath"]
             creator = img_entry["creator"]
             epoch_ms = img_entry["epoch_ms"]
-
+            
             logger.debug(f"[IMG] Processing: {enc_filepath}")
             enc_msgbytes = None
             try:
@@ -1503,7 +1386,7 @@ async def image_sending_loop():
                     logger.error(f"[IMG] Failed to read encrypted image from file, image re-queued {enc_filepath}, e: {e}")
                     imgpaths_to_send.append(img_entry) # pushed to back of queue
                     break
-
+                
                 transmission_start = time_msec()
                 if running_as_cc():
                     # Upload encrypted image directly (already encrypted)
@@ -1544,7 +1427,7 @@ async def image_sending_loop():
                 logger.error(f"[IMG] unexpected error processing image event {enc_filepath}: {e}, re-queued")
                 # import sys
                 # sys.print_exception(e)
-
+                
                 # Re-queue image on error
                 imgpaths_to_send.append(img_entry) # TODO check this logic later
                 break
@@ -1561,7 +1444,7 @@ async def image_sending_loop():
                         if enc_msgbytes is not None: # imgbytes is None
                             del enc_msgbytes
                 except NameError:
-                    pass
+                    pass 
                 except:
                     pass
                 # Help GC reclaim memory
@@ -1575,7 +1458,7 @@ async def image_sending_loop():
         if len(imgpaths_to_send) > 0:
             # Queue still has items (from failed uploads), check again soon
             await asyncio.sleep(PHOTO_SENDING_FAILED_PAUSE)
-
+            
 
 async def event_text_sending_loop():
     # Input: None; Output: None (periodically sends queued images across mesh)
@@ -1606,7 +1489,7 @@ async def event_text_sending_loop():
                 transmission_end = time_msec()
                 transmission_time = transmission_end - transmission_start
                 logger.info(f"[TXT] ✔✔✔ Event transmission completed in {transmission_time} ms ({transmission_time/1000:.4f} seconds)")
-
+  
                 if len(events_to_send) > 0:
                     await asyncio.sleep(EVENT_SENDING_INTERVAL)
                 else:
@@ -1649,7 +1532,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
     if my_addr in spath_received:
         logger.debug(f"[cyclic, ignoring {my_addr} already in {spath_received}")
         return
-
+    
     if len(shortest_path_to_cc) == 0:
         if len(seen_neighbours)>0:
             logger.debug(f"spath_recived for first time, saving and forwarding:{spath_received}")
@@ -1662,7 +1545,7 @@ async def sync_and_transfer_spath(msg_uid, msg):
             new_spath_msg = ",".join([str(x) for x in new_spath])
             logger.debug(f"propogating new_spath:{new_spath_msg}, to dst:{n}")
             asyncio.create_task(send_msg("S", int(msg_uid[1]), new_spath_msg.encode(), n))
-
+        
     elif len(shortest_path_to_cc) > len(spath_received):
         if len(seen_neighbours)>0:
             logger.debug(f"smaller spath received, so updating and forwarding:{spath_received}")
@@ -1690,9 +1573,9 @@ async def sync_and_transfer_spath(msg_uid, msg):
     else:
         logger.info(f"larger spath received, so ignoring it: {spath_received}")
 
-def process_message(data, rssi=None, snr=None, airtime_us=None):
-    # Input: data: bytes raw LoRa payload; rssi: float or None RSSI value in dBm; snr: float or None SNR value in dB; airtime_us: int or None airtime in microseconds; Output: bool indicating if message was processed
-
+def process_message(data, rssi=None):
+    # Input: data: bytes raw LoRa payload; rssi: int or None RSSI value in dBm; Output: bool indicating if message was processed
+        
     parsed = parse_header(data)
     if not parsed:
         logger.error(f"[LORA] failure parsing incoming data : {data}")
@@ -1713,24 +1596,13 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
         recv_log = "⬇ BCAST"
     else:
         recv_log = "⬇ RECV"
-
+        
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
-    # Build log string with RSSI, SNR, and airtime if available
-    log_extra = []
     if rssi is not None:
-        log_extra.append(f"rssi: {rssi:.1f}")
-    if snr is not None:
-        log_extra.append(f"snr: {snr:.1f}")
-    if airtime_us is not None:
-        airtime_ms = airtime_us / 1000.0
-        log_extra.append(f"airtime: {airtime_ms:.2f}ms")
-
-    if log_extra:
-        extra_str = ", ".join(log_extra)
-        logger.info(f"[{recv_log} from {sender}, {extra_str}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
+        logger.info(f"[{recv_log} from {sender}, rssi: {rssi}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
     else:
         logger.info(f"[{recv_log} from {sender}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
-
+    
     # logger.info(f"[PARSED HEADER] msg_uid:{msg_uid}, msg_typ:{msg_typ}, creator:{creator}, sender:{sender}, receiver:{receiver}, len-msg:{len(msg)}")
     if sender not in recv_msg_count:
         recv_msg_count[sender] = 0
@@ -1763,106 +1635,51 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "W": # wait message
         asyncio.create_task(device_busy_life(sender))
-    elif msg_typ == "B": # TODO need to ignore duplicate images, and send some response in A itself
+    elif msg_typ == "B": # TODO need to ignore buplicate images, and send some response in A itself
         try:
             img_id, epoch_ms, numchunks = begin_chunk(msg.decode())
-            # Check if this is a duplicate B packet for the same transfer
-            if check_transmode_lock(sender, img_id):
-                # Same sender and img_id - send ACK anyway (duplicate begin packet)
-                logger.debug(f"[CHUNK] Duplicate B packet for same transfer, sending ACK")
-                asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
-            elif get_transmode_lock(sender, img_id):
+            if get_transmode_lock(sender, img_id):
                 asyncio.create_task(keep_transmode_lock(sender, img_id))
                 asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             else:
-                logger.warning(f"[CHUNK] TRANS MODE already in use for different transfer, sending W...")
+                logger.warning(f"TRANS MODE already in use, could not get lock...")
                 asyncio.create_task(send_msg("W", my_addr, WAIT_MESSAGE, sender))
                 return False
         except Exception as e:
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
-        # CRITICAL FIX: Send ACK IMMEDIATELY before processing chunk to unblock sender
-        # This prevents sender from waiting 2000+ ms for ACK while receiver processes chunk
-        # The issue was: add_chunk() was blocking the receive loop, delaying ACK transmission
-        # Solution: Send ACK synchronously first, then process chunk asynchronously
-        
-        # Format and send ACK immediately (synchronous, non-blocking for sender)
-        ack_msg_uid = get_msg_uid("A", my_addr, sender)
-        ack_databytes = ack_msg_uid + b";" + ackmessage
-        radio_send(sender, ack_databytes, ack_msg_uid)
-        # Add ACK to msgs_recd so sender's ack_time() can detect it
-        msgs_recd.append((ack_msg_uid, ackmessage, time_msec()))
-        
-        # Now process chunk in background (non-blocking) to avoid delaying receive loop
-        async def process_chunk_async():
-            free_before = get_free_memory()
-            logger.info(f"[IMG RX] Free memory before processing chunk: {free_before/1024:.1f}KB")
-            try:
-                if len(msg) >= 3:
-                    chunk_img_id = msg[0:3].decode()
-                    # Check if there's an active transfer mode for this sender and img_id
-                    if check_transmode_lock(sender, chunk_img_id):
-                        # Active transfer - process chunk
-                        add_chunk(msg)
-                    else:
-                        # No active transfer mode, but still try to store chunk (might be late arrival)
-                        # This handles cases where chunks arrive before B packet or after timeout
-                        add_chunk(msg)  # Will log error if chunk_map entry doesn't exist
-                else:
-                    logger.warning(f"[IMG RX] Chunk I message too short ({len(msg)} bytes), cannot extract img_id")
-            except Exception as e:
-                logger.error(f"[IMG RX] Error processing chunk I: {e}")
-        
-        # Process chunk asynchronously so receive loop can continue immediately
-        asyncio.create_task(process_chunk_async())
-    elif msg_typ == "E": #
-        # Process end chunk and respond with missing chunks list or completion confirmation
-        free_before = get_free_memory()
-        logger.info(f"[IMG RX] Free memory before End chunk: {free_before/1024:.1f}KB")
+        add_chunk(msg)  # optional to check check_transmode_lock
+    elif msg_typ == "E": # 
         alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
         if alldone:
             delete_transmode_lock(sender, img_id)
-            # All chunks received - send completion ACK with -1 marker
+            # also when it fails
             ackmessage += b":-1"
-            # Send ACK multiple times for reliability
-            async def send_ack_multiple(): # send ACK 2 times # TODO, move this only if able to save valid image
+            # asyncio.create_task(send_msg("A", creator, ackmessage, sender))
+            async def send_ack_multiple(): # send ACK 2 times
                 msg_count = 2
                 for i in range(msg_count):
                     await send_msg("A", creator, ackmessage, sender)
                     if i < msg_count-1:
-                        await asyncio.sleep(0.2)  # Delay between multiple ACK sends for reliability
+                        await asyncio.sleep(1)
             asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
                 try:
-                    cleanup_chunk_map_by_msg_id(img_id)
-                except Exception as e:
-                    logger.error(f"[IMG RX] Error cleaning up chunk map for img_id {img_id}: {e}")
-
-                try:
                     enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
-                    logger.info(f"[IMG RX] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
+                    logger.debug(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
                     with open(enc_filepath, "wb") as f:
                         f.write(recompiled_msgbytes)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
-
-                    # Delete recompiled bytes after saving to free memory (chunks already deleted in end_chunk)
-                    del recompiled_msgbytes
-                    gc.collect()
-
+                    utime.sleep_ms(500)
                     imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
-                    logger.info(f"[IMG RX] Image saved to {enc_filepath}, adding to send queue")
-                    # TODO send success only if able to save image
+                    logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
-                    logger.error(f"[IMG RX] Error saving image: {e}") # TODO, don't send success if can't save
-                    # Ensure recompiled bytes are freed even on error
-                    del recompiled_msgbytes
-                    gc.collect()
+                    logger.error(f"[CHUNK] error saving image to {enc_filepath}: {e}")
+                # asyncio.create_task(img_process(img_id, recompiled_msgbytes, creator, sender))
             else:
-                logger.warning(f"[IMG RX] Image not recompiled, skipping save (chunks already cleaned up)")
+                logger.warning(f"[CHUNK] img not recompiled, so not sending")
         else:
-            # Missing chunks - send ACK with missing chunks list immediately so sender can retransmit
             ackmessage += b":" + missing_str.encode()
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "A":
@@ -1881,64 +1698,34 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
 async def radio_read():
     logger.info(f"===> Radio Read, LoRa receive loop started... <===\n")
     # Input: None; Output: None (continuously receives LoRa packets and dispatches processing)
-    loop_count = 0
     while True:
-        # Safety check: wait for loranode to be initialized
-        if loranode is None:
-            logger.debug(f"[LORA] Waiting for LoRa initialization...")
-            await asyncio.sleep(1)
-            continue
-
         try:
-            # Use blocking mode with timeout for async compatibility
-            # Optimized timeout (200ms) for high-speed communication (SF5, BW500kHz)
-            # Note: recv() internally uses blocking sleeps (sleep_ms), which blocks the async event loop
-            # but the timeout ensures it returns after LORA_RX_TIMEOUT_MS
-            loop_count += 1
-            if loop_count == 1:
-                logger.info(f"[LORA] Starting receive loop, loranode={loranode is not None}")
-            elif loop_count % 100 == 0:  # Log every 100 iterations (~10 seconds with 100ms timeout)
-                logger.info(f"[LORA] Receive loop running (iteration {loop_count})...")
-
-            # This call will block for up to LORA_RX_TIMEOUT_MS (100ms)
-            # During this time, the async event loop is blocked, but it will return after timeout
-            # Note: recv() uses blocking sleep_ms() internally, which blocks the async event loop
-            # This is acceptable as the timeout ensures it returns after LORA_RX_TIMEOUT_MS
-            msg, status = loranode.recv(len=0, timeout_en=True, timeout_ms=LORA_RX_TIMEOUT_MS)
-
-            if status == ERR_NONE:
-                # Valid packet received
-                if len(msg) > 0:
-                    message = msg.replace(b"{}[]", b"\n")
-                    rssi = loranode.getRSSI()  # Get RSSI after successful receive
-                    snr = loranode.getSNR()  # Get SNR after successful receive
-                    airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime for received packet
-                    process_message(message, rssi, snr, airtime_us)
-                else:
-                    logger.debug(f"[LORA] Empty packet received")
-            elif status == ERR_RX_TIMEOUT:
-                # No packet received (expected, continue loop)
-                pass
-            elif status == ERR_CRC_MISMATCH:
-                # Corrupted packet - log but try to process anyway for robustness
-                logger.warning(f"[LORA] CRC error but attempting to process packet (len={len(msg)})")
-                if len(msg) > 0:
-                    message = msg.replace(b"{}[]", b"\n")
+            # New driver API: recv() returns (data, status)
+            # Use timeout to allow async operation - short timeout for responsiveness
+            message, status = loranode.recv(len=0, timeout_en=True, timeout_ms=LORA_RX_TIMEOUT_MS)
+            
+            if status == ERR_NONE and len(message) > 0:
+                # Successful reception
+                message = message.replace(b"{}[]", b"\n")
+                # Get RSSI for logging (available after successful receive)
+                try:
                     rssi = loranode.getRSSI()
-                    snr = loranode.getSNR()  # Get SNR even for CRC error packets
-                    airtime_us = loranode.getTimeOnAir(len(message))  # Calculate airtime
-                    # Try to process even with CRC error - some protocols can handle it
-                    process_message(message, rssi, snr, airtime_us)
-            else:
-                # Other error - log and continue
-                logger.warning(f"[LORA] Receive error status: {status}")
+                except:
+                    rssi = None
+                process_message(message, rssi)
+            elif status == -6:  # ERR_RX_TIMEOUT
+                # No message received within timeout - this is normal, continue
+                pass
+            elif status != ERR_NONE:
+                # Other error - log but continue
+                logger.debug(f"[LORA] Receive error: {status}")
         except Exception as e:
             logger.error(f"[LORA] Exception in radio_read: {e}")
-            await asyncio.sleep(0.1)  # Brief pause on error
-
-        # Small async sleep to yield to event loop (recv() uses blocking sleeps internally)
-        # This prevents blocking the entire async event loop
-        await asyncio.sleep(0.005)  # Balanced yield for reliable async event loop operation
+            import sys
+            sys.print_exception(e)
+        
+        # Small sleep to prevent tight loop and allow other tasks to run
+        await asyncio.sleep(0.05)  # 50ms sleep for async responsiveness
 
 # ---------------------------------------------------------------------------
 # GPS Persistence Helpers
@@ -1984,7 +1771,7 @@ async def send_heartbeat():
     msgbytes = encrypt_if_needed("H", hbmsg)
     sent_succ = False
     if running_as_cc():
-
+        
         # Convert bytes to base64 for JSON transmission, same as hb_process()
         if isinstance(msgbytes, bytes):
             hb_data = ubinascii.b2a_base64(msgbytes)
@@ -2039,7 +1826,7 @@ async def send_event_text(epoch_ms):
         logger.info(f"[TXT] sending raw event text to cloud, len={len(msgbytes)}, msg:{event_msgstr}")
         sent_succ = await upload_payload_to_server(event_payload, "event_text", my_addr)
         return sent_succ
-    else:
+    else:        
         next_dst = next_device_in_spath()
         if next_dst:
             sent_succ = await send_msg("T", my_addr, msgbytes, next_dst)
@@ -2127,7 +1914,7 @@ async def validate_and_remove_neighbours():
         logger.debug(f"starting neighbours validation: {seen_neighbours}")
         to_be_removed = []
         for n in seen_neighbours:
-
+            
             # ---- waiting, just to not abort partial validation ----
             global image_in_progress
             waiting_retry = 5
@@ -2138,7 +1925,7 @@ async def validate_and_remove_neighbours():
                     break
                 await asyncio.sleep(10)
             # ---- * -----
-
+                
             msgbytes = b"Nothing"
             success = await send_msg("V", my_addr, msgbytes, n)
             if success:
@@ -2188,12 +1975,14 @@ async def print_summary_and_flush_logs():
             continue
         free_mem = get_free_memory()
         mem_str = f", Free: {free_mem/1024:.1f}KB" if free_mem > 0 else ""
-        log_str = f"Recd: {len(msgs_recd)} {mem_str}"
+        log_str = f"sent: {len(msgs_sent)} Recd: {len(msgs_recd)} Unacked: {len(msgs_unacked)}{mem_str}"
         if running_as_cc():
             logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Images at CC (received): {len(images_saved_at_cc)}, Center captured: {center_captured_image_count}, Queued: {len(imgpaths_to_send)}")
         else:
             logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Queued images: {len(imgpaths_to_send)}")
+        #logger.info(msgs_sent)
         #logger.info(msgs_recd)
+        #logger.info(msgs_unacked)
 
 # ---------------------------------------------------------------------------
 # GPS Acquisition Loop
@@ -2361,18 +2150,16 @@ async def init_wifi():
 # ---------------------------------------------------------------------------
 async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
-    gc.enable()
-    free_before = get_free_memory()
-    logger.info(f"[IMG RX] Free mem at init: {free_before/1024:.1f}KB")
     global image_in_progress
     image_in_progress = False
-
+    
     await init_lora()
     asyncio.create_task(radio_read())
     asyncio.create_task(print_summary_and_flush_logs())
     asyncio.create_task(validate_and_remove_neighbours())
     # Start memory management tasks
     asyncio.create_task(periodic_memory_cleanup())
+    asyncio.create_task(periodic_gc())
     logger.info(f"[MEM] Memory management tasks started (free: {get_free_memory()/1024:.1f}KB)\n")
     if running_as_cc():
         logger.info(f"[INIT] ===> Starting command center node <===")
@@ -2401,8 +2188,8 @@ async def main():
         #asyncio.create_task(keep_updating_gps())
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
-        # else:
-        #     logger.warning(f"[INIT] ===> Unit node {my_addr} is not enabled to capture images")
+        else:
+            logger.warning(f"[INIT] ===> Unit node {my_addr} is not enabled to capture images")
         asyncio.create_task(event_text_sending_loop())
         asyncio.create_task(image_sending_loop())
     for i in range(24*7):
