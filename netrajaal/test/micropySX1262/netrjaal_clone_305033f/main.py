@@ -43,7 +43,7 @@ ENCRYPTION_ENABLED = True
 led = LED("LED_BLUE")
 
 MIN_SLEEP = 0.01  # Minimal delay for reliable high-speed communication
-ACK_SLEEP = 0.03  # ACK sleep for reliable checking at high data rates
+ACK_SLEEP = 0.1  # ACK sleep for reliable checking at high data rates
 CHUNK_SLEEP = 0.005  # Minimal delay between chunks for fast transmission
 
 DISCOVERY_COUNT = 100
@@ -1769,6 +1769,7 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
         asyncio.create_task(event_text_process(creator, msg))
     elif msg_typ == "H":
         # Validate HB message payload length for encrypted messages
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
         if ENCRYPTION_ENABLED:
             # RSA encrypted payload should be exactly 128 bytes
             if len(msg) != 128:
@@ -1778,7 +1779,6 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
                 )
                 # Still try to process, but log the issue
         asyncio.create_task(hb_process(msg_uid, msg, sender))
-        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "W": # wait message
         asyncio.create_task(device_busy_life(sender))
     elif msg_typ == "B": # TODO need to ignore duplicate images, and send some response in A itself
