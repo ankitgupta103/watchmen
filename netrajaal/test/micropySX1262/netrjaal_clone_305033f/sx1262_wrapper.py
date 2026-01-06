@@ -162,12 +162,15 @@ class SX1262(SX126X):
             if self.event_callback != None:
                 super().setDio1Action(self._rx_interrupt_handler)
             else:
+                print(f"[INIT] No event_callback provided, clearing interrupt handler")
                 super().clearDio1Action()
+            print(f"[INIT] Non-blocking mode: started receive, state={state}")
             return state
         else:
             state = super().standby()
             ASSERT(state)
             super().clearDio1Action()
+            print(f"[INIT] Blocking mode: standby, state={state}")
             return state
 
     def recv(self, len=0, timeout_en=False, timeout_ms=0):
@@ -224,6 +227,7 @@ class SX1262(SX126X):
         state = ERR_NONE
 
         length = super().getPacketLength()
+        print(f"[RX] _readData called: packet_length={length}, requested_len={len_}")
 
         if len_ < length and len_ != 0:
             length = len_
@@ -233,15 +237,22 @@ class SX1262(SX126X):
 
         try:
             state = super().readData(data_mv, length)
+            print(f"[RX] readData completed: state={state}, actual_len={len(data)}, data_preview={data[:10] if len(data) > 10 else data}")
         except AssertionError as e:
             state = list(ERROR.keys())[list(ERROR.values()).index(str(e))]
+            print(f"[RX] readData exception: {e}, state={state}")
 
-        ASSERT(super().startReceive())
+        rx_state = super().startReceive()
+        if rx_state == ERR_NONE:
+            print(f"[RX] Restarted receive mode after reading packet")
+        else:
+            print(f"[RX] Failed to restart receive mode, state={rx_state}")
 
         if state == ERR_NONE or state == ERR_CRC_MISMATCH:
             return bytes(data), state
 
         else:
+            print(f"[RX] _readData returning empty due to state={state}")
             return b'', state
 
     def _startTransmit(self, data):
@@ -250,12 +261,27 @@ class SX1262(SX126X):
         else:
             return 0, ERR_INVALID_PACKET_TYPE
 
+        print(f"[TX] _startTransmit called: len={len(data)} bytes, data_preview={data[:10] if len(data) > 10 else data}")
         state = super().startTransmit(data, len(data))
+        if state == ERR_NONE:
+            print(f"[TX] startTransmit successful, waiting for TX_DONE interrupt...")
+        else:
+            print(f"[TX] startTransmit failed with status={state}")
         return len(data), state
 
 
     def _rx_interrupt_handler(self, pin):
         events = self._events()
+        # Debug: Log interrupt events (convert to binary for readability)
+        events_bin = bin(events)
         if events & SX126X_IRQ_TX_DONE:
+            print(f"[IRQ] TX_DONE detected, events={events} ({events_bin}), switching to RX mode")
             super().startReceive()
-        self.event_callback(events)
+        if events & SX126X_IRQ_RX_DONE:
+            print(f"[IRQ] RX_DONE detected, events={events} ({events_bin})")
+        if events & SX126X_IRQ_CRC_ERR:
+            print(f"[IRQ] CRC_ERR detected, events={events} ({events_bin})")
+        if events & SX126X_IRQ_TIMEOUT:
+            print(f"[IRQ] TIMEOUT detected, events={events} ({events_bin})")
+        if self.event_callback:
+            self.event_callback(events)
