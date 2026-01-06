@@ -43,7 +43,7 @@ turn_OFF_IR_emitter()
 
 # Initialize PIR sensor pin (adjust pin number based on your wiring)
 # Connect PIR sensor output to a digital pin
-PIR_PIN = Pin('P13', Pin.IN, Pin.PULL_DOWN)  # Adjust pin as needed
+PIR_PIN = Pin('P8', Pin.IN, Pin.PULL_DOWN)  # Adjust pin as needed
 
 MODEL_PATH = "/sdcard/custom_person_det.tflite"
 MODEL_INPUT_SIZE = 256

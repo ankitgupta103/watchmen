@@ -29,6 +29,7 @@ from sx126x import ERR_NONE, ERR_RX_TIMEOUT, ERR_CRC_MISMATCH, SX126X_SYNC_WORD_
 import gps_driver
 # from cellular_driver import Cellular
 import detect
+# jack
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # TESTING VARIABLES
