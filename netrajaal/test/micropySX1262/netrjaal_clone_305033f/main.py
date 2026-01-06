@@ -1,5 +1,4 @@
 from logger import logger
-
 try:
     import requests
     USE_REQUESTS = True
@@ -646,6 +645,8 @@ def radio_send(dest, data, msg_uid):
         logger.debug(f"[TX] radio_send called: dest={dest}, len={len(data)}, msg_uid={msg_uid}")
         # Calculate airtime before sending (more accurate for logging)
         airtime_us = loranode.getTimeOnAir(len(data))
+        logger.debug(f"[TX] Calculated airtime: {airtime_us}us ({airtime_us/1000.0:.2f}ms)")
+        logger.debug(f"[TX] Calling loranode.send(), waiting for TX_DONE interrupt...")
         len_sent, status = loranode.send(data)
         logger.debug(f"[TX] send() returned: len_sent={len_sent}, status={status}")
         if status != ERR_NONE:
@@ -696,6 +697,7 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
             logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
+
 
 def make_chunks(msg):
     # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each (safe size for 255 byte LoRa limit)
