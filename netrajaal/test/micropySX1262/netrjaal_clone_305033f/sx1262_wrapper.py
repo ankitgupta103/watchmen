@@ -46,7 +46,7 @@ class SX1262(SX126X):
         state = super().fixPaClamping()
         ASSERT(state)
 
-        state = self._setBlockingCallback(self.blocking)
+        state = self._setBlockingCallback()
 
         return state
 
@@ -93,7 +93,7 @@ class SX1262(SX126X):
         state = super().fixPaClamping()
         ASSERT(state)
 
-        state = self._setBlockingCallback(self.blocking)
+        state = self._setBlockingCallback()
 
         return state
 
