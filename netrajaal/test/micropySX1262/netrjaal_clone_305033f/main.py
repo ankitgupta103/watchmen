@@ -951,9 +951,14 @@ def add_chunk(msgbytes):
         expected_chunks = entry[1]
         missing = get_missing_chunks(img_id)
         received = expected_chunks - len(missing)
-        # Log progress every 20 chunks or when complete for debugging
+        # Log progress every 20 chunks or when complete for debugging (optimized: only log when significant)
+        # Reduced logging frequency to minimize blocking in receive loop
         if received % 20 == 0 or received == expected_chunks:
-            logger.info(f"[IMG RX] Received chunk {citer}: {received}/{expected_chunks} chunks complete (stored {len(chunk_list)} total, missing={len(missing)})")
+            # Use debug level for frequent updates, info only for milestones
+            if received == expected_chunks:
+                logger.info(f"[IMG RX] Received chunk {citer}: {received}/{expected_chunks} chunks complete (stored {len(chunk_list)} total, missing={len(missing)})")
+            else:
+                logger.debug(f"[IMG RX] Received chunk {citer}: {received}/{expected_chunks} chunks complete (stored {len(chunk_list)} total, missing={len(missing)})")
     except Exception as e:
         logger.error(f"[CHUNK RX] Error adding chunk: {e}, msgbytes_len={len(msgbytes)}")
 
@@ -1777,28 +1782,40 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
-        # Process chunk immediately and send ACK (receiver stays in receive mode)
-        # This ensures sender can wait for ACK before sending next chunk (like example/capture-send pattern)
-        # Extract img_id from chunk to check transfer mode properly
-        free_before = get_free_memory()
-        logger.info(f"[IMG RX] Free memory before processing chunk: {free_before/1024:.1f}KB")
-        try:
-            if len(msg) >= 3:
-                chunk_img_id = msg[0:3].decode()
-                # Check if there's an active transfer mode for this sender and img_id
-                if check_transmode_lock(sender, chunk_img_id):
-                    # Active transfer - process chunk and send ACK immediately
-                    add_chunk(msg)
+        # CRITICAL FIX: Send ACK IMMEDIATELY before processing chunk to unblock sender
+        # This prevents sender from waiting 2000+ ms for ACK while receiver processes chunk
+        # The issue was: add_chunk() was blocking the receive loop, delaying ACK transmission
+        # Solution: Send ACK synchronously first, then process chunk asynchronously
+        
+        # Format and send ACK immediately (synchronous, non-blocking for sender)
+        ack_msg_uid = get_msg_uid("A", my_addr, sender)
+        ack_databytes = ack_msg_uid + b";" + ackmessage
+        radio_send(sender, ack_databytes, ack_msg_uid)
+        # Add ACK to msgs_recd so sender's ack_time() can detect it
+        msgs_recd.append((ack_msg_uid, ackmessage, time_msec()))
+        
+        # Now process chunk in background (non-blocking) to avoid delaying receive loop
+        async def process_chunk_async():
+            free_before = get_free_memory()
+            logger.info(f"[IMG RX] Free memory before processing chunk: {free_before/1024:.1f}KB")
+            try:
+                if len(msg) >= 3:
+                    chunk_img_id = msg[0:3].decode()
+                    # Check if there's an active transfer mode for this sender and img_id
+                    if check_transmode_lock(sender, chunk_img_id):
+                        # Active transfer - process chunk
+                        add_chunk(msg)
+                    else:
+                        # No active transfer mode, but still try to store chunk (might be late arrival)
+                        # This handles cases where chunks arrive before B packet or after timeout
+                        add_chunk(msg)  # Will log error if chunk_map entry doesn't exist
                 else:
-                    # No active transfer mode, but still try to store chunk (might be late arrival)
-                    # This handles cases where chunks arrive before B packet or after timeout
-                    add_chunk(msg)  # Will log error if chunk_map entry doesn't exist
-            else:
-                logger.warning(f"[IMG RX] Chunk I message too short ({len(msg)} bytes), cannot extract img_id")
-        except Exception as e:
-            logger.error(f"[IMG RX] Error processing chunk I: {e}")
-        # Always send ACK to unblock sender (chunk storage is best-effort)
-        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+                    logger.warning(f"[IMG RX] Chunk I message too short ({len(msg)} bytes), cannot extract img_id")
+            except Exception as e:
+                logger.error(f"[IMG RX] Error processing chunk I: {e}")
+        
+        # Process chunk asynchronously so receive loop can continue immediately
+        asyncio.create_task(process_chunk_async())
     elif msg_typ == "E": #
         # Process end chunk and respond with missing chunks list or completion confirmation
         free_before = get_free_memory()
