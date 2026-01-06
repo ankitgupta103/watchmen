@@ -337,9 +337,9 @@ def ellepsis(msg):
 def ack_needed(msg_typ): # msg_type P is devided in (B,I,E)
     # Input: msg_typ: str; Output: bool indicating if acknowledgement required
     # "I" chunks now require ACK for reliable transmission (like example/capture-send pattern)
-    if msg_typ in ["A", "S", "W", "N"]:
+    if msg_typ in ["A", "S", "W", "N", "I"]:
         return False
-    if msg_typ in ["H", "B", "E", "V", "C", "T", "I"]:  # Added "I" for chunk ACKs
+    if msg_typ in ["H", "B", "E", "V", "C", "T"]:  
         return True
     return False
 
