@@ -670,27 +670,26 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         await asyncio.sleep(MIN_SLEEP)
         return (True, [])
 
-    ack_msg_recheck_count = 16 # Increased for frequent ACK detection at high speed
+    ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
     for retry_i in range(retry_count):
-            radio_send(dest, databytes, msg_uid)
-            await asyncio.sleep(ACK_SLEEP)  # Initial wait after sending
-            first_log_flag = True
-            for i in range(ack_msg_recheck_count): # ack_msg recheck
-                at, missing_chunks = ack_time(msg_uid)
-                if at > 0:
-                    logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
-                    return (True, missing_chunks)
+        radio_send(dest, databytes, msg_uid)
+        await asyncio.sleep(ACK_SLEEP)
+        first_log_flag = True
+        for i in range(ack_msg_recheck_count): # ack_msk recheck
+            at, missing_chunks = ack_time(msg_uid)
+            if at > 0:
+                logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
+                return (True, missing_chunks)
+            else:
+                if first_log_flag:
+                    logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
+                    first_log_flag = False
                 else:
-                    if first_log_flag:
-                        logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
-                        first_log_flag = False
-                    else:
-                        logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                    # Balanced ACK checking: frequent but reliable
-                    await asyncio.sleep(
-                        ACK_SLEEP * 0.5  # Progressive sleep for reliable ACK detection
-                    )
-            logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
+                    logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
+                await asyncio.sleep(
+                    ACK_SLEEP * min(i + 1, 3)
+                )  # progressively more sleep, capped at 3x
+        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
     logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
     return (False, [])
 
@@ -755,12 +754,10 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
             asyncio.create_task(keep_transmode_lock(dest, img_id))
             chunks = make_chunks(msgbytes)
             num_chunks = len(chunks)
-            tx_start_time = utime.ticks_ms()  # Track start time for total transmission time
-            logger.info(f"[IMG TX] Starting image transmission: dest={dest}, len={len(msgbytes)} bytes, img_id={img_id}, chunks={num_chunks}")
-
-            # Step 1: Send begin packet and wait for ACK
-            begin_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{num_chunks}", dest)
-            if not begin_succ:
+            tx_start_time = utime.ticks_ms() 
+            logger.info(f"[⋙ sending....] dest={dest}, msg_typ:{msg_typ}, len:{len(msgbytes)} bytes, img_id:{img_id}, image_payload in {len(chunks)} chunks")
+            big_succ, _ = await send_single_packet("B", creator, f"{img_id}:{epoch_ms}:{len(chunks)}", dest)
+            if not big_succ:
                 total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
                 total_time_sec = total_time_ms / 1000.0
                 logger.error(f"[IMG TX] Failed to send begin packet for img_id={img_id}. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
@@ -780,10 +777,10 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     return False
 
                 if i % 10 == 0:
-                    logger.info(f"[IMG TX] Sending chunk {i+1}/{num_chunks}")
-
-                chunkbytes = img_id.encode() + i.to_bytes(2, 'big') + chunks[i]
-                chunk_succ, _ = await send_single_packet("I", creator, chunkbytes, dest, retry_count=5)
+                    logger.info(f"[CHUNK] Sending chunk {i}")
+                await asyncio.sleep(CHUNK_SLEEP)
+                chunkbytes = img_id.encode() + i.to_bytes(2) + chunks[i]
+                chunk_succ, _ = await send_single_packet("I", creator, chunkbytes, dest)
                 if not chunk_succ:
                     logger.warning(f"[IMG TX] Failed to send chunk {i}, will retry in end phase")
                 else:
@@ -793,6 +790,7 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
 
             # Step 3: Send end packet and get missing chunks list
             max_end_retries = 15  # Increased retries for robust transmission
+            await asyncio.sleep(0.1)
             for end_retry in range(max_end_retries):
                 if not check_transmode_lock(dest, img_id):
                     total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
@@ -800,11 +798,10 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     logger.error(f"[IMG TX] TRANS MODE ended during end packet phase. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                     delete_transmode_lock(dest, img_id)
                     return False
-
+                await asyncio.sleep(CHUNK_SLEEP)
                 end_succ, missing_chunks = await send_single_packet("E", creator, f"{img_id}:{epoch_ms}", dest, retry_count=5)
                 if not end_succ:
-                    logger.warning(f"[IMG TX] Failed to send end packet, retry {end_retry+1}/{max_end_retries}")
-                    await asyncio.sleep(0.05)  # Brief delay before retry for reliability
+                    logger.warning(f"[CHUNK] Failed sending chunk end")
                     continue
 
                 # Parse missing chunks from ACK response
@@ -823,35 +820,28 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
                     logger.info(f"[IMG TX] Receiver confirmed all chunks received (ACK with -1). Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                     delete_transmode_lock(dest, img_id)
                     return True
+                
 
-                # Step 4: Send missing chunks sequentially
-                logger.info(f"[IMG TX] Receiver missing {len(missing_chunks)} chunks: first 10 = {missing_chunks[:10]}, last 10 = {missing_chunks[-10:]}")
-                missing_list = missing_chunks[:]  # Copy list
+                logger.info(f"[IMG TX] Receiver missing {len(missing_chunks)} chunks after retry {end_retry}: {missing_chunks}")
                 retransmitted_count = 0
-
-                for mis_chunk_idx in missing_list:
+                for mis_chunk_idx in missing_chunks:
                     if not check_transmode_lock(dest, img_id):
                         total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
                         total_time_sec = total_time_ms / 1000.0
                         logger.error(f"[IMG TX] TRANS MODE ended during missing chunk retransmission. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
                         delete_transmode_lock(dest, img_id)
                         return False
-
                     if mis_chunk_idx < 0 or mis_chunk_idx >= num_chunks:
                         logger.warning(f"[IMG TX] Invalid missing chunk index {mis_chunk_idx}, skipping")
                         continue
-
-                    chunkbytes = img_id.encode() + mis_chunk_idx.to_bytes(2, 'big') + chunks[mis_chunk_idx]
+                    chunkbytes = img_id.encode() + mis_chunk_idx.to_bytes(2) + chunks[mis_chunk_idx]
                     retry_succ, _ = await send_single_packet("I", creator, chunkbytes, dest, retry_count=5)
                     if retry_succ:
                         retransmitted_count += 1
                     else:
                         logger.warning(f"[IMG TX] Failed to retry missing chunk {mis_chunk_idx}")
-
-                logger.info(f"[IMG TX] Retransmitted {retransmitted_count}/{len(missing_list)} missing chunks")
-                # No delay needed - ACK already waited for in send_single_packet
-
-            # If we exhausted retries, transmission failed
+                    await asyncio.sleep(CHUNK_SLEEP)
+                logger.info(f"[IMG TX] Retransmitted {retransmitted_count}/{len(missing_chunks)} missing chunks")
             total_time_ms = utime.ticks_diff(utime.ticks_ms(), tx_start_time)
             total_time_sec = total_time_ms / 1000.0
             logger.error(f"[IMG TX] Failed to complete transmission after {max_end_retries} end packet retries. Total time: {total_time_ms}ms ({total_time_sec:.2f}s)")
@@ -898,7 +888,7 @@ def ack_time(msg_uid):
                     return (t, [])
             else:
                 logger.debug(f"[ACK] ACK payload too short: {len(msgbytes)} bytes, expected at least {MIDLEN-1}")
-    return (-1, None)
+    return (0, [])
 
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
@@ -1868,7 +1858,6 @@ def process_message(data, rssi=None, snr=None, airtime_us=None):
             asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "A":
         # ACK messages are already added to msgs_recd at line 1267
-        # They are matched by ack_time() function which searches msgs_recd
         # No additional processing needed for ACK messages
         logger.debug(f"[ACK] Received ACK message: {msg_uid}, payload: {msg}")
     else:
