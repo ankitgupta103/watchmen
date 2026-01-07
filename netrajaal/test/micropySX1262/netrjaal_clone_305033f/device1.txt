@@ -349,3 +349,17 @@ b'e076465dd7091843'
 00:01:07,925 - INFO - [⬇ RECV from 219, rssi: -47.0] [*] 18 bytes, MSG_UID = b'A\xdf\xdb\xdfIQV'
 00:01:25,893 - INFO - [⬇ BCAST from 219, rssi: -51.0] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*AGT'
 00:01:25,893 - INFO - adding nodeaddr 219 to seen_neighbours
+00:01:33,445 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:01:33,452 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*LHL'
+00:01:56,003 - INFO - [⬇ BCAST from 219, rssi: -51.0] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*TLC'
+00:02:03,552 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 259, Received messages = {219: 7}
+00:02:03,553 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:02:03,560 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*CHZ'
+00:02:26,110 - INFO - [⬇ BCAST from 219, rssi: -49.0] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*WDI'
+00:02:33,660 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 260, Received messages = {219: 8}
+00:02:33,661 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:02:33,667 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*DWC'
+00:02:56,217 - INFO - [⬇ BCAST from 219, rssi: -52.0] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*KTQ'
+00:03:03,767 - INFO - seen neighbours = [219], Shortest path = [219], Sent messages = 261, Received messages = {219: 9}
+00:03:03,768 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:03:03,774 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*VJR'
