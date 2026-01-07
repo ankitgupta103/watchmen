@@ -979,11 +979,27 @@ def recompile_msg(img_id):
         #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
         return []
     msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
-    recompiled = b""
+    
+    # Pre-calculate total size and collect chunks
+    total_size = 0
+    chunk_data_list = []
     for i in range(expected_chunks):
-        recompiled += get_data_for_iter(list_chunks, i)
-    # Ignoring message type for now
-    return recompiled
+        chunk_data = get_data_for_iter(list_chunks, i)
+        if chunk_data is None:
+            return None
+        total_size += len(chunk_data)
+        chunk_data_list.append(chunk_data)
+    
+    # Pre-allocate bytearray to avoid memory fragmentation
+    try:
+        recompiled = bytearray(total_size)
+        offset = 0
+        for chunk_data in chunk_data_list:
+            recompiled[offset:offset+len(chunk_data)] = chunk_data
+            offset += len(chunk_data)
+        return bytes(recompiled)
+    except MemoryError:
+        return None
 
 def clear_chunkid(img_id):
     # Input: img_id: str chunk identifier; Output: None (removes chunk tracking entry)
@@ -1023,6 +1039,9 @@ def end_chunk(msg_uid, msg):
             logger.warning(f"[CHUNK] Ignoring end chunk, we dont have an entry for this img_id.., it might got processed already.")
             return (True, None, img_id, None, epoch_ms)
         recompiled_msgbytes = recompile_msg(img_id)
+        # Clear chunks immediately after recompilation to free memory
+        if recompiled_msgbytes:
+            clear_chunkid(img_id)
         return (True, None, img_id, recompiled_msgbytes, epoch_ms)
 
 # ---------------------------------------------------------------------------
