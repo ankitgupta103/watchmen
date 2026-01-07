@@ -578,10 +578,10 @@ def lora_event_callback(events):
                 logger.warning(f"[LORA] Interrupt fired but previous packet not processed yet - packet may be lost")
                 # Still restart RX mode for next packet to prevent missing future packets
                 # The recv() call above already restarts RX, but we ensure it here as well
-            try:
-                loranode.startReceive()
-            except:
-                pass
+                try:
+                    loranode.startReceive()
+                except:
+                    pass
         except Exception as e:
             logger.error(f"[LORA] Error reading packet in interrupt callback: {e}")
             # FIX: Clear interrupt status even on error to prevent radio from getting stuck
@@ -1010,7 +1010,8 @@ def recompile_msg(img_id):
             recompiled[offset:offset+len(chunk_data)] = chunk_data
             offset += len(chunk_data)
         return bytes(recompiled)
-    except MemoryError:
+    except Exception as e:
+        logger.error(f"[CHUNK] Exception in recompile_msg for {img_id}: {e}")
         return None
 
 def clear_chunkid(img_id):
