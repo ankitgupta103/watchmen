@@ -732,42 +732,46 @@ def pop_and_get(msg_uid):
     return None
 
 async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
-    # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
-    msg_uid = get_msg_uid(msg_typ, creator, dest) # TODO, msg_uid used anywhere except logging
-    databytes = msg_uid + b";" + msgbytes
-    ackneeded = ack_needed(msg_typ)
-    timesent = time_msec()
-    if ackneeded:
-        msgs_unacked.append((msg_uid, msgbytes, timesent))
-    else:
-        msgs_sent.append((msg_uid, msgbytes, timesent))
-    if not ackneeded:
-        radio_send(dest, databytes, msg_uid)
-        await asyncio.sleep(MIN_SLEEP)
-        return (True, [])
-    ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
-    for retry_i in range(retry_count):
-        radio_send(dest, databytes, msg_uid)
-        await asyncio.sleep(ACK_SLEEP)
-        first_log_flag = True
-        for i in range(ack_msg_recheck_count): # ack_msk recheck
-            at, missing_chunks = ack_time(msg_uid)
-            if at > 0:
-                logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
-                msgs_sent.append(pop_and_get(msg_uid))
-                return (True, missing_chunks)
-            else:
-                if first_log_flag:
-                    logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
-                    first_log_flag = False
+    try:
+        # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: tuple(success: bool, missing_chunks: list)
+        msg_uid = get_msg_uid(msg_typ, creator, dest) # TODO, msg_uid used anywhere except logging
+        databytes = msg_uid + b";" + msgbytes
+        ackneeded = ack_needed(msg_typ)
+        timesent = time_msec()
+        if ackneeded:
+            msgs_unacked.append((msg_uid, msgbytes, timesent))
+        else:
+            msgs_sent.append((msg_uid, msgbytes, timesent))
+        if not ackneeded:
+            radio_send(dest, databytes, msg_uid)
+            await asyncio.sleep(MIN_SLEEP)
+            return (True, [])
+        ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
+        for retry_i in range(retry_count):
+            radio_send(dest, databytes, msg_uid)
+            await asyncio.sleep(ACK_SLEEP)
+            first_log_flag = True
+            for i in range(ack_msg_recheck_count): # ack_msk recheck
+                at, missing_chunks = ack_time(msg_uid)
+                if at > 0:
+                    logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
+                    msgs_sent.append(pop_and_get(msg_uid))
+                    return (True, missing_chunks)
                 else:
-                    logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
-                await asyncio.sleep(
-                    ACK_SLEEP * min(i + 1, 3)
-                )  # progressively more sleep, capped at 3x
-        logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
-    logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
-    return (False, [])
+                    if first_log_flag:
+                        logger.info(f"[ACK] Still waiting for ack, MSG_UID =  {msg_uid} # {i}")
+                        first_log_flag = False
+                    else:
+                        logger.debug(f"[ACK] Still waiting for ack, MSG_UID = {msg_uid} # {i}")
+                    await asyncio.sleep(
+                        ACK_SLEEP * min(i + 1, 3)
+                    )  # progressively more sleep, capped at 3x
+            logger.warning(f"[ACK] Failed to get ack, MSG_UID = {msg_uid}, retry # {retry_i+1}/{retry_count}")
+        logger.error(f"[LORA] Failed to send message, MSG_UID = {msg_uid}")
+        return (False, [])
+    except Exception as e:
+        logger.error(f"[LORA] Exception in send_single_packet: {e}")
+        return (False, [])
 
 def make_chunks(msg):
     # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each
