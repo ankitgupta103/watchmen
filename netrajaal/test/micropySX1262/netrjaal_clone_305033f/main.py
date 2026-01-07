@@ -126,6 +126,11 @@ lora_rx_event = asyncio.Event()  # Event signaled when packet received
 lora_rx_data = None               # Received packet data
 lora_rx_status = None              # Receive status
 
+# Packet processing queue - decouples fast packet reception from slow processing
+# This prevents blocking the receive loop when processing heavy operations (file I/O, network uploads)
+packet_queue = []  # Queue for packets to be processed asynchronously
+packet_queue_lock = asyncio.Lock()  # Lock for thread-safe queue access
+
 # SD card write lock
 lock = asyncio.Lock()
 
@@ -1720,6 +1725,9 @@ def process_message(data, rssi=None):
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
+        # I (chunk) packets are processed quickly - just add to chunk map
+        # No ACK needed, no file I/O - this keeps processing fast for rapid chunk reception
+        # The packet queue processor prioritizes I chunks for even faster handling
         add_chunk(msg)  # optional to check check_transmode_lock
     elif msg_typ == "E": #
         alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
@@ -1768,18 +1776,19 @@ def process_message(data, rssi=None):
 
 async def radio_read():
     """
-    Interrupt-driven LoRa receive loop.
-    No polling - waits for interrupt callback to signal packet arrival.
+    Interrupt-driven LoRa receive loop with packet queuing.
+    Queues packets immediately to prevent blocking the receive loop.
+    This allows rapid packet reception even when processing is slow.
     """
-    global lora_rx_data, lora_rx_status, lora_rx_event
-
+    global lora_rx_data, lora_rx_status, lora_rx_event, packet_queue, packet_queue_lock
+    
     logger.info(f"===> Radio Read, LoRa interrupt-driven receive loop started... <===\n")
     while True:
         # Safety check: wait for loranode to be initialized
         if loranode is None:
             await asyncio.sleep(1)
             continue
-
+        
         try:
             # FIX: Clear event BEFORE waiting to handle any stale events from previous iterations
             # This ensures we start with a clean state and don't process old data
@@ -1789,10 +1798,10 @@ async def radio_read():
             # This is much more efficient than polling - task is suspended until data arrives
             # The callback will set this event when RX_DONE interrupt occurs
             await lora_rx_event.wait()
-
-            # Process the received packet
-            # FIX: Process data immediately after event is set, before clearing it
-            # This ensures we don't lose the data if another interrupt fires quickly
+            
+            # CRITICAL FIX: Queue packet immediately without processing
+            # This allows interrupt callback to fire again quickly for next packet
+            # Heavy processing (file I/O, network uploads) happens in background queue processor
             if lora_rx_status == ERR_NONE:
                 # Valid packet received
                 if lora_rx_data and len(lora_rx_data) > 0:
@@ -1800,7 +1809,13 @@ async def radio_read():
                     message = lora_rx_data.replace(b"{}[]", b"\n")
                     # Get RSSI after successful receive (must be called soon after recv)
                     rssi = loranode.getRSSI()
-                    process_message(message, rssi)
+                    # Add to queue instead of processing directly - this is FAST
+                    async with packet_queue_lock:
+                        packet_queue.append((message, rssi))
+                    # Log queue size periodically for monitoring
+                    queue_size = len(packet_queue)
+                    if queue_size > 10 and queue_size % 5 == 0:
+                        logger.warning(f"[QUEUE] Packet queue size: {queue_size} - processing may be slow")
             elif lora_rx_status == ERR_CRC_MISMATCH:
                 # Corrupted packet - log but don't process
                 # The radio detected a CRC error, but we still received the packet
@@ -1809,16 +1824,73 @@ async def radio_read():
                 # Other error - log and continue
                 # This could be timeout, header error, etc.
                 logger.warning(f"[LORA] Receive error status: {lora_rx_status}")
-
-            # FIX: Clear received data AFTER processing to prevent race conditions
-            # Only clear after we've successfully processed or logged the packet
+            
+            # FIX: Clear received data immediately after queuing to prevent race conditions
+            # This allows the interrupt callback to fire again quickly
             lora_rx_data = None
             lora_rx_status = None
-
+            
         except Exception as e:
             lora_rx_data = None
             lora_rx_status = None
             logger.error(f"[LORA] Exception in radio_read: {e}")
+            import sys
+            sys.print_exception(e)
+            await asyncio.sleep(0.1)  # Brief pause on error
+
+async def process_packet_queue():
+    """
+    Background task to process queued packets asynchronously.
+    This prevents blocking the receive loop when doing heavy operations.
+    
+    Prioritizes I (chunk) packets for fast image transfer.
+    """
+    global packet_queue, packet_queue_lock
+    
+    logger.info(f"===> Packet Queue Processor started... <===\n")
+    while True:
+        try:
+            packet_data = None
+            
+            # Get packet from queue with priority for I (chunk) packets
+            async with packet_queue_lock:
+                if len(packet_queue) == 0:
+                    packet_data = None
+                else:
+                    # PRIORITY FIX: Process I (chunk) packets first for fast image transfer
+                    # I chunks are time-sensitive and need fast processing
+                    i_chunk_index = None
+                    for i, (msg, rssi) in enumerate(packet_queue):
+                        try:
+                            # Quick parse to check message type (just first byte after header)
+                            # I chunks have format: msg_uid;img_id(3) + chunk_idx(2) + data
+                            # After parsing header, msg_typ is at msg_uid[0]
+                            if len(msg) >= 7:  # Minimum header length
+                                msg_typ_char = chr(msg[0])
+                                if msg_typ_char == "I":  # I chunk packet
+                                    i_chunk_index = i
+                                    break
+                        except:
+                            pass
+                    
+                    # If I chunk found, process it first; otherwise process first packet
+                    if i_chunk_index is not None:
+                        packet_data = packet_queue.pop(i_chunk_index)
+                    else:
+                        packet_data = packet_queue.pop(0)
+            
+            if packet_data:
+                message, rssi = packet_data
+                # Now process the packet - this can be slow (file I/O, network, etc.)
+                # But it doesn't block the receive loop anymore
+                process_message(message, rssi)
+            else:
+                # No packets in queue, yield to other tasks
+                # Small sleep prevents busy-waiting and allows other tasks to run
+                await asyncio.sleep(0.01)
+                
+        except Exception as e:
+            logger.error(f"[QUEUE] Error processing packet from queue: {e}")
             import sys
             sys.print_exception(e)
             await asyncio.sleep(0.1)  # Brief pause on error
@@ -2251,6 +2323,7 @@ async def main():
 
     await init_lora()
     asyncio.create_task(radio_read())
+    asyncio.create_task(process_packet_queue())  # Process queued packets asynchronously
     asyncio.create_task(print_summary_and_flush_logs())
     asyncio.create_task(validate_and_remove_neighbours())
     # Start memory management tasks
