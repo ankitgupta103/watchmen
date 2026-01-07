@@ -1,226 +1,98 @@
-00:02:27,537 - INFO - stopped by user via keyboard interrupt
-00:02:27,538 - INFO - logger closed successfully
-OpenMV 805a279; MicroPython 46b10ee2; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
-Type "help()" for more information.
->>> 
-
 info - SD card available
 info - Singleton Logger class Initiated, __new__
 Starting fake network with the following neighbours
-(223, 222)
-(222, 221)
-(221, 225)
-(223, 219)
-00:00:00,220 - INFO - [FS] Using FS_ROOT : /sdcard
-00:00:00,228 - INFO - [FS] /sdcard/netimages directory already exists
-00:00:00,240 - INFO - [FS] /sdcard/myimages directory already exists
-00:00:00,248 - INFO - [FS] /sdcard/myevents directory already exists
-00:00:00,326 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7193a09 <===
+fake network node: (223, 222)
+fake network node: (222, 221)
+fake network node: (221, 225)
+fake network node: (225, 219)
+b'e076465dd7193a09'
+00:00:00,053 - INFO - [FS] Using FS_ROOT : /sdcard
+00:00:00,057 - INFO - [FS] /sdcard/netimages directory already exists
+00:00:00,060 - INFO - [FS] /sdcard/myimages directory already exists
+00:00:00,063 - INFO - [FS] /sdcard/myevents directory already exists
+00:00:00,115 - INFO - [INIT] ===> MyAddr = 219, uid=e076465dd7193a09 <===
 
-00:00:03,514 - INFO - [LORA] Initializing LoRa SX1262 module... my lora addr = 219
-00:00:03,579 - INFO - [LORA] SX1262 initialized successfully with SF5, BW500.0kHz, CR5, Preamble6 (maximum speed configuration with optimized chunk size and timing)
-00:00:03,617 - INFO - [MEM] Memory management tasks started (free: 8155.1KB)
+00:00:03,290 - INFO - [LORA] Initializing LoRa SX1262 module... my lora addr = 219
+00:00:03,372 - INFO - [LORA] LoRa SX1262 initialized successfully
+00:00:03,413 - INFO - [MEM] Memory management tasks started (free: 8138.1KB)
 
-00:00:03,617 - INFO - [INIT] ===> Starting command center node <===
-00:00:03,618 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
-00:00:03,175 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
-00:00:03,182 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
-00:00:03,182 - INFO - ===> Radio Read, LoRa receive loop started... <===
+00:00:03,413 - INFO - [INIT] ===> Starting command center node <===
+00:00:03,413 - INFO - [WIFI] Initializing WiFi connection to SSID: Airtel_anki_3363_2.4G
+00:00:03,871 - INFO - [WIFI] Connecting to WiFi network: Airtel_anki_3363_2.4G
+00:00:03,877 - INFO - [WIFI] Connecting... (status: 1, wait: 0s)
+00:00:03,877 - INFO - ===> Radio Read, LoRa interrupt-driven receive loop started... <===
 
-00:00:03,183 - INFO - [LORA] Starting receive loop, loranode=True
-00:00:04,247 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
+00:00:03,878 - INFO - ===> Validate/Remove, Neighbour validation loop started... <===
 
-00:00:04,182 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
-00:00:06,244 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
-00:00:07,244 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
-00:00:08,307 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.5, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 192.168.1.1
-00:00:08,308 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
-00:00:08,326 - INFO - [⮕ SENT to 65535, airtime: 2.90ms] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*GXW'
-00:00:09,643 - INFO - [⬇ BCAST from 223, rssi: -32.0, snr: 7.0, airtime: 2.90ms] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*ZKE'
-00:00:09,643 - INFO - adding nodeaddr 223 to seen_neighbours
-00:00:10,309 - INFO - [NET] Sending shortest path to 223
-00:00:10,309 - INFO - [⋙ sending....] dest=223, msg_typ:S, len:3 bytes, single packet
-00:00:10,327 - INFO - [⮕ SENT to 223, airtime: 3.22ms] [*] 11 bytes, MSG_UID = b'S\xdb\xdb\xdfYTW'
-00:00:11,324 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
-00:00:14,450 - INFO - H : Len msg = 23, len msgbytes = 128
-00:00:14,451 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:14:0:0::-1:[223]:[]
-00:00:14,451 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
-00:00:16,703 - INFO - msg_typ:heartbeat from node 219 uploaded via WiFi successfully
-00:00:16,769 - INFO - [HB] HB SUCCESS, shortest path = []
-00:00:19,759 - INFO - [LORA] Receive loop running (iteration 200)...
-00:00:32,054 - INFO - [LORA] Receive loop running (iteration 400)...
-00:00:32,092 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbSPV'
-00:00:32,093 - INFO - [IMG RX] Initialized chunk_map for img_id=YXC, expected_chunks=144
-00:00:32,093 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:223, img_id:YXC ❮❮●●●●●●●●●●
-00:00:32,094 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:32,113 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXKJ'
-00:00:36,697 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 9.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbMRR'
-00:00:36,698 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:36,699 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:36,717 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfEGF'
-00:00:36,718 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:37,060 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:00:37,110 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 9.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbMRR'
-00:00:37,111 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:37,112 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:37,134 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfANL'
-00:00:37,135 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:38,082 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:00:38,147 - INFO - seen neighbours = [223], Shortest path = [], Sent messages = 5, Received messages = {223: 4}
-00:00:40,409 - INFO - [NET] Skipping spath send because image in progress
-00:00:48,654 - INFO - [LORA] Receive loop running (iteration 600)...
-00:00:56,621 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbULP'
-00:00:56,636 - INFO - [TXT] Sending event text data of length 128 bytes
-00:00:56,637 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:00:56,656 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfFQK'
-00:00:56,721 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:00:57,656 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:01:02,908 - INFO - [LORA] Receive loop running (iteration 800)...
-00:01:06,823 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbEBO'
-00:01:06,824 - INFO - [TXT] Sending event text data of length 128 bytes
-00:01:06,824 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:06,842 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHAF'
-00:01:06,842 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:01:07,856 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:01:08,896 - INFO - [⬇ RECV from 223, rssi: -32.0, snr: 8.3, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbFYZ'
-00:01:08,896 - INFO - [IMG RX] Initialized chunk_map for img_id=MVR, expected_chunks=140
-00:01:08,897 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:01:08,897 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:01:08,915 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfOGQ'
-00:01:16,216 - INFO - [LORA] Receive loop running (iteration 1000)...
-00:01:19,780 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbEDO'
-00:01:19,781 - INFO - [TXT] Sending event text data of length 128 bytes
-00:01:19,782 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:19,799 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDDP'
-00:01:19,799 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:01:20,898 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:01:29,918 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 8.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbJSF'
-00:01:29,919 - INFO - [TXT] Sending event text data of length 128 bytes
-00:01:29,920 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:29,937 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLWS'
-00:01:29,938 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:01:30,115 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:01:32,779 - INFO - [LORA] Receive loop running (iteration 1200)...
-00:01:39,069 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 8.0, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbZUL'
-00:01:39,070 - INFO - [IMG RX] Initialized chunk_map for img_id=WHV, expected_chunks=136
-00:01:39,071 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:01:39,071 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:01:39,090 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfECM'
-00:01:41,415 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbZUL'
-00:01:41,416 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:01:41,417 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:01:41,435 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfPPO'
-00:01:45,091 - INFO - [LORA] Receive loop running (iteration 1400)...
-00:01:53,177 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbHLF'
-00:01:53,178 - INFO - [TXT] Sending event text data of length 128 bytes
-00:01:53,179 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:01:53,197 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfHHL'
-00:01:53,198 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:01:54,138 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:00,321 - INFO - [LORA] Receive loop running (iteration 1600)...
-00:02:05,731 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbXBA'
-00:02:05,732 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:05,733 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:05,750 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfLHY'
-00:02:05,751 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:06,776 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:08,734 - INFO - [⬇ RECV from 223, rssi: -32.0, snr: 7.8, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbVGM'
-00:02:08,734 - INFO - [IMG RX] Initialized chunk_map for img_id=GKP, expected_chunks=144
-00:02:08,735 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:02:08,735 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:02:08,752 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfSIO'
-00:02:11,473 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbVGM'
-00:02:11,474 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:02:11,474 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:02:11,493 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfWRK'
-00:02:14,684 - INFO - [LORA] Receive loop running (iteration 1800)...
-00:02:18,044 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.0, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbQSL'
-00:02:18,045 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:18,046 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:18,064 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfQWM'
-00:02:18,065 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:19,040 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:28,929 - INFO - [LORA] Receive loop running (iteration 2000)...
-00:02:28,195 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 7.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbASG'
-00:02:28,196 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:28,197 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:28,214 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYZY'
-00:02:28,215 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:29,155 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:36,063 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.5, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbZNJ'
-00:02:36,064 - INFO - [IMG RX] Initialized chunk_map for img_id=ZIZ, expected_chunks=138
-00:02:36,064 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:02:36,065 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:02:36,083 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfKSJ'
-00:02:39,910 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbZNJ'
-00:02:39,910 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:02:39,911 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:02:39,928 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfJQZ'
-00:02:41,181 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 7.8, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbJPF'
-00:02:41,182 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:41,183 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:41,200 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMXA'
-00:02:41,201 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:43,262 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:44,260 - INFO - [LORA] Receive loop running (iteration 2200)...
-00:02:48,089 - WARNING - [LORA] CRC error but attempting to process packet (len=65)
-00:02:48,090 - ERROR - [LORA] failure parsing incoming data : b"\xce\x8b\xe6\xa9\x8f\xf9\x89\xad_\xa9\xcd\xfb\x9dB\xf9V\xca\rR)\x0f\xe1\xa2\x00\x911\xa9'\x11\x11z\xa6\xe4\x9d\x19\x07\xa0\xc0\x894a\r-\xcb\xd2\x15G\xc12\x0b:d:\x95d\x04q\x08\xfd\xd1'\xd5\xd7\x83\xcc"
-00:02:50,479 - INFO - [⬇ RECV from 223, rssi: -32.0, snr: 8.5, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbECF'
-00:02:50,480 - INFO - [TXT] Sending event text data of length 128 bytes
-00:02:50,481 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:02:50,499 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfSEG'
-00:02:50,500 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:02:51,472 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:02:58,504 - INFO - [LORA] Receive loop running (iteration 2400)...
-00:03:00,623 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbCGF'
-00:03:00,624 - INFO - [TXT] Sending event text data of length 128 bytes
-00:03:00,625 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:00,642 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUOM'
-00:03:00,643 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:03:01,702 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:03:06,977 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 8.0, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbCKJ'
-00:03:06,978 - INFO - [IMG RX] Initialized chunk_map for img_id=YUG, expected_chunks=138
-00:03:06,978 - WARNING - [CHUNK] TRANS MODE already in use for different transfer, sending W...
-00:03:06,979 - INFO - [⋙ sending....] dest=223, msg_typ:W, len:2 bytes, single packet
-00:03:06,997 - INFO - [⮕ SENT to 223, airtime: 2.90ms] [*] 10 bytes, MSG_UID = b'W\xdb\xdb\xdfECZ'
-00:03:10,822 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbKMV'
-00:03:10,823 - INFO - [TXT] Sending event text data of length 128 bytes
-00:03:10,824 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:10,841 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfZAM'
-00:03:10,841 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:03:11,808 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:03:13,868 - INFO - [LORA] Receive loop running (iteration 2600)...
-00:03:20,972 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbRNM'
-00:03:20,973 - INFO - [TXT] Sending event text data of length 128 bytes
-00:03:20,974 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:20,991 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfDOU'
-00:03:20,992 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:03:21,891 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:03:27,092 - INFO - [LORA] Receive loop running (iteration 2800)...
-00:03:32,518 - INFO - [⬇ RECV from 223, rssi: -31.0, snr: 8.5, airtime: 19.22ms] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbQOP'
-00:03:32,519 - INFO - [TXT] Sending event text data of length 128 bytes
-00:03:32,520 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:32,538 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfROV'
-00:03:32,539 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
-00:03:33,592 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
-00:03:33,659 - WARNING - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended, device:223, img_id:YXC, by TIMEOUT ❮❮●●●●●●●●●●
-00:03:33,972 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.0, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbGUJ'
-00:03:33,972 - INFO - [IMG RX] Initialized chunk_map for img_id=XJW, expected_chunks=139
-00:03:33,973 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:223, img_id:XJW ❮❮●●●●●●●●●●
-00:03:33,974 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:33,991 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfNYL'
-00:03:35,364 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.0, airtime: 5.46ms] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbGUJ'
-00:03:35,365 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:35,382 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfMVA'
-00:03:42,296 - INFO - [⬇ RECV from 223, rssi: -33.0, snr: 8.3, airtime: 33.94ms] [**********] 253 bytes, MSG_UID = b'I\xdf\xdf\xdbBID'
-00:03:42,297 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
-00:03:42,315 - INFO - [⮕ SENT to 223, airtime: 3.54ms] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXSX'
-00:03:42,450 - INFO - [LORA] Receive loop running (iteration 3000)...
-00:03:55,722 - INFO - [LORA] Receive loop running (iteration 3200)...
-00:04:00,444 - INFO - [NET] Skipping spath send because image in progress
-00:04:08,040 - INFO - [LORA] Receive loop running (iteration 3400)...
-00:04:15,360 - INFO - stopped by user via keyboard interrupt
-00:04:15,361 - INFO - logger closed successfully
-OpenMV 805a279; MicroPython 46b10ee2; OpenMV IMXRT1060 with MIMXRT1062DVJ6A
-Type "help()" for more information.
->>> 
+00:00:04,877 - INFO - [WIFI] Connecting... (status: 1, wait: 1s)
+00:00:05,877 - INFO - [WIFI] Connecting... (status: 1, wait: 2s)
+00:00:06,877 - INFO - [WIFI] Connecting... (status: 1, wait: 3s)
+00:00:07,877 - INFO - [WIFI] WiFi connected successfully!, IP add: 192.168.1.13, Subnet mask: 255.255.255.0, Gateway: 192.168.1.1, DNS: 192.168.1.1
+00:00:07,878 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:00:07,884 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*XIR'
+00:00:09,879 - INFO - [⬇ BCAST from 223, rssi: -32.0] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*WOG'
+00:00:09,879 - INFO - adding nodeaddr 223 to seen_neighbours
+00:00:09,880 - INFO - [NET] Sending shortest path to 223
+00:00:09,880 - INFO - [⋙ sending....] dest=223, msg_typ:S, len:3 bytes, single packet
+00:00:09,887 - INFO - [⮕ SENT to 223] [*] 11 bytes, MSG_UID = b'S\xdb\xdb\xdfQBY'
+00:00:10,880 - WARNING - [INIT] ===> Command center node 219 is not enabled to capture images
+00:00:13,939 - INFO - H : Len msg = 23, len msgbytes = 128
+00:00:13,940 - INFO - [HB] sending raw HB to cloud, len=128, msg:219:13:0:0::-1:[223]:[]
+00:00:13,940 - WARNING - msg_typ:heartbeat from node 219 cellular system not initialized, trying WiFi fallback...
+00:00:14,080 - ERROR - msg_typ:heartbeat from node 219 error in wifi_upload_payload: -2
+00:00:14,081 - WARNING - msg_typ:heartbeat from node 219 wifi upload failed, skipping upload...
+00:00:14,081 - WARNING - consecutive heartbeat failures = 1
+00:00:33,917 - INFO - sent: 2 Recd: 1 Unacked: 0, Free: 8136.4KB, Chunks: 0, Images at CC (received): 0, Center captured: 0, Queued: 0
+00:00:37,985 - INFO - [⬇ RECV from 223, rssi: -36.0] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbBGF'
+00:00:37,986 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:223, img_id:QKU ❮❮●●●●●●●●●●
+00:00:37,987 - INFO - seen neighbours = [223], Shortest path = [], Sent messages = 2, Received messages = {223: 2}
+00:00:37,987 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:37,993 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfKKF'
+00:00:39,988 - INFO - [⬇ RECV from 223, rssi: -36.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbZZH'
+00:00:39,989 - INFO - [NET] Skipping spath send because image in progress
+00:00:39,989 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:39,990 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:39,997 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUBW'
+00:00:39,997 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:42,509 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:00:42,510 - INFO - [⬇ RECV from 223, rssi: -37.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbZZH'
+00:00:42,511 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:42,512 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:42,519 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfVVP'
+00:00:42,520 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:45,993 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:00:45,995 - INFO - [⬇ RECV from 223, rssi: -35.0] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbENI'
+00:00:49,014 - INFO - [⬇ RECV from 223, rssi: -34.0] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbBFZ'
+00:00:53,016 - INFO - [⬇ RECV from 223, rssi: -37.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbGPY'
+00:00:53,018 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:53,018 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:53,024 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfPHI'
+00:00:53,025 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:55,837 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:00:55,840 - INFO - [⬇ RECV from 223, rssi: -37.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbGPY'
+00:00:55,841 - INFO - [TXT] Sending event text data of length 128 bytes
+00:00:55,841 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:00:55,848 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfYAS'
+00:00:55,848 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:00:58,871 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:01:06,873 - INFO - [⬇ RECV from 223, rssi: -34.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbAFA'
+00:01:06,874 - INFO - [TXT] Sending event text data of length 128 bytes
+00:01:06,875 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:01:06,880 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfUIR'
+00:01:06,881 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:01:07,962 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:01:18,875 - INFO - [⬇ RECV from 223, rssi: -36.0] [*******] 136 bytes, MSG_UID = b'T\xdf\xdf\xdbBVB'
+00:01:18,877 - INFO - [TXT] Sending event text data of length 128 bytes
+00:01:18,877 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:01:18,884 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfGAQ'
+00:01:18,884 - WARNING - msg_typ:event_text from node 223 cellular system not initialized, trying WiFi fallback...
+00:01:20,502 - INFO - msg_typ:event_text from node 223 uploaded via WiFi successfully
+00:03:37,987 - WARNING - [IMG] ●●●●●●●●●●❯❯ TRANS MODE ended, device:223, img_id:QKU, by TIMEOUT ❮❮●●●●●●●●●●
+00:03:37,988 - INFO - [⋙ sending....] dest=65535, msg_typ:N, len:1 bytes, single packet
+00:03:37,996 - INFO - [⮕ SENT to 65535] [*] 9 bytes, MSG_UID = b'N\xdb\xdb*HMD'
+00:03:38,877 - INFO - [⬇ BCAST from 223, rssi: -34.0] [*] 9 bytes, MSG_UID = b'N\xdf\xdf*EOM'
+00:03:42,878 - INFO - [⬇ RECV from 223, rssi: -35.0] [**] 29 bytes, MSG_UID = b'B\xdf\xdf\xdbNAU'
+00:03:42,878 - INFO - [IMG] ●●●●●●●●●●❯❯ TRANS MODE started, device:223, img_id:IKD ❮❮●●●●●●●●●●
+00:03:42,879 - INFO - [⋙ sending....] dest=223, msg_typ:A, len:7 bytes, single packet
+00:03:42,884 - INFO - [⮕ SENT to 223] [*] 15 bytes, MSG_UID = b'A\xdb\xdb\xdfXFL'
+00:03:46,886 - INFO - [⬇ RECV from 223, rssi: -34.0] [**********] 213 bytes, MSG_UID = b'I\xdf\xdf\xdbEKH'

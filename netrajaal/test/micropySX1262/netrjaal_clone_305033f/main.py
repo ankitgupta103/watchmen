@@ -25,7 +25,7 @@ import gc                   # garbage collection for memory management
 
 import enc
 from sx1262 import SX1262
-from _sx126x import ERR_NONE, ERR_CRC_MISMATCH, ERR_UNKNOWN, SX126X_IRQ_RX_DONE, SX126X_IRQ_TX_DONE, SX126X_SYNC_WORD_PRIVATE
+from _sx126x import ERR_NONE, ERR_CRC_MISMATCH, ERR_UNKNOWN, SX126X_IRQ_RX_DONE, SX126X_IRQ_TX_DONE, SX126X_SYNC_WORD_PRIVATE, SX126X_IRQ_ALL
 import gps_driver
 from cellular_driver import Cellular
 import detect
@@ -529,26 +529,63 @@ def lora_event_callback(events):
     """
     Interrupt callback function - called automatically when RX_DONE or TX_DONE occurs.
     This runs in interrupt context, so keep it minimal and fast.
+    
+    FIX: Added proper interrupt status clearing and race condition protection
+    to prevent packet loss when multiple interrupts fire rapidly.
     """
     global lora_rx_data, lora_rx_status, lora_rx_event
 
     if events & SX126X_IRQ_RX_DONE:
         # Packet received - read it immediately
         try:
+            # FIX: Clear interrupt status IMMEDIATELY to allow next packet to trigger interrupt
+            # This is critical - if we don't clear it, the radio won't generate new interrupts
+            # for subsequent packets, causing packet loss
+            loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
+            
+            # Read the packet from radio buffer
             msg, status = loranode.recv(len=0)
-            lora_rx_data = msg
-            lora_rx_status = status
-            # Signal async task to process the packet
-            lora_rx_event.set()
+            
+            # FIX: Race condition protection - only update data if event is not already set
+            # This prevents overwriting a packet that hasn't been processed yet by the async task.
+            # If the previous packet is still being processed, we might lose this packet,
+            # but that's better than corrupting the previous packet data.
+            if not lora_rx_event.is_set():
+                lora_rx_data = msg
+                lora_rx_status = status
+                # Signal async task to process the packet
+                lora_rx_event.set()
+            else:
+                # Previous packet not processed yet - log warning
+                # In high-traffic scenarios, you might want to implement a packet queue here
+                logger.warning(f"[LORA] Interrupt fired but previous packet not processed yet - packet may be lost")
+                # Still restart RX mode for next packet to prevent missing future packets
+                # The recv() call above already restarts RX, but we ensure it here as well
+                try:
+                    loranode.startReceive()
+                except:
+                    pass
         except Exception as e:
             logger.error(f"[LORA] Error reading packet in interrupt callback: {e}")
-            lora_rx_data = None
-            lora_rx_status = ERR_UNKNOWN
-            lora_rx_event.set()
+            # FIX: Clear interrupt status even on error to prevent radio from getting stuck
+            # Also restart RX mode to ensure we can receive next packet
+            try:
+                loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
+                loranode.startReceive()  # Restart RX mode after error
+            except:
+                pass
+            # Only set error status if event is not already set (race condition protection)
+            if not lora_rx_event.is_set():
+                lora_rx_data = None
+                lora_rx_status = ERR_UNKNOWN
+                lora_rx_event.set()
     elif events & SX126X_IRQ_TX_DONE:
         # Transmission complete - radio automatically returns to RX mode
-        # No action needed, TX is fire-and-forget
-        pass
+        # FIX: Clear TX interrupt status to prevent interrupt register from filling up
+        try:
+            loranode.clearIrqStatus(SX126X_IRQ_TX_DONE)
+        except:
+            pass
 
 def is_lora_ready():
     # Input: None; Output: bool indicating if LoRa is ready to send
@@ -1744,30 +1781,37 @@ async def radio_read():
             continue
 
         try:
+            # FIX: Clear event BEFORE waiting to handle any stale events from previous iterations
+            # This ensures we start with a clean state and don't process old data
+            lora_rx_event.clear()
+            
             # Wait for interrupt event (blocks until callback fires)
             # This is much more efficient than polling - task is suspended until data arrives
+            # The callback will set this event when RX_DONE interrupt occurs
             await lora_rx_event.wait()
 
-            # Clear event for next interrupt
-            lora_rx_event.clear()
-
             # Process the received packet
+            # FIX: Process data immediately after event is set, before clearing it
+            # This ensures we don't lose the data if another interrupt fires quickly
             if lora_rx_status == ERR_NONE:
                 # Valid packet received
                 if lora_rx_data and len(lora_rx_data) > 0:
-                    # Restore newlines
+                    # Restore newlines (they were replaced during send to avoid packet corruption)
                     message = lora_rx_data.replace(b"{}[]", b"\n")
-                    # Get RSSI after successful receive
+                    # Get RSSI after successful receive (must be called soon after recv)
                     rssi = loranode.getRSSI()
                     process_message(message, rssi)
             elif lora_rx_status == ERR_CRC_MISMATCH:
                 # Corrupted packet - log but don't process
+                # The radio detected a CRC error, but we still received the packet
                 logger.warning(f"[LORA] CRC error on received packet")
             else:
                 # Other error - log and continue
+                # This could be timeout, header error, etc.
                 logger.warning(f"[LORA] Receive error status: {lora_rx_status}")
 
-            # Clear received data
+            # FIX: Clear received data AFTER processing to prevent race conditions
+            # Only clear after we've successfully processed or logged the packet
             lora_rx_data = None
             lora_rx_status = None
 
