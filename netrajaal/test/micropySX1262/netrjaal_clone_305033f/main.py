@@ -1716,11 +1716,17 @@ def process_message(data, rssi=None):
     elif msg_typ == "V":
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "S":
-        asyncio.create_task(sync_and_transfer_spath(msg_uid, msg.decode()))
+        try:
+            spath_msg = msg.decode()
+        except Exception as e:
+            logger.error(f"decoding unicode error:{e} , [msg:{msg}]")
+            return False
+        asyncio.create_task(sync_and_transfer_spath(msg_uid, spath_msg))
     elif msg_typ == "T":
-        asyncio.create_task(event_text_process(creator, msg))
         asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+        asyncio.create_task(event_text_process(creator, msg))
     elif msg_typ == "H":
+        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
         # Validate HB message payload length for encrypted messages
         if ENCRYPTION_ENABLED:
             # RSA encrypted payload should be exactly 128 bytes
@@ -1731,7 +1737,6 @@ def process_message(data, rssi=None):
                 )
                 # Still try to process, but log the issue
         asyncio.create_task(hb_process(msg_uid, msg, sender))
-        asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
     elif msg_typ == "W": # wait message
         asyncio.create_task(device_busy_life(sender))
     elif msg_typ == "B": # TODO need to ignore buplicate images, and send some response in A itself
