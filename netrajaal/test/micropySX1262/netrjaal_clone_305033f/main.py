@@ -1021,7 +1021,7 @@ def end_chunk(msg_uid, msg):
     parts = msg.split(":")
     if len(parts) != 2:
         logger.error(f"[CHUNK] end message unparsable {msg}")
-        return
+        return (False, "", None, None, None)
     img_id = parts[0]
     epoch_ms = int(parts[1])
 
@@ -1042,7 +1042,10 @@ def end_chunk(msg_uid, msg):
         # Clear chunks immediately after recompilation to free memory
         if recompiled_msgbytes:
             clear_chunkid(img_id)
-        return (True, None, img_id, recompiled_msgbytes, epoch_ms)
+            return (True, None, img_id, recompiled_msgbytes, epoch_ms)
+        else:
+            logger.error(f"[CHUNK] Failed to recompile message for {img_id}")
+            return (False, "", img_id, None, epoch_ms)
 
 # ---------------------------------------------------------------------------
 # Command Center Integration
