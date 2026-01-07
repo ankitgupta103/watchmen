@@ -236,17 +236,29 @@ def create_dir_if_not_exists(dir_path):
                 os.listdir(dir_path)  # for valid diretory
                 logger.info(f"[FS] {dir_path} directory already exists")
             except OSError:
-                logger.error(
-                    f"dir:{dir_path} exists but not a directory, so deleting and recreating"
+                logger.warning(
+                    f"dir:{dir_path} exists but not a directory, trying deleting and recreating..."
                 )
                 try:
                     os.remove(dir_path)
                     os.mkdir(dir_path)
-                    print(f"info - Removed file {dir_path} and created directory")
+                    logger.info(f"info - Removed file {dir_path} and created directory")
                 except OSError as e:
-                    print(
-                        f"WARNING - Failed to remove file {dir_path} and create directory: {e}"
+                    logger.error(
+                        f"Failed to remove file {dir_path} and create directory: {e}"
                     )
+                    sys.exit()
+            except Exception as e:
+                logger.warning(f"[FS] Unexpected error accessing {dir_path}: {e}")
+                try:
+                    os.remove(dir_path)
+                    os.mkdir(dir_path)
+                    logger.info(f"info - Removed file {dir_path} and created directory")
+                except OSError as e:
+                    logger.error(
+                        f"Failed to remove file {dir_path} and create directory: {e}"
+                    )
+                    sys.exit()
 
     except OSError as e:
         logger.error(f"[FS] Failed to create/access {dir_path}: {e}")
@@ -942,7 +954,7 @@ def get_missing_chunks(img_id):
     msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
     missing_chunks = []
     for i in range(expected_chunks):
-        if not get_data_for_iter(list_chunks, i):
+        if not get_data_for_chunk_id(list_chunks, i):
             missing_chunks.append(i)
     return missing_chunks
 
@@ -952,22 +964,22 @@ def add_chunk(msgbytes):
         logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
         return
     img_id = msgbytes[0:3].decode()
-    citer = int.from_bytes(msgbytes[3:5])
-    #logger.info(f"Got chunk id {citer}")
-    cdata = msgbytes[5:]
+    chunk_id = int.from_bytes(msgbytes[3:5])
+    #logger.info(f"Got chunk id {chunk_id}")
+    chunk_data = msgbytes[5:]
     if img_id not in chunk_map:
         logger.error(f"[CHUNK] no entry yet for {img_id}")
         return
-    chunk_map[img_id][2].append((citer, cdata))
+    chunk_map[img_id][2].append((chunk_id, chunk_data))
     _, expected_chunks, _ = chunk_map[img_id]
     missing = get_missing_chunks(img_id)
     received = expected_chunks - len(missing)
     #logger.info(f" ===== Got {received} / {expected_chunks} chunks ====")
 
-def get_data_for_iter(list_chunks, chunkiter):
+def get_data_for_chunk_id(list_chunks, chunkiter):
     # Input: list_chunks: list of tuples(iter:int, data:bytes), chunkiter: int; Output: bytes or None for specific chunk
-    for citer, chunk_data in list_chunks:
-        if citer == chunkiter:
+    for chunk_id, chunk_data in list_chunks:
+        if chunk_id == chunkiter:
             return chunk_data
     return None
 
@@ -984,7 +996,7 @@ def recompile_msg(img_id):
     total_size = 0
     chunk_data_list = []
     for i in range(expected_chunks):
-        chunk_data = get_data_for_iter(list_chunks, i)
+        chunk_data = get_data_for_chunk_id(list_chunks, i)
         if chunk_data is None:
             return None
         total_size += len(chunk_data)
