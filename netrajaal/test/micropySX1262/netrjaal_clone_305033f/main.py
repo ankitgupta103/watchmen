@@ -1004,7 +1004,20 @@ def recompile_msg(img_id):
         total_size += len(chunk_data)
         chunk_data_list.append(chunk_data)
     
+    # Run garbage collection before large allocation to reduce fragmentation
+    # This helps free up memory that might be holding onto old objects
+    gc.collect()
+    
+    # Check if we have enough free memory (with safety margin)
+    # Need 2x the size due to allocation overhead and temporary objects during bytearray creation
+    free_mem = gc.mem_free()
+    required_mem = total_size * 2  # Safety margin: need 2x for allocation overhead
+    if free_mem < required_mem:
+        logger.warning(f"[CHUNK] Not enough free memory for {img_id}: need {required_mem}, have {free_mem}")
+        return None
+    
     # Pre-allocate bytearray to avoid memory fragmentation
+    # Using bytearray instead of string concatenation prevents creating many intermediate objects
     try:
         recompiled = bytearray(total_size)
         offset = 0
@@ -1012,7 +1025,12 @@ def recompile_msg(img_id):
             recompiled[offset:offset+len(chunk_data)] = chunk_data
             offset += len(chunk_data)
         return bytes(recompiled)
+    except MemoryError as e:
+        # Specific handling for memory allocation failures
+        logger.error(f"[CHUNK] Memory allocation failed for {img_id}: {e}")
+        return None
     except Exception as e:
+        # Catch any other unexpected errors
         logger.error(f"[CHUNK] Exception in recompile_msg for {img_id}: {e}")
         return None
 
