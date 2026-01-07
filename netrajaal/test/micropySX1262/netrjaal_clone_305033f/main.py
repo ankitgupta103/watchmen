@@ -153,7 +153,7 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 print(f"{uid}")
 # COMMAND CENTERS, OTHER NODES
-if uid == b'e076465dd7091027':
+if uid == b'e076465dd7193a09':
     my_addr = 219
 # elif uid == b'e076465dd7194211':
 #     my_addr = 225
