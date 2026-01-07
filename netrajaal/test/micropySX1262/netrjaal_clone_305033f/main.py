@@ -43,9 +43,9 @@ ENCRYPTION_ENABLED = True
 # FIXED VARIABLES
 led = LED("LED_BLUE")
 
-MIN_SLEEP = 0.1
+MIN_SLEEP = 0.02  # 0.03 works
 ACK_SLEEP = 0.2
-CHUNK_SLEEP = 0.1  # Increased from 0.2 to 0.3 (300ms) to exceed RX_DELAY_MS (250ms)
+CHUNK_SLEEP = 0.04 # 0.05 works
 
 DISCOVERY_COUNT = 100
 HB_WAIT = 600
@@ -534,7 +534,7 @@ def lora_event_callback(events):
     """
     Interrupt callback function - called automatically when RX_DONE or TX_DONE occurs.
     This runs in interrupt context, so keep it minimal and fast.
-    
+
     FIX: Added proper interrupt status clearing and race condition protection
     to prevent packet loss when multiple interrupts fire rapidly.
     """
@@ -547,10 +547,10 @@ def lora_event_callback(events):
             # This is critical - if we don't clear it, the radio won't generate new interrupts
             # for subsequent packets, causing packet loss
             loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
-            
+
             # Read the packet from radio buffer
             msg, status = loranode.recv(len=0)
-            
+
             # FIX: Race condition protection - only update data if event is not already set
             # This prevents overwriting a packet that hasn't been processed yet by the async task.
             # If the previous packet is still being processed, we might lose this packet,
@@ -1781,24 +1781,24 @@ async def radio_read():
     This allows rapid packet reception even when processing is slow.
     """
     global lora_rx_data, lora_rx_status, lora_rx_event, packet_queue, packet_queue_lock
-    
+
     logger.info(f"===> Radio Read, LoRa interrupt-driven receive loop started... <===\n")
     while True:
         # Safety check: wait for loranode to be initialized
         if loranode is None:
             await asyncio.sleep(1)
             continue
-        
+
         try:
             # FIX: Clear event BEFORE waiting to handle any stale events from previous iterations
             # This ensures we start with a clean state and don't process old data
             lora_rx_event.clear()
-            
+
             # Wait for interrupt event (blocks until callback fires)
             # This is much more efficient than polling - task is suspended until data arrives
             # The callback will set this event when RX_DONE interrupt occurs
             await lora_rx_event.wait()
-            
+
             # CRITICAL FIX: Queue packet immediately without processing
             # This allows interrupt callback to fire again quickly for next packet
             # Heavy processing (file I/O, network uploads) happens in background queue processor
@@ -1824,12 +1824,12 @@ async def radio_read():
                 # Other error - log and continue
                 # This could be timeout, header error, etc.
                 logger.warning(f"[LORA] Receive error status: {lora_rx_status}")
-            
+
             # FIX: Clear received data immediately after queuing to prevent race conditions
             # This allows the interrupt callback to fire again quickly
             lora_rx_data = None
             lora_rx_status = None
-            
+
         except Exception as e:
             lora_rx_data = None
             lora_rx_status = None
@@ -1842,16 +1842,16 @@ async def process_packet_queue():
     """
     Background task to process queued packets asynchronously.
     This prevents blocking the receive loop when doing heavy operations.
-    
+
     Prioritizes I (chunk) packets for fast image transfer.
     """
     global packet_queue, packet_queue_lock
-    
+
     logger.info(f"===> Packet Queue Processor started... <===\n")
     while True:
         try:
             packet_data = None
-            
+
             # Get packet from queue with priority for I (chunk) packets
             async with packet_queue_lock:
                 if len(packet_queue) == 0:
@@ -1872,13 +1872,13 @@ async def process_packet_queue():
                                     break
                         except:
                             pass
-                    
+
                     # If I chunk found, process it first; otherwise process first packet
                     if i_chunk_index is not None:
                         packet_data = packet_queue.pop(i_chunk_index)
                     else:
                         packet_data = packet_queue.pop(0)
-            
+
             if packet_data:
                 message, rssi = packet_data
                 # Now process the packet - this can be slow (file I/O, network, etc.)
@@ -1888,7 +1888,7 @@ async def process_packet_queue():
                 # No packets in queue, yield to other tasks
                 # Small sleep prevents busy-waiting and allows other tasks to run
                 await asyncio.sleep(0.01)
-                
+
         except Exception as e:
             logger.error(f"[QUEUE] Error processing packet from queue: {e}")
             import sys
