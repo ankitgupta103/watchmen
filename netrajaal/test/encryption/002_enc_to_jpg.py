@@ -1,5 +1,6 @@
 import os
 import gc
+import sys
 
 import enc
 import image
@@ -89,6 +90,7 @@ def main():
         img.save(jpg_file_path)
     except Exception as e:
         print(f"ERROR, [IMG] Failed to decrypt and save image: {e}")
+        sys.print_exception(e)
     finally:
         # Explicitly clean up image objects
         if img_bytes is not None:
