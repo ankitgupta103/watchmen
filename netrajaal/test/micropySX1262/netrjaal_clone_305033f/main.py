@@ -1853,7 +1853,7 @@ async def radio_read():
     logger.info(f"===> Radio Read, LoRa interrupt-driven receive loop started... <===\n")
     while True:
         # Safety check: wait for loranode to be initialized
-        if loranode is None:
+        if not is_lora_ready():
             await asyncio.sleep(1)
             continue
 
