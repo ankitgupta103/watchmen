@@ -582,10 +582,10 @@ def lora_event_callback(events):
                 logger.warning(f"[LORA] Interrupt fired but previous packet not processed yet - packet may be lost")
                 # Still restart RX mode for next packet to prevent missing future packets
                 # The recv() call above already restarts RX, but we ensure it here as well
-                try:
-                    loranode.startReceive()
-                except:
-                    pass
+            try:
+                loranode.startReceive()
+            except:
+                pass
         except Exception as e:
             logger.error(f"[LORA] Error reading packet in interrupt callback: {e}")
             # FIX: Clear interrupt status even on error to prevent radio from getting stuck
@@ -819,7 +819,7 @@ def encrypt_if_needed(msg_typ, msg):
 
 # === Send Function ===
 
-async def send_msg_internal(msg_typ, creator, msgbytes, dest): # all messages except image
+async def send_msg(msg_typ, creator, msgbytes, dest): # all messages except image
     if not is_lora_ready():
         return False
     # Input: msg_typ: str, creator: int, msgbytes: bytes, dest: int; Output: bool success indicator
@@ -893,10 +893,6 @@ async def send_msg_big(msg_typ, creator, msgbytes, dest, epoch_ms): # image send
     else:
         logger.warning(f"Invalid message type: {msg_typ}")
         return False
-
-
-async def send_msg(msg_typ, creator, msgbytes, dest):
-    return await send_msg_internal(msg_typ, creator, msgbytes, dest)
 
 def ack_time(msg_uid):
     # Input: msg_uid: bytes; Output: tuple(timestamp:int, missingids:list or None)
