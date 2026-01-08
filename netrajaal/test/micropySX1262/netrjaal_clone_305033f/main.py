@@ -169,9 +169,9 @@ elif uid ==  b'e076465dd7194025':
     if not DYNAMIC_SPATH:
         shortest_path_to_cc = [225, 219]
 elif uid == b'e076465dd7090d1c':
-    my_addr = 222
+    my_addr = 221
     if not DYNAMIC_SPATH:
-        shortest_path_to_cc = [223, 219]
+        shortest_path_to_cc = [225, 219]
 elif uid == b'e076465dd7091843':
     my_addr = 223
     if not DYNAMIC_SPATH:
