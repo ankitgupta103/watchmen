@@ -144,7 +144,7 @@ seen_neighbours = []
 # --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
 
 COMMAN_CENTER_ADDRS = [219]
-IMAGE_CAPTURING_ADDRS = [221, 223, 222] # [] empty means capture at all device, else on list of devices
+IMAGE_CAPTURING_ADDRS = [221, 223] # [] empty means capture at all device, else on list of devices
 import fakelayout
 flayout = fakelayout.Layout()
 
@@ -159,7 +159,9 @@ uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for 
 print(f"{uid}")
 # COMMAND CENTERS, OTHER NODES
 if uid == b'e076465dd7193a09':
-    my_addr = 219
+    my_addr = 225
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = [219]
 # elif uid == b'e076465dd7194211':
 #     my_addr = 225
 #     if not DYNAMIC_SPATH:
