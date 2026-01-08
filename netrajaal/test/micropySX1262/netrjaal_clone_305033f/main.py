@@ -1662,7 +1662,12 @@ async def sync_and_transfer_spath(msg_uid, msg):
     if len(msg) == 0:
         logger.error(f"empty spath_received message received")
         return
-    spath_received = [int(x) for x in msg.split(",")]
+    try:
+        spath_received = [int(x.strip()) for x in msg.split(",")]
+    except Exception as e:
+        logger.error(f"Error parsing spath message: '{msg}', error: {e}")
+        return
+    
     if my_addr in spath_received:
         logger.debug(f"[cyclic, ignoring {my_addr} already in {spath_received}")
         return
