@@ -157,8 +157,21 @@ rtc.datetime((2025, 1, 1, 0, 0, 0, 0, 0))
 
 uid = binascii.hexlify(machine.unique_id())      # Returns 8 byte unique ID for board
 print(f"{uid}")
-# COMMAND CENTERS, OTHER NODES
-if uid == b'e076465dd7193a09':
+# -------------------------------SETUP 1----------------------------------
+if uid == b'e076465dd7090d1c':
+    my_addr = 221
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = [223, 219]
+elif uid == b'e076465dd7091843':
+    my_addr = 223
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = [219]
+elif uid ==  b'e076465dd7194025':
+    my_addr = 219
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = []
+# -------------------------------SETUP 2----------------------------------
+elif uid == b'e076465dd7193a09':
     my_addr = 225
     if not DYNAMIC_SPATH:
         shortest_path_to_cc = [219]
@@ -166,18 +179,6 @@ if uid == b'e076465dd7193a09':
 #     my_addr = 225
 #     if not DYNAMIC_SPATH:
 #         shortest_path_to_cc = [219]
-elif uid ==  b'e076465dd7194025':
-    my_addr = 219
-    if not DYNAMIC_SPATH:
-        shortest_path_to_cc = []
-elif uid == b'e076465dd7090d1c':
-    my_addr = 221
-    if not DYNAMIC_SPATH:
-        shortest_path_to_cc = [225, 219]
-elif uid == b'e076465dd7091843':
-    my_addr = 223
-    if not DYNAMIC_SPATH:
-        shortest_path_to_cc = [219]
 else:
     logger.error("error in main.py: Unknown device ID for " + omv.board_id())
     sys.exit()
