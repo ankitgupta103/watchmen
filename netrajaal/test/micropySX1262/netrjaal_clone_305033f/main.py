@@ -145,6 +145,7 @@ seen_neighbours = []
 
 COMMAN_CENTER_ADDRS = [219]
 IMAGE_CAPTURING_ADDRS = [221, 223] # [] empty means capture at all device, else on list of devices
+IMAGE_LIMIT = 10 # 10 or None
 import fakelayout
 flayout = fakelayout.Layout()
 
@@ -358,7 +359,7 @@ def ellepsis(msg):
 
 def ack_needed(msg_typ): # msg_type P is devided in (B,I,E)
     # Input: msg_typ: str; Output: bool indicating if acknowledgement required
-    if msg_typ in ["A", "I", "S", "W", "N"]:
+    if msg_typ in ["A", "S", "W", "N", "I"]:
         return False
     if msg_typ in ["H", "B", "E", "V", "C", "T"]:
         return True
@@ -403,6 +404,10 @@ async def keep_transmode_lock(device_id, img_id):
 
 def check_transmode_lock(device_id, img_id): # check if transfer lock is active or not
     global image_in_progress, paired_device, data_id
+    # # If img_id is None, only check device_id (for backward compatibility)
+    # if img_id is None: # TODO
+    #     return image_in_progress and paired_device == device_id
+    # # Otherwise check both device_id and img_id
     if image_in_progress and paired_device == device_id and data_id == img_id:
         return True
     else:
@@ -531,7 +536,7 @@ async def init_lora():
         )
 
         if status != ERR_NONE:
-            logger.error(f"[LORA] Initialization failed with status: {status}")
+            logger.error(f"[LORA] Failed to initialize SX1262, status: {status}")
             loranode = None
             return
 
@@ -624,24 +629,15 @@ def is_lora_ready():
 
 
 
-msgs_sent = []
-msgs_unacked = []
 msgs_recd = []
 
 # Memory Management Functions
-def cleanup_old_messages():
+def cleanup_old_recd_messages():
     """Remove old messages from buffers based on age and size limits"""
-    global msgs_sent, msgs_recd, msgs_unacked
+    global msgs_recd
     current_time = time_msec()
     age_threshold_ms = MAX_OLD_MSG_AGE_SEC * 1000
 
-    # Clean msgs_sent - remove messages older than threshold
-    msgs_sent = [(msg_uid, msg, t) for msg_uid, msg, t in msgs_sent
-                 if (current_time - t) < age_threshold_ms]
-    # Also limit by size
-    if len(msgs_sent) > MAX_MSGS_SENT:
-        msgs_sent = msgs_sent[-MAX_MSGS_SENT:]
-        logger.info(f"[MEM] Trimmed msgs_sent to {MAX_MSGS_SENT} entries")
 
     # Clean msgs_recd - remove messages older than threshold
     msgs_recd = [(msg_uid, msg, t) for msg_uid, msg, t in msgs_recd
@@ -651,26 +647,6 @@ def cleanup_old_messages():
         msgs_recd = msgs_recd[-MAX_MSGS_RECD:]
         logger.info(f"[MEM] Trimmed msgs_recd to {MAX_MSGS_RECD} entries")
 
-    # Clean msgs_unacked - remove very old unacked messages (they likely failed)
-    old_unacked = []
-    new_unacked = []
-    for msg_uid, msg, t in msgs_unacked:
-        age = current_time - t
-        if age > age_threshold_ms * 2:  # Double threshold for unacked (more lenient)
-            old_unacked.append(msg_uid)
-        else:
-            new_unacked.append((msg_uid, msg, t))
-    msgs_unacked = new_unacked
-
-    if len(old_unacked) > 0:
-        logger.info(f"[MEM] Removed {len(old_unacked)} old unacked messages")
-
-    # Also limit by size
-    if len(msgs_unacked) > MAX_MSGS_UNACKED:
-        # Remove oldest ones
-        msgs_unacked.sort(key=lambda x: x[2])  # Sort by timestamp
-        msgs_unacked = msgs_unacked[-MAX_MSGS_UNACKED:]
-        logger.info(f"[MEM] Trimmed msgs_unacked to {MAX_MSGS_UNACKED} entries")
 
 def cleanup_chunk_map():
     """Clean up old/incomplete chunk entries"""
@@ -684,6 +660,13 @@ def cleanup_chunk_map():
             chunk_map.pop(key)
         logger.info(f"[MEM] Cleaned {entries_to_remove} old chunk_map entries")
 
+def cleanup_chunk_map_by_msg_id(img_id):
+    """Clean up old/incomplete chunk entries"""
+    global chunk_map
+    if img_id in chunk_map.keys():
+        chunk_map.pop(img_id)
+        logger.info(f"[MEM] Cleaned chunks from chun_map for img_id:{img_id}")
+
 
 async def periodic_memory_cleanup():
     """Periodically clean up memory buffers and run garbage collection"""
@@ -695,30 +678,30 @@ async def periodic_memory_cleanup():
             logger.info(f"[MEM] Starting memory cleanup (free: {free_before/1024:.1f}KB)")
 
             # Clean up message buffers
-            cleanup_old_messages()
+            cleanup_old_recd_messages()
 
             # Clean up chunk map
             cleanup_chunk_map()
 
             # Run garbage collection
-            gc.collect()
+            # gc.collect()
 
             free_after = get_free_memory()
             freed = free_after - free_before if free_before > 0 and free_after > 0 else 0
             logger.info(f"[MEM] Cleanup complete (free: {free_after/1024:.1f}KB, freed: {freed/1024:.1f}KB)")
-            logger.info(f"[MEM] Buffers - sent:{len(msgs_sent)}, recd:{len(msgs_recd)}, unacked:{len(msgs_unacked)}, chunks:{len(chunk_map)}")
+            logger.info(f"[MEM] Buffers - recd:{len(msgs_recd)}, chunks:{len(chunk_map)}")
 
         except Exception as e:
             logger.error(f"[MEM] error in memory cleanup: {e}")
 
-async def periodic_gc():
-    """Run garbage collection more frequently for aggressive cleanup"""
-    while True:
-        try:
-            await asyncio.sleep(GC_COLLECT_INTERVAL_SEC)
-            gc.collect()
-        except Exception as e:
-            logger.error(f"[MEM] error in periodic GC: {e}")
+# async def periodic_gc():
+#     """Run garbage collection more frequently for aggressive cleanup"""
+#     while True:
+#         try:
+#             await asyncio.sleep(GC_COLLECT_INTERVAL_SEC)
+#             gc.collect()
+#         except Exception as e:
+#             logger.error(f"[MEM] error in periodic GC: {e}")
 
 # MSG TYPE = H(eartbeat), A(ck), B(egin), E(nd), C(hunk), S(hortest path)
 
@@ -740,13 +723,6 @@ def radio_send(dest, data, msg_uid):
     data_masked_log = min(10, max(1, (len(data) + 20) // 21))
     logger.info(f"[⮕ SENT to {dest}] [{'*' * data_masked_log}] {len(data)} bytes, MSG_UID = {msg_uid}")
 
-def pop_and_get(msg_uid):
-    # Input: msg_uid: bytes; Output: tuple(msg_uid, msgbytes, timestamp) removed from msgs_unacked or None
-    for i in range(len(msgs_unacked)):
-        m, d, t = msgs_unacked[i]
-        if m == msg_uid:
-            return msgs_unacked.pop(i)
-    return None
 
 async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
     try:
@@ -755,14 +731,12 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         databytes = msg_uid + b";" + msgbytes
         ackneeded = ack_needed(msg_typ)
         timesent = time_msec()
-        if ackneeded:
-            msgs_unacked.append((msg_uid, msgbytes, timesent))
-        else:
-            msgs_sent.append((msg_uid, msgbytes, timesent))
+
         if not ackneeded:
             radio_send(dest, databytes, msg_uid)
             await asyncio.sleep(MIN_SLEEP)
             return (True, [])
+
         ack_msg_recheck_count = 5 # number of times we are checking if ack received or not
         for retry_i in range(retry_count):
             radio_send(dest, databytes, msg_uid)
@@ -772,7 +746,6 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
                 at, missing_chunks = ack_time(msg_uid)
                 if at > 0:
                     logger.info(f"[ACK] Msg {msg_uid} : was acked in {at - timesent} msecs")
-                    msgs_sent.append(pop_and_get(msg_uid))
                     return (True, missing_chunks)
                 else:
                     if first_log_flag:
@@ -791,11 +764,15 @@ async def send_single_packet(msg_typ, creator, msgbytes, dest, retry_count = 3):
         return (False, [])
 
 def make_chunks(msg):
-    # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each
+    # Input: msg: bytes; Output: list of bytes chunks up to 200 bytes each (safe size for 255 byte LoRa limit)
+    # Calculation: Max LoRa packet (255) - msg_uid+separator (8) - img_id (3) - chunk_index (2) = 242 bytes available
+    # Using 200 bytes per chunk for safety margin (prevents ERR_PACKET_TOO_LONG errors)
+    # Total packet: 7 (msg_uid) + 1 (;) + 3 (img_id) + 2 (chunk_index) + 200 (data) = 213 bytes (safe)
+    CHUNK_DATA_SIZE = 200
     chunks = []
-    while len(msg) > 200:
-        chunks.append(msg[0:200])
-        msg = msg[200:]
+    while len(msg) > CHUNK_DATA_SIZE:
+        chunks.append(msg[0:CHUNK_DATA_SIZE])
+        msg = msg[CHUNK_DATA_SIZE:]
     if len(msg) > 0:
         chunks.append(msg)
     return chunks
@@ -925,7 +902,7 @@ def ack_time(msg_uid):
                     return (t, [])
             else:
                 logger.debug(f"[ACK] ACK payload too short: {len(msgbytes)} bytes, expected at least {MIDLEN-1}")
-    return (-1, None)
+    return (0, [])
 
 
 chunk_map = {} # chunk ID to (expected_chunks, [(iter, chunk_data)])
@@ -943,16 +920,20 @@ def begin_chunk(msg):
     img_id = parts[0]
     epoch_ms = int(parts[1])
     numchunks = int(parts[2])
-    chunk_map[img_id] = ("B", numchunks, [])
+    if img_id not in chunk_map:
+        chunk_map[img_id] = ["B", numchunks, []]
+        logger.info(f"[IMG RX] Initialized chunk_map for img_id={img_id}, expected_chunks={numchunks}")
     return (img_id, epoch_ms, numchunks)
 
 
 def get_missing_chunks(img_id):
     # Input: img_id: str chunk identifier; Output: list of int missing chunk indices
     if img_id not in chunk_map:
-        #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
+        logger.warning(f"[CHUNK] get_missing_chunks: no entry for img_id={img_id}")
         return []
-    msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
+    entry = chunk_map[img_id]
+    expected_chunks = entry[1]
+    list_chunks = entry[2]
     missing_chunks = []
     for i in range(expected_chunks):
         if not get_data_for_chunk_id(list_chunks, i):
@@ -964,18 +945,36 @@ def add_chunk(msgbytes):
     if len(msgbytes) < 5:
         logger.error(f"[CHUNK] not enough bytes {len(msgbytes)} : {msgbytes}")
         return
-    img_id = msgbytes[0:3].decode()
-    chunk_id = int.from_bytes(msgbytes[3:5])
-    #logger.info(f"Got chunk id {chunk_id}")
-    chunk_data = msgbytes[5:]
-    if img_id not in chunk_map:
-        logger.error(f"[CHUNK] no entry yet for {img_id}")
-        return
-    chunk_map[img_id][2].append((chunk_id, chunk_data))
-    _, expected_chunks, _ = chunk_map[img_id]
-    missing = get_missing_chunks(img_id)
-    received = expected_chunks - len(missing)
-    #logger.info(f" ===== Got {received} / {expected_chunks} chunks ====")
+    try:
+        img_id = msgbytes[0:3].decode()
+        chunk_id = int.from_bytes(msgbytes[3:5], 'big')  # Consistent with sender's to_bytes(2, 'big')
+        #logger.info(f"Got chunk id {chunk_id}")
+        chunk_data = msgbytes[5:]
+        if img_id not in chunk_map:
+            logger.error(f"[CHUNK] no entry yet for img_id={img_id}, chunk_index={chunk_id} (chunk may have arrived before B packet or chunk_map was cleared)")
+            return
+        # Check if chunk already exists (deduplicate)
+        img_chunk_list = chunk_map[img_id][2]
+        chunk_exists = False
+        for idx, (stored_chunk_id, _) in enumerate(img_chunk_list):
+            if stored_chunk_id == chunk_id: # OPTIONAL block
+                chunk_exists = True
+                # Update existing chunk (replace with new one in case of corruption)
+                img_chunk_list[idx] = (chunk_id, chunk_data)
+                break
+
+        if not chunk_exists: # Store new chunk
+            chunk_map[img_id][2].append((chunk_id, chunk_data))
+
+        entry = chunk_map[img_id]
+        expected_chunks = entry[1]
+        missing = get_missing_chunks(img_id)
+        received = expected_chunks - len(missing)
+        # Log progress every 20 chunks or when complete for debugging
+        if received % 20 == 0 or received == expected_chunks:
+            logger.info(f"[IMG] Received chunk {chunk_id}: {received}/{expected_chunks} chunks complete (stored {len(img_chunk_list)} total, missing={len(missing)})")
+    except Exception as e:
+        logger.error(f"[CHUNK] Error adding chunk: {e}, msgbytes_len={len(msgbytes)}")
 
 def get_data_for_chunk_id(list_chunks, chunkiter):
     # Input: list_chunks: list of tuples(iter:int, data:bytes), chunkiter: int; Output: bytes or None for specific chunk
@@ -989,45 +988,24 @@ def recompile_msg(img_id):
     if len(get_missing_chunks(img_id)) > 0:
         return None
     if img_id not in chunk_map:
-        #logger.info(f"Should never happen, have no entry in chunk_map for {img_id}")
-        return []
-    msg_typ, expected_chunks, list_chunks = chunk_map[img_id]
-    
-    # Pre-calculate total size and collect chunks
-    total_size = 0
-    chunk_data_list = []
-    for i in range(expected_chunks):
-        chunk_data = get_data_for_chunk_id(list_chunks, i)
-        if chunk_data is None:
-            return None
-        total_size += len(chunk_data)
-        chunk_data_list.append(chunk_data)
-    
-    # Run garbage collection before large allocation to reduce fragmentation
-    # This helps free up memory that might be holding onto old objects
+        logger.warning(f"[CHUNK] recompile_msg: no entry for img_id={img_id}")
+        return None
+
+    # Force garbage collection before allocating memory for full image
     gc.collect()
-    
-    # Check if we have enough free memory (with safety margin)
-    # Need 2x the size due to allocation overhead and temporary objects during bytearray creation
-    free_mem = gc.mem_free()
-    required_mem = total_size * 2  # Safety margin: need 2x for allocation overhead
-    if free_mem < required_mem:
-        logger.warning(f"[CHUNK] Not enough free memory for {img_id}: need {required_mem}, have {free_mem}")
-        return None
-    
-    # Pre-allocate bytearray to avoid memory fragmentation
-    # Using bytearray instead of string concatenation prevents creating many intermediate objects
+
+    entry = chunk_map[img_id]
+    expected_chunks = entry[1]
+    list_chunks = entry[2]
     try:
-        recompiled = bytearray(total_size)
-        offset = 0
-        for chunk_data in chunk_data_list:
-            recompiled[offset:offset+len(chunk_data)] = chunk_data
-            offset += len(chunk_data)
-        return bytes(recompiled)
-    except MemoryError as e:
-        # Specific handling for memory allocation failures
-        logger.error(f"[CHUNK] Memory allocation failed for {img_id}: {e}")
-        return None
+        recompiled = b""
+        for i in range(expected_chunks):
+            chunk_data = get_data_for_chunk_id(list_chunks, i)
+            if chunk_data is None:
+                logger.error(f"[CHUNK] recompile_msg: missing chunk {i} for img_id={img_id}")
+                return None
+            recompiled += chunk_data
+        return recompiled
     except Exception as e:
         # Catch any other unexpected errors
         logger.error(f"[CHUNK] Exception in recompile_msg for {img_id}: {e}")
@@ -1058,13 +1036,26 @@ def end_chunk(msg_uid, msg):
     epoch_ms = int(parts[1])
 
     creator = int(msg_uid[1])
+    if img_id not in chunk_map:
+        logger.warning(f"[CHUNK] end_chunk: no entry for img_id={img_id}, cannot determine missing chunks")
+        return (False, "0", img_id, None, epoch_ms) # TODO check for "0"
+
+    entry = chunk_map[img_id]
+    expected_chunks = entry[1]
+    chunk_list = entry[2]
     missing = get_missing_chunks(img_id)
     if len(missing) > 0:
-        logger.info(f"[CHUNK] I am missing {len(missing)} chunks : {missing}")
+        logger.info(f"[CHUNK] I am missing {len(missing)}/{expected_chunks} chunks: first 20 = {missing[:20]}, stored_chunks={len(chunk_list)}, unique_indices={len(set(c for c, _ in chunk_list))}")
+        max_payload_size = PACKET_PAYLOAD_LIMIT - MIDLEN - MIDLEN - 1  # Reserve space for msg_uid + ":" + safety
         missing_str = str(missing[0])
         for i in range(1, len(missing)):
-            if len(missing_str) + len(str(missing[i])) + 1 + MIDLEN + MIDLEN < PACKET_PAYLOAD_LIMIT:
-                missing_str += "," + str(missing[i])
+            updated_missing_str = missing_str + "," + str(missing[i])
+            if len(updated_missing_str) <= max_payload_size:
+                missing_str = updated_missing_str
+            else:
+                # Truncate - sender will send remaining chunks after getting this list in next round
+                logger.warning(f"[CHUNK] Missing chunk list truncated at {i}/{len(missing)} chunks due to payload limit (will request remaining in next end packet)")
+                break
         return (False, missing_str, img_id, None, epoch_ms)
     else:
         if img_id not in chunk_map:
@@ -1332,7 +1323,7 @@ async def person_detection_loop():
     next_capture_wait = None # max value is 16
     MAX_CAPTURE_WAIT = 10
     FRESH_MOTION_LAP = 16
-    while True:
+    while IMAGE_LIMIT is None or person_image_count < IMAGE_LIMIT:
         # Wait for PIR interrupt event (blocks until PIR detects motion)
         # Task is suspended here - uses minimal CPU until interrupt fires
         await pir_trigger_event.wait()
@@ -1388,11 +1379,17 @@ async def person_detection_loop():
                 async with lock:
                     img.save(raw_path)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(500)
+                    utime.sleep_ms(1600)
                 logger.info(f"Saved raw image: {raw_path}: raw size = {len(img.bytearray())} bytes")
             except Exception as e:
                 logger.warning(f"[PIR] Failed to save raw image: {e}")
                 continue
+
+            # Delete original image object and force GC before reading to prevent memory allocation failures
+            if img is not None:
+                del img
+                gc.collect()  # Force garbage collection to free memory
+                utime.sleep_ms(100)  # Small delay after GC to let system stabilize
 
             # read raw file
             try:
@@ -1413,7 +1410,7 @@ async def person_detection_loop():
                     with open(enc_filepath, "wb") as f:
                         f.write(enc_msgbytes)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(500)
+                    utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
                 logger.info(f"[PIR] Saved encrypted image: {enc_filepath}: encrypted size = {len(enc_msgbytes)} bytes")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save encrypted image: {e}")
@@ -1434,7 +1431,7 @@ async def person_detection_loop():
                 with open(event_filepath, "w") as f:
                     f.write(json.dumps(event_data))
                 os.sync()  # Force filesystem sync to SD card
-                utime.sleep_ms(500)
+                utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
                 logger.info(f"[PIR] Saved event file: {event_filepath}")
             except Exception as e:
                 logger.error(f"[PIR] Failed to save event file {event_filepath}: {e}")
@@ -1779,25 +1776,41 @@ def process_message(data, rssi=None):
         asyncio.create_task(hb_process(msg_uid, msg, sender))
     elif msg_typ == "W": # wait message
         asyncio.create_task(device_busy_life(sender))
-    elif msg_typ == "B": # TODO need to ignore buplicate images, and send some response in A itself
+    elif msg_typ == "B": # TODO need to ignore duplicate images, and send some response in A itself
         try:
             img_id, epoch_ms, numchunks = begin_chunk(msg.decode())
-            if get_transmode_lock(sender, img_id):
+            # Check if this is a duplicate B packet for the same transfer
+            if check_transmode_lock(sender, img_id):
+                # Same sender and img_id - send ACK anyway (duplicate begin packet)
+                logger.debug(f"[CHUNK] Duplicate B packet for same transfer, sending ACK")
+                asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
+            elif get_transmode_lock(sender, img_id):
                 asyncio.create_task(keep_transmode_lock(sender, img_id))
                 asyncio.create_task(send_msg("A", my_addr, ackmessage, sender))
             else:
-                logger.warning(f"TRANS MODE already in use, could not get lock...")
+                logger.warning(f"[CHUNK] TRANS MODE already in use for different transfer, sending W...")
                 asyncio.create_task(send_msg("W", my_addr, WAIT_MESSAGE, sender))
                 return False
         except Exception as e:
             logger.error(f"[CHUNK] decoding unicode {e} : {msg}")
             return False
     elif msg_typ == "I":
-        # I (chunk) packets are processed quickly - just add to chunk map
-        # No ACK needed, no file I/O - this keeps processing fast for rapid chunk reception
-        # The packet queue processor prioritizes I chunks for even faster handling
-        add_chunk(msg)  # optional to check check_transmode_lock
+        # add_chunk(msg)
+        try:
+            if len(msg) >= 3:
+                chunk_img_id = msg[0:3].decode()
+                if check_transmode_lock(sender, chunk_img_id):
+                    add_chunk(msg)
+                else:
+                    add_chunk(msg) # TODO can be removed later
+            else:
+                logger.warning(f"[IMG RX] Chunk I message too short ({len(msg)} bytes), cannot extract img_id")
+        except Exception as e:
+            logger.error(f"[IMG RX] Error processing chunk I: {e}")
     elif msg_typ == "E": #
+        # Process end chunk and respond with missing chunks list or completion confirmation
+        free_before = get_free_memory()
+        logger.info(f"[IMG RX] Free memory before End chunk: {free_before/1024:.1f}KB")
         alldone, missing_str, img_id, recompiled_msgbytes, epoch_ms = end_chunk(msg_uid, msg.decode()) # TODO later, check how can we validate file
         if alldone:
             delete_transmode_lock(sender, img_id)
@@ -1809,21 +1822,33 @@ def process_message(data, rssi=None):
                 for i in range(msg_count):
                     await send_msg("A", creator, ackmessage, sender)
                     if i < msg_count-1:
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(ACK_SLEEP)  # Delay between multiple ACK sends for reliability
             asyncio.create_task(send_ack_multiple())
             if recompiled_msgbytes:
                 try:
+                    cleanup_chunk_map_by_msg_id(img_id)
+                except Exception as e:
+                    logger.error(f"[IMG RX] Error cleaning up chunk map for img_id {img_id}: {e}")
+
+                try:
                     enc_filepath = f"{MY_IMAGE_DIR}/{creator}_{epoch_ms}.enc"
-                    logger.debug(f"[PIR] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
+                    logger.info(f"[IMG RX] Saving encrypted image to {enc_filepath} : encrypted size = {len(recompiled_msgbytes)} bytes...")
                     with open(enc_filepath, "wb") as f:
                         f.write(recompiled_msgbytes)
                     os.sync()  # Force filesystem sync to SD card
-                    utime.sleep_ms(500)
+                    utime.sleep_ms(1600)  # Increased delay to ensure FAT filesystem fully commits
+
+                    # Delete recompiled bytes after saving to free memory (chunks already deleted in end_chunk)
+                    del recompiled_msgbytes
+                    gc.collect()
+
                     imgpaths_to_send.append({"creator": creator, "epoch_ms": epoch_ms, "enc_filepath": enc_filepath})
                     logger.info(f"[CHUNK] image saved to {enc_filepath}, adding to send queue")
                 except Exception as e:
-                    logger.error(f"[CHUNK] error saving image to {enc_filepath}: {e}")
-                # asyncio.create_task(img_process(img_id, recompiled_msgbytes, creator, sender))
+                    logger.error(f"[IMG RX] Error saving image: {e}") # TODO, don't send success if can't save
+                    # Ensure recompiled bytes are freed even on error
+                    del recompiled_msgbytes
+                    gc.collect()
             else:
                 logger.warning(f"[CHUNK] img not recompiled, so not sending")
         else:
@@ -2211,14 +2236,12 @@ async def print_summary_and_flush_logs():
             continue
         free_mem = get_free_memory()
         mem_str = f", Free: {free_mem/1024:.1f}KB" if free_mem > 0 else ""
-        log_str = f"sent: {len(msgs_sent)} Recd: {len(msgs_recd)} Unacked: {len(msgs_unacked)}{mem_str}"
+        log_str = f"Recd: {len(msgs_recd)} {mem_str}"
         if running_as_cc():
             logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Images at CC (received): {len(images_saved_at_cc)}, Center captured: {center_captured_image_count}, Queued: {len(imgpaths_to_send)}")
         else:
             logger.info(f"{log_str}, Chunks: {len(chunk_map)}, Queued images: {len(imgpaths_to_send)}")
-        #logger.info(msgs_sent)
         #logger.info(msgs_recd)
-        #logger.info(msgs_unacked)
 
 # ---------------------------------------------------------------------------
 # GPS Acquisition Loop
@@ -2386,6 +2409,9 @@ async def init_wifi():
 # ---------------------------------------------------------------------------
 async def main():
     # Input: None; Output: None (entry point scheduling initialization and background tasks)
+    gc.enable()
+    free_before = get_free_memory()
+    logger.info(f"[IMG RX] Free mem at init: {free_before/1024:.1f}KB")
     global image_in_progress
     image_in_progress = False
 
@@ -2396,7 +2422,6 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     # Start memory management tasks
     asyncio.create_task(periodic_memory_cleanup())
-    asyncio.create_task(periodic_gc())
     logger.info(f"[MEM] Memory management tasks started (free: {get_free_memory()/1024:.1f}KB)\n")
     if running_as_cc():
         logger.info(f"[INIT] ===> Starting command center node <===")
