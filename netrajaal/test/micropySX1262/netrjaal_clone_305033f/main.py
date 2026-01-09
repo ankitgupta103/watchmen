@@ -12,6 +12,7 @@ import sensor
 import image
 import ml
 import os                   # file system access
+import sys
 import time
 import binascii
 import machine
@@ -29,6 +30,8 @@ from _sx126x import ERR_NONE, ERR_CRC_MISMATCH, ERR_UNKNOWN, SX126X_IRQ_RX_DONE,
 import gps_driver
 from cellular_driver import Cellular
 import detect
+import fakelayout
+from detect import PIR_PIN
 
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # TESTING VARIABLES
@@ -146,7 +149,6 @@ seen_neighbours = []
 COMMAN_CENTER_ADDRS = [219]
 IMAGE_CAPTURING_ADDRS = [221, 223] # [] empty means capture at all device, else on list of devices
 IMAGE_LIMIT = 10 # 10 or None
-import fakelayout
 flayout = fakelayout.Layout()
 
 rtc = machine.RTC()
@@ -546,7 +548,6 @@ async def init_lora():
         logger.info(f"[LORA] LoRa SX1262 initialized successfully")
     except Exception as e:
         logger.error(f"[LORA] Exception during initialization: {e}")
-        import sys
         sys.print_exception(e)
         loranode = None
     finally:
@@ -568,7 +569,6 @@ def lora_event_callback(events):
             # FIX: Clear interrupt status IMMEDIATELY to allow next packet to trigger interrupt
             # This is critical - if we don't clear it, the radio won't generate new interrupts
             # for subsequent packets, causing packet loss
-            loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
 
             # Read the packet from radio buffer
             msg, status = loranode.recv(len=0)
@@ -589,6 +589,8 @@ def lora_event_callback(events):
                 # Still restart RX mode for next packet to prevent missing future packets
                 # The recv() call above already restarts RX, but we ensure it here as well
             try:
+                loranode.clearIrqStatus(SX126X_IRQ_ALL)
+                # loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
                 loranode.startReceive()
             except:
                 pass
@@ -597,7 +599,8 @@ def lora_event_callback(events):
             # FIX: Clear interrupt status even on error to prevent radio from getting stuck
             # Also restart RX mode to ensure we can receive next packet
             try:
-                loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
+                loranode.clearIrqStatus(SX126X_IRQ_ALL)
+                # loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
                 loranode.startReceive()  # Restart RX mode after error
             except:
                 pass
@@ -1314,7 +1317,6 @@ async def person_detection_loop():
 
     # Setup PIR sensor pin for interrupt
     # Get PIR pin from detect module
-    from detect import PIR_PIN
     # Configure IRQ on RISING edge (when PIR goes HIGH)
     PIR_PIN.irq(trigger=Pin.IRQ_RISING, handler=pir_interrupt_handler)
     logger.info(f"[PIR] Interrupt-driven detection initialized on pin {PIR_PIN}")
@@ -1556,7 +1558,6 @@ async def image_sending_loop():
 
             except Exception as e:
                 logger.error(f"[IMG] unexpected error processing image event {enc_filepath}: {e}, re-queued")
-                # import sys
                 # sys.print_exception(e)
 
                 # Re-queue image on error
@@ -1628,7 +1629,6 @@ async def event_text_sending_loop():
 
             except Exception as e:
                 logger.error(f"[TXT] unexpected error processing message event {epoch_ms}: {e}")
-                import sys
                 sys.print_exception(e)
                 # Re-queue event on error
                 events_to_send.append(event_entry)
@@ -1912,11 +1912,11 @@ async def radio_read():
             elif lora_rx_status == ERR_CRC_MISMATCH:
                 # Corrupted packet - log but don't process
                 # The radio detected a CRC error, but we still received the packet
-                logger.warning(f"[LORA] CRC error on received packet")
+                logger.warning(f"[LORA] CRC error on received packet, dropped this packet")
             else:
                 # Other error - log and continue
                 # This could be timeout, header error, etc.
-                logger.warning(f"[LORA] Receive error status: {lora_rx_status}")
+                logger.warning(f"[LORA] Receive error status: {lora_rx_status}, dropped this packet")
 
             # FIX: Clear received data immediately after queuing to prevent race conditions
             # This allows the interrupt callback to fire again quickly
@@ -1927,7 +1927,6 @@ async def radio_read():
             lora_rx_data = None
             lora_rx_status = None
             logger.error(f"[LORA] Exception in radio_read: {e}")
-            import sys
             sys.print_exception(e)
             await asyncio.sleep(0.1)  # Brief pause on error
 
@@ -1984,7 +1983,6 @@ async def process_packet_queue():
 
         except Exception as e:
             logger.error(f"[QUEUE] Error processing packet from queue: {e}")
-            import sys
             sys.print_exception(e)
             await asyncio.sleep(0.1)  # Brief pause on error
 
