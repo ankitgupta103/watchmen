@@ -84,6 +84,137 @@ MIDLEN = 7
 FLAKINESS = 0
 PACKET_PAYLOAD_LIMIT = 195 # bytes
 
+# ============================================================================
+# LORA RANGE TEST CONFIGURATION PARAMETERS
+# ============================================================================
+#
+# CURRENT CONFIGURATION: HIGHEST DATA RATE (Short Range, Fast)
+# - For MAXIMUM RANGE: Increase SF (7-12), Decrease BW (125-250), Increase Power (22)
+# - For BALANCED: SF=7, BW=125, CR=5, Power=22
+# - For MAXIMUM RANGE: SF=12, BW=125, CR=8, Power=22
+#
+# PARAMETER RANGES & EFFECTS:
+# ----------------------------------------------------------------------------
+# FREQUENCY (LORA_FREQ):
+#   - Range: 860.0 - 870.0 MHz (EU868 band)
+#   - Typical: 868.0 MHz
+#   - Effect: Lower frequency = slightly better range (minimal)
+#
+# BANDWIDTH (LORA_BW):
+#   - Options: 7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125, 250, 500 kHz
+#   - Current: 500.0 kHz (HIGHEST DATA RATE)
+#   - For Range: Use 125.0 kHz (better sensitivity, longer range)
+#   - Effect: Lower BW = better sensitivity = longer range, but slower
+#
+# SPREADING FACTOR (LORA_SF):
+#   - Range: 5-12 (SF5 to SF12)
+#   - Current: 5 (HIGHEST DATA RATE, shortest range)
+#   - For Range: Use 7-12 (higher = longer range, slower)
+#   - Effect: Higher SF = much longer range, much slower transmission
+#   - SF5: Fastest, shortest range (~1-2 km)
+#   - SF7: Fast, medium range (~2-5 km)
+#   - SF9: Medium speed, good range (~5-10 km)
+#   - SF12: Slowest, longest range (~10-20+ km)
+#
+# CODING RATE (LORA_CR):
+#   - Range: 5-8 (4/5, 4/6, 4/7, 4/8)
+#   - Current: 5 (4/5 - HIGHEST DATA RATE)
+#   - For Range: Use 6-8 (higher = better error correction, longer range)
+#   - Effect: Higher CR = better error correction = longer range, slower
+#
+# TRANSMISSION POWER (LORA_POWER):
+#   - Range: 2-22 dBm (SX1262 max is 22 dBm)
+#   - Current: 22 dBm (MAXIMUM POWER)
+#   - For Range: Keep at 22 dBm (maximum)
+#   - Effect: Higher power = longer range (but check local regulations)
+#
+# PREAMBLE LENGTH (LORA_PREAMBLE):
+#   - Range: 6-65535 symbols
+#   - Current: 8 (minimum for fast communication)
+#   - For Range: Use 8-12 (longer = better sync, slightly longer range)
+#   - Effect: Longer preamble = better packet detection = slightly longer range
+#
+# PACKET PAYLOAD LIMIT (PACKET_PAYLOAD_LIMIT):
+#   - Range: 51-255 bytes (depends on SF and BW)
+#   - Current: 195 bytes
+#   - Note: Lower SF allows larger packets, Higher SF reduces max packet size
+#   - SF5: ~242 bytes max, SF7: ~222 bytes, SF12: ~51 bytes
+#
+# TIMING PARAMETERS (affect reliability, not range):
+#   - MIN_SLEEP: Delay between packets (0.02s)
+#   - ACK_SLEEP: Wait time for ACK (0.2s)
+#   - CHUNK_SLEEP: Delay between chunks (0.04s)
+#   - Increase these if experiencing packet loss
+#
+# HARDWARE PARAMETERS (in init_lora() function):
+#   - currentLimit: 60.0 mA (typical: 60-140 mA)
+#   - tcxoVoltage: 1.6V (typical: 1.6-3.3V)
+#   - useRegulatorLDO: False (use DCDC for efficiency)
+#   - crcOn: True (enable CRC for error detection)
+#   - implicit: False (explicit header mode)
+#   - blocking: False (interrupt-driven mode)
+#
+# CONFIGURATIONS FOR TESTING:
+# ----------------------------------------------------------------------------
+# 1. MAXIMUM RANGE (Slow, Long Distance):
+#    LORA_FREQ = 868.0
+#    LORA_BW = 125.0
+#    LORA_SF = 12
+#    LORA_CR = 8
+#    LORA_POWER = 22
+#    LORA_PREAMBLE = 12
+#    PACKET_PAYLOAD_LIMIT = 51
+#
+# 2. BALANCED (Medium Speed, Good Range):
+#    LORA_FREQ = 868.0
+#    LORA_BW = 125.0
+#    LORA_SF = 7
+#    LORA_CR = 5
+#    LORA_POWER = 22
+#    LORA_PREAMBLE = 8
+#    PACKET_PAYLOAD_LIMIT = 222        
+#
+# 3. HIGH DATA RATE (Fast, Short Range) - CURRENT:
+#    LORA_FREQ = 868.0
+#    LORA_BW = 500.0
+#    LORA_SF = 5
+#    LORA_CR = 5
+#    LORA_POWER = 22
+#    LORA_PREAMBLE = 8
+#    PACKET_PAYLOAD_LIMIT = 195
+#
+# 4. OPTIMIZED FOR 800M-1KM RANGE (High Speed, Low Packet Loss):
+#    ============================================================
+#    Target: 800m to 1km range with maximum speed and minimal packet loss
+#    Strategy: Use SF7 with 125kHz BW for good sensitivity margin + error correction
+#    
+#    LORA_FREQ = 868.0
+#    LORA_BW = 125.0          # 125kHz provides better sensitivity than 250/500kHz
+#    LORA_SF = 7               # SF7: Fast speed, reliable for 1km+ range
+#    LORA_CR = 6               # CR 4/6: Good error correction without major speed penalty
+#    LORA_POWER = 22           # Maximum power for reliability margin
+#    LORA_PREAMBLE = 10        # Slightly longer preamble for better sync detection
+#    PACKET_PAYLOAD_LIMIT = 222 # SF7 allows up to ~222 bytes per packet
+#
+#    Why this configuration:
+#    - SF7 provides excellent range margin for 1km (typically works up to 2-5km)
+#    - 125kHz BW gives better receiver sensitivity than wider bandwidths
+#    - CR 4/6 adds error correction without significant speed reduction
+#    - Preamble 10 improves packet detection in noisy environments
+#    - Power 22dBm ensures strong signal even with obstacles/interference
+#    - Expected data rate: ~5.47 kbps (much faster than SF12, reliable for 1km)
+#    - Expected packet loss: <1% in good conditions, <5% in challenging conditions
+#
+#    Alternative (if SF7 still has issues, use SF8):
+#    LORA_SF = 8               # SF8: Slightly slower but more robust
+#    LORA_CR = 6               # Keep CR6 for error correction
+#    PACKET_PAYLOAD_LIMIT = 222 # SF8 also supports ~222 bytes
+#
+#    Timing adjustments for reliability (if needed):
+#    - Increase ACK_SLEEP to 0.3-0.4s if ACKs are missed
+#    - Increase CHUNK_SLEEP to 0.05-0.06s if chunks are lost
+# ============================================================================
+
 # LoRa Configuration (replacing AIR_SPEED)
 LORA_FREQ = 868.0          # Frequency in MHz
 LORA_BW = 500.0            # Bandwidth in kHz (500kHz for fast communication)
@@ -145,8 +276,8 @@ seen_neighbours = []
 # -----------------------------------▼▼▼▼▼-----------------------------------
 # --------- DEBUGGING ONLY ---- REMOVE BEFORE FINAL -------------------------
 
-COMMAN_CENTER_ADDRS = [219]
-IMAGE_CAPTURING_ADDRS = [221, 223] # [] empty means capture at all device, else on list of devices
+COMMAN_CENTER_ADDRS = [219, 222]
+IMAGE_CAPTURING_ADDRS = [221, 223, 222] # [] empty means capture at all device, else on list of devices
 IMAGE_LIMIT = 10 # 10 or None
 flayout = fakelayout.Layout()
 
@@ -174,7 +305,7 @@ elif uid ==  b'e076465dd7194025':
         shortest_path_to_cc = []
 # -------------------------------SETUP 2----------------------------------
 elif uid == b'e076465dd7193a09':
-    my_addr = 225
+    my_addr = 222
     if not DYNAMIC_SPATH:
         shortest_path_to_cc = [219]
 # elif uid == b'e076465dd7194211':
