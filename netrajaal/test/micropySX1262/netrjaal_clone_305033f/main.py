@@ -1001,14 +1001,37 @@ def recompile_msg(img_id):
     expected_chunks = entry[1]
     list_chunks = entry[2]
     try:
-        recompiled = b""
+        # recompiled = b""
+        # for i in range(expected_chunks):
+        #     chunk_data = get_data_for_chunk_id(list_chunks, i)
+        #     if chunk_data is None:
+        #         logger.error(f"[CHUNK] recompile_msg: missing chunk {i} for img_id={img_id}")
+        #         return None
+        #     recompiled += chunk_data
+        # return recompiled
+    
+        #------------ New Method ----------------
+        # Pre-calculate total size to avoid memory fragmentation from repeated += operations
+        # This prevents "memory allocation failed" errors after multiple images
+        total_size = 0
         for i in range(expected_chunks):
             chunk_data = get_data_for_chunk_id(list_chunks, i)
             if chunk_data is None:
                 logger.error(f"[CHUNK] recompile_msg: missing chunk {i} for img_id={img_id}")
                 return None
-            recompiled += chunk_data
-        return recompiled
+            total_size += len(chunk_data)
+        
+        # Pre-allocate bytearray with exact size needed (more memory-efficient than repeated +=)
+        recompiled = bytearray(total_size)
+        offset = 0
+        for i in range(expected_chunks):
+            chunk_data = get_data_for_chunk_id(list_chunks, i)
+            chunk_len = len(chunk_data)
+            recompiled[offset:offset + chunk_len] = chunk_data
+            offset += chunk_len
+        
+        # Convert to bytes (immutable)
+        return bytes(recompiled)
     except Exception as e:
         # Catch any other unexpected errors
         logger.error(f"[CHUNK] Exception in recompile_msg for {img_id}: {e}")
