@@ -27,8 +27,7 @@ import gc                   # garbage collection for memory management
 import enc
 from sx1262 import SX1262
 from _sx126x import ERR_NONE, ERR_CRC_MISMATCH, ERR_UNKNOWN, SX126X_IRQ_RX_DONE, SX126X_IRQ_TX_DONE, SX126X_SYNC_WORD_PRIVATE, SX126X_IRQ_ALL
-import gps_driver
-from cellular_driver import Cellular
+from tracx_driver import TracX
 import detect
 import fakelayout
 from detect import PIR_PIN
@@ -100,7 +99,7 @@ WIFI_SSID = "Airtel_anki_3363_2.4G"
 WIFI_PASSWORD = "air34854"
 WIFI_ENABLED = True
 
-cellular_system = None
+tracx_module = None
 wifi_nic = None
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
@@ -1001,37 +1000,14 @@ def recompile_msg(img_id):
     expected_chunks = entry[1]
     list_chunks = entry[2]
     try:
-        # recompiled = b""
-        # for i in range(expected_chunks):
-        #     chunk_data = get_data_for_chunk_id(list_chunks, i)
-        #     if chunk_data is None:
-        #         logger.error(f"[CHUNK] recompile_msg: missing chunk {i} for img_id={img_id}")
-        #         return None
-        #     recompiled += chunk_data
-        # return recompiled
-    
-        #------------ New Method ----------------
-        # Pre-calculate total size to avoid memory fragmentation from repeated += operations
-        # This prevents "memory allocation failed" errors after multiple images
-        total_size = 0
+        recompiled = b""
         for i in range(expected_chunks):
             chunk_data = get_data_for_chunk_id(list_chunks, i)
             if chunk_data is None:
                 logger.error(f"[CHUNK] recompile_msg: missing chunk {i} for img_id={img_id}")
                 return None
-            total_size += len(chunk_data)
-        
-        # Pre-allocate bytearray with exact size needed (more memory-efficient than repeated +=)
-        recompiled = bytearray(total_size)
-        offset = 0
-        for i in range(expected_chunks):
-            chunk_data = get_data_for_chunk_id(list_chunks, i)
-            chunk_len = len(chunk_data)
-            recompiled[offset:offset + chunk_len] = chunk_data
-            offset += chunk_len
-        
-        # Convert to bytes (immutable)
-        return bytes(recompiled)
+            recompiled += chunk_data
+        return recompiled
     except Exception as e:
         # Catch any other unexpected errors
         logger.error(f"[CHUNK] Exception in recompile_msg for {img_id}: {e}")
@@ -1100,28 +1076,28 @@ def end_chunk(msg_uid, msg):
 # Command Center Integration
 # ---------------------------------------------------------------------------
 
-async def init_sim():
-    # Input: None; Output: bool indicating cellular initialization success (updates cellular_system)
+async def init_tracx_internet():
+    # Input: None; Output: bool indicating cellular initialization success (updates tracx_module)
     """Initialize the cellular connection"""
-    global cellular_system
-    logger.info("\n[CELL] === Initializing Cellular System ===")
-    cellular_system = Cellular()
-    if not cellular_system.initialize():
-        logger.info("[CELL] Cellular initialization failed!")
+    global tracx_module
+    logger.info("\n[CELL] === Initializing TracX Module ===")
+    tracx_module = TracX()
+    if not tracx_module.initialize_internet():
+        logger.info("[CELL] TracX internet initialization failed!")
         return False
-    logger.info("[CELL] Cellular system ready")
+    logger.info("[CELL] TracX module ready")
     return True
 
 async def sim_upload_hb(heartbeat_data): # TODO will be replaced by sim_upload_payload later
     # Input: heartbeat_data: dict payload; Output: bool indicating upload success
     """Send heartbeat data via cellular (for command center)"""
-    global cellular_system
+    global tracx_module
 
-    if not cellular_system or not running_as_cc():
+    if not tracx_module or not running_as_cc():
         return False
 
     try:
-        result = cellular_system.upload_data(heartbeat_data, URL)
+        result = tracx_module.upload_data(heartbeat_data, URL)
         if result and result.get('status_code') == 200:
             node_id = heartbeat_data["machine_id"]
             logger.info(f"[HB] Heartbeat from node {node_id} sent to cloud successfully")
@@ -1142,13 +1118,13 @@ async def upload_payload_to_server(payload, msg_typ, creator): # FINAL
     if not running_as_cc():
         return False
 
-    if cellular_system:
+    if tracx_module:
         result = await sim_upload_payload(payload, msg_typ, creator)
         if result:
             return True
         logger.warning(f"msg_typ:{msg_typ} from node {creator} cellular upload failed, trying WiFi fallback...")
     else:
-        logger.warning(f"msg_typ:{msg_typ} from node {creator} cellular system not initialized, trying WiFi fallback...")
+        logger.warning(f"msg_typ:{msg_typ} from node {creator} TracX module not initialized, trying WiFi fallback...")
 
     if wifi_nic and wifi_nic.isconnected():
         result = await wifi_upload_payload(payload, msg_typ, creator)
@@ -1163,12 +1139,18 @@ async def upload_payload_to_server(payload, msg_typ, creator): # FINAL
 async def sim_upload_payload(payload, msg_typ, creator): # FINAL
     # Input: payload_dict: dict payload; Output: bool indicating upload success
     """Send payload data via cellular (for command center)"""
-    global cellular_system
-    if not cellular_system or not running_as_cc():
+    global tracx_module
+    if not tracx_module or not running_as_cc():
+        logger.warning(f"msg_typ:{msg_typ} from node {creator} - TracX module not available")
         return False
 
     try:
-        result = cellular_system.upload_data(payload, URL)
+        # Give a small yield to allow other tasks to complete (important for UART sharing)
+        await asyncio.sleep_ms(100)
+
+        logger.debug(f"msg_typ:{msg_typ} from node {creator} - Starting cellular upload...")
+        result = tracx_module.upload_data(payload, URL)
+
         if result and result.get('status_code') == 200:
             logger.info(f"msg_typ:{msg_typ} from node {creator} sent to cloud successfully")
             return True
@@ -1176,10 +1158,14 @@ async def sim_upload_payload(payload, msg_typ, creator): # FINAL
             logger.error(f"msg_typ:{msg_typ} from node {creator} failed to send to cloud via cellular")
             if result:
                 logger.info(f"HTTP Status: {result.get('status_code', 'Unknown')}")
+            else:
+                logger.error(f"msg_typ:{msg_typ} from node {creator} - upload_data returned None")
             return False
 
     except Exception as e:
         logger.error(f"msg_typ:{msg_typ} from node {creator} error sending to cloud via cellular: {e}")
+        import sys
+        sys.print_exception(e)
         return False
 
 async def wifi_upload_payload(payload, msg_typ, creator): # FINAL
@@ -2270,16 +2256,36 @@ async def print_summary_and_flush_logs():
 
 async def keep_updating_gps():
     # Input: None; Output: None (continuously reads GPS hardware and updates global state)
-    global gps_str, gps_last_time
+    global gps_str, gps_last_time, rtc, tracx_module
     logger.info("[GPS] Initializing GPS...")
 
-    # Wait for LoRa to settle
+    # Wait for LoRa to settle and TracX module to be initialized
     await asyncio.sleep(3)
 
+    # Wait for TracX module to be initialized (if running as CC)
+    max_wait = 30  # Wait up to 30 seconds for TracX initialization
+    wait_count = 0
+    while tracx_module is None and running_as_cc() and wait_count < max_wait:
+        await asyncio.sleep(1)
+        wait_count += 1
+
+    if tracx_module is None:
+        if running_as_cc():
+            logger.error("[GPS] TracX module not initialized, GPS cannot start")
+        else:
+            # For unit nodes, create a separate instance if needed
+            logger.info("[GPS] Creating TracX instance for GPS (unit node)")
+            try:
+                tracx_module = TracX()
+            except Exception as e:
+                logger.error(f"[GPS] Failed to create TracX instance: {e}")
+                return
+        return
+
     try:
-        uart = gps_driver.SC16IS750(spi_bus=1, cs_pin="P3")
-        uart.init_gps()
-        gps = gps_driver.GPS(uart)
+        if not tracx_module.initialize_gps():
+            logger.info("[GPS] GPS initialization failed!")
+            return
         logger.info("[GPS] GPS hardware initialized successfully - starting continuous read loop")
     except Exception as e:
         logger.info(f"[GPS] GPS initialization failed: {e}")
@@ -2287,6 +2293,7 @@ async def keep_updating_gps():
 
     read_count = 0
     last_successful_read = 0
+    rtc_updated = False
 
     # Continuous reading loop
     while True:
@@ -2298,44 +2305,49 @@ async def keep_updating_gps():
                 await asyncio.sleep(GPS_WAIT_SEC * 2)
                 continue
 
-            # Clear any stale data in buffer first
-            stale_data = uart.read_data()
+            # Check if tracx_module is still available (might be None if reinitializing)
+            if tracx_module is None:
+                logger.warning("[GPS] TracX module is None, waiting...")
+                await asyncio.sleep(5)
+                continue
 
-            # Process fresh GPS data
-            gps.update()
+            # Query GPS location and time
+            lat, lon, time_str = tracx_module.get_gps_location()
 
-            if gps.has_fix():
-                lat, lon = gps.get_coordinates()
-                if lat is not None and lon is not None:
-                    gps_str = f"{lat:.6f},{lon:.6f}"
-                    logger.info(f"[GPS] {gps_str}")
-                    gps_last_time = time_msec()
-                    last_successful_read = read_count
-                else:
-                    if read_count % 10 == 1:
-                        logger.info("[GPS] GPS has fix but no coordinates")
+            if lat is not None and lon is not None and time_str is not None:
+                gps_str = f"{lat:.6f},{lon:.6f}"
+                logger.info(f"[GPS] {gps_str} Time: {time_str}")
+                gps_last_time = time_msec()
+                last_successful_read = read_count
+
+                # Update RTC with GPS time (local time) - only once when we get first fix
+                if not rtc_updated:
+                    try:
+                        time_components = tracx_module.get_gps_time_components(time_str)
+                        if time_components:
+                            rtc.datetime(time_components)
+                            logger.info(f"[GPS] RTC updated with GPS time: {time_str}")
+                            rtc_updated = True
+                    except Exception as e:
+                        logger.warning(f"[GPS] Failed to update RTC: {e}")
+
+                # Write GPS coordinates to file (for compatibility with read_gps_from_file)
+                try:
+                    with open("gps_coordinate.txt", "w") as f:
+                        f.write(f"{gps_str}\n")
+                        f.write(f"Updated:{gps_last_time}\n")
+                except Exception as e:
+                    logger.warning(f"[GPS] Failed to write GPS file: {e}")
             else:
                 if read_count % 20 == 1:
                     logger.info("[GPS] GPS has no fix")
-                    # Show raw data for debugging
-                    raw_debug = uart.read_data()
-                    if raw_debug:
-                        sample = raw_debug[:60].replace('\r', '\\r').replace('\n', '\\n')
-                        logger.info(f"[GPS] GPS raw: {sample}")
-
-            # Clear buffer periodically to prevent overflow
-            if read_count % 30 == 0:
-                while uart.read_data():  # Clear all buffered data
-                    pass
-                gps.buffer = ""  # Clear internal parser buffer
-                logger.info("[GPS] GPS buffer cleared")
 
             # Reinitialize if too many failures
             if last_successful_read > 0 and (read_count - last_successful_read) > 100:
                 logger.info("[GPS] GPS not working, reinitializing...")
                 try:
-                    uart.init_gps()
-                    gps = gps_driver.GPS(uart)
+                    if tracx_module is not None:
+                        tracx_module.initialize_gps()
                     await asyncio.sleep(2)
                     last_successful_read = read_count
                 except Exception as e:
@@ -2346,7 +2358,7 @@ async def keep_updating_gps():
             logger.error(f"[GPS] error in GPS read: {e}")
             await asyncio.sleep(2)
 
-        # Shorter sleep to prevent buffer overflow
+        # Wait before next query
         await asyncio.sleep(max(1, GPS_WAIT_SEC))  # At least 1 second
 
 # ---------------------------------------------------------------------------
@@ -2450,12 +2462,15 @@ async def main():
         if WIFI_ENABLED:
             await init_wifi()
 
-        # await init_sim()
+        # Initialize TracX module (cellular/GPS)
+        await init_tracx_internet()
         asyncio.create_task(neighbour_scan())
         await asyncio.sleep(2)
         asyncio.create_task(initiate_spath_pings()) # TODO enable for dynamic path
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
+        await asyncio.sleep(1)
+        asyncio.create_task(keep_updating_gps())
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
         else:
@@ -2468,7 +2483,7 @@ async def main():
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
-        #asyncio.create_task(keep_updating_gps())
+        asyncio.create_task(keep_updating_gps())
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
         else:
