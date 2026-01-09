@@ -1,5 +1,6 @@
 import os
 import gc
+import sys
 import utime
 
 import enc
@@ -63,7 +64,7 @@ def main():
     
     
     # input file
-    jpg_filepath = f"{MY_IMAGE_DIR}/221_1735689810000_raw.jpg"
+    jpg_filepath = f"{MY_IMAGE_DIR}/221_1735689732000_raw.jpg"
     # output file
     enc_filepath = f"{MY_IMAGE_DIR}/221_1735689810000_testing.enc"
     
@@ -74,7 +75,8 @@ def main():
         imgbytes = img.bytearray()
         print(f"DEBUG, [IMG] Captured image, size: {len(imgbytes)} bytes")
     except Exception as e:
-        print(f"ERROR, [IMG] Failed read raw image file: {e}")
+        print(f"ERROR, [IMG] Failed read raw image file:{jpg_filepath}, error: {e}")
+        sys.print_exception(e)
         return
         
     # Encrypt image immediately
@@ -90,6 +92,7 @@ def main():
         print(f"INFO, [IMG] Saved encrypted image: {enc_filepath}: encrypted size = {len(enc_msgbytes)} bytes")
     except Exception as e:
         print(f"ERROR, [IMG] Failed to save encrypted image: {e}")
+        sys.print_exception(e)
         return
     finally:
         # Explicitly clean up image objects

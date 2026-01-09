@@ -1,4 +1,5 @@
-from sx126x import *
+from _sx126x import *
+from sx126x import SX126X
 
 _SX126X_PA_CONFIG_SX1262 = const(0x00)
 
@@ -15,16 +16,14 @@ class SX1262(SX126X):
     PREAMBLE_DETECT_32 = SX126X_GFSK_PREAMBLE_DETECT_32
     STATUS = ERROR
 
-    def __init__(self, spi_bus, clk, mosi, miso, cs, irq, rst, gpio, spi_baudrate=2000000, spi_polarity=0, spi_phase=0, blocking=True, event_callback=None):
+    def __init__(self, spi_bus, clk, mosi, miso, cs, irq, rst, gpio, spi_baudrate=2000000, spi_polarity=0, spi_phase=0):
         super().__init__(spi_bus, clk, mosi, miso, cs, irq, rst, gpio, spi_baudrate, spi_polarity, spi_phase)
-        self.blocking = blocking
-        self.event_callback = event_callback
-        
+        self._callbackFunction = self._dummyFunction
 
     def begin(self, freq=434.0, bw=125.0, sf=9, cr=7, syncWord=SX126X_SYNC_WORD_PRIVATE,
               power=14, currentLimit=60.0, preambleLength=8, implicit=False, implicitLen=0xFF,
-              crcOn=True, txIq=False, rxIq=False, tcxoVoltage=1.6, useRegulatorLDO=False
-):
+              crcOn=True, txIq=False, rxIq=False, tcxoVoltage=1.6, useRegulatorLDO=False,
+              blocking=True):
         state = super().begin(bw, sf, cr, syncWord, currentLimit, preambleLength, tcxoVoltage, useRegulatorLDO, txIq, rxIq)
         ASSERT(state)
 
@@ -46,7 +45,7 @@ class SX1262(SX126X):
         state = super().fixPaClamping()
         ASSERT(state)
 
-        state = self._setBlockingCallback()
+        state = self.setBlockingCallback(blocking)
 
         return state
 
@@ -55,7 +54,8 @@ class SX1262(SX126X):
                  addrFilter=SX126X_GFSK_ADDRESS_FILT_OFF, addr=0x00, crcLength=2, crcInitial=0x1D0F, crcPolynomial=0x1021,
                  crcInverted=True, whiteningOn=True, whiteningInitial=0x0100,
                  fixedPacketLength=False, packetLength=0xFF, preambleDetectorLength=SX126X_GFSK_PREAMBLE_DETECT_16,
-                 tcxoVoltage=1.6, useRegulatorLDO=False):
+                 tcxoVoltage=1.6, useRegulatorLDO=False,
+                 blocking=True):
         state = super().beginFSK(br, freqDev, rxBw, currentLimit, preambleLength, dataShaping, preambleDetectorLength, tcxoVoltage, useRegulatorLDO)
         ASSERT(state)
 
@@ -93,7 +93,7 @@ class SX1262(SX126X):
         state = super().fixPaClamping()
         ASSERT(state)
 
-        state = self._setBlockingCallback()
+        state = self.setBlockingCallback(blocking)
 
         return state
 
@@ -155,22 +155,23 @@ class SX1262(SX126X):
         if not self.blocking:
             ASSERT(super().startReceive())
 
-    def _setBlockingCallback(self):
+    def setBlockingCallback(self, blocking, callback=None):
+        self.blocking = blocking
         if not self.blocking:
             state = super().startReceive()
             ASSERT(state)
-            if self.event_callback != None:
-                super().setDio1Action(self._rx_interrupt_handler)
+            if callback != None:
+                self._callbackFunction = callback
+                super().setDio1Action(self._onIRQ)
             else:
-                print(f"[INIT] No event_callback provided, clearing interrupt handler")
+                self._callbackFunction = self._dummyFunction
                 super().clearDio1Action()
-            print(f"[INIT] Non-blocking mode: started receive, state={state}")
             return state
         else:
             state = super().standby()
             ASSERT(state)
+            self._callbackFunction = self._dummyFunction
             super().clearDio1Action()
-            print(f"[INIT] Blocking mode: standby, state={state}")
             return state
 
     def recv(self, len=0, timeout_en=False, timeout_ms=0):
@@ -227,7 +228,6 @@ class SX1262(SX126X):
         state = ERR_NONE
 
         length = super().getPacketLength()
-        print(f"[RX] _readData called: packet_length={length}, requested_len={len_}")
 
         if len_ < length and len_ != 0:
             length = len_
@@ -237,22 +237,15 @@ class SX1262(SX126X):
 
         try:
             state = super().readData(data_mv, length)
-            print(f"[RX] readData completed: state={state}, actual_len={len(data)}, data_preview={data[:10] if len(data) > 10 else data}")
         except AssertionError as e:
             state = list(ERROR.keys())[list(ERROR.values()).index(str(e))]
-            print(f"[RX] readData exception: {e}, state={state}")
 
-        rx_state = super().startReceive()
-        if rx_state == ERR_NONE:
-            print(f"[RX] Restarted receive mode after reading packet")
-        else:
-            print(f"[RX] Failed to restart receive mode, state={rx_state}")
+        ASSERT(super().startReceive())
 
         if state == ERR_NONE or state == ERR_CRC_MISMATCH:
             return bytes(data), state
 
         else:
-            print(f"[RX] _readData returning empty due to state={state}")
             return b'', state
 
     def _startTransmit(self, data):
@@ -261,27 +254,14 @@ class SX1262(SX126X):
         else:
             return 0, ERR_INVALID_PACKET_TYPE
 
-        print(f"[TX] _startTransmit called: len={len(data)} bytes, data_preview={data[:10] if len(data) > 10 else data}")
         state = super().startTransmit(data, len(data))
-        if state == ERR_NONE:
-            print(f"[TX] startTransmit successful, waiting for TX_DONE interrupt...")
-        else:
-            print(f"[TX] startTransmit failed with status={state}")
         return len(data), state
 
+    def _dummyFunction(self, *args):
+        pass
 
-    def _rx_interrupt_handler(self, pin):
+    def _onIRQ(self, callback):
         events = self._events()
-        # Debug: Log interrupt events (convert to binary for readability)
-        events_bin = bin(events)
         if events & SX126X_IRQ_TX_DONE:
-            print(f"[IRQ] TX_DONE detected, events={events} ({events_bin}), switching to RX mode")
             super().startReceive()
-        if events & SX126X_IRQ_RX_DONE:
-            print(f"[IRQ] RX_DONE detected, events={events} ({events_bin})")
-        if events & SX126X_IRQ_CRC_ERR:
-            print(f"[IRQ] CRC_ERR detected, events={events} ({events_bin})")
-        if events & SX126X_IRQ_TIMEOUT:
-            print(f"[IRQ] TIMEOUT detected, events={events} ({events_bin})")
-        if self.event_callback:
-            self.event_callback(events)
+        self._callbackFunction(events)
