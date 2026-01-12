@@ -1,27 +1,14 @@
-"""
-OpenMV RT1062 WiFi Data Sender
-Connects to laptop WiFi hotspot and sends data via TCP socket
-"""
-
 import network
 import socket
 import time
-# from machine import Pin
 
-# WiFi Configuration - Update these with your laptop hotspot credentials
 WIFI_SSID = "A"
 WIFI_PASSWORD = "123456789"
 
-# Laptop IP address (usually the gateway IP of the hotspot)
-# Common hotspot IPs: 192.168.137.1, 192.168.43.1, 192.168.0.1
-LAPTOP_IP = "10.42.0.1"  # Your laptop's hotspot IP
-LAPTOP_PORT = 5000  # Port on which laptop server is listening
-
-# LED for status indication (if available)
-# led = Pin("LED", Pin.OUT)
+LAPTOP_IP = "10.42.0.1"     
+LAPTOP_PORT = 5000  
 
 def connect_wifi(ssid, password):
-    """Connect to WiFi network"""
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     wlan.connect(ssid, password)
@@ -47,7 +34,6 @@ def connect_wifi(ssid, password):
     return wlan
 
 def send_data(data, host, port):
-    """Send data to laptop via TCP socket"""
     try:
         # Create socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -85,25 +71,12 @@ def main():
         # Connect to WiFi
         wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD)
 
-        # Blink LED to indicate connection
-        # for _ in range(3):
-        #     led.on()
-        #     time.sleep(0.2)
-        #     led.off()
-        #     time.sleep(0.2)
-
-        # Example: Send data periodically
         counter = 0
         while True:
-            # Create sample data (replace with your actual data)
             timestamp = time.ticks_ms()
             data = f"Data packet #{counter}, Timestamp: {timestamp}, Status: OK\n"
 
-            # Send data
             send_data(data, LAPTOP_IP, LAPTOP_PORT)
-            #     led.on()  # Indicate successful send
-            #     time.sleep(0.1)
-            #     led.off()
 
             counter += 1
             time.sleep(2)  # Send every 2 seconds
