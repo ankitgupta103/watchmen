@@ -26,8 +26,10 @@ import gc                   # garbage collection for memory management
 
 import enc
 from sx1262 import SX1262
-from _sx126x import ERR_NONE, ERR_CRC_MISMATCH, ERR_UNKNOWN, SX126X_IRQ_RX_DONE, SX126X_IRQ_TX_DONE, SX126X_SYNC_WORD_PRIVATE, SX126X_IRQ_ALL
 from tracx_driver import TracX
+from _sx126x import ERR_NONE, ERR_CRC_MISMATCH, ERR_UNKNOWN, SX126X_IRQ_CRC_ERR, SX126X_IRQ_HEADER_ERR, SX126X_IRQ_RX_DONE, SX126X_IRQ_TIMEOUT, SX126X_IRQ_TX_DONE, SX126X_SYNC_WORD_PRIVATE, SX126X_IRQ_ALL
+import gps_driver
+from cellular_driver import Cellular
 import detect
 import fakelayout
 from detect import PIR_PIN
@@ -712,33 +714,57 @@ def lora_event_callback(events):
                 lora_rx_status = status
                 # Signal async task to process the packet
                 lora_rx_event.set()
-            else:
-                # Previous packet not processed yet - log warning
-                # In high-traffic scenarios, you might want to implement a packet queue here
-                logger.warning(f"[LORA] Interrupt fired but previous packet not processed yet - packet may be lost")
-                # Still restart RX mode for next packet to prevent missing future packets
-                # The recv() call above already restarts RX, but we ensure it here as well
+            else: # Previous packet not processed yet - log warning
+                logger.warning(f"[LORA] Interrupt fired but previous packet not processed yet - this packet is skipped")
+            
             try:
-                loranode.clearIrqStatus(SX126X_IRQ_ALL)
-                # loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
+                loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
                 loranode.startReceive()
             except:
                 pass
         except Exception as e:
             logger.error(f"[LORA] Error reading packet in interrupt callback: {e}")
-            # FIX: Clear interrupt status even on error to prevent radio from getting stuck
-            # Also restart RX mode to ensure we can receive next packet
             try:
                 loranode.clearIrqStatus(SX126X_IRQ_ALL)
-                # loranode.clearIrqStatus(SX126X_IRQ_RX_DONE)
                 loranode.startReceive()  # Restart RX mode after error
             except:
                 pass
+            
             # Only set error status if event is not already set (race condition protection)
             if not lora_rx_event.is_set():
                 lora_rx_data = None
                 lora_rx_status = ERR_UNKNOWN
                 lora_rx_event.set()
+    elif events & (SX126X_IRQ_CRC_ERR | SX126X_IRQ_HEADER_ERR):
+        try:
+            msg, status = loranode.recv(len=0)
+            try:
+                loranode.clearIrqStatus(SX126X_IRQ_CRC_ERR | SX126X_IRQ_HEADER_ERR)
+            except:
+                pass
+            loranode.startReceive()
+            if not lora_rx_event.is_set():
+                lora_rx_data = None
+                lora_rx_status = ERR_CRC_MISMATCH
+                lora_rx_event.set()
+        except Exception as e:
+            logger.error(f"[LORA] Error handling CRC/Header error in interrupt callback: {e}")
+            try:
+                loranode.clearIrqStatus(SX126X_IRQ_ALL)
+                loranode.startReceive()
+            except:
+                pass
+    elif events & SX126X_IRQ_TIMEOUT:
+        try:
+            loranode.clearIrqStatus(SX126X_IRQ_TIMEOUT)
+            loranode.startReceive()  # Restart RX mode after timeout
+        except Exception as e:
+            logger.error(f"[LORA] Error handling timeout in interrupt callback: {e}")
+            try:
+                loranode.clearIrqStatus(SX126X_IRQ_ALL)
+                loranode.startReceive()
+            except:
+                pass
     elif events & SX126X_IRQ_TX_DONE:
         # Transmission complete - radio automatically returns to RX mode
         # FIX: Clear TX interrupt status to prevent interrupt register from filling up
@@ -746,6 +772,14 @@ def lora_event_callback(events):
             loranode.clearIrqStatus(SX126X_IRQ_TX_DONE)
         except:
             pass
+    else:
+        logger.warning(f"[LORA] Unknown interrupt event: {events}, resetting status, receive mode...")
+        try:
+            loranode.clearIrqStatus(SX126X_IRQ_ALL)
+            loranode.startReceive()
+        except:
+            pass
+        
 
 def is_lora_ready():
     # Input: None; Output: bool indicating if LoRa is ready to send
