@@ -28,8 +28,6 @@ import enc
 from sx1262 import SX1262
 from tracx_driver import TracX
 from _sx126x import ERR_NONE, ERR_CRC_MISMATCH, ERR_UNKNOWN, SX126X_IRQ_CRC_ERR, SX126X_IRQ_HEADER_ERR, SX126X_IRQ_RX_DONE, SX126X_IRQ_TIMEOUT, SX126X_IRQ_TX_DONE, SX126X_SYNC_WORD_PRIVATE, SX126X_IRQ_ALL
-import gps_driver
-from cellular_driver import Cellular
 import detect
 import fakelayout
 from detect import PIR_PIN
