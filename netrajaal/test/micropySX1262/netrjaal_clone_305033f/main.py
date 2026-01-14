@@ -2626,14 +2626,14 @@ async def main():
             await init_wifi()
 
         # Initialize TracX module (cellular/GPS)
-        await init_tracx_internet()
+        # await init_tracx_internet()
         asyncio.create_task(neighbour_scan())
         await asyncio.sleep(2)
         asyncio.create_task(initiate_spath_pings()) # TODO enable for dynamic path
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(1)
-        asyncio.create_task(keep_updating_gps())
+        # asyncio.create_task(keep_updating_gps())
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
         else:
@@ -2646,7 +2646,7 @@ async def main():
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
-        asyncio.create_task(keep_updating_gps())
+        # asyncio.create_task(keep_updating_gps())
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
         else:
