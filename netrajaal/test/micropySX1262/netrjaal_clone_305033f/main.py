@@ -278,7 +278,7 @@ seen_neighbours = []
 
 COMMAN_CENTER_ADDRS = [219, 222]
 IMAGE_CAPTURING_ADDRS = [221, 223, 222] # [] empty means capture at all device, else on list of devices
-IMAGE_LIMIT = 10 # 10 or None
+IMAGE_LIMIT = 50 # 10 or None
 flayout = fakelayout.Layout()
 
 rtc = machine.RTC()
@@ -816,22 +816,107 @@ def cleanup_old_recd_messages():
 def cleanup_chunk_map():
     """Clean up old/incomplete chunk entries"""
     global chunk_map
-    if len(chunk_map) > MAX_CHUNK_MAP_SIZE:
-        # Remove oldest entries (FIFO)
-        # Note: Python dicts maintain insertion order (Python 3.7+)
-        entries_to_remove = len(chunk_map) - MAX_CHUNK_MAP_SIZE
-        keys_to_remove = list(chunk_map.keys())[:entries_to_remove]
-        for key in keys_to_remove:
-            chunk_map.pop(key)
-        logger.info(f"[MEM] Cleaned {entries_to_remove} old chunk_map entries")
+    current_epoch_ms = get_epoch_ms()
+    age_threshold_ms = 5 * 60 * 1000  # 5 minutes in milliseconds
+    keys_to_remove_by_age = []
+    
+    try:
+        # First pass: Find entries older than 5 minutes
+        for img_id, img_entry in chunk_map.items():
+            if len(img_entry) > 0:
+                entry_epoch_ms = img_entry[0]  # epoch_ms is at index 0
+                age_ms = current_epoch_ms - entry_epoch_ms
+                if age_ms > age_threshold_ms:
+                    keys_to_remove_by_age.append(img_id)
+        
+        # Remove old entries with efficient cleanup (same pattern as cleanup_chunk_map_by_msg_id)
+        for img_id in keys_to_remove_by_age:
+            img_entry = chunk_map.pop(img_id)
+            # Explicitly clear chunk data to free memory
+            if len(img_entry) > 2 and isinstance(img_entry[2], list):
+                chunk_list = img_entry[2]  # List of tuples: [(chunk_id, chunk_data), ...]
+                chunk_list.clear()  # Clear removes references to tuples/their bytes obj
+                del chunk_list
+            del img_entry
+        
+        if keys_to_remove_by_age:
+            logger.info(f"[MEM] Cleaned {len(keys_to_remove_by_age)} chunk_map entries older than 5 minutes")
+            gc.collect()  # Force GC after removing old entries
+    except Exception as e:
+        logger.error(f"[MEM] Error in cleanup_chunk_map: {e}")
+    
+    try:
+        # Second pass: If still over size limit, remove oldest entries by epoch_ms with efficient cleanup
+        if len(chunk_map) > MAX_CHUNK_MAP_SIZE:
+            # Sort entries by epoch_ms (oldest first) to find truly oldest entries
+            entries_to_remove = len(chunk_map) - MAX_CHUNK_MAP_SIZE
+            # Create list of (epoch_ms, img_id) tuples and sort by epoch_ms
+            entries_with_time = []
+            for img_id, img_entry in chunk_map.items():
+                if len(img_entry) > 0:
+                    entry_epoch_ms = img_entry[0]  # epoch_ms is at index 0
+                    entries_with_time.append((entry_epoch_ms, img_id))
+            # Sort by epoch_ms (oldest first) and get the img_ids to remove
+            entries_with_time.sort(key=lambda x: x[0])  # Sort by epoch_ms
+            keys_to_remove = [img_id for _, img_id in entries_with_time[:entries_to_remove]]
+            for img_id in keys_to_remove:
+                img_entry = chunk_map.pop(img_id)
+                # Explicitly clear chunk data to free memory
+                if len(img_entry) > 2 and isinstance(img_entry[2], list):
+                    chunk_list = img_entry[2]
+                    chunk_list.clear()
+                    del chunk_list
+                del img_entry
+            logger.info(f"[MEM] Cleaned {entries_to_remove} old chunk_map entries (size limit)")
+            gc.collect()  # Force GC after removing size-based entries
+    except Exception as e:
+        logger.error(f"[MEM] Error in cleanup_chunk_map 2: {e}")
+
+# def cleanup_chunk_map_by_msg_id(img_id):
+#     """Clean up old/incomplete chunk entries (DEPRECATED: use cleanup_chunk_map_by_msg_id2 instead)
+#     This function is less efficient - it doesn't explicitly clear memory or force GC.
+#     Use cleanup_chunk_map_by_msg_id2() for better memory management.
+#     """
+#     global chunk_map
+#     if img_id in chunk_map:  # Fixed: use direct lookup instead of .keys()
+#         chunk_map.pop(img_id)
+#         logger.info(f"[MEM] Cleaned chunks from chun_map for img_id:{img_id}")
+#     else:
+#         logger.warning(f"[CHUNK] couldn't find {img_id} in chunk_map to cleanup")
 
 def cleanup_chunk_map_by_msg_id(img_id):
-    """Clean up old/incomplete chunk entries"""
+    """Clean up chunk map entry and explicitly free memory from heap
+    
+    Structure: chunk_map[img_id] = [epoch_ms, numchunks, [(chunk_id, chunk_data), ...]]
+    This function explicitly clears all references and forces GC to free heap memory.
+    """
     global chunk_map
-    if img_id in chunk_map.keys():
-        chunk_map.pop(img_id)
-        logger.info(f"[MEM] Cleaned chunks from chun_map for img_id:{img_id}")
+    if img_id in chunk_map:
+        img_entry = chunk_map.pop(img_id)
+        if len(img_entry) > 2 and isinstance(img_entry[2], list):
+            chunk_list = img_entry[2]  # List of tuples: [(chunk_id, chunk_data), ...]            
+            chunk_list.clear() # Clear removes references to tuples/thier bytes obj, bytes will be freed when GC runs 
+            del chunk_list
+        del img_entry
+        gc.collect() # Force garbage collection to reclaim memory, critical in MicroPython to free the bytes
+        logger.info(f"[MEM] Cleaned chunks from chunk_map for img_id:{img_id} (freed heap memory via GC)")
+    else:
+        logger.warning(f"[CHUNK] couldn't find {img_id} in chunk_map to cleanup")
 
+
+# def clear_chunkid(img_id):
+#     # Input: img_id: str chunk identifier; Output: None (removes chunk tracking entry)
+#     if img_id in chunk_map:
+#         img_entry = chunk_map.pop(img_id)
+#         # Explicitly delete chunk data to free memory
+#         if len(img_entry) > 2 and isinstance(img_entry[2], list):
+#             for _, chunk_data in img_entry[2]:
+#                 del chunk_data
+#         del img_entry
+#         gc.collect()  # Help GC reclaim memory immediately
+#     else:
+#         logger.warning(f"[CHUNK] couldn't find {img_id} in {chunk_map}")
+        
 
 async def periodic_memory_cleanup():
     """Periodically clean up memory buffers and run garbage collection"""
@@ -1083,12 +1168,13 @@ def begin_chunk(msg):
         logger.error(f"[CHUNK] begin message unparsable {msg}")
         return
     img_id = parts[0]
-    epoch_ms = int(parts[1])
+    # epoch_ms = int(parts[1])
+    epoch_ms = get_epoch_ms()
     numchunks = int(parts[2])
     if img_id not in chunk_map:
-        chunk_map[img_id] = ["B", numchunks, []]
+        chunk_map[img_id] = [epoch_ms, numchunks, []]
         logger.info(f"[IMG RX] Initialized chunk_map for img_id={img_id}, expected_chunks={numchunks}")
-    return (img_id, epoch_ms, numchunks)
+    return (img_id, numchunks)
 
 
 def get_missing_chunks(img_id):
@@ -1096,9 +1182,9 @@ def get_missing_chunks(img_id):
     if img_id not in chunk_map:
         logger.warning(f"[CHUNK] get_missing_chunks: no entry for img_id={img_id}")
         return []
-    entry = chunk_map[img_id]
-    expected_chunks = entry[1]
-    list_chunks = entry[2]
+    img_entry = chunk_map[img_id]
+    expected_chunks = img_entry[1]
+    list_chunks = img_entry[2]
     missing_chunks = []
     for i in range(expected_chunks):
         if not get_data_for_chunk_id(list_chunks, i):
@@ -1119,7 +1205,9 @@ def add_chunk(msgbytes):
             logger.error(f"[CHUNK] no entry yet for img_id={img_id}, chunk_index={chunk_id} (chunk may have arrived before B packet or chunk_map was cleared)")
             return
         # Check if chunk already exists (deduplicate)
-        img_chunk_list = chunk_map[img_id][2]
+        img_entry = chunk_map[img_id]
+        expected_chunks = img_entry[1]
+        img_chunk_list = img_entry[2]
         chunk_exists = False
         for idx, (stored_chunk_id, _) in enumerate(img_chunk_list):
             if stored_chunk_id == chunk_id: # OPTIONAL block
@@ -1131,8 +1219,6 @@ def add_chunk(msgbytes):
         if not chunk_exists: # Store new chunk
             chunk_map[img_id][2].append((chunk_id, chunk_data))
 
-        entry = chunk_map[img_id]
-        expected_chunks = entry[1]
         missing = get_missing_chunks(img_id)
         received = expected_chunks - len(missing)
         # Log progress every 20 chunks or when complete for debugging
@@ -1159,9 +1245,9 @@ def recompile_msg(img_id):
     # Force garbage collection before allocating memory for full image
     gc.collect()
 
-    entry = chunk_map[img_id]
-    expected_chunks = entry[1]
-    list_chunks = entry[2]
+    img_entry = chunk_map[img_id]
+    expected_chunks = img_entry[1]
+    list_chunks = img_entry[2]
     try:
         recompiled = b""
         for i in range(expected_chunks):
@@ -1176,18 +1262,6 @@ def recompile_msg(img_id):
         logger.error(f"[CHUNK] Exception in recompile_msg for {img_id}: {e}")
         return None
 
-def clear_chunkid(img_id):
-    # Input: img_id: str chunk identifier; Output: None (removes chunk tracking entry)
-    if img_id in chunk_map:
-        entry = chunk_map.pop(img_id)
-        # Explicitly delete chunk data to free memory
-        if len(entry) > 2 and isinstance(entry[2], list):
-            for _, chunk_data in entry[2]:
-                del chunk_data
-        del entry
-        gc.collect()  # Help GC reclaim memory immediately
-    else:
-        logger.warning(f"[CHUNK] couldn't find {img_id} in {chunk_map}")
 
 # Note only sends as many as wouldnt go beyond frame size
 # Assumption is that subsequent end chunks would get the rest
@@ -1205,9 +1279,9 @@ def end_chunk(msg_uid, msg):
         logger.warning(f"[CHUNK] end_chunk: no entry for img_id={img_id}, cannot determine missing chunks")
         return (False, "0", img_id, None, epoch_ms) # TODO check for "0"
 
-    entry = chunk_map[img_id]
-    expected_chunks = entry[1]
-    chunk_list = entry[2]
+    img_entry = chunk_map[img_id]
+    expected_chunks = img_entry[1]
+    chunk_list = img_entry[2]
     missing = get_missing_chunks(img_id)
     if len(missing) > 0:
         logger.info(f"[CHUNK] I am missing {len(missing)}/{expected_chunks} chunks: first 20 = {missing[:20]}, stored_chunks={len(chunk_list)}, unique_indices={len(set(c for c, _ in chunk_list))}")
@@ -1229,7 +1303,6 @@ def end_chunk(msg_uid, msg):
         recompiled_msgbytes = recompile_msg(img_id)
         # Clear chunks immediately after recompilation to free memory
         if recompiled_msgbytes:
-            clear_chunkid(img_id)
             return (True, None, img_id, recompiled_msgbytes, epoch_ms)
         else:
             logger.error(f"[CHUNK] Failed to recompile message for {img_id}")
@@ -1950,7 +2023,7 @@ def process_message(data, rssi=None):
         asyncio.create_task(device_busy_life(sender))
     elif msg_typ == "B": # TODO need to ignore duplicate images, and send some response in A itself
         try:
-            img_id, epoch_ms, numchunks = begin_chunk(msg.decode())
+            img_id, numchunks = begin_chunk(msg.decode())
             # Check if this is a duplicate B packet for the same transfer
             if check_transmode_lock(sender, img_id):
                 # Same sender and img_id - send ACK anyway (duplicate begin packet)
