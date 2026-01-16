@@ -37,6 +37,7 @@ from detect import PIR_PIN
 DYNAMIC_SPATH = False
 ENCRYPTION_ENABLED = True
 TESTING_MODE = True
+WIFI_ENABLED = False
 # -----------------------------------▲▲▲▲▲-----------------------------------
 
 
@@ -73,7 +74,7 @@ GPS_WAIT_SEC = 5
 # Memory Management Constants
 MAX_MSGS_RECD = 500          # Maximum messages in received buffer
 MAX_CHUNK_MAP_SIZE = 5      # Maximum chunk entries (chunk_id to chunks), ideally 1
-MAX_IMAGES_TO_SEND = 50 if TESTING_MODE else None     # Maximum images to capture
+MAX_IMAGES_TO_SEND = 25 if TESTING_MODE else None     # Maximum images to capture
 
 MAX_AGE_MSG_RCD_SEC = 20   # 20 sec, after 20 sec messages will be removed
 MAX_AGE_FILE_CHUNK_SEC = 100 # 100 sec, after 100 sec chunks will be removed
@@ -228,7 +229,6 @@ LORA_PREAMBLE = 8          # Preamble length
 # WiFi Configuration
 WIFI_SSID = "Airtel_anki_3363_2.4G"
 WIFI_PASSWORD = "air34854"
-WIFI_ENABLED = True
 
 tracx_module = None
 wifi_nic = None
@@ -2520,7 +2520,6 @@ async def keep_updating_gps():
             except Exception as e:
                 logger.error(f"[GPS] Failed to create TracX instance: {e}")
                 return
-        return
 
     try:
         if not tracx_module.initialize_gps():
@@ -2694,7 +2693,6 @@ async def main():
     asyncio.create_task(validate_and_remove_neighbours())
     # Start memory management tasks
     asyncio.create_task(periodic_memory_cleanup())
-    # asyncio.create_task(print_summary_and_flush_logs())
     logger.info(f"[MEM] Memory management tasks started (free: {get_free_memory()/1024:.1f}KB)\n")
     if running_as_cc():
         logger.info(f"[INIT] ===> Starting command center node <===")
@@ -2703,14 +2701,14 @@ async def main():
             await init_wifi()
 
         # Initialize TracX module (cellular/GPS)
-        # await init_tracx_internet()
+        await init_tracx_internet()
         asyncio.create_task(neighbour_scan())
         await asyncio.sleep(2)
         asyncio.create_task(initiate_spath_pings()) # TODO enable for dynamic path
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(1)
-        # asyncio.create_task(keep_updating_gps())
+        asyncio.create_task(keep_updating_gps())
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
         else:
@@ -2723,7 +2721,7 @@ async def main():
         await asyncio.sleep(1)
         asyncio.create_task(keep_sending_heartbeat())
         await asyncio.sleep(2)
-        # asyncio.create_task(keep_updating_gps())
+        asyncio.create_task(keep_updating_gps())
         if len(IMAGE_CAPTURING_ADDRS)==0 or my_addr in IMAGE_CAPTURING_ADDRS:
             asyncio.create_task(person_detection_loop())
         else:
