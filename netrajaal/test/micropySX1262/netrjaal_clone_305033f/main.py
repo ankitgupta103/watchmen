@@ -73,7 +73,7 @@ GPS_WAIT_SEC = 5
 
 # Memory Management Constants
 MAX_MSGS_RECD = 500          # Maximum messages in received buffer
-MAX_CHUNK_MAP_SIZE = 5      # Maximum chunk entries (chunk_id to chunks), ideally 1
+MAX_CHUNK_MAP_SIZE = 2      # Maximum chunk entries (chunk_id to chunks), ideally 1
 MAX_IMAGES_TO_SEND = 25 if TESTING_MODE else None     # Maximum images to capture
 
 MAX_AGE_MSG_RCD_SEC = 20   # 20 sec, after 20 sec messages will be removed
@@ -308,10 +308,10 @@ elif uid == b'e076465dd7193a09':
     my_addr = 222
     if not DYNAMIC_SPATH:
         shortest_path_to_cc = [219]
-# elif uid == b'e076465dd7194211':
-#     my_addr = 225
-#     if not DYNAMIC_SPATH:
-#         shortest_path_to_cc = [219]
+elif uid == b'e076465dd7194211':
+    my_addr = 221
+    if not DYNAMIC_SPATH:
+        shortest_path_to_cc = [219]
 else:
     logger.error("error in main.py: Unknown device ID for " + omv.board_id())
     sys.exit()
