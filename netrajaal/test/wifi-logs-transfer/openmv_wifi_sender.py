@@ -31,7 +31,8 @@ def connect_wifi(ssid, password):
         time.sleep(1)
 
     if wlan.status() != 3:
-        raise RuntimeError("WiFi connection failed")
+        print(f"WiFi connection failed. Status: {wlan.status()}")
+        return None
 
     print("WiFi connected!")
     print("IP address:", wlan.ifconfig()[0])
@@ -216,7 +217,13 @@ def main():
         sensor.skip_frames(time=2000)  # Let camera adjust
         print("Camera initialized")
 
-        wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD)
+        # Keep trying to connect to WiFi
+        wlan = None
+        while wlan is None:
+            wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD)
+            if wlan is None:
+                print("WiFi connection failed. Retrying in 5 seconds...")
+                time.sleep(5)
 
         # Keep trying to establish initial connection
         sock = None
